@@ -268,7 +268,7 @@ export const footerLinks = {
   ],
   contact: {
     location: 'Hyderabad, India',
-    email: 'pranavith@gmail.com',
+    email: 'info@pranvithdop.com',
     phone: '+91 9059867883',
   },
 };
