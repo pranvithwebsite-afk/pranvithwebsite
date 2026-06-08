@@ -48,7 +48,13 @@ const TransformVision = () => {
                     <span className="font-semibold">bb_edits00</span>
                   </div>
                   <div className="flex items-center gap-3 mb-3">
-                    <div className="w-14 h-14 rounded-full bg-gradient-to-br from-orange-500 to-rose-500 flex items-center justify-center text-base font-bold">BB</div>
+                    <div className="w-14 h-14 rounded-full overflow-hidden bg-gradient-to-br from-orange-500 to-rose-500">
+                      <img
+                        src="https://customer-assets.emergentagent.com/job_bb-redesign/artifacts/n2h83zkv_IMG_7675.PNG"
+                        alt="PranavithDOP"
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
                     <div className="flex-1">
                       <div className="flex justify-between text-center">
                         <div>

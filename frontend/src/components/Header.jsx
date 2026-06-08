@@ -22,8 +22,12 @@ const Header = () => {
         }`}
       >
         <Link to="/" className="flex items-center gap-2 shrink-0">
-          <div className="w-9 h-9 rounded-full overflow-hidden ring-2 ring-violet-500/40 bg-gradient-to-br from-rose-500 to-orange-500 flex items-center justify-center">
-            <span className="text-white text-sm font-bold">PD</span>
+          <div className="w-9 h-9 rounded-full overflow-hidden ring-2 ring-violet-500/40 bg-gradient-to-br from-rose-500 to-orange-500">
+            <img
+              src="https://customer-assets.emergentagent.com/job_bb-redesign/artifacts/n2h83zkv_IMG_7675.PNG"
+              alt="PranavithDOP"
+              className="w-full h-full object-cover"
+            />
           </div>
           <span className="text-white font-bold text-lg tracking-tight">PranavithDOP</span>
         </Link>
