@@ -3,6 +3,7 @@ from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 import os
+import asyncio
 import logging
 from pathlib import Path
 from pydantic import BaseModel, Field, ConfigDict, EmailStr
@@ -175,8 +176,8 @@ app.add_middleware(
 )
 
 
-@app.on_event("startup")
-async def seed_db():
+async def _seed_db():
+    """Run seed in background so startup is non-blocking on Atlas."""
     try:
         # Seed courses
         if await db.courses.count_documents({}) == 0:
@@ -193,10 +194,19 @@ async def seed_db():
             for i, f in enumerate(FAQS):
                 await db.faqs.insert_one({**f, "order": i})
             logger.info("Seeded %d faqs", len(FAQS))
-        # Ensure index on subscribers email
-        await db.subscribers.create_index("email", unique=True)
+        # Ensure index on subscribers email (best-effort, ignore errors)
+        try:
+            await db.subscribers.create_index("email", unique=True)
+        except Exception as ie:
+            logger.warning("subscribers index skipped: %s", ie)
     except Exception as e:
         logger.exception("Seed failed: %s", e)
+
+
+@app.on_event("startup")
+async def on_startup():
+    # Fire-and-forget so startup completes immediately and readiness probes pass.
+    asyncio.create_task(_seed_db())
 
 
 @app.on_event("shutdown")
