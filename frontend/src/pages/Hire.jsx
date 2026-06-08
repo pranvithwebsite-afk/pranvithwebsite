@@ -3,6 +3,7 @@ import Header from '../components/Header';
 import Footer from '../components/Footer';
 import { CheckCircle2, Send } from 'lucide-react';
 import { toast } from 'sonner';
+import { submitHireRequest } from '../lib/api';
 
 const benefits = [
   'Vetted, course-trained video editors',
@@ -14,15 +15,25 @@ const benefits = [
 
 const Hire = () => {
   const [form, setForm] = useState({ name: '', email: '', requirement: '' });
+  const [busy, setBusy] = useState(false);
 
-  const submit = (e) => {
+  const submit = async (e) => {
     e.preventDefault();
     if (!form.name || !form.email || !form.requirement) {
       toast.error('Please fill all fields');
       return;
     }
-    toast.success('Request sent! Our team will reach out within 24 hours.');
-    setForm({ name: '', email: '', requirement: '' });
+    try {
+      setBusy(true);
+      const res = await submitHireRequest(form);
+      toast.success(res?.message || 'Request sent!');
+      setForm({ name: '', email: '', requirement: '' });
+    } catch (err) {
+      const msg = err?.response?.data?.detail || 'Failed to send. Try again.';
+      toast.error(typeof msg === 'string' ? msg : 'Failed to send request.');
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (

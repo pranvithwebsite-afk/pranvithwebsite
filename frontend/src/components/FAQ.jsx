@@ -1,9 +1,22 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Plus, Minus } from 'lucide-react';
-import { faqs } from '../data/mock';
+import { faqs as mockFaqs } from '../data/mock';
+import { fetchFAQs } from '../lib/api';
 
 const FAQ = () => {
+  const [faqs, setFaqs] = useState(mockFaqs);
   const [open, setOpen] = useState(0);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const data = await fetchFAQs();
+        if (Array.isArray(data) && data.length) setFaqs(data);
+      } catch (e) {
+        // fallback
+      }
+    })();
+  }, []);
 
   return (
     <section className="relative py-24">

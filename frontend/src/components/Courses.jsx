@@ -1,8 +1,25 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { ChevronRight, CheckCircle2 } from 'lucide-react';
-import { courses } from '../data/mock';
+import { courses as mockCourses } from '../data/mock';
+import { fetchCourses } from '../lib/api';
 
 const Courses = () => {
+  const [courses, setCourses] = useState(mockCourses);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const data = await fetchCourses();
+        if (Array.isArray(data) && data.length) setCourses(data);
+      } catch (e) {
+        // fallback to mock
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
+
   return (
     <section className="relative py-24">
       <div className="absolute inset-0 radial-purple-bottom pointer-events-none" />
@@ -22,7 +39,6 @@ const Courses = () => {
               key={c.id}
               className="group relative rounded-2xl overflow-hidden bg-[#0f0830]/50 border border-violet-500/15 hover:border-violet-500/40 transition-all duration-300 hover:-translate-y-1"
             >
-              {/* Image */}
               <div className="relative aspect-[16/10] overflow-hidden">
                 <img
                   src={c.image}
@@ -39,7 +55,6 @@ const Courses = () => {
                 </div>
               </div>
 
-              {/* Body */}
               <div className="p-6">
                 <h3 className="text-lg font-semibold text-white leading-snug mb-2 line-clamp-2">
                   {c.title}
@@ -65,6 +80,7 @@ const Courses = () => {
             </div>
           ))}
         </div>
+        {loading && <p className="text-center text-white/30 text-xs mt-6">Loading latest catalog...</p>}
       </div>
     </section>
   );

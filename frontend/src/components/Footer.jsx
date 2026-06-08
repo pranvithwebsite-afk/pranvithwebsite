@@ -3,18 +3,29 @@ import { Link } from 'react-router-dom';
 import { MapPin, Mail, Phone, Youtube, Instagram } from 'lucide-react';
 import { footerLinks } from '../data/mock';
 import { toast } from 'sonner';
+import { subscribeNewsletter } from '../lib/api';
 
 const Footer = () => {
   const [email, setEmail] = useState('');
+  const [busy, setBusy] = useState(false);
 
-  const onSubscribe = (e) => {
+  const onSubscribe = async (e) => {
     e.preventDefault();
     if (!email || !email.includes('@')) {
       toast.error('Please enter a valid email');
       return;
     }
-    toast.success('Subscribed! Thanks for joining BBEdits.');
-    setEmail('');
+    try {
+      setBusy(true);
+      const res = await subscribeNewsletter(email);
+      toast.success(res?.message || 'Subscribed!');
+      setEmail('');
+    } catch (err) {
+      const msg = err?.response?.data?.detail || 'Subscription failed. Try again.';
+      toast.error(typeof msg === 'string' ? msg : 'Subscription failed.');
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (
@@ -85,9 +96,10 @@ const Footer = () => {
               />
               <button
                 type="submit"
-                className="w-full py-2.5 rounded-lg bg-violet-600 hover:bg-violet-500 transition-colors text-white text-sm font-semibold"
+                disabled={busy}
+                className="w-full py-2.5 rounded-lg bg-violet-600 hover:bg-violet-500 disabled:opacity-60 transition-colors text-white text-sm font-semibold"
               >
-                Subscribe
+                {busy ? 'Subscribing...' : 'Subscribe'}
               </button>
             </form>
           </div>

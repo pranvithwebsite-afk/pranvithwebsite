@@ -1,8 +1,22 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Star } from 'lucide-react';
-import { testimonials } from '../data/mock';
+import { testimonials as mockTestimonials } from '../data/mock';
+import { fetchTestimonials } from '../lib/api';
 
 const Testimonials = () => {
+  const [testimonials, setTestimonials] = useState(mockTestimonials);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const data = await fetchTestimonials();
+        if (Array.isArray(data) && data.length) setTestimonials(data);
+      } catch (e) {
+        // fallback
+      }
+    })();
+  }, []);
+
   const row1 = testimonials.slice(0, 5);
   const row2 = testimonials.slice(5);
   const all1 = [...row1, ...row1];
