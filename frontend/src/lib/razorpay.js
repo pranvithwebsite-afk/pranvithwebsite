@@ -63,7 +63,7 @@ export async function payWithRazorpay({ amountRupees, itemId, itemName, prefill 
       key: order.key_id || RAZORPAY_KEY_ID,
       amount: order.amount,
       currency: order.currency,
-      name: 'BBEdits',
+      name: 'PranavithDOP',
       description: itemName || 'Purchase',
       order_id: order.order_id,
       prefill,

@@ -42,7 +42,7 @@ COURSES = [
 
 TESTIMONIALS = [
     {"id": str(uuid.uuid4()), "name": "Priya Sharma", "role": "YouTuber", "text": "Best investment I made for my channel. The techniques are industry-standard.", "rating": 5},
-    {"id": str(uuid.uuid4()), "name": "Arun Patel", "role": "Freelancer", "text": "From zero to landing my first client. Anil explains everything so cleanly.", "rating": 5},
+    {"id": str(uuid.uuid4()), "name": "Arun Patel", "role": "Freelancer", "text": "From zero to landing my first client. Pranavith explains everything so cleanly.", "rating": 5},
     {"id": str(uuid.uuid4()), "name": "Sneha Reddy", "role": "Student", "text": "Booked my first wedding edit project within weeks of completing it.", "rating": 5},
     {"id": str(uuid.uuid4()), "name": "Vikram Singh", "role": "Wedding Editor", "text": "The AI editing module alone was worth the price. My clients love the results!", "rating": 5},
     {"id": str(uuid.uuid4()), "name": "Meera Krishnan", "role": "Instagram Creator", "text": "My reels quality improved drastically. Gained 50K followers in 2 months!", "rating": 5},
@@ -56,8 +56,8 @@ TESTIMONIALS = [
 FAQS = [
     {
         "id": str(uuid.uuid4()),
-        "q": "I can find free tutorials on YouTube. Why should I pay to join BBEdits?",
-        "a": "YouTube tutorials are scattered and lack structure. BBEdits provides a step-by-step roadmap, real projects, lifetime access, downloadable assets, community support, and direct mentorship from a professional editor \u2014 saving you months of trial and error.",
+        "q": "I can find free tutorials on YouTube. Why should I pay to join PranavithDOP?",
+        "a": "YouTube tutorials are scattered and lack structure. PranavithDOP provides a step-by-step roadmap, real projects, lifetime access, downloadable assets, community support, and direct mentorship from a professional editor \u2014 saving you months of trial and error.",
     },
     {
         "id": str(uuid.uuid4()),

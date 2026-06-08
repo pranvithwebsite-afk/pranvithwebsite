@@ -50,7 +50,7 @@ const Hire = () => {
             </h1>
             <p className="mt-6 text-white/70 leading-relaxed">
               Need a professional editor for your wedding, brand or YouTube channel? Tell us about your project
-              and we will match you with the right BBEdits-trained editor.
+              and we will match you with the right PranavithDOP-trained editor.
             </p>
             <ul className="mt-8 space-y-3">
               {benefits.map((b) => (

@@ -23,9 +23,9 @@ const Header = () => {
       >
         <Link to="/" className="flex items-center gap-2 shrink-0">
           <div className="w-9 h-9 rounded-full overflow-hidden ring-2 ring-violet-500/40 bg-gradient-to-br from-rose-500 to-orange-500 flex items-center justify-center">
-            <span className="text-white text-sm font-bold">BB</span>
+            <span className="text-white text-sm font-bold">PD</span>
           </div>
-          <span className="text-white font-bold text-lg tracking-tight">BBEdits</span>
+          <span className="text-white font-bold text-lg tracking-tight">PranavithDOP</span>
         </Link>
 
         <ul className="hidden md:flex items-center gap-1">

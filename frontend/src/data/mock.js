@@ -1,4 +1,4 @@
-// Mock data for BBEdits clone
+// Mock data for PranavithDOP clone
 
 export const assetProducts = [
   {
@@ -11,7 +11,7 @@ export const assetProducts = [
     isPaid: true,
     createdAt: '2025-08-01',
     bg: 'linear-gradient(135deg, #1e3a8a 0%, #0c1e4d 60%, #050b1f 100%)',
-    headline: 'BB EDITS',
+    headline: 'PRANAVITH',
     subhead: 'CINEMATIC LUT PACK 5',
   },
   {
@@ -223,7 +223,7 @@ export const ourWorks = [
 
 export const testimonials = [
   { name: 'Priya Sharma', role: 'YouTuber', text: 'Best investment I made for my channel. The techniques are industry-standard.', rating: 5 },
-  { name: 'Arun Patel', role: 'Freelancer', text: 'From zero to landing my first client. Anil explains everything so cleanly.', rating: 5 },
+  { name: 'Arun Patel', role: 'Freelancer', text: 'From zero to landing my first client. Pranavith explains everything so cleanly.', rating: 5 },
   { name: 'Sneha Reddy', role: 'Student', text: 'Booked my first wedding edit project within weeks of completing it.', rating: 5 },
   { name: 'Vikram Singh', role: 'Wedding Editor', text: 'The AI editing module alone was worth the price. My clients love the results!', rating: 5 },
   { name: 'Meera Krishnan', role: 'Instagram Creator', text: 'My reels quality improved drastically. Gained 50K followers in 2 months!', rating: 5 },
@@ -236,8 +236,8 @@ export const testimonials = [
 
 export const faqs = [
   {
-    q: 'I can find free tutorials on YouTube. Why should I pay to join BBEdits?',
-    a: "YouTube tutorials are scattered and lack structure. BBEdits provides a step-by-step roadmap, real projects, lifetime access, downloadable assets, community support, and direct mentorship from a professional editor — saving you months of trial and error.",
+    q: 'I can find free tutorials on YouTube. Why should I pay to join PranavithDOP?',
+    a: "YouTube tutorials are scattered and lack structure. PranavithDOP provides a step-by-step roadmap, real projects, lifetime access, downloadable assets, community support, and direct mentorship from a professional editor — saving you months of trial and error.",
   },
   {
     q: 'Is this course for absolute beginners, or do I need prior experience?',
@@ -267,8 +267,8 @@ export const footerLinks = {
     { name: 'FAQ', path: '/faq' },
   ],
   contact: {
-    location: 'Vizag, India',
-    email: 'support@bbedits.in',
-    phone: '+91 9110772715',
+    location: 'Hyderabad, India',
+    email: 'pranavith@gmail.com',
+    phone: '+91 9059867883',
   },
 };

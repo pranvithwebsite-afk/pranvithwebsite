@@ -67,7 +67,7 @@ const TransformVision = () => {
                     </div>
                   </div>
                   <div className="text-xs leading-tight">
-                    <div className="font-semibold">BB EDITS</div>
+                    <div className="font-semibold">PRANAVITH</div>
                     <div className="text-white/70">Video Editor &amp; Mentor</div>
                     <div className="text-white/70">MASTERY VIDEO EDITING COURSE</div>
                     <div className="text-violet-300 mt-1">t.me/bbedits</div>
