@@ -1,11 +1,14 @@
 import React, { useEffect, useState } from 'react';
-import { ChevronRight, CheckCircle2 } from 'lucide-react';
+import { ChevronRight, CheckCircle2, Loader2 } from 'lucide-react';
 import { courses as mockCourses } from '../data/mock';
 import { fetchCourses } from '../lib/api';
+import { payWithRazorpay } from '../lib/razorpay';
+import { toast } from 'sonner';
 
 const Courses = () => {
   const [courses, setCourses] = useState(mockCourses);
   const [loading, setLoading] = useState(true);
+  const [buyingId, setBuyingId] = useState(null);
 
   useEffect(() => {
     (async () => {
@@ -19,6 +22,26 @@ const Courses = () => {
       }
     })();
   }, []);
+
+  const handleBuy = async (course) => {
+    try {
+      setBuyingId(course.id);
+      const res = await payWithRazorpay({
+        amountRupees: course.price,
+        itemId: String(course.id),
+        itemName: course.title,
+      });
+      if (res.success) {
+        toast.success(`Enrolled! Payment ID: ${res.paymentId}`);
+      } else if (res.error === 'cancelled') {
+        toast.message('Payment cancelled');
+      } else {
+        toast.error(res.error || 'Payment failed');
+      }
+    } finally {
+      setBuyingId(null);
+    }
+  };
 
   return (
     <section className="relative py-24">
@@ -72,8 +95,13 @@ const Courses = () => {
                       <span className="ml-2 text-sm text-white/45 line-through">₹{c.original}</span>
                     )}
                   </div>
-                  <button className="w-10 h-10 rounded-full bg-violet-600 hover:bg-violet-500 flex items-center justify-center text-white transition">
-                    <ChevronRight size={18} />
+                  <button
+                    onClick={() => handleBuy(c)}
+                    disabled={buyingId === c.id}
+                    aria-label={`Buy ${c.title}`}
+                    className="w-10 h-10 rounded-full bg-violet-600 hover:bg-violet-500 disabled:opacity-60 flex items-center justify-center text-white transition"
+                  >
+                    {buyingId === c.id ? <Loader2 size={16} className="animate-spin" /> : <ChevronRight size={18} />}
                   </button>
                 </div>
               </div>

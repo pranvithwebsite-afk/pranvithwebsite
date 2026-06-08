@@ -101,3 +101,115 @@
 #====================================================================================================
 # Testing Data - Main Agent and testing sub agent both should log testing data below this section
 #====================================================================================================
+
+user_problem_statement: "Test the newly added Razorpay payment endpoints on the BBEdits backend"
+
+backend:
+  - task: "POST /api/create-order endpoint"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "Tested POST /api/create-order with valid request (amount: 29900, currency: INR, item_id: p2). Returns 200 with correct order_id (starts with 'order_'), amount (29900), currency (INR), key_id (starts with 'rzp_test_'), and receipt. All validations passed."
+      - working: true
+        agent: "testing"
+        comment: "Tested validation: Invalid amount below 100 paise correctly returns 422 (Pydantic validation error). Missing amount field correctly returns 422. All edge cases handled properly."
+
+  - task: "POST /api/verify-payment endpoint"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "Tested POST /api/verify-payment with invalid signature (deadbeef) - correctly returns 400 'Invalid payment signature'. Missing fields correctly return 422 validation error."
+      - working: true
+        agent: "testing"
+        comment: "Tested with correctly computed HMAC-SHA256 signature using RAZORPAY_KEY_SECRET on payload 'order_test123|pay_test123'. Returns 200 with success: true, message, razorpay_order_id, and razorpay_payment_id. Signature verification working correctly."
+
+  - task: "GET /api/ root endpoint"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "Regression test passed. GET /api/ returns 200 with message and status fields."
+
+  - task: "GET /api/courses endpoint"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "Regression test passed. GET /api/courses returns 200 with list of 3 courses as expected."
+
+  - task: "GET /api/testimonials endpoint"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "Regression test passed. GET /api/testimonials returns 200 with list of 10 testimonials as expected."
+
+  - task: "GET /api/faqs endpoint"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "Regression test passed. GET /api/faqs returns 200 with list of 5 FAQs as expected."
+
+frontend:
+  - task: "Frontend testing not requested"
+    implemented: false
+    working: "NA"
+    file: "N/A"
+    stuck_count: 0
+    priority: "low"
+    needs_retesting: false
+    status_history:
+      - working: "NA"
+        agent: "testing"
+        comment: "Frontend testing was not part of this review request. Only backend Razorpay endpoints were tested."
+
+metadata:
+  created_by: "testing_agent"
+  version: "1.0"
+  test_sequence: 1
+  run_ui: false
+
+test_plan:
+  current_focus:
+    - "POST /api/create-order endpoint"
+    - "POST /api/verify-payment endpoint"
+  stuck_tasks: []
+  test_all: false
+  test_priority: "high_first"
+
+agent_communication:
+  - agent: "testing"
+    message: "Completed comprehensive testing of Razorpay payment endpoints. All 7 tests passed successfully. Both new Razorpay endpoints (/api/create-order and /api/verify-payment) are working correctly with proper validation, error handling, and signature verification. All existing endpoints (root, courses, testimonials, faqs) continue to work correctly - no regressions detected."

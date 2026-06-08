@@ -4,12 +4,15 @@ from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 import os
 import asyncio
+import hmac
+import hashlib
 import logging
 from pathlib import Path
 from pydantic import BaseModel, Field, ConfigDict, EmailStr
 from typing import List, Optional
 import uuid
 from datetime import datetime, timezone
+import razorpay
 
 from seed_data import COURSES, TESTIMONIALS, FAQS
 
@@ -19,6 +22,16 @@ load_dotenv(ROOT_DIR / '.env')
 mongo_url = os.environ['MONGO_URL']
 client = AsyncIOMotorClient(mongo_url)
 db = client[os.environ['DB_NAME']]
+
+# Razorpay client (lazy / safe-init)
+RAZORPAY_KEY_ID = os.environ.get('RAZORPAY_KEY_ID', '')
+RAZORPAY_KEY_SECRET = os.environ.get('RAZORPAY_KEY_SECRET', '')
+razorpay_client = None
+if RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET:
+    try:
+        razorpay_client = razorpay.Client(auth=(RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET))
+    except Exception as _e:
+        razorpay_client = None
 
 app = FastAPI(title='BBEdits API')
 api_router = APIRouter(prefix="/api")
@@ -85,6 +98,24 @@ class Subscriber(BaseModel):
     created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
 
+class CreateOrderIn(BaseModel):
+    amount: int = Field(ge=100, description="Amount in paise (minimum 100)")
+    currency: str = Field(default="INR", min_length=3, max_length=3)
+    receipt: Optional[str] = None
+    item_id: Optional[str] = None
+    item_name: Optional[str] = None
+
+
+class VerifyPaymentIn(BaseModel):
+    razorpay_order_id: str
+    razorpay_payment_id: str
+    razorpay_signature: str
+    item_id: Optional[str] = None
+    item_name: Optional[str] = None
+    amount: Optional[int] = None
+    email: Optional[str] = None
+
+
 class StatusCheck(BaseModel):
     model_config = ConfigDict(extra="ignore")
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
@@ -144,6 +175,110 @@ async def subscribe(payload: SubscribeIn):
         logger.exception("subscribe insert failed")
         raise HTTPException(status_code=500, detail="Failed to subscribe")
     return {"id": sub.id, "success": True, "message": "Subscribed! Thanks for joining BBEdits."}
+
+
+# ---------- Razorpay ----------
+@api_router.post("/create-order")
+async def create_order(payload: CreateOrderIn):
+    if razorpay_client is None:
+        raise HTTPException(status_code=500, detail="Payment gateway not configured")
+    if payload.amount < 100:
+        raise HTTPException(status_code=400, detail="Amount must be at least 100 paise")
+
+    receipt = payload.receipt or f"rcpt_{uuid.uuid4().hex[:16]}"
+    try:
+        order = razorpay_client.order.create({
+            "amount": int(payload.amount),
+            "currency": payload.currency.upper(),
+            "receipt": receipt,
+            "payment_capture": 1,
+            "notes": {
+                "item_id": payload.item_id or "",
+                "item_name": payload.item_name or "",
+            },
+        })
+    except razorpay.errors.BadRequestError as e:
+        logger.exception("Razorpay bad request")
+        raise HTTPException(status_code=400, detail=str(e))
+    except razorpay.errors.ServerError as e:
+        logger.exception("Razorpay server error")
+        raise HTTPException(status_code=502, detail="Payment gateway error")
+    except Exception as e:
+        logger.exception("Razorpay order failure")
+        raise HTTPException(status_code=500, detail="Could not create order")
+
+    # Persist order record
+    try:
+        await db.orders.insert_one({
+            "id": str(uuid.uuid4()),
+            "razorpay_order_id": order.get("id"),
+            "amount": order.get("amount"),
+            "currency": order.get("currency"),
+            "receipt": receipt,
+            "item_id": payload.item_id,
+            "item_name": payload.item_name,
+            "status": "created",
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        })
+    except Exception:
+        logger.exception("orders insert failed (non-fatal)")
+
+    return {
+        "order_id": order.get("id"),
+        "amount": order.get("amount"),
+        "currency": order.get("currency"),
+        "key_id": RAZORPAY_KEY_ID,
+        "receipt": receipt,
+    }
+
+
+@api_router.post("/verify-payment")
+async def verify_payment(payload: VerifyPaymentIn):
+    if not (payload.razorpay_order_id and payload.razorpay_payment_id and payload.razorpay_signature):
+        raise HTTPException(status_code=400, detail="Missing payment fields")
+    if not RAZORPAY_KEY_SECRET:
+        raise HTTPException(status_code=500, detail="Payment gateway not configured")
+
+    message = f"{payload.razorpay_order_id}|{payload.razorpay_payment_id}".encode("utf-8")
+    expected_sig = hmac.new(
+        RAZORPAY_KEY_SECRET.encode("utf-8"),
+        message,
+        hashlib.sha256,
+    ).hexdigest()
+
+    if not hmac.compare_digest(expected_sig, payload.razorpay_signature):
+        # Record failed attempt (best-effort) but do not mark order paid
+        try:
+            await db.orders.update_one(
+                {"razorpay_order_id": payload.razorpay_order_id},
+                {"$set": {"status": "signature_mismatch",
+                          "razorpay_payment_id": payload.razorpay_payment_id,
+                          "verified_at": datetime.now(timezone.utc).isoformat()}},
+            )
+        except Exception:
+            pass
+        raise HTTPException(status_code=400, detail="Invalid payment signature")
+
+    # Signature valid -> mark as paid
+    try:
+        await db.orders.update_one(
+            {"razorpay_order_id": payload.razorpay_order_id},
+            {"$set": {
+                "status": "paid",
+                "razorpay_payment_id": payload.razorpay_payment_id,
+                "verified_at": datetime.now(timezone.utc).isoformat(),
+                "buyer_email": payload.email,
+            }},
+        )
+    except Exception:
+        logger.exception("orders update failed (non-fatal)")
+
+    return {
+        "success": True,
+        "message": "Payment verified successfully",
+        "razorpay_order_id": payload.razorpay_order_id,
+        "razorpay_payment_id": payload.razorpay_payment_id,
+    }
 
 
 # Legacy status endpoints (kept for compatibility)

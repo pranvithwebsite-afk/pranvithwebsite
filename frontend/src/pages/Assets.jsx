@@ -1,8 +1,10 @@
 import React, { useMemo, useState } from 'react';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
-import { Search } from 'lucide-react';
+import { Search, Loader2 } from 'lucide-react';
 import { assetProducts } from '../data/mock';
+import { payWithRazorpay } from '../lib/razorpay';
+import { toast } from 'sonner';
 
 const Assets = () => {
   const [query, setQuery] = useState('');
@@ -149,8 +151,35 @@ const RadioRow = ({ name, value, checked, onChange, label }) => (
   </label>
 );
 
-const ProductCard = ({ p }) => (
-  <div className="group rounded-2xl bg-[#0a0518]/80 border border-violet-500/15 hover:border-violet-500/40 transition-all duration-300 hover:-translate-y-1 overflow-hidden">
+const ProductCard = ({ p }) => {
+  const [busy, setBusy] = useState(false);
+
+  const onBuy = async () => {
+    if (p.isFree) {
+      toast.success(`${p.title} added to your downloads (free).`);
+      return;
+    }
+    try {
+      setBusy(true);
+      const res = await payWithRazorpay({
+        amountRupees: p.price,
+        itemId: p.id,
+        itemName: p.title,
+      });
+      if (res.success) {
+        toast.success(`Payment successful! Payment ID: ${res.paymentId}`);
+      } else if (res.error === 'cancelled') {
+        toast.message('Payment cancelled');
+      } else {
+        toast.error(res.error || 'Payment failed');
+      }
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+  <div className="group rounded-2xl bg-[#0a0518]/80 border border-violet-500/15 hover:border-violet-500/40 transition-all duration-300 hover:-translate-y-1 overflow-hidden flex flex-col">
     {/* Image area (faux product box) */}
     <div className="relative aspect-[4/5] overflow-hidden">
       <div
@@ -191,7 +220,7 @@ const ProductCard = ({ p }) => (
     </div>
 
     {/* Body */}
-    <div className="p-5">
+    <div className="p-5 flex-1 flex flex-col">
       <h3 className="text-base md:text-lg font-semibold text-white">{p.title}</h3>
       <div className="mt-2 flex items-center gap-2">
         {p.original && (
@@ -201,8 +230,24 @@ const ProductCard = ({ p }) => (
           {p.isFree ? 'Free' : `₹${p.price.toLocaleString('en-IN')}.00`}
         </span>
       </div>
+      <button
+        onClick={onBuy}
+        disabled={busy}
+        className="mt-4 w-full inline-flex items-center justify-center gap-2 bg-violet-600 hover:bg-violet-500 disabled:opacity-60 disabled:cursor-not-allowed transition-colors text-white py-2.5 rounded-lg text-sm font-semibold"
+      >
+        {busy ? (
+          <>
+            <Loader2 size={14} className="animate-spin" /> Processing...
+          </>
+        ) : p.isFree ? (
+          'Get Free'
+        ) : (
+          'Buy Now'
+        )}
+      </button>
     </div>
   </div>
-);
+  );
+};
 
 export default Assets;
