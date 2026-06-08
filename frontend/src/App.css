@@ -1,0 +1,65 @@
+.App {
+  min-height: 100vh;
+  background: #070314;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #0a0518;
+}
+::-webkit-scrollbar-thumb {
+  background: #3a1d6b;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #5b2bb0;
+}
+
+/* Marquee animation */
+@keyframes marquee {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+.animate-marquee {
+  animation: marquee 40s linear infinite;
+}
+.animate-marquee-slow {
+  animation: marquee 60s linear infinite;
+}
+.animate-marquee:hover, .animate-marquee-slow:hover {
+  animation-play-state: paused;
+}
+
+/* Grid background */
+.grid-bg {
+  background-image:
+    linear-gradient(to right, rgba(139, 92, 246, 0.06) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(139, 92, 246, 0.06) 1px, transparent 1px);
+  background-size: 60px 60px;
+}
+
+/* Glow */
+.purple-glow {
+  box-shadow: 0 0 80px 20px rgba(139, 92, 246, 0.15);
+}
+
+/* Fade in animation */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(30px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.fade-in-up {
+  animation: fadeInUp 0.8s ease-out forwards;
+}
+
+/* Radial gradient bg */
+.radial-purple {
+  background: radial-gradient(ellipse at top, rgba(91, 33, 182, 0.25), transparent 60%);
+}
+.radial-purple-bottom {
+  background: radial-gradient(ellipse at bottom, rgba(139, 92, 246, 0.18), transparent 60%);
+}

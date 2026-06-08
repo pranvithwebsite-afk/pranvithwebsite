@@ -1,0 +1,163 @@
+// Mock data for BBEdits clone
+
+export const navLinks = [
+  { name: 'Home', path: '/' },
+  { name: 'Courses', path: '/courses' },
+  { name: 'About', path: '/about' },
+  { name: 'Assets', path: '/assets' },
+  { name: 'Hire From Us', path: '/hire' },
+];
+
+export const audienceCards = [
+  {
+    num: '01.',
+    title: 'Beginners',
+    desc: 'Perfect for complete beginners who want to learn professional video editing from scratch.',
+  },
+  {
+    num: '02.',
+    title: 'Content Creators',
+    desc: 'Ideal for Instagram Reels, YouTubers, and digital creators who want clean, engaging edits.',
+  },
+  {
+    num: '03.',
+    title: 'Wedding Editors',
+    desc: 'Designed for wedding & event editors who want faster workflows and cinematic-looking videos.',
+  },
+  {
+    num: '04.',
+    title: 'Students & Freelancers',
+    desc: 'Great for students and aspiring freelancers who want to start earning with video editing skills.',
+  },
+];
+
+export const courses = [
+  {
+    id: 1,
+    title: 'PREMIERE Pro BEGINNER TO EXPORT',
+    description: 'Premiere Pro Mastery — From Beginner to Export! The Ultimate Premiere Pro Course — Learn. Edit. Create. Export. Do you want to master Adobe Premiere Pro from scratch and turn your ideas into professional-level videos?',
+    lectures: 42,
+    discount: '70% OFF',
+    price: 2999,
+    original: 9999,
+    image: 'https://images.unsplash.com/photo-1574717024653-61fd2cf4d44d?w=800&q=80',
+    tag: 'Premiere Pro',
+    color: 'from-purple-600 to-indigo-700',
+  },
+  {
+    id: 2,
+    title: 'Family Forever with AI',
+    description: 'Create stunning wedding and family memories using AI-powered editing techniques. Master the art of cinematic storytelling with modern AI tools and workflows.',
+    lectures: 7,
+    discount: '85% OFF',
+    price: 1500,
+    original: 9999,
+    image: 'https://images.unsplash.com/photo-1519741497674-611481863552?w=800&q=80',
+    tag: 'AI Editing',
+    color: 'from-amber-500 to-orange-600',
+  },
+  {
+    id: 3,
+    title: 'After Effects',
+    description: 'Master After Effects from scratch and turn your ideas into professional-level videos. This course is perfect for beginners who want to learn motion graphics, VFX, and editing.',
+    lectures: 35,
+    discount: 'COMPLETE COURSE',
+    price: 2999,
+    original: null,
+    image: 'https://images.unsplash.com/photo-1626785774573-4b799315345d?w=800&q=80',
+    tag: 'After Effects',
+    color: 'from-violet-600 to-purple-700',
+  },
+];
+
+export const whatYoullLearn = [
+  {
+    tag: 'Premiere Pro',
+    letters: 'Pr',
+    bg: 'from-indigo-900 to-purple-900',
+    textColor: 'text-violet-300',
+    desc: "Master Adobe Premiere Pro with our comprehensive course designed for aspiring video editors and content creators. Learn professional video editing techniques, advanced workflows, and industry-standard practices to create stunning videos. Dive deep into color correction, audio mixing, multi-cam editing, and advanced effects. Whether you're creating content for YouTube, films, or corporate videos, this course covers everything from basic cuts to complex storytelling techniques. Build a strong foundation and develop the skills needed to compete in the professional video editing industry.",
+  },
+  {
+    tag: 'After Effects',
+    letters: 'Ae',
+    bg: 'from-indigo-900 to-violet-900',
+    textColor: 'text-violet-200',
+    desc: 'Create breathtaking motion graphics and visual effects with Adobe After Effects, the industry standard for animation and compositing. Learn advanced techniques in kinetic typography, 3D camera tracking, rotoscoping, keying, and particle systems. Master the art of creating professional title sequences, animated logos, and cinematic visual effects that bring your stories to life with stunning visual impact.',
+  },
+  {
+    tag: 'AI in Editing',
+    letters: 'AI',
+    bg: 'from-purple-900 to-fuchsia-900',
+    textColor: 'text-fuchsia-200',
+    desc: 'Harness the power of cutting-edge AI tools in video editing to revolutionize your workflow and creativity. Discover how artificial intelligence is transforming the editing landscape with automated color grading, intelligent object removal, smart reframing, and voice synthesis. Learn to integrate AI-powered plugins and tools that save hours of manual work while maintaining creative control. Explore auto-captioning, scene detection, content-aware fill, and neural filters that bring professional-grade results in a fraction of the time. Stay ahead of the curve and unlock new creative possibilities that were impossible just a few years ago.',
+  },
+];
+
+export const studentVideos = [
+  { id: 1, name: 'Student 1', thumb: 'https://images.unsplash.com/photo-1492691527719-9d1e07e534b4?w=600&q=80' },
+  { id: 2, name: 'Student 2', thumb: 'https://images.unsplash.com/photo-1535191042502-e6a9a3d407e7?w=600&q=80' },
+  { id: 3, name: 'Student 3', thumb: 'https://images.unsplash.com/photo-1542038784456-1ea8e935640e?w=600&q=80' },
+  { id: 4, name: 'Student 4', thumb: 'https://images.unsplash.com/photo-1551817958-d9d86fb29431?w=600&q=80' },
+  { id: 5, name: 'Student 5', thumb: 'https://images.unsplash.com/photo-1492619375914-88005aa9e8fb?w=600&q=80' },
+];
+
+export const ourWorks = [
+  { id: 1, thumb: 'https://images.unsplash.com/photo-1492619375914-88005aa9e8fb?w=600&q=80' },
+  { id: 2, thumb: 'https://images.unsplash.com/photo-1492691527719-9d1e07e534b4?w=600&q=80' },
+  { id: 3, thumb: 'https://images.unsplash.com/photo-1542038784456-1ea8e935640e?w=600&q=80' },
+  { id: 4, thumb: 'https://images.unsplash.com/photo-1535191042502-e6a9a3d407e7?w=600&q=80' },
+  { id: 5, thumb: 'https://images.unsplash.com/photo-1551817958-d9d86fb29431?w=600&q=80' },
+];
+
+export const testimonials = [
+  { name: 'Priya Sharma', role: 'YouTuber', text: 'Best investment I made for my channel. The techniques are industry-standard.', rating: 5 },
+  { name: 'Arun Patel', role: 'Freelancer', text: 'From zero to landing my first client. Anil explains everything so cleanly.', rating: 5 },
+  { name: 'Sneha Reddy', role: 'Student', text: 'Booked my first wedding edit project within weeks of completing it.', rating: 5 },
+  { name: 'Vikram Singh', role: 'Wedding Editor', text: 'The AI editing module alone was worth the price. My clients love the results!', rating: 5 },
+  { name: 'Meera Krishnan', role: 'Instagram Creator', text: 'My reels quality improved drastically. Gained 50K followers in 2 months!', rating: 5 },
+  { name: 'Karthik Nair', role: 'Brand Manager', text: 'We do all our brand videos in-house. No more outsourcing needed.', rating: 5 },
+  { name: 'Rohit Verma', role: 'Vlogger', text: 'The color grading section was mind-blowing. My videos look cinematic now.', rating: 5 },
+  { name: 'Lakshmi Pillai', role: 'Entrepreneur', text: 'Started my own editing service after this course. Already have 10+ clients!', rating: 5 },
+  { name: 'Siddharth Rao', role: 'Music Producer', text: 'Perfect for creating music videos. The effects tutorials are incredible.', rating: 5 },
+  { name: 'Pooja Desai', role: 'Travel Blogger', text: 'My travel videos went viral after applying these techniques. Thank you!', rating: 5 },
+];
+
+export const faqs = [
+  {
+    q: 'I can find free tutorials on YouTube. Why should I pay to join BBEdits?',
+    a: "YouTube tutorials are scattered and lack structure. BBEdits provides a step-by-step roadmap, real projects, lifetime access, downloadable assets, community support, and direct mentorship from a professional editor — saving you months of trial and error.",
+  },
+  {
+    q: 'Is this course for absolute beginners, or do I need prior experience?',
+    a: 'No prior experience required! We start from the absolute basics — installing software, understanding the interface — and gradually take you to advanced professional techniques.',
+  },
+  {
+    q: 'Who is this course NOT for?',
+    a: 'This course is not for people looking for quick shortcuts without practice. If you are not willing to spend time editing and applying what you learn, this is not for you.',
+  },
+  {
+    q: 'I have a full-time job/college. How much time do I need to dedicate daily?',
+    a: 'Just 30–60 minutes a day is enough. The course is self-paced, so you can learn whenever you have free time — early mornings, lunch breaks, or weekends.',
+  },
+  {
+    q: 'Will I just be watching videos, or will I actually edit?',
+    a: 'You will be editing real projects! Every module comes with practice files, assignments, and challenges that mirror real-world client work.',
+  },
+];
+
+export const footerLinks = {
+  explore: [
+    { name: 'Courses', path: '/courses' },
+    { name: 'About Us', path: '/about' },
+    { name: 'Our Works', path: '/works' },
+    { name: 'Contact', path: '/contact' },
+    { name: 'Privacy Policy', path: '/privacy' },
+    { name: 'FAQ', path: '/faq' },
+  ],
+  contact: {
+    location: 'Vizag, India',
+    email: 'support@bbedits.in',
+    phone: '+91 9110772715',
+  },
+};
