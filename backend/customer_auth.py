@@ -379,6 +379,9 @@ def build_webhook_router(db) -> APIRouter:
             update_fields["product_name"] = product.get("name")
 
         if order_id:
+            existing_order = await db.orders.find_one({"id": order_id}, {"_id": 0})
+            if existing_order and existing_order.get("status") == "paid":
+                return {"received": True, "idempotent": True}
             await db.orders.update_one(
                 {"id": order_id},
                 {"$set": update_fields},

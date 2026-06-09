@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
@@ -15,9 +15,9 @@ const Login = () => {
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
 
-  if (user) {
-    navigate('/dashboard', { replace: true });
-  }
+  useEffect(() => {
+    if (user) navigate('/dashboard', { replace: true });
+  }, [user, navigate]);
 
   const redirectTo = location.state?.from?.pathname || '/dashboard';
 

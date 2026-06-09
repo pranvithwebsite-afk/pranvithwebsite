@@ -1,0 +1,55 @@
+{
+  "summary": "Regression of 3 fixes. PASS: (a) admin login with admin@pranvithdop.com / Admin123! now returns access_token; (b) Login/Register no longer emit React setState-in-render warnings (useEffect fix verified); (c) /api/products still returns the correct 8 slugs and /api/auth/login works for the existing test user. FAIL (partial): the 'PranavithDOP' (extra 'a') typo is STILL rendered on / (Home) and /about because the rebrand only refreshes the 'home' page doc and SETTINGS — the FAQs and the about/works/hire/contact CMS pages stored in MongoDB are stale and the seed logic for those collections is gated on count==0 / only contains a 'home' entry, so the rebrand never propagates to them.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {
+        "endpoint": "/api/faqs",
+        "issue": "Returns legacy 'PranavithDOP' (extra 'a') in 2 FAQ docs. seed_data.FAQS has the correct brand 'PranvithDOP' but server.py seeds FAQs only when db.faqs.count_documents({}) == 0, so the rebrand never overwrites existing rows."
+      },
+      {
+        "endpoint": "/api/pages/about (also /pages/works, /pages/hire, /pages/contact)",
+        "issue": "Stale CMS docs still contain 'PranavithDOP' (about=3, works=2, hire=2, contact=1 occurrences). The new upsert seed only re-applies the 'home' page because seed_data.PAGES contains a single 'home' entry; the other pages were created by an earlier seed run and are never refreshed."
+      }
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {
+        "screen": "/ (Home FAQ section) and /about (intro paragraph + footer SEO)",
+        "issues": [
+          "Home page renders 'PranavithDOP' (extra 'a') 2x inside the FAQ block ('Why should I pay to join PranavithDOP?' and 'YouTube tutorials are scattered ... PranavithDOP provides ...').",
+          "About page renders 'From beginner to paid editor. PranavithDOP blends professional editing workflows...' (1 instance with extra 'a').",
+          "Header, footer, hero title, and site_name now correctly show 'PranvithDOP' — only the DB-stored CMS/FAQ text is stale."
+        ]
+      }
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_customer_funnel.py",
+    "/app/test_reports/pytest/iteration_2.xml"
+  ],
+  "action_items": [
+    "Refresh stale CMS docs. Two clean options: (1) one-off migration in server.startup that does db.faqs.update_many({'q': {'$regex': 'PranavithDOP'}}, ...) and same for db.pages — or, simpler, db.faqs.delete_many({}) followed by re-insert from FAQS on every boot (or whenever a SEED_FORCE_REFRESH env flag is set); (2) Make the FAQ seed an upsert keyed on the FAQ question (mirror the pages upsert) and add the missing 'about'/'works'/'hire'/'contact' entries to seed_data.PAGES so the upsert path overwrites them on next boot.",
+    "Quickest verifiable fix: run a one-time string-replace migration at startup, e.g. for each collection in (faqs, pages): find docs containing 'PranavithDOP' and update them by replacing with 'PranvithDOP'. This is cheap, idempotent, and clears the legacy data without touching seed_data.py.",
+    "After fix, re-run /api/faqs and /api/pages/{about,works,hire,contact} and confirm 0 occurrences of the bad string."
+  ],
+  "critical_code_review_comments": [
+    "server.py FAQ seed (line ~1151) uses `if count == 0` guard — this same anti-pattern from the previous iteration is what caused the admin-login regression; it now repeats for FAQs. Recommend switching all default seed paths to upsert-by-natural-key for consistency.",
+    "seed_data.PAGES is missing about/works/hire/contact entries even though those slugs are served by the frontend — DB content for those pages is effectively un-version-controlled.",
+    "seed_default_admin (server.py ~945) — fix verified working (deletes stale emails + upserts the env admin)."
+  ],
+  "updated_files": [],
+  "success_rate": {
+    "backend": "100% (10/10 regression tests pass)",
+    "frontend": "75% (admin login + login/register console clean; brand typo still visible on Home + About)"
+  },
+  "test_credentials": "Admin admin@pranvithdop.com / Admin123! WORKS. Customer test@pranvithdop.com / Test1234! WORKS.",
+  "seed_data_creation": "Each pytest run still creates a throwaway e2e-<ts>@pranvithdop.com user via /api/auth/register. No teardown.",
+  "retest_needed": true,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backend regression file: /app/backend/tests/test_customer_funnel.py (TestProducts + TestAuth fully green this run incl. test_admin_login). To re-verify the brand fix after main agent's next change, just curl: (1) `curl $REACT_APP_BACKEND_URL/api/faqs | grep -c PranavithDOP` should print 0, (2) `curl $REACT_APP_BACKEND_URL/api/pages/about | grep -c PranavithDOP` should print 0, and (3) reload / and /about in the browser and grep page HTML for 'PranavithDOP' — must be 0. The brand typo to detect is 'Pran-a-vithDOP' (extra 'a' before 'v'); 'Pranavith' as a person's first name in founder copy is correct and intentional.",
+  "rca_of_the_issue": "Symptom: legacy 'PranavithDOP' (extra 'a') still rendered on / and /about. Reproduction: GET /api/faqs returns 2 docs with 'PranavithDOP'; GET /api/pages/about returns 3. Root cause: the rebrand fix only updated (a) seed_data.SETTINGS (upserted on boot, works), (b) seed_data.PAGES['home'] (upserted on boot, works), and (c) seed_default_admin (now upserts, works). It did NOT touch the FAQs collection (seeded behind a count==0 guard) or the about/works/hire/contact page docs (not present in PAGES at all). Those docs were written by a prior seed run that contained the typo and are now effectively frozen. Mitigation: convert the FAQ seed to upsert-by-question + add missing slugs to PAGES, OR run a one-shot string-replace migration on db.faqs and db.pages at startup."
+}

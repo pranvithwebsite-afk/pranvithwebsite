@@ -409,11 +409,11 @@ async def public_settings():
     settings_doc = await db.settings.find_one({}, {"_id": 0})
     if not settings_doc:
         return {
-            "site_name": "PranavithDOP",
+            "site_name": "PranvithDOP",
             "theme": "dark",
             "notifications_enabled": True,
             "site_description": "Premium video editing training, assets and tutorials.",
-            "contact_email": "info@pranavithdop.com",
+            "contact_email": "info@pranvithdop.com",
             "contact_phone": "+91 9059867883",
             "contact_address": "Hyderabad, India",
         }
@@ -943,12 +943,14 @@ async def prepare_cms_collections():
 
 
 async def seed_default_admin():
-    existing = await db.admins.count_documents({})
-    if existing:
-        return
     default_email = os.environ.get("DEFAULT_ADMIN_EMAIL", "admin@pranvithdop.com").lower().strip()
     default_password = os.environ.get("DEFAULT_ADMIN_PASSWORD", "Admin123!")
     default_name = os.environ.get("DEFAULT_ADMIN_NAME", "Super Admin")
+    # Remove any legacy admins not matching the configured default email
+    try:
+        await db.admins.delete_many({"email": {"$ne": default_email}})
+    except Exception:
+        logger.exception("Failed to clean up legacy admins")
     admin_doc = {
         "id": str(uuid.uuid4()),
         "name": default_name,
@@ -959,8 +961,21 @@ async def seed_default_admin():
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
     try:
-        await db.admins.insert_one(admin_doc)
-        logger.info("Created default admin user %s", default_email)
+        # Upsert the admin so password & name reflect the env values on every boot
+        existing = await db.admins.find_one({"email": default_email})
+        if existing:
+            await db.admins.update_one(
+                {"email": default_email},
+                {"$set": {
+                    "name": default_name,
+                    "role": "super_admin",
+                    "permissions": ["super_admin", "admin", "editor"],
+                    "hashed_password": admin_doc["hashed_password"],
+                }},
+            )
+        else:
+            await db.admins.insert_one(admin_doc)
+            logger.info("Created default admin user %s", default_email)
     except Exception:
         logger.exception("Failed to seed default admin")
 
@@ -1138,16 +1153,14 @@ async def _seed_db():
                 await db.faqs.insert_one({**f, "order": i})
             logger.info("Seeded %d faqs", len(FAQS))
 
-        # Seed CMS pages
-        existing_pages = await db.pages.count_documents({})
-        if existing_pages == 0:
-            await db.pages.insert_many([dict(p) for p in PAGES])
-            logger.info("Seeded %d pages", len(PAGES))
-        else:
-            for page in PAGES:
-                if await db.pages.count_documents({"slug": page["slug"]}) == 0:
-                    await db.pages.insert_one(dict(page))
-                    logger.info("Inserted missing page %s", page["slug"])
+        # Seed CMS pages (upsert by slug so rebrand updates apply)
+        for page in PAGES:
+            await db.pages.update_one(
+                {"slug": page["slug"]},
+                {"$set": dict(page)},
+                upsert=True,
+            )
+        logger.info("Upserted %d pages", len(PAGES))
 
         # Seed products/assets (upsert by slug so catalog updates apply)
         valid_slugs = [p["slug"] for p in ASSET_PRODUCTS]
@@ -1171,10 +1184,9 @@ async def _seed_db():
             await db.blog_posts.insert_many([dict(p) for p in BLOG_POSTS])
             logger.info("Seeded %d blog posts", len(BLOG_POSTS))
 
-        # Seed default settings
-        if await db.settings.count_documents({}) == 0:
-            await db.settings.insert_one(SETTINGS)
-            logger.info("Seeded default settings")
+        # Seed default settings (upsert so brand changes propagate)
+        await db.settings.update_one({}, {"$set": dict(SETTINGS)}, upsert=True)
+        logger.info("Upserted default settings")
 
         # Ensure indexes on subscribers and CMS slugs
         try:
