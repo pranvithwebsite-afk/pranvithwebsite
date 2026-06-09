@@ -8,9 +8,9 @@ IMG_MUSIC_BUNDLE = "https://customer-assets.emergentagent.com/job_bb-redesign/ar
 IMG_SOUND_FX = "https://customer-assets.emergentagent.com/job_bb-redesign/artifacts/ij9tey1x_Cinematic%20Sound%20Fx.PNG"
 IMG_TYPOGRAPHY = "https://customer-assets.emergentagent.com/job_bb-redesign/artifacts/6drz1ha4_Typography%20Fonts.PNG"
 # Reused / generic for assets without dedicated images yet
-IMG_PREMIERE_WED = ""
-IMG_AE_TITLES = ""
-IMG_COLOR_GRAD = ""
+IMG_PREMIERE_WED = "https://customer-assets.emergentagent.com/job_bb-redesign/artifacts/udmgpnfi_Wedding%20templates.PNG"
+IMG_AE_TITLES = "https://customer-assets.emergentagent.com/job_bb-redesign/artifacts/6qb8citv_ChatGPT%20Image%20Jun%2010%2C%202026%2C%2001_33_59%20AM.png"
+IMG_COLOR_GRAD = "https://customer-assets.emergentagent.com/job_bb-redesign/artifacts/r933b3bq_colour%20gradient.PNG"
 
 
 def _landing(headline, subhead, bullets, before_after_desc, compat, table, faqs):
