@@ -6,6 +6,7 @@ from motor.motor_asyncio import AsyncIOMotorClient
 from passlib.context import CryptContext
 from jose import JWTError, jwt
 import os
+import json
 import asyncio
 import hmac
 import hashlib
@@ -1187,6 +1188,24 @@ async def _seed_db():
         # Seed default settings (upsert so brand changes propagate)
         await db.settings.update_one({}, {"$set": dict(SETTINGS)}, upsert=True)
         logger.info("Upserted default settings")
+
+        # One-shot brand migration: replace legacy 'PranavithDOP' with 'PranvithDOP'
+        # in any user/CMS content that was seeded under the old brand name.
+        try:
+            for coll_name in ("faqs", "pages", "blog_posts", "settings", "products"):
+                cursor = db[coll_name].find({}, {"_id": 1})
+                async for doc in cursor:
+                    full = await db[coll_name].find_one({"_id": doc["_id"]})
+                    if not full:
+                        continue
+                    payload = json.dumps(full, default=str)
+                    if "PranavithDOP" in payload:
+                        fixed = json.loads(payload.replace("PranavithDOP", "PranvithDOP"))
+                        fixed.pop("_id", None)
+                        await db[coll_name].update_one({"_id": doc["_id"]}, {"$set": fixed})
+                        logger.info("Rebranded legacy doc in %s/%s", coll_name, doc["_id"])
+        except Exception:
+            logger.exception("brand migration failed")
 
         # Ensure indexes on subscribers and CMS slugs
         try:
