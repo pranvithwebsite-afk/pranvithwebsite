@@ -172,3 +172,68 @@ export const deleteAdminMedia = async (mediaId) => {
   const { data } = await adminApi.delete(`/admin/media/${mediaId}`);
   return data;
 };
+
+// ---------------- Customer auth ----------------
+export const customerApi = axios.create({
+  baseURL: API,
+  timeout: 15000,
+});
+
+export const setCustomerAuthToken = (token) => {
+  if (token) {
+    customerApi.defaults.headers.common.Authorization = `Bearer ${token}`;
+  } else {
+    delete customerApi.defaults.headers.common.Authorization;
+  }
+};
+
+export const customerRegister = async (payload) => {
+  const { data } = await customerApi.post('/auth/register', payload);
+  return data;
+};
+
+export const customerLogin = async (payload) => {
+  const { data } = await customerApi.post('/auth/login', payload);
+  return data;
+};
+
+export const customerMe = async () => {
+  const { data } = await customerApi.get('/auth/me');
+  return data;
+};
+
+export const customerLogout = async () => {
+  try {
+    await customerApi.post('/auth/logout');
+  } catch (_) {}
+};
+
+export const customerMyOrders = async () => {
+  const { data } = await customerApi.get('/auth/my-orders');
+  return data;
+};
+
+export const customerMyDownloads = async () => {
+  const { data } = await customerApi.get('/auth/my-downloads');
+  return data;
+};
+
+export const customerChangePassword = async (payload) => {
+  const { data } = await customerApi.post('/auth/change-password', payload);
+  return data;
+};
+
+export const customerClaimFree = async (product_slug) => {
+  const { data } = await customerApi.post('/auth/claim-free', { product_slug });
+  return data;
+};
+
+export const customerCheckoutInit = async (product_slug) => {
+  const { data } = await customerApi.post('/auth/checkout/init', { product_slug });
+  return data;
+};
+
+export const fetchProductBySlug = async (slug) => {
+  const { data } = await api.get(`/products/${slug}`);
+  return data;
+};

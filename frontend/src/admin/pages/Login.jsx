@@ -45,7 +45,7 @@ const Login = () => {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="w-full rounded-2xl border border-slate-800 bg-slate-950 px-4 py-3 text-white outline-none transition focus:border-violet-500"
-                placeholder="admin@bbedits.com"
+                placeholder="admin@pranvithdop.com"
                 required
               />
             </label>
@@ -71,7 +71,7 @@ const Login = () => {
           </form>
           <div className="mt-6 rounded-3xl bg-slate-950/80 p-4 text-sm text-slate-400">
             <p className="font-medium text-slate-200">Default seeded admin</p>
-            <p>Email: <span className="text-white">admin@bbedits.com</span></p>
+            <p>Email: <span className="text-white">admin@pranvithdop.com</span></p>
             <p>Password: <span className="text-white">Admin123!</span></p>
           </div>
         </div>

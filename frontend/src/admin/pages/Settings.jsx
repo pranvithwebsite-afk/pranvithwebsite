@@ -53,7 +53,7 @@ const Settings = () => {
               value={settings.site_name}
               onChange={(e) => setSettings((prev) => ({ ...prev, site_name: e.target.value }))}
               className="mt-2 w-full rounded-2xl border border-slate-800 bg-slate-900 px-4 py-3 text-white outline-none"
-              placeholder="BBEdits"
+              placeholder="PranvithDOP"
             />
           </label>
           <label className="block text-sm text-slate-200">

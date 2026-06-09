@@ -34,7 +34,7 @@ const Footer = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-10">
           {/* About */}
           <div>
-            <h4 className="text-2xl font-bold text-white">PranavithDOP</h4>
+            <h4 className="text-2xl font-bold text-white">PranvithDOP</h4>
             <p className="mt-4 text-sm text-white/65 leading-relaxed max-w-xs">
               Empowering creators with AI-driven tools and professional video editing resources.
               Join the future of content creation.
@@ -106,7 +106,7 @@ const Footer = () => {
         </div>
 
         <div className="mt-14 pt-6 border-t border-white/10 flex flex-col md:flex-row items-center justify-between gap-3">
-          <p className="text-xs text-white/55">© {new Date().getFullYear()} PranavithDOP. All rights reserved.</p>
+          <p className="text-xs text-white/55">© {new Date().getFullYear()} PranvithDOP. All rights reserved.</p>
           <div className="flex items-center gap-6 text-xs text-white/55">
             <a href="#" className="hover:text-white">Terms</a>
             <a href="#" className="hover:text-white">Privacy</a>

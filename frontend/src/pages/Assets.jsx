@@ -3,10 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
 import { Search, Loader2 } from 'lucide-react';
-import { assetProducts } from '../data/mock';
-import { payWithRazorpay } from '../lib/razorpay';
 import { fetchProducts } from '../lib/api';
-import { toast } from 'sonner';
 
 const defaultBackgrounds = [
   'linear-gradient(135deg, #1e3a8a 0%, #0c1e4d 60%, #050b1f 100%)',
@@ -19,48 +16,53 @@ const defaultBackgrounds = [
   'linear-gradient(135deg, #0ea5e9 0%, #1e3a8a 100%)',
 ];
 
-const normalizeProduct = (item, index) => {
+const normalize = (item, index) => {
   const price = item.sale_price ?? item.price ?? 0;
-  const original = item.price && item.sale_price && item.price > item.sale_price ? item.price : item.original ?? null;
+  const original = item.price && item.sale_price && item.price > item.sale_price ? item.price : null;
   const name = item.name || item.title || 'Asset';
   const category = item.category || 'Asset';
-  const slug = item.slug || String(item.id);
-  const headline = name.split(' ')[0].toUpperCase();
-  const subhead = category;
-
+  const slug = item.slug;
+  const heroImage = item.hero_image || (item.images && item.images[0]);
+  const word = name.toUpperCase();
+  const parts = word.split(' ');
+  const headline = parts.slice(0, 2).join(' ') || word;
+  const subhead = parts.slice(2).join(' ') || category.toUpperCase();
   return {
     id: item.id,
     slug,
     title: name,
+    category,
     price,
     original,
-    isFree: price === 0,
-    isPaid: price > 0,
-    createdAt: item.created_at || item.createdAt || new Date().toISOString(),
-    bg: item.bg || defaultBackgrounds[index % defaultBackgrounds.length],
+    isFree: price === 0 || item.is_free,
+    isPaid: price > 0 && !item.is_free,
+    createdAt: item.created_at || new Date().toISOString(),
+    bg: defaultBackgrounds[index % defaultBackgrounds.length],
+    image: heroImage,
     headline,
     subhead,
-    badge: price === 0 ? 'FREE' : 'SALE!',
-    description: item.description || item.excerpt || '',
+    badge: price === 0 || item.is_free ? 'FREE' : 'SALE!',
+    description: item.description || '',
   };
 };
 
 const Assets = () => {
+  const navigate = useNavigate();
   const [query, setQuery] = useState('');
   const [sort, setSort] = useState('newest');
   const [priceFilter, setPriceFilter] = useState('all');
-  const [products, setProducts] = useState(assetProducts.map((p, idx) => normalizeProduct(p, idx)));
+  const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     (async () => {
       try {
         const data = await fetchProducts();
-        if (Array.isArray(data) && data.length) {
-          setProducts(data.map((p, idx) => normalizeProduct(p, idx)));
+        if (Array.isArray(data)) {
+          setProducts(data.map((p, idx) => normalize(p, idx)));
         }
       } catch (e) {
-        // fallback to mock
+        // ignore
       } finally {
         setLoading(false);
       }
@@ -87,11 +89,10 @@ const Assets = () => {
     <main className="bg-[#070314] text-white min-h-screen">
       <Header />
 
-      {/* Top banner */}
       <section className="pt-32 pb-10">
         <div className="max-w-7xl mx-auto px-6">
           <div className="rounded-2xl bg-gradient-to-r from-violet-900/40 via-indigo-900/30 to-violet-900/40 border border-violet-500/20 px-8 py-7">
-            <h1 className="text-2xl md:text-4xl font-bold tracking-tight">Creative Assets Store</h1>
+            <h1 className="text-2xl md:text-4xl font-bold tracking-tight" data-testid="assets-page-title">Creative Assets Store</h1>
             <p className="mt-2 text-sm text-white/65">
               Premium LUTs, sound packs, motion templates and more — built for editors.
             </p>
@@ -99,10 +100,8 @@ const Assets = () => {
         </div>
       </section>
 
-      {/* Filters + Grid */}
       <section className="pb-24">
         <div className="max-w-7xl mx-auto px-6 grid grid-cols-1 lg:grid-cols-[260px_1fr] gap-8">
-          {/* Sidebar */}
           <aside className="lg:sticky lg:top-28 h-fit rounded-2xl bg-[#0d0820]/60 border border-violet-500/15 p-6">
             <h3 className="text-violet-400 text-xs font-bold tracking-[0.3em] mb-5">FILTERS</h3>
 
@@ -113,64 +112,38 @@ const Assets = () => {
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Search assets..."
+                data-testid="assets-search-input"
                 className="w-full pl-9 pr-3 py-2.5 rounded-lg bg-white/5 border border-white/10 text-sm text-white placeholder:text-white/35 focus:outline-none focus:border-violet-500/60"
               />
             </div>
 
             <div className="mb-7">
               <p className="text-sm font-semibold text-white mb-3">Sort By</p>
-              <RadioRow
-                name="sort"
-                value="newest"
-                checked={sort === 'newest'}
-                onChange={() => setSort('newest')}
-                label="Newest First"
-              />
-              <RadioRow
-                name="sort"
-                value="oldest"
-                checked={sort === 'oldest'}
-                onChange={() => setSort('oldest')}
-                label="Oldest First"
-              />
+              <RadioRow name="sort" value="newest" checked={sort === 'newest'} onChange={() => setSort('newest')} label="Newest First" />
+              <RadioRow name="sort" value="oldest" checked={sort === 'oldest'} onChange={() => setSort('oldest')} label="Oldest First" />
             </div>
 
             <div>
               <p className="text-sm font-semibold text-white mb-3">Price</p>
-              <RadioRow
-                name="price"
-                value="all"
-                checked={priceFilter === 'all'}
-                onChange={() => setPriceFilter('all')}
-                label="All"
-              />
-              <RadioRow
-                name="price"
-                value="free"
-                checked={priceFilter === 'free'}
-                onChange={() => setPriceFilter('free')}
-                label="Free"
-              />
-              <RadioRow
-                name="price"
-                value="paid"
-                checked={priceFilter === 'paid'}
-                onChange={() => setPriceFilter('paid')}
-                label="Paid"
-              />
+              <RadioRow name="price" value="all" checked={priceFilter === 'all'} onChange={() => setPriceFilter('all')} label="All" />
+              <RadioRow name="price" value="free" checked={priceFilter === 'free'} onChange={() => setPriceFilter('free')} label="Free" />
+              <RadioRow name="price" value="paid" checked={priceFilter === 'paid'} onChange={() => setPriceFilter('paid')} label="Paid" />
             </div>
           </aside>
 
-          {/* Grid */}
           <div>
-            {filtered.length === 0 ? (
-              <div className="rounded-2xl border border-white/10 bg-white/5 p-12 text-center text-white/60">
+            {loading ? (
+              <div className="flex items-center gap-2 text-white/60 text-sm" data-testid="assets-loading">
+                <Loader2 size={14} className="animate-spin" /> Loading assets...
+              </div>
+            ) : filtered.length === 0 ? (
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-12 text-center text-white/60" data-testid="assets-empty">
                 No assets match your filters.
               </div>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6" data-testid="assets-grid">
                 {filtered.map((p) => (
-                  <ProductCard key={p.id} p={p} />
+                  <ProductCard key={p.id} p={p} onView={() => navigate(`/assets/${p.slug}`)} />
                 ))}
               </div>
             )}
@@ -186,102 +159,47 @@ const Assets = () => {
 const RadioRow = ({ name, value, checked, onChange, label }) => (
   <label className="flex items-center gap-3 py-1.5 cursor-pointer group">
     <span className="relative inline-flex">
-      <input
-        type="radio"
-        name={name}
-        value={value}
-        checked={checked}
-        onChange={onChange}
-        className="sr-only"
-      />
-      <span
-        className={`w-4 h-4 rounded-full border-2 transition ${
-          checked ? 'border-violet-500' : 'border-white/30 group-hover:border-white/50'
-        }`}
-      />
-      {checked && (
-        <span className="absolute inset-0 m-auto w-2 h-2 rounded-full bg-violet-500" />
-      )}
+      <input type="radio" name={name} value={value} checked={checked} onChange={onChange} className="sr-only" />
+      <span className={`w-4 h-4 rounded-full border-2 transition ${checked ? 'border-violet-500' : 'border-white/30 group-hover:border-white/50'}`} />
+      {checked && <span className="absolute inset-0 m-auto w-2 h-2 rounded-full bg-violet-500" />}
     </span>
     <span className={`text-sm ${checked ? 'text-white' : 'text-white/75'}`}>{label}</span>
   </label>
 );
 
-const ProductCard = ({ p }) => {
-  const navigate = useNavigate();
-  const [busy, setBusy] = useState(false);
-
-  const onBuy = async () => {
-    if (p.slug === 'lut-pack-5') {
-      navigate('/assets/lut-pack-5');
-      return;
-    }
-
-    if (p.isFree) {
-      toast.success(`${p.title} added to your downloads (free).`);
-      return;
-    }
-    try {
-      setBusy(true);
-      const res = await payWithRazorpay({
-        amountRupees: p.price,
-        itemId: p.id,
-        itemName: p.title,
-      });
-      if (res.success) {
-        toast.success(`Payment successful! Payment ID: ${res.paymentId}`);
-      } else if (res.error === 'cancelled') {
-        toast.message('Payment cancelled');
-      } else {
-        toast.error(res.error || 'Payment failed');
-      }
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return (
-  <div className="group rounded-2xl bg-[#0a0518]/80 border border-violet-500/15 hover:border-violet-500/40 transition-all duration-300 hover:-translate-y-1 overflow-hidden flex flex-col">
-    {/* Image area (faux product box) */}
+const ProductCard = ({ p, onView }) => (
+  <div
+    onClick={onView}
+    data-testid={`asset-card-${p.slug}`}
+    className="group rounded-2xl bg-[#0a0518]/80 border border-violet-500/15 hover:border-violet-500/40 transition-all duration-300 hover:-translate-y-1 overflow-hidden flex flex-col cursor-pointer"
+  >
     <div className="relative aspect-[4/5] overflow-hidden">
-      <div
-        className="absolute inset-0"
-        style={{ background: p.bg }}
-      />
-      {/* decorative diagonal shine */}
+      {p.image ? (
+        <img src={p.image} alt={p.title} className="absolute inset-0 w-full h-full object-cover" />
+      ) : (
+        <div className="absolute inset-0" style={{ background: p.bg }} />
+      )}
       <div className="absolute -inset-1 opacity-30 pointer-events-none" style={{
         background: 'linear-gradient(115deg, transparent 40%, rgba(255,255,255,0.18) 50%, transparent 60%)'
       }} />
-      {/* product label */}
-      <div className="absolute inset-0 flex items-center justify-center px-6">
-        <div className="text-center">
-          <p className="text-white/90 text-3xl md:text-4xl font-black tracking-tight leading-tight drop-shadow-[0_4px_20px_rgba(0,0,0,0.6)]">
-            {p.headline}
-          </p>
-          <p className="mt-2 text-white/85 text-lg md:text-xl font-bold tracking-wide drop-shadow-[0_4px_20px_rgba(0,0,0,0.6)]">
-            {p.subhead}
-          </p>
-          {p.sub2 && (
-            <p className="mt-3 inline-block px-3 py-0.5 rounded-sm bg-amber-500/90 text-black text-[10px] font-bold tracking-widest">
-              {p.sub2}
+      {!p.image && (
+        <div className="absolute inset-0 flex items-center justify-center px-6">
+          <div className="text-center">
+            <p className="text-white/90 text-3xl md:text-4xl font-black tracking-tight leading-tight drop-shadow-[0_4px_20px_rgba(0,0,0,0.6)]">
+              {p.headline}
             </p>
-          )}
+            <p className="mt-2 text-white/85 text-lg md:text-xl font-bold tracking-wide drop-shadow-[0_4px_20px_rgba(0,0,0,0.6)]">
+              {p.subhead}
+            </p>
+          </div>
         </div>
-      </div>
-
-      {/* Badge */}
-      <span
-        className={`absolute top-4 left-4 px-3 py-1 rounded-full text-[11px] font-bold tracking-wider ${
-          p.isFree
-            ? 'bg-violet-500 text-white'
-            : 'bg-rose-500 text-white'
-        }`}
-      >
+      )}
+      <span className={`absolute top-4 left-4 px-3 py-1 rounded-full text-[11px] font-bold tracking-wider ${
+        p.isFree ? 'bg-violet-500 text-white' : 'bg-rose-500 text-white'
+      }`}>
         {p.badge}
       </span>
     </div>
-
-    {/* Body */}
     <div className="p-5 flex-1 flex flex-col">
       <h3 className="text-base md:text-lg font-semibold text-white">{p.title}</h3>
       <div className="mt-2 flex items-center gap-2">
@@ -293,23 +211,14 @@ const ProductCard = ({ p }) => {
         </span>
       </div>
       <button
-        onClick={onBuy}
-        disabled={busy}
-        className="mt-4 w-full inline-flex items-center justify-center gap-2 bg-violet-600 hover:bg-violet-500 disabled:opacity-60 disabled:cursor-not-allowed transition-colors text-white py-2.5 rounded-lg text-sm font-semibold"
+        onClick={(e) => { e.stopPropagation(); onView(); }}
+        data-testid={`view-asset-btn-${p.slug}`}
+        className="mt-4 w-full inline-flex items-center justify-center gap-2 bg-violet-600 hover:bg-violet-500 transition-colors text-white py-2.5 rounded-lg text-sm font-semibold"
       >
-        {busy ? (
-          <>
-            <Loader2 size={14} className="animate-spin" /> Processing...
-          </>
-        ) : p.isFree ? (
-          'Get Free'
-        ) : (
-          'Buy Now'
-        )}
+        {p.isFree ? 'Get Free' : 'Buy Now'}
       </button>
     </div>
   </div>
-  );
-};
+);
 
 export default Assets;

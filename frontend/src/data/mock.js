@@ -1,4 +1,4 @@
-// Mock data for PranavithDOP clone
+// Mock data for PranvithDOP clone
 
 export const assetProducts = [
   {
@@ -237,8 +237,8 @@ export const testimonials = [
 
 export const faqs = [
   {
-    q: 'I can find free tutorials on YouTube. Why should I pay to join PranavithDOP?',
-    a: "YouTube tutorials are scattered and lack structure. PranavithDOP provides a step-by-step roadmap, real projects, lifetime access, downloadable assets, community support, and direct mentorship from a professional editor — saving you months of trial and error.",
+    q: 'I can find free tutorials on YouTube. Why should I pay to join PranvithDOP?',
+    a: "YouTube tutorials are scattered and lack structure. PranvithDOP provides a step-by-step roadmap, real projects, lifetime access, downloadable assets, community support, and direct mentorship from a professional editor — saving you months of trial and error.",
   },
   {
     q: 'Is this course for absolute beginners, or do I need prior experience?',

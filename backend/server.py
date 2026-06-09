@@ -47,8 +47,10 @@ if RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET:
     except Exception as _e:
         razorpay_client = None
 
-app = FastAPI(title='BBEdits API')
+app = FastAPI(title='PranvithDOP API')
 api_router = APIRouter(prefix="/api")
+
+from customer_auth import build_customer_router, build_webhook_router
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -125,6 +127,11 @@ class Product(BaseModel):
     images: List[str] = []
     videos: List[str] = []
     download_file: Optional[str] = None
+    payment_link: Optional[str] = None
+    thank_you_content: Optional[Dict[str, Any]] = None
+    landing_content: Optional[Dict[str, Any]] = None
+    hero_image: Optional[str] = None
+    is_free: Optional[bool] = None
     seo_title: Optional[str] = None
     seo_description: Optional[str] = None
     published: bool = True
@@ -149,6 +156,11 @@ class ProductIn(BaseModel):
     images: List[str] = []
     videos: List[str] = []
     download_file: Optional[str] = None
+    payment_link: Optional[str] = None
+    thank_you_content: Optional[Dict[str, Any]] = None
+    landing_content: Optional[Dict[str, Any]] = None
+    hero_image: Optional[str] = None
+    is_free: Optional[bool] = None
     seo_title: Optional[str] = None
     seo_description: Optional[str] = None
     published: bool = True
@@ -371,7 +383,7 @@ class StatusCheckCreate(BaseModel):
 # ---------- Routes ----------
 @api_router.get("/")
 async def root():
-    return {"message": "BBEdits API", "status": "ok"}
+    return {"message": "PranvithDOP API", "status": "ok"}
 
 
 @api_router.get("/courses", response_model=List[Course])
@@ -475,7 +487,7 @@ async def subscribe(payload: SubscribeIn):
     except Exception as e:
         logger.exception("subscribe insert failed")
         raise HTTPException(status_code=500, detail="Failed to subscribe")
-    return {"id": sub.id, "success": True, "message": "Subscribed! Thanks for joining BBEdits."}
+    return {"id": sub.id, "success": True, "message": "Subscribed! Thanks for joining PranvithDOP."}
 
 
 # ---------- Admin models and auth ----------
@@ -679,7 +691,7 @@ async def admin_settings(current_admin: AdminBase = Depends(get_current_active_a
     settings_doc = await db.settings.find_one({}, {"_id": 0})
     if not settings_doc:
         return {
-            "site_name": "BBEdits",
+            "site_name": "PranvithDOP",
             "theme": "default",
             "notifications_enabled": True,
             "site_description": "A modern CMS foundation for pages, products, orders, customers, media and settings.",
@@ -889,6 +901,7 @@ async def prepare_cms_collections():
     existing_collections = await db.list_collection_names()
     for collection_name in [
         "admins",
+        "users",
         "pages",
         "products",
         "orders",
@@ -900,6 +913,7 @@ async def prepare_cms_collections():
         "testimonials",
         "blog_posts",
         "blog_categories",
+        "webhook_events",
     ]:
         if collection_name not in existing_collections:
             try:
@@ -908,6 +922,10 @@ async def prepare_cms_collections():
                 pass
     try:
         await db.admins.create_index("email", unique=True)
+    except Exception:
+        pass
+    try:
+        await db.users.create_index("email", unique=True)
     except Exception:
         pass
     try:
@@ -928,7 +946,7 @@ async def seed_default_admin():
     existing = await db.admins.count_documents({})
     if existing:
         return
-    default_email = os.environ.get("DEFAULT_ADMIN_EMAIL", "admin@bbedits.com").lower().strip()
+    default_email = os.environ.get("DEFAULT_ADMIN_EMAIL", "admin@pranvithdop.com").lower().strip()
     default_password = os.environ.get("DEFAULT_ADMIN_PASSWORD", "Admin123!")
     default_name = os.environ.get("DEFAULT_ADMIN_NAME", "Super Admin")
     admin_doc = {
@@ -956,6 +974,8 @@ async def on_startup():
 
 
 api_router.include_router(admin_router)
+api_router.include_router(build_customer_router(db))
+api_router.include_router(build_webhook_router(db))
 
 
 # ---------- Razorpay ----------
@@ -1129,16 +1149,17 @@ async def _seed_db():
                     await db.pages.insert_one(dict(page))
                     logger.info("Inserted missing page %s", page["slug"])
 
-        # Seed products/assets
-        existing_products = await db.products.count_documents({})
-        if existing_products == 0:
-            await db.products.insert_many([dict(p) for p in ASSET_PRODUCTS])
-            logger.info("Seeded %d products", len(ASSET_PRODUCTS))
-        else:
-            for product in ASSET_PRODUCTS:
-                if await db.products.count_documents({"slug": product["slug"]}) == 0:
-                    await db.products.insert_one(dict(product))
-                    logger.info("Inserted missing product %s", product["slug"]) 
+        # Seed products/assets (upsert by slug so catalog updates apply)
+        valid_slugs = [p["slug"] for p in ASSET_PRODUCTS]
+        # Remove stale products no longer in the catalog
+        await db.products.delete_many({"slug": {"$nin": valid_slugs}})
+        for product in ASSET_PRODUCTS:
+            await db.products.update_one(
+                {"slug": product["slug"]},
+                {"$set": dict(product)},
+                upsert=True,
+            )
+        logger.info("Upserted %d products", len(ASSET_PRODUCTS))
 
         # Seed blog categories
         if await db.blog_categories.count_documents({}) == 0:

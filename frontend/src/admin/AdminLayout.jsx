@@ -14,7 +14,7 @@ const AdminLayout = () => {
         <aside className="fixed left-0 top-0 z-20 h-full w-full border-b border-slate-800 bg-slate-950/95 p-4 backdrop-blur-xl lg:relative lg:h-auto lg:w-80 lg:border-r lg:border-b-0 lg:bg-slate-950/100">
           <div className="flex items-center justify-between lg:justify-start">
             <Link to="/admin/dashboard" className="text-xl font-semibold tracking-tight text-white">
-              BBEdits CMS
+              PranvithDOP CMS
             </Link>
             <button
               type="button"

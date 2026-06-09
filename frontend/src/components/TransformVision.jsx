@@ -51,7 +51,7 @@ const TransformVision = () => {
                     <div className="w-14 h-14 rounded-full overflow-hidden bg-gradient-to-br from-orange-500 to-rose-500">
                       <img
                         src="https://customer-assets.emergentagent.com/job_bb-redesign/artifacts/n2h83zkv_IMG_7675.PNG"
-                        alt="PranavithDOP"
+                        alt="PranvithDOP"
                         className="w-full h-full object-cover"
                       />
                     </div>
@@ -76,7 +76,7 @@ const TransformVision = () => {
                     <div className="font-semibold">PRANAVITH</div>
                     <div className="text-white/70">Video Editor &amp; Mentor</div>
                     <div className="text-white/70">MASTERY VIDEO EDITING COURSE</div>
-                    <div className="text-violet-300 mt-1">t.me/bbedits</div>
+                    <div className="text-violet-300 mt-1">t.me/pranvithdop</div>
                   </div>
                   <button className="mt-3 w-full py-2 rounded-lg bg-violet-600 text-xs font-semibold">Follow</button>
                   <div className="mt-4 grid grid-cols-3 gap-1">
