@@ -4,8 +4,9 @@ import Footer from '../components/Footer';
 import { CheckCircle2, Send } from 'lucide-react';
 import { toast } from 'sonner';
 import { submitHireRequest } from '../lib/api';
+import { usePageData } from '../hooks/usePageData';
 
-const benefits = [
+const defaultBenefits = [
   'Vetted, course-trained video editors',
   'Wedding, reels, YouTube and brand specialists',
   'Fast 24–48 hour turnaround',
@@ -14,6 +15,10 @@ const benefits = [
 ];
 
 const Hire = () => {
+  const { page } = usePageData('hire');
+  const intro = page?.sections?.intro || {};
+  const benefits = page?.sections?.benefits || defaultBenefits;
+
   const [form, setForm] = useState({ name: '', email: '', requirement: '' });
   const [busy, setBusy] = useState(false);
 
@@ -43,14 +48,17 @@ const Hire = () => {
         <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-12 items-start">
           <div>
             <h1 className="text-5xl md:text-6xl font-bold tracking-tight leading-tight">
-              Hire From{' '}
-              <span className="bg-clip-text text-transparent bg-gradient-to-r from-violet-400 to-fuchsia-300">
-                Our Editors
-              </span>
+              {intro.headline || (
+                <>
+                  Hire From{' '}
+                  <span className="bg-clip-text text-transparent bg-gradient-to-r from-violet-400 to-fuchsia-300">
+                    Our Editors
+                  </span>
+                </>
+              )}
             </h1>
             <p className="mt-6 text-white/70 leading-relaxed">
-              Need a professional editor for your wedding, brand or YouTube channel? Tell us about your project
-              and we will match you with the right PranavithDOP-trained editor.
+              {intro.description || 'Need a professional editor for your wedding, brand or YouTube channel? Tell us about your project and we will match you with the right PranavithDOP-trained editor.'}
             </p>
             <ul className="mt-8 space-y-3">
               {benefits.map((b) => (

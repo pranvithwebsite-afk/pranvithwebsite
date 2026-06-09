@@ -3,7 +3,8 @@
 export const assetProducts = [
   {
     id: 'p1',
-    title: 'Cinematic LUT Pack',
+    slug: 'lut-pack-5',
+    title: 'Pranavith Cinematic LUT Pack 5',
     badge: 'SALE!',
     price: 10,
     original: 1000,

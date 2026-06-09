@@ -1,18 +1,74 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
 import { Search, Loader2 } from 'lucide-react';
 import { assetProducts } from '../data/mock';
 import { payWithRazorpay } from '../lib/razorpay';
+import { fetchProducts } from '../lib/api';
 import { toast } from 'sonner';
+
+const defaultBackgrounds = [
+  'linear-gradient(135deg, #1e3a8a 0%, #0c1e4d 60%, #050b1f 100%)',
+  'linear-gradient(135deg, #1f2937 0%, #0b1220 100%)',
+  'linear-gradient(135deg, #6d28d9 0%, #ec4899 60%, #1e1b4b 100%)',
+  'linear-gradient(135deg, #111827 0%, #1f2937 60%, #312e81 100%)',
+  'linear-gradient(135deg, #b91c1c 0%, #7f1d1d 60%, #0a0418 100%)',
+  'linear-gradient(135deg, #047857 0%, #134e4a 60%, #0a0418 100%)',
+  'linear-gradient(135deg, #be185d 0%, #4c1d95 100%)',
+  'linear-gradient(135deg, #0ea5e9 0%, #1e3a8a 100%)',
+];
+
+const normalizeProduct = (item, index) => {
+  const price = item.sale_price ?? item.price ?? 0;
+  const original = item.price && item.sale_price && item.price > item.sale_price ? item.price : item.original ?? null;
+  const name = item.name || item.title || 'Asset';
+  const category = item.category || 'Asset';
+  const slug = item.slug || String(item.id);
+  const headline = name.split(' ')[0].toUpperCase();
+  const subhead = category;
+
+  return {
+    id: item.id,
+    slug,
+    title: name,
+    price,
+    original,
+    isFree: price === 0,
+    isPaid: price > 0,
+    createdAt: item.created_at || item.createdAt || new Date().toISOString(),
+    bg: item.bg || defaultBackgrounds[index % defaultBackgrounds.length],
+    headline,
+    subhead,
+    badge: price === 0 ? 'FREE' : 'SALE!',
+    description: item.description || item.excerpt || '',
+  };
+};
 
 const Assets = () => {
   const [query, setQuery] = useState('');
   const [sort, setSort] = useState('newest');
   const [priceFilter, setPriceFilter] = useState('all');
+  const [products, setProducts] = useState(assetProducts.map((p, idx) => normalizeProduct(p, idx)));
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const data = await fetchProducts();
+        if (Array.isArray(data) && data.length) {
+          setProducts(data.map((p, idx) => normalizeProduct(p, idx)));
+        }
+      } catch (e) {
+        // fallback to mock
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
 
   const filtered = useMemo(() => {
-    let list = [...assetProducts];
+    let list = [...products];
     if (query.trim()) {
       const q = query.toLowerCase();
       list = list.filter((p) => p.title.toLowerCase().includes(q));
@@ -25,7 +81,7 @@ const Assets = () => {
         : new Date(a.createdAt) - new Date(b.createdAt)
     );
     return list;
-  }, [query, sort, priceFilter]);
+  }, [products, query, sort, priceFilter]);
 
   return (
     <main className="bg-[#070314] text-white min-h-screen">
@@ -35,7 +91,7 @@ const Assets = () => {
       <section className="pt-32 pb-10">
         <div className="max-w-7xl mx-auto px-6">
           <div className="rounded-2xl bg-gradient-to-r from-violet-900/40 via-indigo-900/30 to-violet-900/40 border border-violet-500/20 px-8 py-7">
-            <h1 className="text-2xl md:text-4xl font-bold tracking-tight">Editing Assets Shop</h1>
+            <h1 className="text-2xl md:text-4xl font-bold tracking-tight">Creative Assets Store</h1>
             <p className="mt-2 text-sm text-white/65">
               Premium LUTs, sound packs, motion templates and more — built for editors.
             </p>
@@ -152,9 +208,15 @@ const RadioRow = ({ name, value, checked, onChange, label }) => (
 );
 
 const ProductCard = ({ p }) => {
+  const navigate = useNavigate();
   const [busy, setBusy] = useState(false);
 
   const onBuy = async () => {
+    if (p.slug === 'lut-pack-5') {
+      navigate('/assets/lut-pack-5');
+      return;
+    }
+
     if (p.isFree) {
       toast.success(`${p.title} added to your downloads (free).`);
       return;
