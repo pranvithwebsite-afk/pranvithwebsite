@@ -97,7 +97,7 @@ const ThankYou = () => {
               <p className="text-xs uppercase tracking-[0.35em] text-white/45 mb-4">How to use</p>
               <ol className="space-y-3 list-decimal list-inside text-white/80">
                 {ty.instructions.map((step, idx) => (
-                  <li key={idx} className="leading-relaxed">{step}</li>
+                  <li key={`step-${idx}`} className="leading-relaxed">{step}</li>
                 ))}
               </ol>
             </div>

@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback, useMemo } from 'react';
 import {
   customerApi,
   setCustomerAuthToken,
@@ -65,8 +65,13 @@ export const CustomerAuthProvider = ({ children }) => {
     setUser(null);
   }, []);
 
+  const value = useMemo(
+    () => ({ user, token, loading, login, register, logout }),
+    [user, token, loading, login, register, logout]
+  );
+
   return (
-    <CustomerAuthContext.Provider value={{ user, token, loading, login, register, logout }}>
+    <CustomerAuthContext.Provider value={value}>
       {children}
     </CustomerAuthContext.Provider>
   );

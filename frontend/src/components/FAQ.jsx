@@ -41,7 +41,7 @@ const FAQ = () => {
             const isOpen = open === i;
             return (
               <div
-                key={i}
+                key={f.id || f.q || i}
                 className={`rounded-2xl border transition-all ${
                   isOpen ? 'border-violet-500/40 bg-[#100830]/70' : 'border-white/10 bg-[#0f0830]/40 hover:border-violet-500/25'
                 }`}

@@ -22,7 +22,7 @@ const Orders = () => {
       <div className="space-y-4">
         {loading
           ? Array.from({ length: 3 }).map((_, index) => (
-              <div key={index} className="rounded-3xl border border-slate-800 bg-slate-950 p-5 h-28 animate-pulse" />
+              <div key={`skeleton-${index}`} className="rounded-3xl border border-slate-800 bg-slate-950 p-5 h-28 animate-pulse" />
             ))
           : orders.length > 0
           ? orders.map((order) => (

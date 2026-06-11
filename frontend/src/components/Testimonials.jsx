@@ -36,7 +36,7 @@ const Testimonials = () => {
           <div className="absolute right-0 top-0 bottom-0 w-24 z-10 bg-gradient-to-l from-[#070314] to-transparent pointer-events-none" />
           <div className="flex gap-5 animate-marquee w-max">
             {all1.map((t, idx) => (
-              <TestimonialCard key={idx} t={t} />
+              <TestimonialCard key={`r1-${t.id || t.name || ''}-${idx}`} t={t} />
             ))}
           </div>
         </div>
@@ -46,7 +46,7 @@ const Testimonials = () => {
           <div className="absolute right-0 top-0 bottom-0 w-24 z-10 bg-gradient-to-l from-[#070314] to-transparent pointer-events-none" />
           <div className="flex gap-5 animate-marquee-slow w-max" style={{ animationDirection: 'reverse' }}>
             {all2.map((t, idx) => (
-              <TestimonialCard key={idx} t={t} />
+              <TestimonialCard key={`r2-${t.id || t.name || ''}-${idx}`} t={t} />
             ))}
           </div>
         </div>
@@ -59,7 +59,7 @@ const TestimonialCard = ({ t }) => (
   <div className="w-[340px] shrink-0 p-6 rounded-2xl border border-violet-500/15 bg-gradient-to-br from-[#100830]/60 to-[#070314]/60 hover:border-violet-500/40 transition">
     <div className="flex gap-0.5 mb-4">
       {Array.from({ length: t.rating }).map((_, i) => (
-        <Star key={i} size={16} className="text-amber-400 fill-amber-400" />
+        <Star key={`${t.id || t.name}-star-${i}`} size={16} className="text-amber-400 fill-amber-400" />
       ))}
     </div>
     <p className="text-sm text-white/85 leading-relaxed mb-5 min-h-[56px]">&ldquo;{t.text}&rdquo;</p>

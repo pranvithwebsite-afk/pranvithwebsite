@@ -152,7 +152,7 @@ class TestCheckoutInit:
         body = r.json()
         assert "payment_link" in body
         assert "order_id" in body
-        assert body.get("is_free") is False
+        assert body.get("is_free") == False
         assert "prefill[email]" in body["payment_link"]
         assert f"notes[order_id]={body['order_id']}" in body["payment_link"]
         # Save the order_id for the webhook test on this user
@@ -175,7 +175,7 @@ class TestFreeClaim:
                          json={"product_slug": "smooth-transitions-pack"},
                          headers=auth_headers(fresh_user["token"]))
         assert r.status_code == 200, r.text
-        assert r.json().get("success") is True
+        assert r.json().get("success") == True
 
         # GET downloads to verify persistence
         r2 = session.get(f"{API}/auth/my-downloads", headers=auth_headers(fresh_user["token"]))
@@ -260,7 +260,7 @@ class TestWebhook:
         }
         r = session.post(f"{API}/webhooks/razorpay", json=payload)
         assert r.status_code == 200, r.text
-        assert r.json().get("received") is True
+        assert r.json().get("received") == True
 
         # Verify downloads now includes the paid product
         r2 = session.get(f"{API}/auth/my-downloads", headers=auth_headers(fresh_user["token"]))

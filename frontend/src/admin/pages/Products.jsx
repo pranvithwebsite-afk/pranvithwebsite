@@ -463,7 +463,7 @@ const ArrayEditor = ({
       <div className="flex flex-wrap gap-2">
         {items.map((item, idx) => (
           <div
-            key={idx}
+            key={`${item}-${idx}`}
             className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-900 border border-slate-700 text-slate-100 text-sm"
           >
             <span className="truncate max-w-xs">{item}</span>

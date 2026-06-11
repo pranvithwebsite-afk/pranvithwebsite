@@ -264,7 +264,7 @@ const AssetLanding = () => {
                 </thead>
                 <tbody>
                   {marketTable.map((row, idx) => (
-                    <tr key={idx} className="border-b border-white/10 last:border-b-0">
+                    <tr key={`${row[0]}-${idx}`} className="border-b border-white/10 last:border-b-0">
                       <td className="px-6 py-4 text-white/85 font-medium">{row[0]}</td>
                       <td className="px-6 py-4">{row[1]}</td>
                       <td className="px-6 py-4">{row[2]}</td>
@@ -284,7 +284,7 @@ const AssetLanding = () => {
             <h2 className="text-3xl font-bold tracking-tight mb-8">Frequently Asked Questions</h2>
             <div className="grid gap-4">
               {faqs.map((item, idx) => (
-                <div key={idx} className="rounded-3xl border border-white/10 bg-[#0a0518]/90 p-6">
+                <div key={item.q || idx} className="rounded-3xl border border-white/10 bg-[#0a0518]/90 p-6">
                   <p className="font-semibold text-white">{item.q}</p>
                   <p className="mt-3 text-white/70 leading-relaxed text-sm">{item.a}</p>
                 </div>
