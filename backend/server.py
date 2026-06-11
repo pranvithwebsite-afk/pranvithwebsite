@@ -55,6 +55,16 @@ if RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET:
     except Exception as _e:
         razorpay_client = None
 
+
+def smtp_configured() -> bool:
+    return all([
+        os.environ.get("SMTP_HOST"),
+        os.environ.get("SMTP_PORT"),
+        os.environ.get("SMTP_USER"),
+        os.environ.get("SMTP_PASS"),
+        os.environ.get("SMTP_FROM") or os.environ.get("SMTP_USER"),
+    ])
+
 app = FastAPI(title='PranvithDOP API')
 api_router = APIRouter(prefix="/api")
 
@@ -405,7 +415,13 @@ class StatusCheckCreate(BaseModel):
 # ---------- Routes ----------
 @api_router.get("/")
 async def root():
-    return {"message": "PranvithDOP API", "status": "ok", "db_configured": db is not None}
+    return {
+        "message": "PranvithDOP API",
+        "status": "ok",
+        "db_configured": db is not None,
+        "razorpay_configured": razorpay_client is not None,
+        "smtp_configured": smtp_configured(),
+    }
 
 
 @api_router.get("/courses", response_model=List[Course])
@@ -1043,9 +1059,18 @@ async def seed_default_admin():
 
 @app.on_event("startup")
 async def on_startup():
+    logger.info("MongoDB configured: %s", db is not None)
+    logger.info("Razorpay configured: %s", razorpay_client is not None)
+    logger.info("SMTP configured: %s", smtp_configured())
     if db is None:
         logger.warning("MONGO_URL and DB_NAME are not configured; using public seed-data fallbacks.")
         return
+    try:
+        await db.command("ping")
+        logger.info("MongoDB connection established for database: %s", db_name)
+    except Exception:
+        logger.exception("MongoDB connection failed")
+        raise
     await prepare_cms_collections()
     await seed_default_admin()
     # Seed default content in the background to keep startup responsive.
