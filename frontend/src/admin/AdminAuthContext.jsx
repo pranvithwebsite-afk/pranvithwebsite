@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { adminLogin, fetchAdminMe, setAdminAuthToken } from '../lib/api';
 
@@ -10,19 +10,19 @@ export const AdminAuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
-  const clearAuth = () => {
+  const clearAuth = useCallback(() => {
     setToken(null);
     setAdmin(null);
     setAdminAuthToken(null);
     localStorage.removeItem('cms_admin');
-  };
+  }, []);
 
-  const setAdminSession = (authToken, adminProfile) => {
+  const setAdminSession = useCallback((authToken, adminProfile) => {
     setToken(authToken);
     setAdmin(adminProfile);
     setAdminAuthToken(authToken);
     localStorage.setItem('cms_admin', JSON.stringify({ token: authToken, admin: adminProfile }));
-  };
+  }, []);
 
   useEffect(() => {
     const stored = localStorage.getItem('cms_admin');
@@ -47,22 +47,22 @@ export const AdminAuthProvider = ({ children }) => {
       clearAuth();
       setLoading(false);
     }
-  }, []);
+  }, [clearAuth, setAdminSession]);
 
-  const login = async ({ email, password }) => {
+  const login = useCallback(async ({ email, password }) => {
     const result = await adminLogin({ email, password });
     setAdminSession(result.access_token, result.admin);
     return result;
-  };
+  }, [setAdminSession]);
 
-  const logout = () => {
+  const logout = useCallback(() => {
     clearAuth();
     navigate('/admin/login');
-  };
+  }, [clearAuth, navigate]);
 
   const value = useMemo(
     () => ({ admin, token, login, logout, loading, isAuthenticated: Boolean(admin) }),
-    [admin, token, loading]
+    [admin, token, login, logout, loading]
   );
 
   return <AdminAuthContext.Provider value={value}>{children}</AdminAuthContext.Provider>;
