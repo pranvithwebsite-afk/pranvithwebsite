@@ -33,6 +33,25 @@ JWT_EXPIRATION_MINUTES=180
 3. Add the environment variables above for Production, Preview, and Development as needed.
 4. Deploy. Vercel reads `vercel.json`, builds `frontend/package.json`, and routes `/api/*` to `api/index.py`.
 
+## Domain DNS
+
+Vercel project aliases:
+
+```text
+pranvithdop.com
+www.pranvithdop.com
+```
+
+Hostinger DNS must be:
+
+```text
+Type  Name  Value
+A     @     76.76.21.21
+CNAME www   b29cf27618525d1a.vercel-dns-017.com
+```
+
+Current root-domain issue: `pranvithdop.com` still resolves to `216.198.79.1`. Change the Hostinger `@` A record to `76.76.21.21`, then wait for DNS propagation. The `www` CNAME is already pointed at Vercel.
+
 ## Local Production Check
 
 From `frontend/`:
