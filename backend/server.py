@@ -473,6 +473,7 @@ async def public_page_by_slug(slug: str):
 def _public_product(product: dict) -> dict:
     safe = dict(product)
     safe.pop("download_file", None)
+    safe.pop("payment_link", None)
     return safe
 
 
@@ -480,7 +481,7 @@ def _public_product(product: dict) -> dict:
 async def public_products():
     if db is None:
         return [_public_product(product) for product in ASSET_PRODUCTS if product.get("published", True)]
-    rows = await db.products.find({"published": True}, {"_id": 0, "download_file": 0}).to_list(100)
+    rows = await db.products.find({"published": True}, {"_id": 0, "download_file": 0, "payment_link": 0}).to_list(100)
     return rows
 
 
@@ -491,7 +492,7 @@ async def public_product_by_slug(slug: str):
         if not product:
             raise HTTPException(status_code=404, detail="Product not found")
         return _public_product(product)
-    product = await db.products.find_one({"slug": slug, "published": True}, {"_id": 0, "download_file": 0})
+    product = await db.products.find_one({"slug": slug, "published": True}, {"_id": 0, "download_file": 0, "payment_link": 0})
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
     return product
@@ -1441,7 +1442,14 @@ if UPLOAD_DIR.exists():
 app.add_middleware(
     CORSMiddleware,
     allow_credentials=True,
-    allow_origins=os.environ.get('CORS_ORIGINS', '*').split(','),
+    allow_origins=[
+        origin.strip()
+        for origin in os.environ.get(
+            "CORS_ORIGINS",
+            "https://pranvithdop.com,https://www.pranvithdop.com,http://localhost:3000",
+        ).split(",")
+        if origin.strip()
+    ],
     allow_methods=["*"],
     allow_headers=["*"],
 )

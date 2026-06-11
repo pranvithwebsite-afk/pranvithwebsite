@@ -188,7 +188,8 @@ def build_customer_router(db) -> APIRouter:
     @router.get("/my-orders")
     async def my_orders(user: dict = Depends(get_current_customer)):
         orders = await db.orders.find(
-            {"user_id": user["id"]}, {"_id": 0}
+            {"user_id": user["id"]},
+            {"_id": 0, "download_file": 0, "download_token_hash": 0, "razorpay_signature": 0},
         ).sort("created_at", -1).to_list(200)
         return orders
 

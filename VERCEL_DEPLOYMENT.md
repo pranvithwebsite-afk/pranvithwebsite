@@ -15,24 +15,28 @@ Set these in Vercel Project Settings > Environment Variables:
 MONGO_URL=your_mongodb_connection_string
 DB_NAME=pranvithdop
 JWT_SECRET=make_any_long_random_secret
+CUSTOMER_JWT_SECRET=make_a_different_long_random_secret
 DEFAULT_ADMIN_EMAIL=your_email@gmail.com
 DEFAULT_ADMIN_PASSWORD=your_admin_password
 DEFAULT_ADMIN_NAME=Pranvith
 RAZORPAY_KEY_ID=your_razorpay_key_id
 RAZORPAY_KEY_SECRET=your_razorpay_key_secret
+RAZORPAY_WEBHOOK_SECRET=your_razorpay_webhook_secret
 REACT_APP_RAZORPAY_KEY_ID=your_razorpay_key_id
 SMTP_HOST=smtp.example.com
 SMTP_PORT=587
 SMTP_USER=your_smtp_username
 SMTP_PASS=your_smtp_password
 SMTP_FROM="PranvithDOP <no-reply@pranvithdop.com>"
-CORS_ORIGINS=*
+PUBLIC_BASE_URL=https://pranvithdop.com
+CORS_ORIGINS=https://pranvithdop.com,https://www.pranvithdop.com
 JWT_EXPIRATION_MINUTES=180
+CUSTOMER_JWT_EXPIRATION_MINUTES=1440
 ```
 
 `REACT_APP_BACKEND_URL` is optional. Leave it unset on Vercel so the frontend uses the same deployment origin and calls `/api`. Set it only if the frontend must call a separate backend host.
 
-`RAZORPAY_KEY_SECRET` must only be set for the backend environment. The frontend should use `REACT_APP_RAZORPAY_KEY_ID` only. `PUBLIC_BASE_URL` is optional; set it to your production origin if you want confirmation emails to include absolute download URLs.
+`RAZORPAY_KEY_SECRET` must only be set for the backend environment. The frontend should use `REACT_APP_RAZORPAY_KEY_ID` only. `PUBLIC_BASE_URL` is used for absolute secure download links in confirmation emails.
 
 ## Deploy From GitHub
 

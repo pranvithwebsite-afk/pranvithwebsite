@@ -60,7 +60,7 @@
     "test": "craco test"
   },
   "engines": {
-    "node": ">=20 <25",
+    "node": ">=20 <26",
     "npm": ">=10 <12"
   },
   "browserslist": {
@@ -79,7 +79,6 @@
     "@babel/plugin-proposal-private-property-in-object": "7.21.11",
     "@craco/craco": "7.1.0",
     "autoprefixer": "10.4.20",
-    "dotenv": "16.4.5",
     "eslint": "8.57.1",
     "eslint-plugin-react-hooks": "5.2.0",
     "postcss": "8.4.49",
