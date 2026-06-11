@@ -35,7 +35,7 @@ const Header = () => {
         <Link to="/" className="flex items-center gap-2 shrink-0" data-testid="header-brand">
           <div className="w-9 h-9 rounded-full overflow-hidden ring-2 ring-violet-500/40 bg-gradient-to-br from-rose-500 to-orange-500">
             <img
-              src="https://customer-assets.emergentagent.com/job_bb-redesign/artifacts/n2h83zkv_IMG_7675.PNG"
+              src="/assets/brand-profile.png"
               alt="PranvithDOP"
               className="w-full h-full object-cover"
             />

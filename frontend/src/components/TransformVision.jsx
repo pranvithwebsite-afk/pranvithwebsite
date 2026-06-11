@@ -50,7 +50,7 @@ const TransformVision = () => {
                   <div className="flex items-center gap-3 mb-3">
                     <div className="w-14 h-14 rounded-full overflow-hidden bg-gradient-to-br from-orange-500 to-rose-500">
                       <img
-                        src="https://customer-assets.emergentagent.com/job_bb-redesign/artifacts/n2h83zkv_IMG_7675.PNG"
+                        src="/assets/brand-profile.png"
                         alt="PranvithDOP"
                         className="w-full h-full object-cover"
                       />

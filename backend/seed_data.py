@@ -2,15 +2,15 @@
 import uuid
 
 # Asset hero images (uploaded by user)
-IMG_CREATIVE_LUT = "https://customer-assets.emergentagent.com/job_bb-redesign/artifacts/s5119fa9_creative%20luts.PNG"
-IMG_SMOOTH_TRANS = "https://customer-assets.emergentagent.com/job_bb-redesign/artifacts/6tryef8s_Smooth%20transition.PNG"
-IMG_MUSIC_BUNDLE = "https://customer-assets.emergentagent.com/job_bb-redesign/artifacts/9i2oc9yg_Royal%20free%20music%20bundle.PNG"
-IMG_SOUND_FX = "https://customer-assets.emergentagent.com/job_bb-redesign/artifacts/ij9tey1x_Cinematic%20Sound%20Fx.PNG"
-IMG_TYPOGRAPHY = "https://customer-assets.emergentagent.com/job_bb-redesign/artifacts/6drz1ha4_Typography%20Fonts.PNG"
+IMG_CREATIVE_LUT = "/assets/creative-luts.png"
+IMG_SMOOTH_TRANS = "/assets/smooth-transition.png"
+IMG_MUSIC_BUNDLE = "/assets/royalty-free-music-bundle.png"
+IMG_SOUND_FX = "/assets/cinematic-sound-fx.png"
+IMG_TYPOGRAPHY = "/assets/typography-fonts.png"
 # Reused / generic for assets without dedicated images yet
-IMG_PREMIERE_WED = "https://customer-assets.emergentagent.com/job_bb-redesign/artifacts/udmgpnfi_Wedding%20templates.PNG"
-IMG_AE_TITLES = "https://customer-assets.emergentagent.com/job_bb-redesign/artifacts/6qb8citv_ChatGPT%20Image%20Jun%2010%2C%202026%2C%2001_33_59%20AM.png"
-IMG_COLOR_GRAD = "https://customer-assets.emergentagent.com/job_bb-redesign/artifacts/r933b3bq_colour%20gradient.PNG"
+IMG_PREMIERE_WED = "/assets/wedding-templates.png"
+IMG_AE_TITLES = "/assets/after-effects-titles.png"
+IMG_COLOR_GRAD = "/assets/color-gradient.png"
 
 
 def _landing(headline, subhead, bullets, before_after_desc, compat, table, faqs):
