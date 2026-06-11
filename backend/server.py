@@ -34,9 +34,10 @@ from seed_data import (
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
-mongo_url = os.environ['MONGO_URL']
-client = AsyncIOMotorClient(mongo_url)
-db = client[os.environ['DB_NAME']]
+mongo_url = os.environ.get('MONGO_URL')
+db_name = os.environ.get('DB_NAME')
+client = AsyncIOMotorClient(mongo_url) if mongo_url and db_name else None
+db = client[db_name] if client is not None else None
 
 # Razorpay client (lazy / safe-init)
 RAZORPAY_KEY_ID = os.environ.get('RAZORPAY_KEY_ID', '')
@@ -384,29 +385,37 @@ class StatusCheckCreate(BaseModel):
 # ---------- Routes ----------
 @api_router.get("/")
 async def root():
-    return {"message": "PranvithDOP API", "status": "ok"}
+    return {"message": "PranvithDOP API", "status": "ok", "db_configured": db is not None}
 
 
 @api_router.get("/courses", response_model=List[Course])
 async def get_courses():
+    if db is None:
+        return COURSES
     rows = await db.courses.find({}, {"_id": 0}).sort("order", 1).to_list(100)
     return rows
 
 
 @api_router.get("/testimonials", response_model=List[Testimonial])
 async def get_testimonials():
+    if db is None:
+        return TESTIMONIALS
     rows = await db.testimonials.find({}, {"_id": 0}).to_list(200)
     return rows
 
 
 @api_router.get("/faqs", response_model=List[FAQ])
 async def get_faqs():
+    if db is None:
+        return FAQS
     rows = await db.faqs.find({}, {"_id": 0}).sort("order", 1).to_list(100)
     return rows
 
 
 @api_router.get("/settings")
 async def public_settings():
+    if db is None:
+        return SETTINGS
     settings_doc = await db.settings.find_one({}, {"_id": 0})
     if not settings_doc:
         return {
@@ -423,11 +432,18 @@ async def public_settings():
 
 @api_router.get("/pages")
 async def public_pages():
+    if db is None:
+        return [page for page in PAGES if page.get("published", True)]
     return await db.pages.find({"published": True}, {"_id": 0}).to_list(100)
 
 
 @api_router.get("/pages/{slug}")
 async def public_page_by_slug(slug: str):
+    if db is None:
+        page = next((page for page in PAGES if page.get("slug") == slug and page.get("published", True)), None)
+        if not page:
+            raise HTTPException(status_code=404, detail="Page not found")
+        return page
     page = await db.pages.find_one({"slug": slug, "published": True}, {"_id": 0})
     if not page:
         raise HTTPException(status_code=404, detail="Page not found")
@@ -436,11 +452,18 @@ async def public_page_by_slug(slug: str):
 
 @api_router.get("/products")
 async def public_products():
+    if db is None:
+        return [product for product in ASSET_PRODUCTS if product.get("published", True)]
     return await db.products.find({"published": True}, {"_id": 0}).to_list(100)
 
 
 @api_router.get("/products/{slug}")
 async def public_product_by_slug(slug: str):
+    if db is None:
+        product = next((product for product in ASSET_PRODUCTS if product.get("slug") == slug and product.get("published", True)), None)
+        if not product:
+            raise HTTPException(status_code=404, detail="Product not found")
+        return product
     product = await db.products.find_one({"slug": slug, "published": True}, {"_id": 0})
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
@@ -449,11 +472,18 @@ async def public_product_by_slug(slug: str):
 
 @api_router.get("/blog-posts")
 async def public_blog_posts():
+    if db is None:
+        return [post for post in BLOG_POSTS if post.get("published", True)]
     return await db.blog_posts.find({"published": True}, {"_id": 0}).to_list(100)
 
 
 @api_router.get("/blog-posts/{slug}")
 async def public_blog_post(slug: str):
+    if db is None:
+        post = next((post for post in BLOG_POSTS if post.get("slug") == slug and post.get("published", True)), None)
+        if not post:
+            raise HTTPException(status_code=404, detail="Blog post not found")
+        return post
     post = await db.blog_posts.find_one({"slug": slug, "published": True}, {"_id": 0})
     if not post:
         raise HTTPException(status_code=404, detail="Blog post not found")
@@ -462,6 +492,8 @@ async def public_blog_post(slug: str):
 
 @api_router.get("/blog-categories")
 async def public_blog_categories():
+    if db is None:
+        return BLOG_CATEGORIES
     return await db.blog_categories.find({}, {"_id": 0}).to_list(100)
 
 
@@ -983,6 +1015,9 @@ async def seed_default_admin():
 
 @app.on_event("startup")
 async def on_startup():
+    if db is None:
+        logger.warning("MONGO_URL and DB_NAME are not configured; using public seed-data fallbacks.")
+        return
     await prepare_cms_collections()
     await seed_default_admin()
     # Seed default content in the background to keep startup responsive.
@@ -1230,4 +1265,5 @@ async def _seed_db():
 
 @app.on_event("shutdown")
 async def shutdown_db_client():
-    client.close()
+    if client is not None:
+        client.close()
