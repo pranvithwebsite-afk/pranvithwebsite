@@ -30,9 +30,10 @@ const loadScript = () =>
  * @param {string} opts.itemId
  * @param {string} opts.itemName
  * @param {Object} [opts.prefill]      { name, email, contact }
- * @returns {Promise<{success: boolean, paymentId?: string, orderId?: string, error?: string}>}
+ * @param {string} [opts.productSlug]
+ * @returns {Promise<{success: boolean, paymentId?: string, orderId?: string, downloadUrl?: string, productSlug?: string, error?: string}>}
  */
-export async function payWithRazorpay({ amountRupees, itemId, itemName, prefill = {} }) {
+export async function payWithRazorpay({ amountRupees, itemId, itemName, productSlug, prefill = {} }) {
   if (!RAZORPAY_KEY_ID) {
     return { success: false, error: 'Razorpay key missing on client' };
   }
@@ -41,15 +42,15 @@ export async function payWithRazorpay({ amountRupees, itemId, itemName, prefill 
     return { success: false, error: 'Failed to load Razorpay SDK' };
   }
 
-  // 1. Create order on backend
-  const amountPaise = Math.max(100, Math.round(Number(amountRupees) * 100));
+  // 1. Create order on backend. The backend calculates the final amount from the product.
   let order;
   try {
-    const { data } = await api.post('/create-order', {
-      amount: amountPaise,
-      currency: 'INR',
-      item_id: itemId || '',
-      item_name: itemName || '',
+    const { data } = await api.post('/payments/create-order', {
+      product_id: itemId || '',
+      product_slug: productSlug || '',
+      name: prefill.name || '',
+      email: prefill.email || '',
+      phone: prefill.contact || '',
     });
     order = data;
   } catch (err) {
@@ -73,19 +74,17 @@ export async function payWithRazorpay({ amountRupees, itemId, itemName, prefill 
       },
       handler: async (response) => {
         try {
-          const { data } = await api.post('/verify-payment', {
+          const { data } = await api.post('/payments/verify', {
             razorpay_order_id: response.razorpay_order_id,
             razorpay_payment_id: response.razorpay_payment_id,
             razorpay_signature: response.razorpay_signature,
-            item_id: itemId || '',
-            item_name: itemName || '',
-            amount: order.amount,
-            email: prefill.email || '',
           });
           resolve({
             success: !!data?.success,
             paymentId: response.razorpay_payment_id,
             orderId: response.razorpay_order_id,
+            productSlug: data?.product_slug,
+            downloadUrl: data?.download_url,
           });
         } catch (err) {
           const msg = err?.response?.data?.detail || 'Verification failed';

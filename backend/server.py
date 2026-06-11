@@ -2,15 +2,21 @@ from fastapi import FastAPI, APIRouter, HTTPException, Depends, status, UploadFi
 from fastapi.security import OAuth2PasswordBearer
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
+from starlette.responses import RedirectResponse
 from motor.motor_asyncio import AsyncIOMotorClient
 from passlib.context import CryptContext
 from jose import JWTError, jwt
+from email.message import EmailMessage
 import os
 import json
 import asyncio
 import hmac
 import hashlib
 import logging
+import re
+import secrets
+import smtplib
+import ssl
 from pathlib import Path
 from pydantic import BaseModel, Field, ConfigDict, EmailStr
 from typing import Any, Dict, List, Optional
@@ -371,6 +377,20 @@ class VerifyPaymentIn(BaseModel):
     email: Optional[str] = None
 
 
+class PaymentCreateOrderIn(BaseModel):
+    product_id: Optional[str] = None
+    product_slug: Optional[str] = None
+    name: str = Field(min_length=2, max_length=120)
+    email: EmailStr
+    phone: str = Field(min_length=7, max_length=20)
+
+
+class PaymentVerifyIn(BaseModel):
+    razorpay_order_id: str
+    razorpay_payment_id: str
+    razorpay_signature: str
+
+
 class StatusCheck(BaseModel):
     model_config = ConfigDict(extra="ignore")
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
@@ -450,11 +470,18 @@ async def public_page_by_slug(slug: str):
     return page
 
 
+def _public_product(product: dict) -> dict:
+    safe = dict(product)
+    safe.pop("download_file", None)
+    return safe
+
+
 @api_router.get("/products")
 async def public_products():
     if db is None:
-        return [product for product in ASSET_PRODUCTS if product.get("published", True)]
-    return await db.products.find({"published": True}, {"_id": 0}).to_list(100)
+        return [_public_product(product) for product in ASSET_PRODUCTS if product.get("published", True)]
+    rows = await db.products.find({"published": True}, {"_id": 0, "download_file": 0}).to_list(100)
+    return rows
 
 
 @api_router.get("/products/{slug}")
@@ -463,8 +490,8 @@ async def public_product_by_slug(slug: str):
         product = next((product for product in ASSET_PRODUCTS if product.get("slug") == slug and product.get("published", True)), None)
         if not product:
             raise HTTPException(status_code=404, detail="Product not found")
-        return product
-    product = await db.products.find_one({"slug": slug, "published": True}, {"_id": 0})
+        return _public_product(product)
+    product = await db.products.find_one({"slug": slug, "published": True}, {"_id": 0, "download_file": 0})
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
     return product
@@ -1030,6 +1057,258 @@ api_router.include_router(build_webhook_router(db))
 
 
 # ---------- Razorpay ----------
+def _normalize_phone(phone: str) -> str:
+    cleaned = re.sub(r"[\s().-]+", "", phone or "")
+    if not re.fullmatch(r"\+?\d{7,15}", cleaned):
+        raise HTTPException(status_code=422, detail="Enter a valid phone number")
+    return cleaned
+
+
+def _hash_download_token(token: str) -> str:
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
+def _paid_download_url(order_id: str, token: str) -> str:
+    return f"/api/orders/{order_id}/download?token={token}"
+
+
+async def _find_checkout_product(product_id: Optional[str], product_slug: Optional[str]) -> dict:
+    product = None
+    if db is not None:
+        query = {"published": True}
+        if product_id:
+            product = await db.products.find_one({**query, "id": product_id}, {"_id": 0})
+        if not product and product_slug:
+            product = await db.products.find_one({**query, "slug": product_slug}, {"_id": 0})
+    if not product:
+        product = next(
+            (
+                p for p in ASSET_PRODUCTS
+                if p.get("published", True)
+                and ((product_id and p.get("id") == product_id) or (product_slug and p.get("slug") == product_slug))
+            ),
+            None,
+        )
+    if not product:
+        raise HTTPException(status_code=404, detail="Product not found")
+    return product
+
+
+def _product_price_paise(product: dict) -> int:
+    price_rupees = product.get("sale_price")
+    if price_rupees is None:
+        price_rupees = product.get("price", 0)
+    amount = int(round(float(price_rupees or 0) * 100))
+    if product.get("is_free") or amount <= 0:
+        raise HTTPException(status_code=400, detail="This product does not require payment")
+    if amount < 100:
+        raise HTTPException(status_code=400, detail="Amount must be at least 100 paise")
+    return amount
+
+
+def _send_confirmation_email(to_email: str, buyer_name: str, product_name: str, payment_id: str, download_url: str) -> bool:
+    smtp_host = os.environ.get("SMTP_HOST")
+    smtp_port = int(os.environ.get("SMTP_PORT", "587") or "587")
+    smtp_user = os.environ.get("SMTP_USER")
+    smtp_pass = os.environ.get("SMTP_PASS")
+    smtp_from = os.environ.get("SMTP_FROM") or smtp_user
+    if not all([smtp_host, smtp_port, smtp_user, smtp_pass, smtp_from]):
+        logger.warning("SMTP is not fully configured; confirmation email skipped")
+        return False
+
+    msg = EmailMessage()
+    msg["Subject"] = f"Your {product_name} download is ready"
+    msg["From"] = smtp_from
+    msg["To"] = to_email
+    msg.set_content(
+        "\n".join([
+            f"Hi {buyer_name},",
+            "",
+            "Thank you for your purchase.",
+            f"Product: {product_name}",
+            f"Payment ID: {payment_id}",
+            f"Download: {download_url}",
+            "",
+            "This download link is protected and should not be shared.",
+        ])
+    )
+
+    try:
+        context = ssl.create_default_context()
+        if smtp_port == 465:
+            with smtplib.SMTP_SSL(smtp_host, smtp_port, context=context, timeout=20) as server:
+                server.login(smtp_user, smtp_pass)
+                server.send_message(msg)
+        else:
+            with smtplib.SMTP(smtp_host, smtp_port, timeout=20) as server:
+                server.starttls(context=context)
+                server.login(smtp_user, smtp_pass)
+                server.send_message(msg)
+        return True
+    except Exception:
+        logger.exception("confirmation email failed")
+        return False
+
+
+@api_router.post("/payments/create-order")
+async def payment_create_order(payload: PaymentCreateOrderIn):
+    if db is None:
+        raise HTTPException(status_code=500, detail="Database not configured")
+    if razorpay_client is None:
+        raise HTTPException(status_code=500, detail="Payment gateway not configured")
+
+    phone = _normalize_phone(payload.phone)
+    product = await _find_checkout_product(payload.product_id, payload.product_slug)
+    amount = _product_price_paise(product)
+    receipt = f"asset_{uuid.uuid4().hex[:24]}"
+
+    try:
+        razorpay_order = razorpay_client.order.create({
+            "amount": amount,
+            "currency": "INR",
+            "receipt": receipt,
+            "payment_capture": 1,
+            "notes": {
+                "product_id": product.get("id", ""),
+                "product_slug": product.get("slug", ""),
+                "product_name": product.get("name", ""),
+                "buyer_email": str(payload.email).lower().strip(),
+            },
+        })
+    except razorpay.errors.BadRequestError as e:
+        logger.exception("Razorpay bad request")
+        raise HTTPException(status_code=400, detail=str(e))
+    except razorpay.errors.ServerError:
+        logger.exception("Razorpay server error")
+        raise HTTPException(status_code=502, detail="Payment gateway error")
+    except Exception:
+        logger.exception("Razorpay order failure")
+        raise HTTPException(status_code=500, detail="Could not create order")
+
+    order_doc = {
+        "id": str(uuid.uuid4()),
+        "razorpay_order_id": razorpay_order.get("id"),
+        "amount": razorpay_order.get("amount"),
+        "currency": razorpay_order.get("currency", "INR"),
+        "receipt": receipt,
+        "product_id": product.get("id"),
+        "product_slug": product.get("slug"),
+        "product_name": product.get("name"),
+        "status": "created",
+        "buyer_name": payload.name.strip(),
+        "buyer_email": str(payload.email).lower().strip(),
+        "buyer_phone": phone,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "source": "razorpay_checkout",
+    }
+    await db.orders.insert_one(order_doc)
+
+    return {
+        "order_id": razorpay_order.get("id"),
+        "amount": razorpay_order.get("amount"),
+        "currency": razorpay_order.get("currency", "INR"),
+        "key_id": RAZORPAY_KEY_ID,
+        "product_name": product.get("name"),
+    }
+
+
+@api_router.post("/payments/verify")
+async def payment_verify(payload: PaymentVerifyIn):
+    if db is None:
+        raise HTTPException(status_code=500, detail="Database not configured")
+    if not RAZORPAY_KEY_SECRET:
+        raise HTTPException(status_code=500, detail="Payment gateway not configured")
+
+    order = await db.orders.find_one({"razorpay_order_id": payload.razorpay_order_id}, {"_id": 0})
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+
+    message = f"{payload.razorpay_order_id}|{payload.razorpay_payment_id}".encode("utf-8")
+    expected_sig = hmac.new(RAZORPAY_KEY_SECRET.encode("utf-8"), message, hashlib.sha256).hexdigest()
+    now = datetime.now(timezone.utc).isoformat()
+    if not hmac.compare_digest(expected_sig, payload.razorpay_signature):
+        await db.orders.update_one(
+            {"razorpay_order_id": payload.razorpay_order_id},
+            {"$set": {
+                "status": "signature_mismatch",
+                "razorpay_payment_id": payload.razorpay_payment_id,
+                "verified_at": now,
+            }},
+        )
+        raise HTTPException(status_code=400, detail="Invalid payment signature")
+
+    product = await _find_checkout_product(order.get("product_id"), order.get("product_slug"))
+    download_file = product.get("download_file")
+    if not download_file:
+        raise HTTPException(status_code=404, detail="Download file not configured")
+
+    download_token = secrets.token_urlsafe(32)
+    download_url = _paid_download_url(order["razorpay_order_id"], download_token)
+    await db.orders.update_one(
+        {"razorpay_order_id": payload.razorpay_order_id},
+        {"$set": {
+            "status": "paid",
+            "razorpay_payment_id": payload.razorpay_payment_id,
+            "razorpay_signature": payload.razorpay_signature,
+            "verified_at": now,
+            "paid_at": now,
+            "download_token_hash": _hash_download_token(download_token),
+            "download_file": download_file,
+            "download_url": download_url,
+        }},
+    )
+    await db.products.update_one({"id": product.get("id")}, {"$inc": {"sold_count": 1}})
+
+    full_download_url = download_url
+    public_base = os.environ.get("PUBLIC_BASE_URL", "").rstrip("/")
+    if public_base:
+        full_download_url = f"{public_base}{download_url}"
+    email_sent = _send_confirmation_email(
+        order.get("buyer_email", ""),
+        order.get("buyer_name", "there"),
+        order.get("product_name") or product.get("name", "your asset"),
+        payload.razorpay_payment_id,
+        full_download_url,
+    )
+
+    return {
+        "success": True,
+        "order_id": payload.razorpay_order_id,
+        "payment_id": payload.razorpay_payment_id,
+        "product_slug": product.get("slug"),
+        "product_name": product.get("name"),
+        "download_url": download_url,
+        "email_sent": email_sent,
+    }
+
+
+@api_router.get("/orders/{order_id}/download")
+async def order_download(order_id: str, token: str):
+    if db is None:
+        raise HTTPException(status_code=500, detail="Database not configured")
+    order = await db.orders.find_one(
+        {"$or": [{"razorpay_order_id": order_id}, {"id": order_id}]}, {"_id": 0}
+    )
+    if not order or order.get("status") != "paid":
+        raise HTTPException(status_code=403, detail="Download is available only after successful payment")
+    expected_hash = order.get("download_token_hash")
+    if not expected_hash or not hmac.compare_digest(expected_hash, _hash_download_token(token)):
+        raise HTTPException(status_code=403, detail="Invalid or expired download link")
+
+    download_file = order.get("download_file")
+    if not download_file:
+        product = await _find_checkout_product(order.get("product_id"), order.get("product_slug"))
+        download_file = product.get("download_file")
+    if not download_file:
+        raise HTTPException(status_code=404, detail="Download file not configured")
+
+    await db.orders.update_one(
+        {"$or": [{"razorpay_order_id": order_id}, {"id": order_id}]},
+        {"$inc": {"download_count": 1}, "$set": {"last_downloaded_at": datetime.now(timezone.utc).isoformat()}},
+    )
+    return RedirectResponse(download_file, status_code=302)
+
+
 @api_router.post("/create-order")
 async def create_order(payload: CreateOrderIn):
     if razorpay_client is None:

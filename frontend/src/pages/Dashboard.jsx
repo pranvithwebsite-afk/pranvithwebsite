@@ -162,11 +162,13 @@ const DownloadsTab = ({ items }) => {
             <p className="mt-1 text-xs text-white/55">{p.category}</p>
             <div className="mt-4 flex items-center gap-2">
               <a
-                href={p.download_file || '#'}
+                href={p.download_url || '#'}
                 target="_blank"
                 rel="noopener noreferrer"
                 data-testid={`download-btn-${p.slug}`}
-                className="inline-flex items-center gap-2 bg-violet-600 hover:bg-violet-500 transition text-white px-4 py-2 rounded-lg text-sm font-semibold"
+                className={`inline-flex items-center gap-2 transition text-white px-4 py-2 rounded-lg text-sm font-semibold ${
+                  p.download_url ? 'bg-violet-600 hover:bg-violet-500' : 'bg-white/10 pointer-events-none opacity-60'
+                }`}
               >
                 <Download size={14} /> Download
               </a>

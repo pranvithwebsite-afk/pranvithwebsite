@@ -20,11 +20,19 @@ DEFAULT_ADMIN_PASSWORD=your_admin_password
 DEFAULT_ADMIN_NAME=Pranvith
 RAZORPAY_KEY_ID=your_razorpay_key_id
 RAZORPAY_KEY_SECRET=your_razorpay_key_secret
+REACT_APP_RAZORPAY_KEY_ID=your_razorpay_key_id
+SMTP_HOST=smtp.example.com
+SMTP_PORT=587
+SMTP_USER=your_smtp_username
+SMTP_PASS=your_smtp_password
+SMTP_FROM="PranvithDOP <no-reply@pranvithdop.com>"
 CORS_ORIGINS=*
 JWT_EXPIRATION_MINUTES=180
 ```
 
 `REACT_APP_BACKEND_URL` is optional. Leave it unset on Vercel so the frontend uses the same deployment origin and calls `/api`. Set it only if the frontend must call a separate backend host.
+
+`RAZORPAY_KEY_SECRET` must only be set for the backend environment. The frontend should use `REACT_APP_RAZORPAY_KEY_ID` only. `PUBLIC_BASE_URL` is optional; set it to your production origin if you want confirmation emails to include absolute download URLs.
 
 ## Deploy From GitHub
 

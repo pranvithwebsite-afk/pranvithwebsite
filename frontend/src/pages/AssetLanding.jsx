@@ -15,10 +15,10 @@ import {
 import { toast } from 'sonner';
 import {
   fetchProductBySlug,
-  customerCheckoutInit,
   customerClaimFree,
 } from '../lib/api';
 import { useCustomerAuth } from '../auth/CustomerAuthContext';
+import CheckoutModal from '../components/CheckoutModal';
 
 const AssetLanding = () => {
   const { slug } = useParams();
@@ -28,6 +28,7 @@ const AssetLanding = () => {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [notFound, setNotFound] = useState(false);
+  const [checkoutOpen, setCheckoutOpen] = useState(false);
 
   useEffect(() => {
     setLoading(true);
@@ -75,6 +76,10 @@ const AssetLanding = () => {
   const heroImage = product.hero_image || (product.images && product.images[0]);
 
   const onPrimaryCta = async () => {
+    if (!isFree) {
+      setCheckoutOpen(true);
+      return;
+    }
     if (!user) {
       toast.message('Please sign in to continue');
       navigate('/login', { state: { from: { pathname: `/assets/${slug}` } } });
@@ -88,9 +93,6 @@ const AssetLanding = () => {
         navigate(`/thank-you/${product.slug}`);
         return;
       }
-      const res = await customerCheckoutInit(product.slug);
-      // Open the rzp.io payment link in the same tab.
-      window.location.href = res.payment_link;
     } catch (e) {
       toast.error('Could not start checkout. Please try again.');
     } finally {
@@ -318,6 +320,21 @@ const AssetLanding = () => {
       </section>
 
       <Footer />
+      <CheckoutModal
+        product={product}
+        open={checkoutOpen}
+        onClose={() => setCheckoutOpen(false)}
+        onSuccess={(result) => {
+          setCheckoutOpen(false);
+          const params = new URLSearchParams({
+            orderId: result.orderId || '',
+            paymentId: result.paymentId || '',
+            download: result.downloadUrl || '',
+          });
+          navigate(`/thank-you/${result.productSlug || product.slug}?${params.toString()}`);
+        }}
+        onFailure={(message) => toast.error(message)}
+      />
     </main>
   );
 };

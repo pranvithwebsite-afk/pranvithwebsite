@@ -10,11 +10,13 @@ import uuid
 import hmac
 import hashlib
 import logging
+import secrets
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer
+from starlette.responses import RedirectResponse
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from pydantic import BaseModel, EmailStr, Field, ConfigDict
@@ -202,17 +204,60 @@ def build_customer_router(db) -> APIRouter:
             if o.get("product_slug"):
                 claimed_slugs.add(o["product_slug"])
         products = await db.products.find(
-            {"slug": {"$in": list(claimed_slugs)}}, {"_id": 0}
+            {"slug": {"$in": list(claimed_slugs)}}, {"_id": 0, "download_file": 0}
         ).to_list(500)
         # Add purchased_at timestamps when we know them
         by_slug_purchased_at: Dict[str, str] = {}
+        by_slug_download_url: Dict[str, str] = {}
         for o in paid_orders:
             slug = o.get("product_slug")
             if slug and slug not in by_slug_purchased_at:
                 by_slug_purchased_at[slug] = o.get("verified_at") or o.get("created_at") or ""
+            if slug and slug not in by_slug_download_url:
+                order_identifier = o.get("razorpay_order_id") or o.get("id") or ""
+                token_hash = o.get("download_token_hash")
+                download_token = None
+                if order_identifier and not token_hash:
+                    download_token = secrets.token_urlsafe(32)
+                    generated_download_url = f"/api/orders/{order_identifier}/download?token={download_token}"
+                    await db.orders.update_one(
+                        {"id": o.get("id")},
+                        {"$set": {
+                            "download_token_hash": hashlib.sha256(download_token.encode("utf-8")).hexdigest(),
+                            "download_url": generated_download_url,
+                        }},
+                    )
+                if order_identifier:
+                    if download_token:
+                        by_slug_download_url[slug] = generated_download_url
+                    elif o.get("download_url"):
+                        by_slug_download_url[slug] = o["download_url"]
         for p in products:
             p["purchased_at"] = by_slug_purchased_at.get(p.get("slug"), user.get("created_at", ""))
+            download_url = by_slug_download_url.get(p.get("slug"))
+            if download_url:
+                p["download_url"] = download_url
         return products
+
+    @router.get("/orders/{order_id}/download")
+    async def download_order(order_id: str, user: dict = Depends(get_current_customer)):
+        order = await db.orders.find_one(
+            {"id": order_id, "user_id": user["id"], "status": "paid"}, {"_id": 0}
+        )
+        if not order:
+            order = await db.orders.find_one(
+                {"razorpay_order_id": order_id, "user_id": user["id"], "status": "paid"}, {"_id": 0}
+            )
+        if not order:
+            raise HTTPException(status_code=403, detail="Download is available only after successful payment")
+        product = await db.products.find_one({"slug": order.get("product_slug"), "published": True}, {"_id": 0})
+        if not product or not product.get("download_file"):
+            raise HTTPException(status_code=404, detail="Download file not configured")
+        await db.orders.update_one(
+            {"id": order.get("id")},
+            {"$inc": {"download_count": 1}, "$set": {"last_downloaded_at": datetime.now(timezone.utc).isoformat()}},
+        )
+        return RedirectResponse(product["download_file"], status_code=302)
 
     @router.post("/claim-free", response_model=Dict[str, Any])
     async def claim_free(payload: CheckoutInitIn, user: dict = Depends(get_current_customer)):

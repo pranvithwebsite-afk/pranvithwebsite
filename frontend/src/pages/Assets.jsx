@@ -4,6 +4,7 @@ import Header from '../components/Header';
 import Footer from '../components/Footer';
 import { Search, Loader2 } from 'lucide-react';
 import { fetchProducts } from '../lib/api';
+import CheckoutModal from '../components/CheckoutModal';
 
 const defaultBackgrounds = [
   'linear-gradient(135deg, #1e3a8a 0%, #0c1e4d 60%, #050b1f 100%)',
@@ -30,8 +31,10 @@ const normalize = (item, index) => {
   return {
     id: item.id,
     slug,
+    name,
     title: name,
     category,
+    sale_price: item.sale_price,
     price,
     original,
     isFree: price === 0 || item.is_free,
@@ -53,6 +56,7 @@ const Assets = () => {
   const [priceFilter, setPriceFilter] = useState('all');
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [checkoutProduct, setCheckoutProduct] = useState(null);
 
   useEffect(() => {
     (async () => {
@@ -143,7 +147,12 @@ const Assets = () => {
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-6" data-testid="assets-grid">
                 {filtered.map((p) => (
-                  <ProductCard key={p.id} p={p} onView={() => navigate(`/assets/${p.slug}`)} />
+                  <ProductCard
+                    key={p.id}
+                    p={p}
+                    onView={() => navigate(`/assets/${p.slug}`)}
+                    onBuy={() => setCheckoutProduct(p)}
+                  />
                 ))}
               </div>
             )}
@@ -152,6 +161,20 @@ const Assets = () => {
       </section>
 
       <Footer />
+      <CheckoutModal
+        product={checkoutProduct}
+        open={!!checkoutProduct}
+        onClose={() => setCheckoutProduct(null)}
+        onSuccess={(result) => {
+          setCheckoutProduct(null);
+          const params = new URLSearchParams({
+            orderId: result.orderId || '',
+            paymentId: result.paymentId || '',
+            download: result.downloadUrl || '',
+          });
+          navigate(`/thank-you/${result.productSlug || checkoutProduct.slug}?${params.toString()}`);
+        }}
+      />
     </main>
   );
 };
@@ -167,7 +190,7 @@ const RadioRow = ({ name, value, checked, onChange, label }) => (
   </label>
 );
 
-const ProductCard = ({ p, onView }) => (
+const ProductCard = ({ p, onView, onBuy }) => (
   <div
     onClick={onView}
     data-testid={`asset-card-${p.slug}`}
@@ -211,7 +234,7 @@ const ProductCard = ({ p, onView }) => (
         </span>
       </div>
       <button
-        onClick={(e) => { e.stopPropagation(); onView(); }}
+        onClick={(e) => { e.stopPropagation(); p.isFree ? onView() : onBuy(); }}
         data-testid={`view-asset-btn-${p.slug}`}
         className="mt-4 w-full inline-flex items-center justify-center gap-2 bg-violet-600 hover:bg-violet-500 transition-colors text-white py-2.5 rounded-lg text-sm font-semibold"
       >

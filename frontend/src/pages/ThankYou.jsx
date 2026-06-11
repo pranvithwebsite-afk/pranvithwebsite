@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useParams, useSearchParams } from 'react-router-dom';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
 import { CheckCircle2, Download, Loader2, ArrowRight } from 'lucide-react';
@@ -8,9 +8,12 @@ import { useCustomerAuth } from '../auth/CustomerAuthContext';
 
 const ThankYou = () => {
   const { slug } = useParams();
+  const [searchParams] = useSearchParams();
   const { user } = useCustomerAuth();
   const [product, setProduct] = useState(null);
   const [loading, setLoading] = useState(true);
+  const downloadUrl = searchParams.get('download') || '';
+  const paymentId = searchParams.get('paymentId') || '';
 
   useEffect(() => {
     setLoading(true);
@@ -53,6 +56,11 @@ const ThankYou = () => {
               {ty.message ||
                 `Your ${product?.name || 'asset'} is on its way. Download the files below to get started right away.`}
             </p>
+            {paymentId && (
+              <p className="mt-4 text-xs uppercase tracking-[0.25em] text-white/45">
+                Payment ID: {paymentId}
+              </p>
+            )}
 
             {heroImage && (
               <div className="mt-10 rounded-3xl overflow-hidden border border-white/10 max-w-md mx-auto">
@@ -61,9 +69,9 @@ const ThankYou = () => {
             )}
 
             <div className="mt-10 flex flex-col sm:flex-row gap-3 justify-center">
-              {product?.download_file && (
+              {downloadUrl && (
                 <a
-                  href={product.download_file}
+                  href={downloadUrl}
                   target="_blank"
                   rel="noopener noreferrer"
                   data-testid="thankyou-download-btn"
@@ -71,6 +79,15 @@ const ThankYou = () => {
                 >
                   <Download size={16} /> Download files
                 </a>
+              )}
+              {!downloadUrl && (
+                <Link
+                  to="/assets"
+                  data-testid="thankyou-no-download"
+                  className="inline-flex items-center justify-center gap-2 rounded-full bg-violet-600 hover:bg-violet-500 transition text-white px-8 py-3.5 text-sm font-semibold uppercase tracking-wider"
+                >
+                  Browse assets <ArrowRight size={16} />
+                </Link>
               )}
               {user ? (
                 <Link
