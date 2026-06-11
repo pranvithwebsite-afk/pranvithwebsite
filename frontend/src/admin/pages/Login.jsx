@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAdminAuth } from '../AdminAuthContext';
+import { formatApiErrorDetail } from '../../auth/CustomerAuthContext';
 
 const Login = () => {
   const { login } = useAdminAuth();
@@ -21,7 +22,7 @@ const Login = () => {
       await login({ email, password });
       navigate(from, { replace: true });
     } catch (err) {
-      setError('Invalid login credentials. Please check your email and password.');
+      setError(formatApiErrorDetail(err?.response?.data?.detail) || 'Invalid login credentials. Please check your email and password.');
     } finally {
       setLoading(false);
     }

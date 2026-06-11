@@ -1,4 +1,4 @@
-from fastapi import FastAPI, APIRouter, HTTPException, Depends, status, UploadFile, File
+from fastapi import FastAPI, APIRouter, HTTPException, Depends, status, UploadFile, File, Header
 from fastapi.security import OAuth2PasswordBearer
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
@@ -605,6 +605,7 @@ class AdminLoginResponse(Token):
 class TokenData(BaseModel):
     model_config = ConfigDict(extra="ignore")
     id: Optional[str] = None
+    sub: Optional[str] = None
     role: Optional[str] = "admin"
 
 
@@ -617,7 +618,11 @@ admin_router = APIRouter(prefix="/admin", tags=["admin"])
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    return pwd_context.verify(plain_password, hashed_password)
+    try:
+        return pwd_context.verify(plain_password, hashed_password)
+    except Exception:
+        logger.exception("Admin password verification failed due to invalid hash")
+        return False
 
 
 def get_password_hash(password: str) -> str:
@@ -625,16 +630,25 @@ def get_password_hash(password: str) -> str:
 
 
 async def get_admin_by_email(email: str):
+    if db is None:
+        return None
     return await db.admins.find_one({"email": email})
 
 
 async def get_admin_by_id(admin_id: str):
+    if db is None:
+        return None
     return await db.admins.find_one({"id": admin_id})
 
 
 async def authenticate_admin(email: str, password: str):
-    admin = await get_admin_by_email(email.lower().strip())
-    if not admin or not verify_password(password, admin.get("hashed_password", "")):
+    normalized_email = email.lower().strip()
+    admin = await get_admin_by_email(normalized_email)
+    if not admin:
+        logger.warning("Admin login failed: admin not found for email %s", normalized_email)
+        return None
+    if not verify_password(password, admin.get("hashed_password", "")):
+        logger.warning("Admin login failed: invalid password for email %s", normalized_email)
         return None
     return admin
 
@@ -667,10 +681,13 @@ async def get_current_admin(token: str = Depends(oauth2_scheme)) -> AdminBase:
         token_data = TokenData(**payload)
     except JWTError:
         raise credentials_exception
-    if not token_data.id:
+    admin_id = token_data.id or token_data.sub
+    if not admin_id:
+        logger.warning("Admin token rejected: missing admin id/sub claim")
         raise credentials_exception
-    admin = await get_admin_by_id(token_data.id)
+    admin = await get_admin_by_id(admin_id)
     if admin is None:
+        logger.warning("Admin token rejected: admin id %s not found", admin_id)
         raise credentials_exception
     return admin_doc_to_public(admin)
 
@@ -681,15 +698,40 @@ async def get_current_active_admin(current_admin: AdminBase = Depends(get_curren
 
 @admin_router.post("/login", response_model=AdminLoginResponse)
 async def admin_login(payload: AdminLoginIn):
+    if db is None:
+        logger.warning("Admin login failed: database is not configured")
+        raise HTTPException(status_code=503, detail="Database is not configured")
+    await ensure_default_admin_seeded()
     admin = await authenticate_admin(payload.email, payload.password)
     if not admin:
         raise HTTPException(status_code=401, detail="Invalid email or password")
-    access_token = create_access_token({"sub": admin["id"], "role": admin.get("role", "admin")})
+    logger.info("Admin login successful for email %s", payload.email.lower().strip())
+    access_token = create_access_token({"id": admin["id"], "sub": admin["id"], "role": admin.get("role", "admin")})
     return {
         "access_token": access_token,
         "token_type": "bearer",
         "admin": admin_doc_to_public(admin).model_dump(),
     }
+
+
+@admin_router.post("/seed-default")
+async def admin_seed_default(seed_key: Optional[str] = Header(default=None, alias="X-Admin-Seed-Key")):
+    """Explicitly seed the default admin using a secret key.
+
+    This is intended for production recovery if a serverless startup hook has not
+    run yet. The key must match JWT_SECRET and is never returned.
+    """
+    if db is None:
+        logger.warning("Admin seed endpoint failed: database is not configured")
+        raise HTTPException(status_code=503, detail="Database is not configured")
+    if JWT_SECRET == "change-this-secret":
+        logger.warning("Admin seed endpoint rejected: JWT_SECRET is not configured")
+        raise HTTPException(status_code=503, detail="JWT_SECRET is not configured")
+    if not seed_key or not hmac.compare_digest(seed_key, JWT_SECRET):
+        logger.warning("Admin seed endpoint rejected: invalid seed key")
+        raise HTTPException(status_code=403, detail="Forbidden")
+    result = await ensure_default_admin_seeded()
+    return {"success": True, **result}
 
 
 @admin_router.post("/logout")
@@ -1019,42 +1061,73 @@ async def prepare_cms_collections():
         pass
 
 
-async def seed_default_admin():
+async def ensure_default_admin_seeded():
+    if db is None:
+        logger.warning("Default admin seed skipped: database is not configured")
+        return {"action": "skipped", "reason": "database_not_configured"}
     default_email = os.environ.get("DEFAULT_ADMIN_EMAIL", "admin@pranvithdop.com").lower().strip()
     default_password = os.environ.get("DEFAULT_ADMIN_PASSWORD", "Admin123!")
     default_name = os.environ.get("DEFAULT_ADMIN_NAME", "Super Admin")
-    # Remove any legacy admins not matching the configured default email
+    if not default_email or not default_password:
+        logger.error("Default admin seed failed: DEFAULT_ADMIN_EMAIL or DEFAULT_ADMIN_PASSWORD is empty")
+        raise HTTPException(status_code=500, detail="Default admin environment variables are invalid")
+
     try:
-        await db.admins.delete_many({"email": {"$ne": default_email}})
-    except Exception:
-        logger.exception("Failed to clean up legacy admins")
-    admin_doc = {
-        "id": str(uuid.uuid4()),
-        "name": default_name,
-        "email": default_email,
-        "role": "super_admin",
-        "permissions": ["super_admin", "admin", "editor"],
-        "hashed_password": get_password_hash(default_password),
-        "created_at": datetime.now(timezone.utc).isoformat(),
-    }
-    try:
-        # Upsert the admin so password & name reflect the env values on every boot
         existing = await db.admins.find_one({"email": default_email})
         if existing:
+            update_doc = {
+                "name": default_name,
+                "role": "super_admin",
+                "permissions": ["super_admin", "admin", "editor"],
+                "hashed_password": get_password_hash(default_password),
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+            }
+            if not existing.get("id"):
+                update_doc["id"] = str(uuid.uuid4())
             await db.admins.update_one(
                 {"email": default_email},
-                {"$set": {
-                    "name": default_name,
-                    "role": "super_admin",
-                    "permissions": ["super_admin", "admin", "editor"],
-                    "hashed_password": admin_doc["hashed_password"],
-                }},
+                {"$set": update_doc},
             )
-        else:
+            logger.info("Default admin user already exists and was refreshed: %s", default_email)
+            return {"action": "updated", "email": default_email}
+
+        admin_doc = {
+            "id": str(uuid.uuid4()),
+            "name": default_name,
+            "email": default_email,
+            "role": "super_admin",
+            "permissions": ["super_admin", "admin", "editor"],
+            "hashed_password": get_password_hash(default_password),
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        }
+        try:
             await db.admins.insert_one(admin_doc)
-            logger.info("Created default admin user %s", default_email)
+            logger.info("Default admin user created: %s", default_email)
+            return {"action": "created", "email": default_email}
+        except Exception as insert_error:
+            # Another cold start may have inserted it between find and insert.
+            duplicate = await db.admins.find_one({"email": default_email})
+            if duplicate:
+                await db.admins.update_one(
+                    {"email": default_email},
+                    {"$set": {
+                        "name": default_name,
+                        "role": "super_admin",
+                        "permissions": ["super_admin", "admin", "editor"],
+                        "hashed_password": get_password_hash(default_password),
+                        "updated_at": datetime.now(timezone.utc).isoformat(),
+                    }},
+                )
+                logger.info("Default admin user already existed after race and was refreshed: %s", default_email)
+                return {"action": "updated", "email": default_email}
+            raise insert_error
     except Exception:
         logger.exception("Failed to seed default admin")
+        raise
+
+
+async def seed_default_admin():
+    return await ensure_default_admin_seeded()
 
 
 @app.on_event("startup")
