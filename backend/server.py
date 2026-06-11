@@ -830,8 +830,8 @@ async def admin_coupons(current_admin: AdminBase = Depends(get_current_active_ad
     return await db.coupons.find({}, {"_id": 0}).to_list(100)
 
 
-# Create uploads directory if it doesn't exist
-UPLOAD_DIR = ROOT_DIR / "uploads"
+# Vercel serverless functions can only write to /tmp at runtime.
+UPLOAD_DIR = Path(os.environ.get("UPLOAD_DIR", "/tmp/uploads" if os.environ.get("VERCEL") else str(ROOT_DIR / "uploads")))
 UPLOAD_DIR.mkdir(exist_ok=True)
 
 
