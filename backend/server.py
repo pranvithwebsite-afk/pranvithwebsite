@@ -4,6 +4,7 @@ from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from starlette.responses import RedirectResponse
 from motor.motor_asyncio import AsyncIOMotorClient
+from pymongo.errors import OperationFailure, ServerSelectionTimeoutError
 from passlib.context import CryptContext
 from jose import JWTError, jwt
 from email.message import EmailMessage
@@ -50,6 +51,27 @@ client = AsyncIOMotorClient(
 ) if mongo_url and db_name else None
 db = client[db_name] if client is not None else None
 
+
+def mongodb_config_summary() -> dict:
+    hostname_match = re.search(r"@([^/?]+)", mongo_url or "")
+    return {
+        "configured": bool(mongo_url and db_name),
+        "scheme": "mongodb+srv" if (mongo_url or "").startswith("mongodb+srv://") else "other",
+        "hostname": hostname_match.group(1) if hostname_match else None,
+        "database": db_name,
+    }
+
+
+def mongodb_error_category(exc: Exception) -> str:
+    if isinstance(exc, OperationFailure) and exc.code == 8000:
+        return "authentication_failed"
+    if isinstance(exc, ServerSelectionTimeoutError):
+        message = str(exc).lower()
+        if "ssl" in message or "tls" in message:
+            return "tls_or_network_failed"
+        return "server_selection_failed"
+    return "connection_failed"
+
 # Razorpay client (lazy / safe-init)
 RAZORPAY_KEY_ID = os.environ.get('RAZORPAY_KEY_ID', '')
 RAZORPAY_KEY_SECRET = os.environ.get('RAZORPAY_KEY_SECRET', '')
@@ -75,6 +97,20 @@ api_router = APIRouter(prefix="/api")
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
+
+
+@api_router.get("/health/mongodb")
+async def mongodb_health():
+    summary = mongodb_config_summary()
+    if db is None:
+        return {**summary, "ok": False, "error": "not_configured"}
+    try:
+        await db.command("ping")
+        return {**summary, "ok": True, "error": None}
+    except Exception as exc:
+        category = mongodb_error_category(exc)
+        logger.warning("MongoDB health check failed: category=%s", category)
+        return {**summary, "ok": False, "error": category}
 
 
 # ---------- Models ----------
@@ -1153,8 +1189,7 @@ async def seed_default_admin():
 
 @app.on_event("startup")
 async def on_startup():
-    logger.info("MongoDB configured: %s", db is not None)
-    logger.info("MongoDB database name configured: %s", db_name or "<not configured>")
+    logger.info("MongoDB configuration: %s", mongodb_config_summary())
     logger.info("Admin email being seeded: %s", (DEFAULT_ADMIN_EMAIL or "").lower().strip() or "<not configured>")
     logger.info("Razorpay configured: %s", razorpay_client is not None)
     logger.info("SMTP configured: %s", smtp_configured())
@@ -1167,7 +1202,7 @@ async def on_startup():
         await db.command("ping")
         logger.info("MongoDB connection status: connected db=%s", db_name)
     except Exception as exc:
-        logger.exception("MongoDB connection status: failed")
+        logger.exception("MongoDB connection status: failed category=%s", mongodb_error_category(exc))
         logger.warning("Admin seed status: skipped mongo_connection_failed")
         if IS_DEVELOPMENT:
             logger.warning("MongoDB development error detail: %s", exc)
