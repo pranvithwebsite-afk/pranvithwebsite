@@ -1,7 +1,32 @@
 import React, { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { Eye, EyeOff } from 'lucide-react';
 import { useAdminAuth } from '../AdminAuthContext';
 import { formatApiErrorDetail } from '../../auth/CustomerAuthContext';
+
+const isDevelopment = process.env.NODE_ENV === 'development';
+
+const getLoginErrorMessage = (err) => {
+  const status = err?.response?.status;
+  const backendMessage = formatApiErrorDetail(err?.response?.data?.detail);
+
+  if (status === 401 || status === 403) {
+    return 'Incorrect email or password';
+  }
+
+  if (err?.response) {
+    if (isDevelopment && backendMessage) {
+      return `Server unavailable: ${backendMessage}`;
+    }
+    return 'Server unavailable';
+  }
+
+  if (err?.request) {
+    return 'Cannot connect to server';
+  }
+
+  return isDevelopment && err?.message ? `Server unavailable: ${err.message}` : 'Server unavailable';
+};
 
 const Login = () => {
   const { login } = useAdminAuth();
@@ -11,6 +36,7 @@ const Login = () => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const from = location.state?.from?.pathname || '/admin/dashboard';
 
@@ -22,7 +48,13 @@ const Login = () => {
       await login({ email, password });
       navigate(from, { replace: true });
     } catch (err) {
-      setError(formatApiErrorDetail(err?.response?.data?.detail) || 'Invalid login credentials. Please check your email and password.');
+      const backendMessage = formatApiErrorDetail(err?.response?.data?.detail) || err?.message || 'Unknown login error';
+      console.warn('Admin login failed', {
+        requestEmail: email,
+        status: err?.response?.status || null,
+        errorMessage: backendMessage,
+      });
+      setError(getLoginErrorMessage(err));
     } finally {
       setLoading(false);
     }
@@ -52,14 +84,25 @@ const Login = () => {
             </label>
             <label className="block space-y-2 text-sm text-slate-200">
               <span>Password</span>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full rounded-2xl border border-slate-800 bg-slate-950 px-4 py-3 text-white outline-none transition focus:border-violet-500"
-                placeholder="Enter password"
-                required
-              />
+              <div className="relative">
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full rounded-2xl border border-slate-800 bg-slate-950 px-4 py-3 pr-12 text-white outline-none transition focus:border-violet-500"
+                  placeholder="Enter password"
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((current) => !current)}
+                  className="absolute right-3 top-1/2 inline-flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full text-slate-400 transition hover:bg-slate-800 hover:text-white focus:outline-none focus:ring-2 focus:ring-violet-500"
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  title={showPassword ? 'Hide password' : 'Show password'}
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
             </label>
             {error && <p className="text-sm text-rose-400">{error}</p>}
             <button
@@ -67,13 +110,13 @@ const Login = () => {
               disabled={loading}
               className="w-full rounded-2xl bg-violet-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-violet-500 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {loading ? 'Signing in …' : 'Sign In'}
+              {loading ? 'Signing in...' : 'Sign In'}
             </button>
           </form>
           <div className="mt-6 rounded-3xl bg-slate-950/80 p-4 text-sm text-slate-400">
-            <p className="font-medium text-slate-200">Default seeded admin</p>
-            <p>Email: <span className="text-white">admin@pranvithdop.com</span></p>
-            <p>Password: <span className="text-white">Admin123!</span></p>
+            <p className="font-medium text-slate-200">Admin access</p>
+            <p>Use the seeded admin account configured for this deployment.</p>
+            <p>If you need access, ask your site administrator to provide the current admin credentials.</p>
           </div>
         </div>
       </div>

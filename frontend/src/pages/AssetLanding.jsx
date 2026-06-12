@@ -13,17 +13,12 @@ import {
   Download,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import {
-  fetchProductBySlug,
-  customerClaimFree,
-} from '../lib/api';
-import { useCustomerAuth } from '../auth/CustomerAuthContext';
+import { fetchProductBySlug } from '../lib/api';
 import CheckoutModal from '../components/CheckoutModal';
 
 const AssetLanding = () => {
   const { slug } = useParams();
   const navigate = useNavigate();
-  const { user } = useCustomerAuth();
   const [product, setProduct] = useState(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -75,29 +70,8 @@ const AssetLanding = () => {
   const landing = product.landing_content || {};
   const heroImage = product.hero_image || (product.images && product.images[0]);
 
-  const onPrimaryCta = async () => {
-    if (!isFree) {
-      setCheckoutOpen(true);
-      return;
-    }
-    if (!user) {
-      toast.message('Please sign in to continue');
-      navigate('/login', { state: { from: { pathname: `/assets/${slug}` } } });
-      return;
-    }
-    setBusy(true);
-    try {
-      if (isFree) {
-        await customerClaimFree(product.slug);
-        toast.success(`${product.name} added to your downloads`);
-        navigate(`/thank-you/${product.slug}`);
-        return;
-      }
-    } catch (e) {
-      toast.error('Could not start checkout. Please try again.');
-    } finally {
-      setBusy(false);
-    }
+  const onPrimaryCta = () => {
+    setCheckoutOpen(true);
   };
 
   const features = product.features || [];
@@ -153,12 +127,6 @@ const AssetLanding = () => {
                     )}
                   </button>
                 </div>
-                {!user && (
-                  <p className="mt-4 text-xs text-white/55" data-testid="asset-signin-hint">
-                    <Link to="/login" className="text-violet-300 hover:text-white underline-offset-4 hover:underline">Sign in</Link>
-                    {' '}to track this purchase in your account.
-                  </p>
-                )}
               </div>
 
               <div className="rounded-[2rem] border border-white/10 bg-[#090712] overflow-hidden shadow-[0_30px_80px_rgba(0,0,0,0.35)]">
@@ -330,10 +298,21 @@ const AssetLanding = () => {
             orderId: result.orderId || '',
             paymentId: result.paymentId || '',
             download: result.downloadUrl || '',
+            product: result.productSlug || product.slug,
           });
-          navigate(`/thank-you/${result.productSlug || product.slug}?${params.toString()}`);
+          navigate(`/payment-success?${params.toString()}`);
         }}
-        onFailure={(message) => toast.error(message)}
+        onFailure={(message, result) => {
+          toast.error(message);
+          if (result?.failed) {
+            const params = new URLSearchParams({
+              product: product.slug,
+              message,
+              orderId: result.orderId || '',
+            });
+            navigate(`/payment-failed?${params.toString()}`);
+          }
+        }}
       />
     </main>
   );

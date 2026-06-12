@@ -171,8 +171,19 @@ const Assets = () => {
             orderId: result.orderId || '',
             paymentId: result.paymentId || '',
             download: result.downloadUrl || '',
+            product: result.productSlug || checkoutProduct.slug,
           });
-          navigate(`/thank-you/${result.productSlug || checkoutProduct.slug}?${params.toString()}`);
+          navigate(`/payment-success?${params.toString()}`);
+        }}
+        onFailure={(message, result) => {
+          if (result?.failed && checkoutProduct?.slug) {
+            const params = new URLSearchParams({
+              product: checkoutProduct.slug,
+              message,
+              orderId: result.orderId || '',
+            });
+            navigate(`/payment-failed?${params.toString()}`);
+          }
         }}
       />
     </main>

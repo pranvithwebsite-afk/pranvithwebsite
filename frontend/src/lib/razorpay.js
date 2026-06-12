@@ -1,7 +1,7 @@
 // Razorpay Standard Checkout helper
 import { api } from './api';
 
-const RAZORPAY_KEY_ID = process.env.REACT_APP_RAZORPAY_KEY_ID;
+const RAZORPAY_KEY_ID = process.env.VITE_RAZORPAY_KEY_ID || process.env.REACT_APP_RAZORPAY_KEY_ID;
 
 const SCRIPT_SRC = 'https://checkout.razorpay.com/v1/checkout.js';
 
@@ -45,7 +45,7 @@ export async function payWithRazorpay({ amountRupees, itemId, itemName, productS
   // 1. Create order on backend. The backend calculates the final amount from the product.
   let order;
   try {
-    const { data } = await api.post('/payments/create-order', {
+    const { data } = await api.post('/checkout/create-order', {
       product_id: itemId || '',
       product_slug: productSlug || '',
       name: prefill.name || '',
@@ -74,7 +74,7 @@ export async function payWithRazorpay({ amountRupees, itemId, itemName, productS
       },
       handler: async (response) => {
         try {
-          const { data } = await api.post('/payments/verify', {
+          const { data } = await api.post('/checkout/verify-payment', {
             razorpay_order_id: response.razorpay_order_id,
             razorpay_payment_id: response.razorpay_payment_id,
             razorpay_signature: response.razorpay_signature,
@@ -95,7 +95,7 @@ export async function payWithRazorpay({ amountRupees, itemId, itemName, productS
 
     rzp.on('payment.failed', (resp) => {
       const reason = resp?.error?.description || 'Payment failed';
-      resolve({ success: false, error: reason });
+      resolve({ success: false, error: reason, failed: true, orderId: order.order_id });
     });
 
     rzp.open();

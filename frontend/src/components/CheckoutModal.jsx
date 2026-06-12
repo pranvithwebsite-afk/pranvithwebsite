@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { X, Loader2 } from 'lucide-react';
 import { payWithRazorpay } from '../lib/razorpay';
+import { createFreeOrder } from '../lib/api';
 
 const initialForm = {
   name: '',
@@ -46,17 +47,41 @@ const CheckoutModal = ({ product, open, onClose, onSuccess, onFailure }) => {
 
     setBusy(true);
     setMessage('');
-    const result = await payWithRazorpay({
-      amountRupees: price,
-      itemId: product.id,
-      productSlug: product.slug,
-      itemName: product.name || product.title,
-      prefill: {
-        name: form.name.trim(),
-        email: form.email.trim(),
-        contact: form.phone.trim(),
-      },
-    });
+
+    let result;
+    if (price <= 0 || product?.is_free) {
+      try {
+        const data = await createFreeOrder({
+          product_id: product.id,
+          product_slug: product.slug,
+          name: form.name.trim(),
+          email: form.email.trim(),
+          phone: form.phone.trim(),
+        });
+        result = {
+          success: true,
+          orderId: data.order_id,
+          productSlug: data.product_slug,
+          downloadUrl: data.download_url,
+        };
+      } catch (err) {
+        const msg = err?.response?.data?.detail || 'Could not create free order';
+        result = { success: false, error: typeof msg === 'string' ? msg : 'Could not create free order' };
+      }
+    } else {
+      result = await payWithRazorpay({
+        amountRupees: price,
+        itemId: product.id,
+        productSlug: product.slug,
+        itemName: product.name || product.title,
+        prefill: {
+          name: form.name.trim(),
+          email: form.email.trim(),
+          contact: form.phone.trim(),
+        },
+      });
+    }
+
     setBusy(false);
 
     if (result.success) {
@@ -67,7 +92,7 @@ const CheckoutModal = ({ product, open, onClose, onSuccess, onFailure }) => {
 
     const error = result.error === 'cancelled' ? 'Payment cancelled. You can retry when ready.' : (result.error || 'Payment failed. Please retry.');
     setMessage(error);
-    onFailure?.(error);
+    onFailure?.(error, result);
   };
 
   return (
@@ -130,7 +155,13 @@ const CheckoutModal = ({ product, open, onClose, onSuccess, onFailure }) => {
             disabled={busy}
             className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-violet-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-violet-500 disabled:opacity-60"
           >
-            {busy ? <><Loader2 size={16} className="animate-spin" /> Opening payment...</> : 'Continue to payment'}
+            {busy ? (
+              <><Loader2 size={16} className="animate-spin" /> Processing...</>
+            ) : product?.is_free || price <= 0 ? (
+              'Continue to download'
+            ) : (
+              'Continue to payment'
+            )}
           </button>
         </form>
       </div>

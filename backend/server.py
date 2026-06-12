@@ -73,8 +73,6 @@ def smtp_configured() -> bool:
 app = FastAPI(title='PranvithDOP API')
 api_router = APIRouter(prefix="/api")
 
-from customer_auth import build_customer_router, build_webhook_router
-
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
@@ -406,6 +404,34 @@ class PaymentVerifyIn(BaseModel):
     razorpay_signature: str
 
 
+class PaymentFreeOrderIn(BaseModel):
+    product_id: Optional[str] = None
+    product_slug: Optional[str] = None
+    name: Optional[str] = Field(default=None, min_length=2, max_length=120)
+    email: Optional[EmailStr] = None
+    phone: Optional[str] = Field(default=None, min_length=7, max_length=20)
+
+
+class CheckoutOrder(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str
+    razorpay_order_id: str
+    razorpay_payment_id: Optional[str] = None
+    razorpay_signature: Optional[str] = None
+    customer_name: str
+    customer_email: EmailStr
+    customer_phone: str
+    product_id: Optional[str] = None
+    product_slug: Optional[str] = None
+    product_name: str
+    amount: int
+    currency: str = "INR"
+    payment_status: str = "pending"
+    status: str = "pending"
+    created_at: str
+    paid_at: Optional[str] = None
+
+
 class StatusCheck(BaseModel):
     model_config = ConfigDict(extra="ignore")
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
@@ -619,7 +645,18 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/admin/login")
 JWT_SECRET = os.environ.get("JWT_SECRET", "change-this-secret")
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRATION_MINUTES = int(os.environ.get("JWT_EXPIRATION_MINUTES", "180"))
+DEFAULT_ADMIN_EMAIL = os.environ.get("DEFAULT_ADMIN_EMAIL")
+DEFAULT_ADMIN_PASSWORD = os.environ.get("DEFAULT_ADMIN_PASSWORD")
+DEFAULT_ADMIN_NAME = os.environ.get("DEFAULT_ADMIN_NAME", "Super Admin")
+APP_ENV = os.environ.get("APP_ENV") or os.environ.get("ENVIRONMENT") or os.environ.get("ENV") or "production"
+IS_DEVELOPMENT = APP_ENV.lower() in {"dev", "development", "local"} or os.environ.get("DEBUG", "").lower() == "true"
 admin_router = APIRouter(prefix="/admin", tags=["admin"])
+
+
+def development_detail(public_message: str, detail: Optional[Any] = None) -> str:
+    if IS_DEVELOPMENT and detail:
+        return f"{public_message}: {detail}"
+    return public_message
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
@@ -705,11 +742,35 @@ async def get_current_active_admin(current_admin: AdminBase = Depends(get_curren
 async def admin_login(payload: AdminLoginIn):
     if db is None:
         logger.warning("Admin login failed: database is not configured")
-        raise HTTPException(status_code=503, detail="Database is not configured")
-    await ensure_default_admin_seeded()
-    admin = await authenticate_admin(payload.email, payload.password)
+        raise HTTPException(
+            status_code=503,
+            detail=development_detail("Server unavailable", "MONGO_URL or DB_NAME is not configured"),
+        )
+    try:
+        await ensure_default_admin_seeded()
+    except HTTPException as exc:
+        logger.exception("Admin login failed while seeding default admin")
+        raise HTTPException(
+            status_code=503,
+            detail=development_detail("Server unavailable", exc.detail),
+        )
+    except Exception as exc:
+        logger.exception("Admin login failed while seeding default admin")
+        raise HTTPException(
+            status_code=503,
+            detail=development_detail("Server unavailable", str(exc)),
+        )
+
+    try:
+        admin = await authenticate_admin(payload.email, payload.password)
+    except Exception as exc:
+        logger.exception("Admin login failed during authentication")
+        raise HTTPException(
+            status_code=503,
+            detail=development_detail("Server unavailable", str(exc)),
+        )
     if not admin:
-        raise HTTPException(status_code=401, detail="Invalid email or password")
+        raise HTTPException(status_code=401, detail="Incorrect email or password")
     logger.info("Admin login successful for email %s", payload.email.lower().strip())
     access_token = create_access_token({"id": admin["id"], "sub": admin["id"], "role": admin.get("role", "admin")})
     return {
@@ -736,6 +797,7 @@ async def admin_seed_default(seed_key: Optional[str] = Header(default=None, alia
         logger.warning("Admin seed endpoint rejected: invalid seed key")
         raise HTTPException(status_code=403, detail="Forbidden")
     result = await ensure_default_admin_seeded()
+    logger.info("Admin seed endpoint completed: %s", result)
     return {"success": True, **result}
 
 
@@ -1070,9 +1132,11 @@ async def ensure_default_admin_seeded():
     if db is None:
         logger.warning("Default admin seed skipped: database is not configured")
         return {"action": "skipped", "reason": "database_not_configured"}
-    default_email = os.environ.get("DEFAULT_ADMIN_EMAIL", "admin@pranvithdop.com").lower().strip()
-    default_password = os.environ.get("DEFAULT_ADMIN_PASSWORD", "Admin123!")
-    default_name = os.environ.get("DEFAULT_ADMIN_NAME", "Super Admin")
+    default_email = (DEFAULT_ADMIN_EMAIL or "").lower().strip()
+    default_password = DEFAULT_ADMIN_PASSWORD or ""
+    default_name = DEFAULT_ADMIN_NAME
+    logger.info("Admin email being seeded: %s", default_email or "<not configured>")
+
     if not default_email or not default_password:
         logger.error("Default admin seed failed: DEFAULT_ADMIN_EMAIL or DEFAULT_ADMIN_PASSWORD is empty")
         raise HTTPException(status_code=500, detail="Default admin environment variables are invalid")
@@ -1080,21 +1144,8 @@ async def ensure_default_admin_seeded():
     try:
         existing = await db.admins.find_one({"email": default_email})
         if existing:
-            update_doc = {
-                "name": default_name,
-                "role": "super_admin",
-                "permissions": ["super_admin", "admin", "editor"],
-                "hashed_password": get_password_hash(default_password),
-                "updated_at": datetime.now(timezone.utc).isoformat(),
-            }
-            if not existing.get("id"):
-                update_doc["id"] = str(uuid.uuid4())
-            await db.admins.update_one(
-                {"email": default_email},
-                {"$set": update_doc},
-            )
-            logger.info("Default admin user already exists and was refreshed: %s", default_email)
-            return {"action": "updated", "email": default_email}
+            logger.info("Default admin user already exists: %s", default_email)
+            return {"action": "exists", "email": default_email}
 
         admin_doc = {
             "id": str(uuid.uuid4()),
@@ -1103,29 +1154,12 @@ async def ensure_default_admin_seeded():
             "role": "super_admin",
             "permissions": ["super_admin", "admin", "editor"],
             "hashed_password": get_password_hash(default_password),
-            "created_at": datetime.now(timezone.utc).isoformat(),
+            "updated_at": datetime.now(timezone.utc).isoformat(),
         }
-        try:
-            await db.admins.insert_one(admin_doc)
-            logger.info("Default admin user created: %s", default_email)
-            return {"action": "created", "email": default_email}
-        except Exception as insert_error:
-            # Another cold start may have inserted it between find and insert.
-            duplicate = await db.admins.find_one({"email": default_email})
-            if duplicate:
-                await db.admins.update_one(
-                    {"email": default_email},
-                    {"$set": {
-                        "name": default_name,
-                        "role": "super_admin",
-                        "permissions": ["super_admin", "admin", "editor"],
-                        "hashed_password": get_password_hash(default_password),
-                        "updated_at": datetime.now(timezone.utc).isoformat(),
-                    }},
-                )
-                logger.info("Default admin user already existed after race and was refreshed: %s", default_email)
-                return {"action": "updated", "email": default_email}
-            raise insert_error
+        admin_doc["created_at"] = datetime.now(timezone.utc).isoformat()
+        await db.admins.insert_one(admin_doc)
+        logger.info("Default admin user created: %s", default_email)
+        return {"action": "created", "email": default_email}
     except Exception:
         logger.exception("Failed to seed default admin")
         raise
@@ -1138,26 +1172,37 @@ async def seed_default_admin():
 @app.on_event("startup")
 async def on_startup():
     logger.info("MongoDB configured: %s", db is not None)
+    logger.info("MongoDB database name configured: %s", db_name or "<not configured>")
+    logger.info("Admin email being seeded: %s", (DEFAULT_ADMIN_EMAIL or "").lower().strip() or "<not configured>")
     logger.info("Razorpay configured: %s", razorpay_client is not None)
     logger.info("SMTP configured: %s", smtp_configured())
     if db is None:
+        logger.warning("MongoDB connection status: not_configured")
         logger.warning("MONGO_URL and DB_NAME are not configured; using public seed-data fallbacks.")
+        logger.warning("Admin seed status: skipped database_not_configured")
         return
     try:
         await db.command("ping")
-        logger.info("MongoDB connection established for database: %s", db_name)
-    except Exception:
-        logger.exception("MongoDB connection failed")
+        logger.info("MongoDB connection status: connected db=%s", db_name)
+    except Exception as exc:
+        logger.exception("MongoDB connection status: failed")
+        logger.warning("Admin seed status: skipped mongo_connection_failed")
+        if IS_DEVELOPMENT:
+            logger.warning("MongoDB development error detail: %s", exc)
         return
     await prepare_cms_collections()
-    await seed_default_admin()
+    try:
+        seed_result = await seed_default_admin()
+        logger.info("Admin seed status: %s", seed_result)
+    except Exception as exc:
+        logger.exception("Admin seed status: failed")
+        if IS_DEVELOPMENT:
+            logger.warning("Admin seed development error detail: %s", exc)
     # Seed default content in the background to keep startup responsive.
     asyncio.create_task(_seed_db())
 
 
 api_router.include_router(admin_router)
-api_router.include_router(build_customer_router(db))
-api_router.include_router(build_webhook_router(db))
 
 
 # ---------- Razorpay ----------
@@ -1174,6 +1219,13 @@ def _hash_download_token(token: str) -> str:
 
 def _paid_download_url(order_id: str, token: str) -> str:
     return f"/api/orders/{order_id}/download?token={token}"
+
+
+def _public_download_url(download_url: str) -> str:
+    public_base = os.environ.get("PUBLIC_BASE_URL", "").rstrip("/")
+    if public_base and download_url.startswith("/"):
+        return f"{public_base}{download_url}"
+    return download_url
 
 
 async def _find_checkout_product(product_id: Optional[str], product_slug: Optional[str]) -> dict:
@@ -1208,6 +1260,49 @@ def _product_price_paise(product: dict) -> int:
     if amount < 100:
         raise HTTPException(status_code=400, detail="Amount must be at least 100 paise")
     return amount
+
+
+async def _upsert_checkout_customer(order: dict, product: dict, paid: bool = False) -> None:
+    if db is None:
+        return
+    now = datetime.now(timezone.utc).isoformat()
+    email = (order.get("customer_email") or order.get("buyer_email") or "").lower().strip()
+    if not email:
+        return
+
+    customer_doc = {
+        "name": order.get("customer_name") or order.get("buyer_name") or "",
+        "email": email,
+        "phone": order.get("customer_phone") or order.get("buyer_phone") or "",
+        "updated_at": now,
+    }
+    set_on_insert = {
+        "id": str(uuid.uuid4()),
+        "created_at": now,
+        "purchased_products": [],
+        "total_spend": 0,
+        "purchase_history": [],
+    }
+    update: Dict[str, Any] = {
+        "$set": customer_doc,
+        "$setOnInsert": set_on_insert,
+    }
+    if paid:
+        purchase = {
+            "order_id": order.get("id"),
+            "razorpay_order_id": order.get("razorpay_order_id"),
+            "razorpay_payment_id": order.get("razorpay_payment_id"),
+            "product_id": product.get("id"),
+            "product_slug": product.get("slug"),
+            "product_name": product.get("name"),
+            "amount": order.get("amount", 0),
+            "currency": order.get("currency", "INR"),
+            "paid_at": order.get("paid_at") or now,
+        }
+        update["$addToSet"] = {"purchased_products": product.get("slug")}
+        update["$inc"] = {"total_spend": int(order.get("amount") or 0)}
+        update["$push"] = {"purchase_history": purchase}
+    await db.customers.update_one({"email": email}, update, upsert=True)
 
 
 def _send_confirmation_email(to_email: str, buyer_name: str, product_name: str, payment_id: str, download_url: str) -> bool:
@@ -1254,8 +1349,8 @@ def _send_confirmation_email(to_email: str, buyer_name: str, product_name: str, 
         return False
 
 
-@api_router.post("/payments/create-order")
-async def payment_create_order(payload: PaymentCreateOrderIn):
+@api_router.post("/checkout/create-order")
+async def checkout_create_order(payload: PaymentCreateOrderIn):
     if db is None:
         raise HTTPException(status_code=500, detail="Database not configured")
     if razorpay_client is None:
@@ -1298,7 +1393,11 @@ async def payment_create_order(payload: PaymentCreateOrderIn):
         "product_id": product.get("id"),
         "product_slug": product.get("slug"),
         "product_name": product.get("name"),
-        "status": "created",
+        "status": "pending",
+        "payment_status": "pending",
+        "customer_name": payload.name.strip(),
+        "customer_email": str(payload.email).lower().strip(),
+        "customer_phone": phone,
         "buyer_name": payload.name.strip(),
         "buyer_email": str(payload.email).lower().strip(),
         "buyer_phone": phone,
@@ -1306,6 +1405,7 @@ async def payment_create_order(payload: PaymentCreateOrderIn):
         "source": "razorpay_checkout",
     }
     await db.orders.insert_one(order_doc)
+    await _upsert_checkout_customer(order_doc, product)
 
     return {
         "order_id": razorpay_order.get("id"),
@@ -1316,8 +1416,8 @@ async def payment_create_order(payload: PaymentCreateOrderIn):
     }
 
 
-@api_router.post("/payments/verify")
-async def payment_verify(payload: PaymentVerifyIn):
+@api_router.post("/checkout/verify-payment")
+async def checkout_verify_payment(payload: PaymentVerifyIn):
     if db is None:
         raise HTTPException(status_code=500, detail="Database not configured")
     if not RAZORPAY_KEY_SECRET:
@@ -1335,6 +1435,7 @@ async def payment_verify(payload: PaymentVerifyIn):
             {"razorpay_order_id": payload.razorpay_order_id},
             {"$set": {
                 "status": "signature_mismatch",
+                "payment_status": "failed",
                 "razorpay_payment_id": payload.razorpay_payment_id,
                 "verified_at": now,
             }},
@@ -1342,34 +1443,45 @@ async def payment_verify(payload: PaymentVerifyIn):
         raise HTTPException(status_code=400, detail="Invalid payment signature")
 
     product = await _find_checkout_product(order.get("product_id"), order.get("product_slug"))
+    if order.get("status") == "paid" or order.get("payment_status") == "paid":
+        return {
+            "success": True,
+            "order_id": payload.razorpay_order_id,
+            "payment_id": order.get("razorpay_payment_id") or payload.razorpay_payment_id,
+            "product_slug": product.get("slug"),
+            "product_name": product.get("name"),
+            "download_url": order.get("download_url"),
+            "email_sent": False,
+        }
+
     download_file = product.get("download_file")
     if not download_file:
         raise HTTPException(status_code=404, detail="Download file not configured")
 
     download_token = secrets.token_urlsafe(32)
     download_url = _paid_download_url(order["razorpay_order_id"], download_token)
+    paid_fields = {
+        "status": "paid",
+        "payment_status": "paid",
+        "razorpay_payment_id": payload.razorpay_payment_id,
+        "razorpay_signature": payload.razorpay_signature,
+        "verified_at": now,
+        "paid_at": now,
+        "download_token_hash": _hash_download_token(download_token),
+        "download_file": download_file,
+        "download_url": download_url,
+    }
     await db.orders.update_one(
         {"razorpay_order_id": payload.razorpay_order_id},
-        {"$set": {
-            "status": "paid",
-            "razorpay_payment_id": payload.razorpay_payment_id,
-            "razorpay_signature": payload.razorpay_signature,
-            "verified_at": now,
-            "paid_at": now,
-            "download_token_hash": _hash_download_token(download_token),
-            "download_file": download_file,
-            "download_url": download_url,
-        }},
+        {"$set": paid_fields},
     )
     await db.products.update_one({"id": product.get("id")}, {"$inc": {"sold_count": 1}})
+    await _upsert_checkout_customer({**order, **paid_fields}, product, paid=True)
 
-    full_download_url = download_url
-    public_base = os.environ.get("PUBLIC_BASE_URL", "").rstrip("/")
-    if public_base:
-        full_download_url = f"{public_base}{download_url}"
+    full_download_url = _public_download_url(download_url)
     email_sent = _send_confirmation_email(
-        order.get("buyer_email", ""),
-        order.get("buyer_name", "there"),
+        order.get("customer_email") or order.get("buyer_email", ""),
+        order.get("customer_name") or order.get("buyer_name", "there"),
         order.get("product_name") or product.get("name", "your asset"),
         payload.razorpay_payment_id,
         full_download_url,
@@ -1384,6 +1496,16 @@ async def payment_verify(payload: PaymentVerifyIn):
         "download_url": download_url,
         "email_sent": email_sent,
     }
+
+
+@api_router.post("/payments/create-order")
+async def payment_create_order(payload: PaymentCreateOrderIn):
+    return await checkout_create_order(payload)
+
+
+@api_router.post("/payments/verify")
+async def payment_verify(payload: PaymentVerifyIn):
+    return await checkout_verify_payment(payload)
 
 
 @api_router.get("/orders/{order_id}/download")
@@ -1513,6 +1635,54 @@ async def verify_payment(payload: VerifyPaymentIn):
         "message": "Payment verified successfully",
         "razorpay_order_id": payload.razorpay_order_id,
         "razorpay_payment_id": payload.razorpay_payment_id,
+    }
+
+
+@api_router.post("/payments/free-order")
+async def payment_free_order(payload: PaymentFreeOrderIn):
+    if db is None:
+        raise HTTPException(status_code=500, detail="Database not configured")
+
+    product = await _find_checkout_product(payload.product_id, payload.product_slug)
+    if not product.get("is_free") and int(round(float(product.get("sale_price") or product.get("price") or 0) * 100)) > 0:
+        raise HTTPException(status_code=400, detail="This product is not free")
+
+    download_file = product.get("download_file")
+    if not download_file:
+        raise HTTPException(status_code=404, detail="Download file not configured")
+
+    download_token = secrets.token_urlsafe(32)
+    order_id = str(uuid.uuid4())
+    download_url = _paid_download_url(order_id, download_token)
+    order_doc = {
+        "id": order_id,
+        "razorpay_order_id": None,
+        "amount": 0,
+        "currency": "INR",
+        "receipt": f"free_{uuid.uuid4().hex[:24]}",
+        "product_id": product.get("id"),
+        "product_slug": product.get("slug"),
+        "product_name": product.get("name"),
+        "status": "paid",
+        "buyer_name": payload.name.strip() if payload.name else None,
+        "buyer_email": str(payload.email).lower().strip() if payload.email else None,
+        "buyer_phone": _normalize_phone(payload.phone) if payload.phone else None,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "verified_at": datetime.now(timezone.utc).isoformat(),
+        "paid_at": datetime.now(timezone.utc).isoformat(),
+        "source": "free_download",
+        "download_token_hash": _hash_download_token(download_token),
+        "download_file": download_file,
+        "download_url": download_url,
+    }
+    await db.orders.insert_one(order_doc)
+
+    return {
+        "success": True,
+        "order_id": order_id,
+        "product_slug": product.get("slug"),
+        "product_name": product.get("name"),
+        "download_url": download_url,
     }
 
 

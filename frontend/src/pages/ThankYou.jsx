@@ -4,12 +4,10 @@ import Header from '../components/Header';
 import Footer from '../components/Footer';
 import { CheckCircle2, Download, Loader2, ArrowRight } from 'lucide-react';
 import { fetchProductBySlug } from '../lib/api';
-import { useCustomerAuth } from '../auth/CustomerAuthContext';
 
 const ThankYou = () => {
   const { slug } = useParams();
   const [searchParams] = useSearchParams();
-  const { user } = useCustomerAuth();
   const [product, setProduct] = useState(null);
   const [loading, setLoading] = useState(true);
   const downloadUrl = searchParams.get('download') || '';
@@ -89,23 +87,13 @@ const ThankYou = () => {
                   Browse assets <ArrowRight size={16} />
                 </Link>
               )}
-              {user ? (
-                <Link
-                  to="/dashboard"
-                  data-testid="thankyou-dashboard-link"
-                  className="inline-flex items-center justify-center gap-2 rounded-full border border-white/15 hover:bg-white/5 transition text-white px-8 py-3.5 text-sm font-semibold uppercase tracking-wider"
-                >
-                  Go to My Downloads <ArrowRight size={16} />
-                </Link>
-              ) : (
-                <Link
-                  to="/register"
-                  data-testid="thankyou-signup-link"
-                  className="inline-flex items-center justify-center gap-2 rounded-full border border-white/15 hover:bg-white/5 transition text-white px-8 py-3.5 text-sm font-semibold uppercase tracking-wider"
-                >
-                  Create account for re-downloads <ArrowRight size={16} />
-                </Link>
-              )}
+              <Link
+                to="/assets"
+                data-testid="thankyou-assets-link"
+                className="inline-flex items-center justify-center gap-2 rounded-full border border-white/15 hover:bg-white/5 transition text-white px-8 py-3.5 text-sm font-semibold uppercase tracking-wider"
+              >
+                Browse more assets <ArrowRight size={16} />
+              </Link>
             </div>
           </div>
 

@@ -21,6 +21,8 @@ export const setAdminAuthToken = (token) => {
   }
 };
 
+export const ADMIN_LOGIN_ENDPOINT = '/admin/login';
+
 export const fetchCourses = async () => {
   const { data } = await api.get('/courses');
   return data;
@@ -62,7 +64,7 @@ export const subscribeNewsletter = async (email) => {
 };
 
 export const adminLogin = async (payload) => {
-  const { data } = await adminApi.post('/admin/login', payload);
+  const { data } = await adminApi.post(ADMIN_LOGIN_ENDPOINT, payload);
   return data;
 };
 
@@ -230,6 +232,11 @@ export const customerClaimFree = async (product_slug) => {
 
 export const customerCheckoutInit = async (product_slug) => {
   const { data } = await customerApi.post('/auth/checkout/init', { product_slug });
+  return data;
+};
+
+export const createFreeOrder = async (payload) => {
+  const { data } = await api.post('/payments/free-order', payload);
   return data;
 };
 

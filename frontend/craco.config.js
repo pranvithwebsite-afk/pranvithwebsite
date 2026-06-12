@@ -1,5 +1,6 @@
 // craco.config.js
 const path = require("path");
+const webpack = require("webpack");
 
 let webpackConfig = {
   eslint: {
@@ -29,6 +30,13 @@ let webpackConfig = {
             '**/public/**',
         ],
       };
+
+      webpackConfig.plugins = [
+        ...(webpackConfig.plugins || []),
+        new webpack.DefinePlugin({
+          "process.env.VITE_RAZORPAY_KEY_ID": JSON.stringify(process.env.VITE_RAZORPAY_KEY_ID || ""),
+        }),
+      ];
 
       return webpackConfig;
     },

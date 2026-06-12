@@ -1,14 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Menu, X, LayoutDashboard, LogOut } from 'lucide-react';
+import { Link, useLocation } from 'react-router-dom';
+import { Menu, X, ShieldCheck } from 'lucide-react';
 import { navLinks } from '../data/mock';
-import { useCustomerAuth } from '../auth/CustomerAuthContext';
-import { toast } from 'sonner';
 
 const Header = () => {
   const location = useLocation();
-  const navigate = useNavigate();
-  const { user, logout } = useCustomerAuth();
   const [open, setOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
 
@@ -17,13 +13,6 @@ const Header = () => {
     window.addEventListener('scroll', onScroll);
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
-
-  const onSignOut = async () => {
-    await logout();
-    toast.success('Signed out');
-    navigate('/');
-    setOpen(false);
-  };
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 flex justify-center pt-5 px-4">
@@ -63,41 +52,13 @@ const Header = () => {
         </ul>
 
         <div className="hidden md:flex items-center gap-2">
-          {user ? (
-            <>
-              <Link
-                to="/dashboard"
-                data-testid="header-dashboard"
-                className="inline-flex items-center gap-1.5 text-white/85 hover:text-white px-3 py-2 text-sm font-medium"
-              >
-                <LayoutDashboard size={14} /> Dashboard
-              </Link>
-              <button
-                onClick={onSignOut}
-                data-testid="header-signout"
-                className="inline-flex items-center gap-1.5 bg-white text-[#0a0518] px-4 py-2 rounded-full text-sm font-semibold hover:bg-violet-100 transition"
-              >
-                <LogOut size={14} /> Sign Out
-              </button>
-            </>
-          ) : (
-            <>
-              <Link
-                to="/login"
-                data-testid="header-signin"
-                className="text-white/85 hover:text-white px-3 py-2 text-sm font-medium"
-              >
-                Sign In
-              </Link>
-              <Link
-                to="/register"
-                data-testid="header-signup"
-                className="bg-white text-[#0a0518] px-4 py-2 rounded-full text-sm font-semibold hover:bg-violet-100 transition"
-              >
-                Sign Up
-              </Link>
-            </>
-          )}
+          <Link
+            to="/admin/login"
+            data-testid="header-admin-login"
+            className="inline-flex items-center gap-1.5 bg-white text-[#0a0518] px-4 py-2 rounded-full text-sm font-semibold hover:bg-violet-100 transition"
+          >
+            <ShieldCheck size={14} /> Admin
+          </Link>
         </div>
 
         <button className="md:hidden text-white" onClick={() => setOpen(!open)} aria-label="menu">
@@ -120,52 +81,16 @@ const Header = () => {
                 </Link>
               </li>
             ))}
-            {user ? (
-              <>
-                <li>
-                  <Link
-                    to="/dashboard"
-                    onClick={() => setOpen(false)}
-                    data-testid="mobile-dashboard"
-                    className="block px-4 py-3 rounded-xl text-white/90 hover:bg-white/5"
-                  >
-                    Dashboard
-                  </Link>
-                </li>
-                <li>
-                  <button
-                    onClick={onSignOut}
-                    data-testid="mobile-signout"
-                    className="w-full text-left px-4 py-3 rounded-xl text-rose-300 hover:bg-rose-500/10"
-                  >
-                    Sign Out
-                  </button>
-                </li>
-              </>
-            ) : (
-              <>
-                <li>
-                  <Link
-                    to="/login"
-                    onClick={() => setOpen(false)}
-                    data-testid="mobile-signin"
-                    className="block px-4 py-3 rounded-xl text-white/90 hover:bg-white/5"
-                  >
-                    Sign In
-                  </Link>
-                </li>
-                <li>
-                  <Link
-                    to="/register"
-                    onClick={() => setOpen(false)}
-                    data-testid="mobile-signup"
-                    className="block w-full mt-1 bg-white text-[#0a0518] px-5 py-3 rounded-xl text-sm font-semibold text-center"
-                  >
-                    Sign Up
-                  </Link>
-                </li>
-              </>
-            )}
+            <li>
+              <Link
+                to="/admin/login"
+                onClick={() => setOpen(false)}
+                data-testid="mobile-admin-login"
+                className="block w-full mt-1 bg-white text-[#0a0518] px-5 py-3 rounded-xl text-sm font-semibold text-center"
+              >
+                Admin Login
+              </Link>
+            </li>
           </ul>
         </div>
       )}
