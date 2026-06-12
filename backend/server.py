@@ -42,7 +42,12 @@ load_dotenv(ROOT_DIR / '.env')
 
 mongo_url = os.environ.get('MONGO_URL')
 db_name = os.environ.get('DB_NAME')
-client = AsyncIOMotorClient(mongo_url) if mongo_url and db_name else None
+mongo_timeout_ms = int(os.environ.get("MONGO_SERVER_SELECTION_TIMEOUT_MS", "8000"))
+client = AsyncIOMotorClient(
+    mongo_url,
+    serverSelectionTimeoutMS=mongo_timeout_ms,
+    connectTimeoutMS=mongo_timeout_ms,
+) if mongo_url and db_name else None
 db = client[db_name] if client is not None else None
 
 # Razorpay client (lazy / safe-init)
@@ -1143,7 +1148,7 @@ async def on_startup():
         logger.info("MongoDB connection established for database: %s", db_name)
     except Exception:
         logger.exception("MongoDB connection failed")
-        raise
+        return
     await prepare_cms_collections()
     await seed_default_admin()
     # Seed default content in the background to keep startup responsive.
