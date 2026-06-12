@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Menu, X, ShieldCheck } from 'lucide-react';
+import { Menu, X } from 'lucide-react';
 import { navLinks } from '../data/mock';
 
 const Header = () => {
@@ -51,16 +51,6 @@ const Header = () => {
           })}
         </ul>
 
-        <div className="hidden md:flex items-center gap-2">
-          <Link
-            to="/admin/login"
-            data-testid="header-admin-login"
-            className="inline-flex items-center gap-1.5 bg-white text-[#0a0518] px-4 py-2 rounded-full text-sm font-semibold hover:bg-violet-100 transition"
-          >
-            <ShieldCheck size={14} /> Admin
-          </Link>
-        </div>
-
         <button className="md:hidden text-white" onClick={() => setOpen(!open)} aria-label="menu">
           {open ? <X size={22} /> : <Menu size={22} />}
         </button>
@@ -81,16 +71,6 @@ const Header = () => {
                 </Link>
               </li>
             ))}
-            <li>
-              <Link
-                to="/admin/login"
-                onClick={() => setOpen(false)}
-                data-testid="mobile-admin-login"
-                className="block w-full mt-1 bg-white text-[#0a0518] px-5 py-3 rounded-xl text-sm font-semibold text-center"
-              >
-                Admin Login
-              </Link>
-            </li>
           </ul>
         </div>
       )}
