@@ -4,8 +4,6 @@ import { Eye, EyeOff } from 'lucide-react';
 import { useAdminAuth } from '../AdminAuthContext';
 import { formatApiErrorDetail } from '../../lib/api';
 
-const isDevelopment = process.env.NODE_ENV === 'development';
-
 const getLoginErrorMessage = (err) => {
   const status = err?.response?.status;
   const backendMessage = formatApiErrorDetail(err?.response?.data?.detail);
@@ -15,17 +13,14 @@ const getLoginErrorMessage = (err) => {
   }
 
   if (err?.response) {
-    if (isDevelopment && backendMessage) {
-      return `Server unavailable: ${backendMessage}`;
-    }
-    return 'Server unavailable';
+    return backendMessage || `Login failed with status ${status}`;
   }
 
   if (err?.request) {
-    return 'Cannot connect to server';
+    return 'Cannot connect to the login service. Check your connection and try again.';
   }
 
-  return isDevelopment && err?.message ? `Server unavailable: ${err.message}` : 'Server unavailable';
+  return err?.message || 'Unable to sign in. Please try again.';
 };
 
 const Login = () => {
@@ -77,6 +72,7 @@ const Login = () => {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                autoComplete="username"
                 className="w-full rounded-2xl border border-slate-800 bg-slate-950 px-4 py-3 text-white outline-none transition focus:border-violet-500"
                 placeholder="admin@pranvithdop.com"
                 required
@@ -89,6 +85,7 @@ const Login = () => {
                   type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
+                  autoComplete="current-password"
                   className="w-full rounded-2xl border border-slate-800 bg-slate-950 px-4 py-3 pr-12 text-white outline-none transition focus:border-violet-500"
                   placeholder="Enter password"
                   required
@@ -98,6 +95,7 @@ const Login = () => {
                   onClick={() => setShowPassword((current) => !current)}
                   className="absolute right-3 top-1/2 inline-flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full text-slate-400 transition hover:bg-slate-800 hover:text-white focus:outline-none focus:ring-2 focus:ring-violet-500"
                   aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  aria-pressed={showPassword}
                   title={showPassword ? 'Hide password' : 'Show password'}
                 >
                   {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}

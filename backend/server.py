@@ -72,6 +72,16 @@ def mongodb_error_category(exc: Exception) -> str:
         return "server_selection_failed"
     return "connection_failed"
 
+
+def mongodb_public_error(exc: Exception) -> str:
+    category = mongodb_error_category(exc)
+    if category == "authentication_failed":
+        return "Database authentication failed. Check the production MONGO_URL credentials."
+    if category == "tls_or_network_failed":
+        return "Database connection failed during TLS or network negotiation."
+    return "Database is temporarily unavailable. Please try again shortly."
+
+
 # Razorpay client (lazy / safe-init)
 RAZORPAY_KEY_ID = os.environ.get('RAZORPAY_KEY_ID', '')
 RAZORPAY_KEY_SECRET = os.environ.get('RAZORPAY_KEY_SECRET', '')
@@ -762,21 +772,28 @@ async def admin_login(payload: AdminLoginIn):
         logger.warning("Admin login failed: database is not configured")
         raise HTTPException(
             status_code=503,
-            detail=development_detail("Server unavailable", "MONGO_URL or DB_NAME is not configured"),
+            detail="Database is not configured. Check MONGO_URL and DB_NAME.",
         )
+    try:
+        await db.command("ping")
+    except Exception as exc:
+        category = mongodb_error_category(exc)
+        logger.exception("Admin login failed: database connection category=%s", category)
+        raise HTTPException(status_code=503, detail=mongodb_public_error(exc))
+
     try:
         await ensure_default_admin_seeded()
     except HTTPException as exc:
         logger.exception("Admin login failed while seeding default admin")
         raise HTTPException(
-            status_code=503,
-            detail=development_detail("Server unavailable", exc.detail),
+            status_code=exc.status_code,
+            detail=exc.detail,
         )
     except Exception as exc:
         logger.exception("Admin login failed while seeding default admin")
         raise HTTPException(
             status_code=503,
-            detail=development_detail("Server unavailable", str(exc)),
+            detail=mongodb_public_error(exc),
         )
 
     try:
@@ -785,7 +802,7 @@ async def admin_login(payload: AdminLoginIn):
         logger.exception("Admin login failed during authentication")
         raise HTTPException(
             status_code=503,
-            detail=development_detail("Server unavailable", str(exc)),
+            detail=mongodb_public_error(exc),
         )
     if not admin:
         raise HTTPException(status_code=401, detail="Incorrect email or password")
