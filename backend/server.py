@@ -836,6 +836,23 @@ async def admin_seed_default(seed_key: Optional[str] = Header(default=None, alia
     return {"success": True, **result}
 
 
+@admin_router.post("/reset-default-password")
+async def admin_reset_default_password(seed_key: Optional[str] = Header(default=None, alias="X-Admin-Seed-Key")):
+    """Reset the configured default admin from encrypted environment values."""
+    if db is None:
+        logger.warning("Admin password reset endpoint failed: database is not configured")
+        raise HTTPException(status_code=503, detail="Database is not configured")
+    if JWT_SECRET == "change-this-secret":
+        logger.warning("Admin password reset endpoint rejected: JWT_SECRET is not configured")
+        raise HTTPException(status_code=503, detail="JWT_SECRET is not configured")
+    if not seed_key or not hmac.compare_digest(seed_key, JWT_SECRET):
+        logger.warning("Admin password reset endpoint rejected: invalid seed key")
+        raise HTTPException(status_code=403, detail="Forbidden")
+    result = await reset_default_admin_password()
+    logger.info("Admin password reset endpoint completed for %s", result["email"])
+    return {"success": True, **result}
+
+
 @admin_router.post("/logout")
 async def admin_logout(current_admin: AdminBase = Depends(get_current_active_admin)):
     return {"success": True, "message": "Logged out successfully"}
@@ -1197,6 +1214,40 @@ async def ensure_default_admin_seeded():
         return {"action": "created", "email": default_email}
     except Exception:
         logger.exception("Failed to seed default admin")
+        raise
+
+
+async def reset_default_admin_password():
+    if db is None:
+        logger.warning("Default admin password reset skipped: database is not configured")
+        raise HTTPException(status_code=503, detail="Database is not configured")
+
+    default_email = (DEFAULT_ADMIN_EMAIL or "").lower().strip()
+    default_password = DEFAULT_ADMIN_PASSWORD or ""
+    if not default_email or not default_password:
+        logger.error("Default admin password reset failed: required environment variables are empty")
+        raise HTTPException(status_code=500, detail="Default admin environment variables are invalid")
+
+    try:
+        existing = await db.admins.find_one({"email": default_email})
+        if not existing:
+            return await ensure_default_admin_seeded()
+
+        await db.admins.update_one(
+            {"email": default_email},
+            {
+                "$set": {
+                    "hashed_password": get_password_hash(default_password),
+                    "updated_at": datetime.now(timezone.utc).isoformat(),
+                }
+            },
+        )
+        logger.info("Default admin password reset completed for email %s", default_email)
+        return {"action": "password_reset", "email": default_email}
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Failed to reset default admin password")
         raise
 
 
