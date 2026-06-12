@@ -170,7 +170,7 @@ const Assets = () => {
           const params = new URLSearchParams({
             orderId: result.orderId || '',
             paymentId: result.paymentId || '',
-            download: result.downloadUrl || '',
+            token: result.downloadToken || '',
             product: result.productSlug || checkoutProduct.slug,
           });
           navigate(`/payment-success?${params.toString()}`);

@@ -47,17 +47,6 @@ def test_admin_login(session):
     assert isinstance(data["access_token"], str) and len(data["access_token"]) > 0
 
 
-def test_customer_login(session):
-    r = session.post(
-        f"{BASE_URL}/api/auth/login",
-        json={"email": "test@pranvithdop.com", "password": "Test1234!"},
-        timeout=30,
-    )
-    assert r.status_code == 200, f"Customer login failed {r.status_code}: {r.text[:200]}"
-    data = r.json()
-    assert "access_token" in data
-
-
 def test_products_eight_slugs(session):
     r = session.get(f"{BASE_URL}/api/products", timeout=30)
     assert r.status_code == 200

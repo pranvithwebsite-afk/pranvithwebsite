@@ -15,28 +15,36 @@ Set these in Vercel Project Settings > Environment Variables:
 MONGO_URL=your_mongodb_connection_string
 DB_NAME=pranvithdop
 JWT_SECRET=make_any_long_random_secret
-CUSTOMER_JWT_SECRET=make_a_different_long_random_secret
 DEFAULT_ADMIN_EMAIL=your_email@gmail.com
 DEFAULT_ADMIN_PASSWORD=your_admin_password
 DEFAULT_ADMIN_NAME=Pranvith
 RAZORPAY_KEY_ID=your_razorpay_key_id
 RAZORPAY_KEY_SECRET=your_razorpay_key_secret
-RAZORPAY_WEBHOOK_SECRET=your_razorpay_webhook_secret
-REACT_APP_RAZORPAY_KEY_ID=your_razorpay_key_id
+VITE_RAZORPAY_KEY_ID=your_razorpay_key_id
+FRONTEND_URL=https://pranvithdop.com
 SMTP_HOST=smtp.example.com
 SMTP_PORT=587
 SMTP_USER=your_smtp_username
 SMTP_PASS=your_smtp_password
 SMTP_FROM="PranvithDOP <no-reply@pranvithdop.com>"
-PUBLIC_BASE_URL=https://pranvithdop.com
 CORS_ORIGINS=https://pranvithdop.com,https://www.pranvithdop.com
 JWT_EXPIRATION_MINUTES=180
-CUSTOMER_JWT_EXPIRATION_MINUTES=1440
 ```
 
-`REACT_APP_BACKEND_URL` is optional. Leave it unset on Vercel so the frontend uses the same deployment origin and calls `/api`. Set it only if the frontend must call a separate backend host.
+`VITE_BACKEND_URL` is optional. Leave it unset on Vercel so the frontend uses the same deployment origin and calls `/api`. Set it only if the frontend must call a separate backend host. The existing `REACT_APP_BACKEND_URL` and `REACT_APP_RAZORPAY_KEY_ID` names remain supported as local compatibility aliases.
 
-`RAZORPAY_KEY_SECRET` must only be set for the backend environment. The frontend should use `REACT_APP_RAZORPAY_KEY_ID` only. `PUBLIC_BASE_URL` is used for absolute secure download links in confirmation emails.
+`RAZORPAY_KEY_SECRET` must only be set for the backend environment. The frontend receives only `VITE_RAZORPAY_KEY_ID`. `FRONTEND_URL` is used to create absolute protected download links in confirmation emails.
+
+SMTP is optional. If `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, and `SMTP_FROM` are all configured, a successful payment sends the protected download link to the checkout email address. If they are omitted, checkout and download access continue to work and the backend logs that email delivery was skipped.
+
+## Guest Checkout Flow
+
+1. The asset Buy Now button opens the checkout modal and collects name, email, and phone.
+2. `POST /api/checkout/create-order` calculates the amount from MongoDB and creates the Razorpay order.
+3. Razorpay Checkout uses the submitted customer details as prefill values.
+4. `POST /api/checkout/verify-payment` validates the Razorpay HMAC signature and marks the MongoDB order paid.
+5. The payment success page calls `GET /api/orders/{order_id}/access?token=...` before displaying the download button.
+6. `GET /api/orders/{order_id}/download?token=...` verifies paid status and the protected token before redirecting to the private asset URL.
 
 ## Deploy From GitHub
 

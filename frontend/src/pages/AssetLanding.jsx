@@ -297,7 +297,7 @@ const AssetLanding = () => {
           const params = new URLSearchParams({
             orderId: result.orderId || '',
             paymentId: result.paymentId || '',
-            download: result.downloadUrl || '',
+            token: result.downloadToken || '',
             product: result.productSlug || product.slug,
           });
           navigate(`/payment-success?${params.toString()}`);

@@ -1,6 +1,6 @@
 import React from 'react';
 import './App.css';
-import { BrowserRouter, Navigate, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import Home from './pages/Home';
 import Courses from './pages/Courses';
 import About from './pages/About';
@@ -8,7 +8,6 @@ import Assets from './pages/Assets';
 import Hire from './pages/Hire';
 import Works from './pages/Works';
 import AssetLanding from './pages/AssetLanding';
-import ThankYou from './pages/ThankYou';
 import PaymentSuccess from './pages/PaymentSuccess';
 import PaymentFailed from './pages/PaymentFailed';
 import { Toaster } from './components/ui/sonner';
@@ -52,12 +51,8 @@ function App() {
             <Route path="/assets/:slug" element={<AssetLanding />} />
             <Route path="/payment-success" element={<PaymentSuccess />} />
             <Route path="/payment-failed" element={<PaymentFailed />} />
-            <Route path="/thank-you/:slug" element={<ThankYou />} />
             <Route path="/works" element={<Works />} />
             <Route path="/hire" element={<Hire />} />
-            <Route path="/login" element={<Navigate to="/assets" replace />} />
-            <Route path="/register" element={<Navigate to="/assets" replace />} />
-            <Route path="/dashboard" element={<Navigate to="/assets" replace />} />
           </Routes>
         </AdminAuthProvider>
       </BrowserRouter>

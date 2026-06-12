@@ -372,24 +372,6 @@ class Subscriber(BaseModel):
     created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
 
-class CreateOrderIn(BaseModel):
-    amount: int = Field(ge=100, description="Amount in paise (minimum 100)")
-    currency: str = Field(default="INR", min_length=3, max_length=3)
-    receipt: Optional[str] = None
-    item_id: Optional[str] = None
-    item_name: Optional[str] = None
-
-
-class VerifyPaymentIn(BaseModel):
-    razorpay_order_id: str
-    razorpay_payment_id: str
-    razorpay_signature: str
-    item_id: Optional[str] = None
-    item_name: Optional[str] = None
-    amount: Optional[int] = None
-    email: Optional[str] = None
-
-
 class PaymentCreateOrderIn(BaseModel):
     product_id: Optional[str] = None
     product_slug: Optional[str] = None
@@ -1222,7 +1204,11 @@ def _paid_download_url(order_id: str, token: str) -> str:
 
 
 def _public_download_url(download_url: str) -> str:
-    public_base = os.environ.get("PUBLIC_BASE_URL", "").rstrip("/")
+    public_base = (
+        os.environ.get("FRONTEND_URL")
+        or os.environ.get("PUBLIC_BASE_URL")
+        or ""
+    ).rstrip("/")
     if public_base and download_url.startswith("/"):
         return f"{public_base}{download_url}"
     return download_url
@@ -1393,6 +1379,7 @@ async def checkout_create_order(payload: PaymentCreateOrderIn):
         "product_id": product.get("id"),
         "product_slug": product.get("slug"),
         "product_name": product.get("name"),
+        "product_title": product.get("name"),
         "status": "pending",
         "payment_status": "pending",
         "customer_name": payload.name.strip(),
@@ -1494,18 +1481,42 @@ async def checkout_verify_payment(payload: PaymentVerifyIn):
         "product_slug": product.get("slug"),
         "product_name": product.get("name"),
         "download_url": download_url,
+        "download_token": download_token,
         "email_sent": email_sent,
     }
 
 
-@api_router.post("/payments/create-order")
-async def payment_create_order(payload: PaymentCreateOrderIn):
-    return await checkout_create_order(payload)
+def _validate_download_access(order: Optional[dict], token: str) -> dict:
+    if not order or order.get("payment_status") != "paid":
+        raise HTTPException(status_code=403, detail="Download is available only after successful payment")
+    expected_hash = order.get("download_token_hash")
+    if not expected_hash or not hmac.compare_digest(expected_hash, _hash_download_token(token)):
+        raise HTTPException(status_code=403, detail="Invalid or expired download link")
+    return order
 
 
-@api_router.post("/payments/verify")
-async def payment_verify(payload: PaymentVerifyIn):
-    return await checkout_verify_payment(payload)
+@api_router.get("/orders/{order_id}/access")
+async def order_access(order_id: str, token: str):
+    if db is None:
+        raise HTTPException(status_code=500, detail="Database not configured")
+    order = await db.orders.find_one(
+        {"$or": [{"razorpay_order_id": order_id}, {"id": order_id}]}, {"_id": 0}
+    )
+    order = _validate_download_access(order, token)
+    return {
+        "verified": True,
+        "order_id": order.get("razorpay_order_id") or order.get("id"),
+        "payment_id": order.get("razorpay_payment_id"),
+        "product_id": order.get("product_id"),
+        "product_slug": order.get("product_slug"),
+        "product_name": order.get("product_name"),
+        "product_title": order.get("product_title") or order.get("product_name"),
+        "amount": order.get("amount"),
+        "currency": order.get("currency", "INR"),
+        "payment_status": order.get("payment_status"),
+        "download_url": _paid_download_url(order_id, token),
+        "created_at": order.get("created_at"),
+    }
 
 
 @api_router.get("/orders/{order_id}/download")
@@ -1515,11 +1526,7 @@ async def order_download(order_id: str, token: str):
     order = await db.orders.find_one(
         {"$or": [{"razorpay_order_id": order_id}, {"id": order_id}]}, {"_id": 0}
     )
-    if not order or order.get("status") != "paid":
-        raise HTTPException(status_code=403, detail="Download is available only after successful payment")
-    expected_hash = order.get("download_token_hash")
-    if not expected_hash or not hmac.compare_digest(expected_hash, _hash_download_token(token)):
-        raise HTTPException(status_code=403, detail="Invalid or expired download link")
+    order = _validate_download_access(order, token)
 
     download_file = order.get("download_file")
     if not download_file:
@@ -1533,109 +1540,6 @@ async def order_download(order_id: str, token: str):
         {"$inc": {"download_count": 1}, "$set": {"last_downloaded_at": datetime.now(timezone.utc).isoformat()}},
     )
     return RedirectResponse(download_file, status_code=302)
-
-
-@api_router.post("/create-order")
-async def create_order(payload: CreateOrderIn):
-    if razorpay_client is None:
-        raise HTTPException(status_code=500, detail="Payment gateway not configured")
-    if payload.amount < 100:
-        raise HTTPException(status_code=400, detail="Amount must be at least 100 paise")
-
-    receipt = payload.receipt or f"rcpt_{uuid.uuid4().hex[:16]}"
-    try:
-        order = razorpay_client.order.create({
-            "amount": int(payload.amount),
-            "currency": payload.currency.upper(),
-            "receipt": receipt,
-            "payment_capture": 1,
-            "notes": {
-                "item_id": payload.item_id or "",
-                "item_name": payload.item_name or "",
-            },
-        })
-    except razorpay.errors.BadRequestError as e:
-        logger.exception("Razorpay bad request")
-        raise HTTPException(status_code=400, detail=str(e))
-    except razorpay.errors.ServerError as e:
-        logger.exception("Razorpay server error")
-        raise HTTPException(status_code=502, detail="Payment gateway error")
-    except Exception as e:
-        logger.exception("Razorpay order failure")
-        raise HTTPException(status_code=500, detail="Could not create order")
-
-    # Persist order record
-    try:
-        await db.orders.insert_one({
-            "id": str(uuid.uuid4()),
-            "razorpay_order_id": order.get("id"),
-            "amount": order.get("amount"),
-            "currency": order.get("currency"),
-            "receipt": receipt,
-            "item_id": payload.item_id,
-            "item_name": payload.item_name,
-            "status": "created",
-            "created_at": datetime.now(timezone.utc).isoformat(),
-        })
-    except Exception:
-        logger.exception("orders insert failed (non-fatal)")
-
-    return {
-        "order_id": order.get("id"),
-        "amount": order.get("amount"),
-        "currency": order.get("currency"),
-        "key_id": RAZORPAY_KEY_ID,
-        "receipt": receipt,
-    }
-
-
-@api_router.post("/verify-payment")
-async def verify_payment(payload: VerifyPaymentIn):
-    if not (payload.razorpay_order_id and payload.razorpay_payment_id and payload.razorpay_signature):
-        raise HTTPException(status_code=400, detail="Missing payment fields")
-    if not RAZORPAY_KEY_SECRET:
-        raise HTTPException(status_code=500, detail="Payment gateway not configured")
-
-    message = f"{payload.razorpay_order_id}|{payload.razorpay_payment_id}".encode("utf-8")
-    expected_sig = hmac.new(
-        RAZORPAY_KEY_SECRET.encode("utf-8"),
-        message,
-        hashlib.sha256,
-    ).hexdigest()
-
-    if not hmac.compare_digest(expected_sig, payload.razorpay_signature):
-        # Record failed attempt (best-effort) but do not mark order paid
-        try:
-            await db.orders.update_one(
-                {"razorpay_order_id": payload.razorpay_order_id},
-                {"$set": {"status": "signature_mismatch",
-                          "razorpay_payment_id": payload.razorpay_payment_id,
-                          "verified_at": datetime.now(timezone.utc).isoformat()}},
-            )
-        except Exception:
-            pass
-        raise HTTPException(status_code=400, detail="Invalid payment signature")
-
-    # Signature valid -> mark as paid
-    try:
-        await db.orders.update_one(
-            {"razorpay_order_id": payload.razorpay_order_id},
-            {"$set": {
-                "status": "paid",
-                "razorpay_payment_id": payload.razorpay_payment_id,
-                "verified_at": datetime.now(timezone.utc).isoformat(),
-                "buyer_email": payload.email,
-            }},
-        )
-    except Exception:
-        logger.exception("orders update failed (non-fatal)")
-
-    return {
-        "success": True,
-        "message": "Payment verified successfully",
-        "razorpay_order_id": payload.razorpay_order_id,
-        "razorpay_payment_id": payload.razorpay_payment_id,
-    }
 
 
 @api_router.post("/payments/free-order")
@@ -1663,10 +1567,12 @@ async def payment_free_order(payload: PaymentFreeOrderIn):
         "product_id": product.get("id"),
         "product_slug": product.get("slug"),
         "product_name": product.get("name"),
+        "product_title": product.get("name"),
         "status": "paid",
-        "buyer_name": payload.name.strip() if payload.name else None,
-        "buyer_email": str(payload.email).lower().strip() if payload.email else None,
-        "buyer_phone": _normalize_phone(payload.phone) if payload.phone else None,
+        "payment_status": "paid",
+        "customer_name": payload.name.strip() if payload.name else None,
+        "customer_email": str(payload.email).lower().strip() if payload.email else None,
+        "customer_phone": _normalize_phone(payload.phone) if payload.phone else None,
         "created_at": datetime.now(timezone.utc).isoformat(),
         "verified_at": datetime.now(timezone.utc).isoformat(),
         "paid_at": datetime.now(timezone.utc).isoformat(),
@@ -1683,6 +1589,7 @@ async def payment_free_order(payload: PaymentFreeOrderIn):
         "product_slug": product.get("slug"),
         "product_name": product.get("name"),
         "download_url": download_url,
+        "download_token": download_token,
     }
 
 

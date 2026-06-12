@@ -62,7 +62,7 @@ const CheckoutModal = ({ product, open, onClose, onSuccess, onFailure }) => {
           success: true,
           orderId: data.order_id,
           productSlug: data.product_slug,
-          downloadUrl: data.download_url,
+          downloadToken: data.download_token,
         };
       } catch (err) {
         const msg = err?.response?.data?.detail || 'Could not create free order';
@@ -123,6 +123,7 @@ const CheckoutModal = ({ product, open, onClose, onSuccess, onFailure }) => {
               className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-white/35 focus:border-violet-500/60 focus:outline-none"
               placeholder="Your name"
               autoComplete="name"
+              required
             />
           </Field>
           <Field label="Email" error={errors.email}>
@@ -132,6 +133,8 @@ const CheckoutModal = ({ product, open, onClose, onSuccess, onFailure }) => {
               className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-white/35 focus:border-violet-500/60 focus:outline-none"
               placeholder="you@example.com"
               autoComplete="email"
+              type="email"
+              required
             />
           </Field>
           <Field label="Phone" error={errors.phone}>
@@ -141,6 +144,8 @@ const CheckoutModal = ({ product, open, onClose, onSuccess, onFailure }) => {
               className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-white/35 focus:border-violet-500/60 focus:outline-none"
               placeholder="+91 98765 43210"
               autoComplete="tel"
+              type="tel"
+              required
             />
           </Field>
 

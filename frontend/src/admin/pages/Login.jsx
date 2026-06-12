@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Eye, EyeOff } from 'lucide-react';
 import { useAdminAuth } from '../AdminAuthContext';
-import { formatApiErrorDetail } from '../../auth/CustomerAuthContext';
+import { formatApiErrorDetail } from '../../lib/api';
 
 const isDevelopment = process.env.NODE_ENV === 'development';
 

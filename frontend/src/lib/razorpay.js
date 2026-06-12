@@ -31,7 +31,7 @@ const loadScript = () =>
  * @param {string} opts.itemName
  * @param {Object} [opts.prefill]      { name, email, contact }
  * @param {string} [opts.productSlug]
- * @returns {Promise<{success: boolean, paymentId?: string, orderId?: string, downloadUrl?: string, productSlug?: string, error?: string}>}
+ * @returns {Promise<{success: boolean, paymentId?: string, orderId?: string, downloadToken?: string, productSlug?: string, error?: string}>}
  */
 export async function payWithRazorpay({ amountRupees, itemId, itemName, productSlug, prefill = {} }) {
   if (!RAZORPAY_KEY_ID) {
@@ -84,11 +84,16 @@ export async function payWithRazorpay({ amountRupees, itemId, itemName, productS
             paymentId: response.razorpay_payment_id,
             orderId: response.razorpay_order_id,
             productSlug: data?.product_slug,
-            downloadUrl: data?.download_url,
+            downloadToken: data?.download_token || new URLSearchParams((data?.download_url || '').split('?')[1] || '').get('token'),
           });
         } catch (err) {
           const msg = err?.response?.data?.detail || 'Verification failed';
-          resolve({ success: false, error: typeof msg === 'string' ? msg : 'Verification failed' });
+          resolve({
+            success: false,
+            failed: true,
+            orderId: response.razorpay_order_id,
+            error: typeof msg === 'string' ? msg : 'Verification failed',
+          });
         }
       },
     });

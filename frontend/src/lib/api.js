@@ -1,6 +1,10 @@
 import axios from 'axios';
 
-const BACKEND_URL = (process.env.REACT_APP_BACKEND_URL || '').replace(/\/$/, '');
+const BACKEND_URL = (
+  process.env.VITE_BACKEND_URL
+  || process.env.REACT_APP_BACKEND_URL
+  || ''
+).replace(/\/$/, '');
 export const API = `${BACKEND_URL}/api`;
 
 export const api = axios.create({
@@ -118,6 +122,19 @@ export const adminLogout = async () => {
   return data;
 };
 
+export const formatApiErrorDetail = (detail) => {
+  if (detail == null) return 'Something went wrong. Please try again.';
+  if (typeof detail === 'string') return detail;
+  if (Array.isArray(detail)) {
+    return detail
+      .map((item) => (item && typeof item.msg === 'string' ? item.msg : JSON.stringify(item)))
+      .filter(Boolean)
+      .join(' ');
+  }
+  if (detail && typeof detail.msg === 'string') return detail.msg;
+  return String(detail);
+};
+
 // Admin Page Management
 export const fetchAdminPage = async (pageId) => {
   const { data } = await adminApi.get(`/admin/pages/${pageId}`);
@@ -175,66 +192,6 @@ export const deleteAdminMedia = async (mediaId) => {
   return data;
 };
 
-// ---------------- Customer auth ----------------
-export const customerApi = axios.create({
-  baseURL: API,
-  timeout: 15000,
-});
-
-export const setCustomerAuthToken = (token) => {
-  if (token) {
-    customerApi.defaults.headers.common.Authorization = `Bearer ${token}`;
-  } else {
-    delete customerApi.defaults.headers.common.Authorization;
-  }
-};
-
-export const customerRegister = async (payload) => {
-  const { data } = await customerApi.post('/auth/register', payload);
-  return data;
-};
-
-export const customerLogin = async (payload) => {
-  const { data } = await customerApi.post('/auth/login', payload);
-  return data;
-};
-
-export const customerMe = async () => {
-  const { data } = await customerApi.get('/auth/me');
-  return data;
-};
-
-export const customerLogout = async () => {
-  try {
-    await customerApi.post('/auth/logout');
-  } catch (_) {}
-};
-
-export const customerMyOrders = async () => {
-  const { data } = await customerApi.get('/auth/my-orders');
-  return data;
-};
-
-export const customerMyDownloads = async () => {
-  const { data } = await customerApi.get('/auth/my-downloads');
-  return data;
-};
-
-export const customerChangePassword = async (payload) => {
-  const { data } = await customerApi.post('/auth/change-password', payload);
-  return data;
-};
-
-export const customerClaimFree = async (product_slug) => {
-  const { data } = await customerApi.post('/auth/claim-free', { product_slug });
-  return data;
-};
-
-export const customerCheckoutInit = async (product_slug) => {
-  const { data } = await customerApi.post('/auth/checkout/init', { product_slug });
-  return data;
-};
-
 export const createFreeOrder = async (payload) => {
   const { data } = await api.post('/payments/free-order', payload);
   return data;
@@ -242,5 +199,12 @@ export const createFreeOrder = async (payload) => {
 
 export const fetchProductBySlug = async (slug) => {
   const { data } = await api.get(`/products/${slug}`);
+  return data;
+};
+
+export const fetchOrderAccess = async (orderId, token) => {
+  const { data } = await api.get(`/orders/${encodeURIComponent(orderId)}/access`, {
+    params: { token },
+  });
   return data;
 };
