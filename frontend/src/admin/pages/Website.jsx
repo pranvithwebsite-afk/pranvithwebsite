@@ -158,7 +158,7 @@ const PageEditor = ({ page, onSave, onClose, onInputChange, onSectionChange, sav
         </div>
       </div>
 
-      <div className="rounded-3xl border border-slate-800 bg-slate-950 p-6 space-y-6 max-w-3xl">
+      <div className="max-w-3xl space-y-6 rounded-3xl border border-slate-800 bg-slate-950 p-4 sm:p-6">
         <div>
           <label className="block text-sm font-semibold text-white mb-2">Page Title</label>
           <input
@@ -237,18 +237,18 @@ const PageEditor = ({ page, onSave, onClose, onInputChange, onSectionChange, sav
         </div>
       </div>
 
-      <div className="flex gap-3">
+      <div className="flex flex-col gap-3 sm:flex-row">
         <button
           onClick={onSave}
           disabled={saving}
-          className="flex items-center gap-2 px-6 py-3 rounded-lg bg-green-600 hover:bg-green-500 disabled:opacity-60 text-white font-semibold transition"
+          className="flex w-full items-center justify-center gap-2 rounded-lg bg-green-600 px-6 py-3 font-semibold text-white transition hover:bg-green-500 disabled:opacity-60 sm:w-auto"
         >
           <Save size={18} />
           {saving ? 'Saving...' : 'Save Changes'}
         </button>
         <button
           onClick={onClose}
-          className="px-6 py-3 rounded-lg border border-slate-700 hover:border-slate-600 text-white font-semibold transition"
+          className="w-full rounded-lg border border-slate-700 px-6 py-3 font-semibold text-white transition hover:border-slate-600 sm:w-auto"
         >
           Cancel
         </button>

@@ -153,14 +153,14 @@ const Products = () => {
 
   return (
     <section className="space-y-6">
-      <div className="rounded-3xl border border-slate-800 bg-slate-900/95 p-6 flex items-center justify-between">
+      <div className="flex flex-col gap-4 rounded-3xl border border-slate-800 bg-slate-900/95 p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6">
         <div>
           <h1 className="text-3xl font-semibold text-white">Products</h1>
           <p className="mt-3 text-slate-400">Manage your product catalog.</p>
         </div>
         <button
           onClick={openNewForm}
-          className="flex items-center gap-2 px-6 py-3 rounded-lg bg-violet-600 hover:bg-violet-500 text-white font-semibold transition"
+          className="flex w-full items-center justify-center gap-2 rounded-lg bg-violet-600 px-6 py-3 font-semibold text-white transition hover:bg-violet-500 sm:w-auto"
         >
           <Plus size={18} />
           Add Product
@@ -228,8 +228,8 @@ const ProductForm = ({
 
   return (
     <section className="space-y-6">
-      <div className="rounded-3xl border border-slate-800 bg-slate-900/95 p-6 flex items-center justify-between">
-        <h1 className="text-3xl font-semibold text-white">
+      <div className="flex items-center justify-between gap-4 rounded-3xl border border-slate-800 bg-slate-900/95 p-5 sm:p-6">
+        <h1 className="text-2xl font-semibold text-white sm:text-3xl">
           {isEdit ? 'Edit Product' : 'New Product'}
         </h1>
         <button
@@ -240,9 +240,9 @@ const ProductForm = ({
         </button>
       </div>
 
-      <div className="rounded-3xl border border-slate-800 bg-slate-950 p-6 space-y-6 max-w-3xl">
+      <div className="max-w-3xl space-y-6 rounded-3xl border border-slate-800 bg-slate-950 p-4 sm:p-6">
         {/* Basic Fields */}
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid gap-4 sm:grid-cols-2">
           <div>
             <label className="block text-sm font-semibold text-white mb-2">Product Name *</label>
             <input
@@ -265,7 +265,7 @@ const ProductForm = ({
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid gap-4 sm:grid-cols-2">
           <div>
             <label className="block text-sm font-semibold text-white mb-2">Category</label>
             <input
@@ -290,7 +290,7 @@ const ProductForm = ({
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid gap-4 sm:grid-cols-2">
           <div>
             <label className="block text-sm font-semibold text-white mb-2">Price (₹)</label>
             <input
@@ -412,18 +412,18 @@ const ProductForm = ({
         </div>
       </div>
 
-      <div className="flex gap-3">
+      <div className="flex flex-col gap-3 sm:flex-row">
         <button
           onClick={onSave}
           disabled={saving}
-          className="flex items-center gap-2 px-6 py-3 rounded-lg bg-green-600 hover:bg-green-500 disabled:opacity-60 text-white font-semibold transition"
+          className="flex w-full items-center justify-center gap-2 rounded-lg bg-green-600 px-6 py-3 font-semibold text-white transition hover:bg-green-500 disabled:opacity-60 sm:w-auto"
         >
           <Save size={18} />
           {saving ? 'Saving...' : 'Save Product'}
         </button>
         <button
           onClick={onClose}
-          className="px-6 py-3 rounded-lg border border-slate-700 hover:border-slate-600 text-white font-semibold transition"
+          className="w-full rounded-lg border border-slate-700 px-6 py-3 font-semibold text-white transition hover:border-slate-600 sm:w-auto"
         >
           Cancel
         </button>
@@ -444,18 +444,18 @@ const ArrayEditor = ({
   return (
     <div>
       <label className="block text-sm font-semibold text-white mb-2">{label}</label>
-      <div className="flex gap-2 mb-3">
+      <div className="mb-3 flex flex-col gap-2 sm:flex-row">
         <input
           type={isUrl ? 'url' : 'text'}
           value={newItem}
           onChange={(e) => onNewItemChange(e.target.value)}
           placeholder={isUrl ? 'https://example.com/image.jpg' : `Add a ${label.toLowerCase()} item`}
-          className="flex-1 px-4 py-2 rounded-lg bg-slate-900 border border-slate-700 text-white placeholder:text-slate-600 focus:outline-none focus:border-violet-500 text-sm"
+          className="min-w-0 flex-1 rounded-lg border border-slate-700 bg-slate-900 px-4 py-2 text-sm text-white placeholder:text-slate-600 focus:border-violet-500 focus:outline-none"
           onKeyPress={(e) => e.key === 'Enter' && onAdd()}
         />
         <button
           onClick={onAdd}
-          className="px-4 py-2 rounded-lg bg-violet-600 hover:bg-violet-500 text-white font-semibold transition"
+          className="rounded-lg bg-violet-600 px-4 py-2 font-semibold text-white transition hover:bg-violet-500"
         >
           Add
         </button>
@@ -464,9 +464,9 @@ const ArrayEditor = ({
         {items.map((item, idx) => (
           <div
             key={`${item}-${idx}`}
-            className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-900 border border-slate-700 text-slate-100 text-sm"
+            className="inline-flex max-w-full items-center gap-2 rounded-full border border-slate-700 bg-slate-900 px-3 py-1 text-sm text-slate-100"
           >
-            <span className="truncate max-w-xs">{item}</span>
+            <span className="max-w-[calc(100vw-8rem)] truncate sm:max-w-xs">{item}</span>
             <button
               onClick={() => onRemove(idx)}
               className="text-slate-400 hover:text-red-400 transition"
