@@ -1,10 +1,10 @@
-from fastapi import FastAPI, APIRouter, HTTPException, Depends, status, UploadFile, File, Header
+from fastapi import FastAPI, APIRouter, HTTPException, Depends, status, UploadFile, File
 from fastapi.security import OAuth2PasswordBearer
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from starlette.responses import RedirectResponse
 from motor.motor_asyncio import AsyncIOMotorClient
-from pymongo.errors import OperationFailure, ServerSelectionTimeoutError
+from pymongo.errors import DuplicateKeyError, OperationFailure, ServerSelectionTimeoutError
 from passlib.context import CryptContext
 from jose import JWTError, jwt
 from email.message import EmailMessage
@@ -555,8 +555,15 @@ def _public_product(product: dict) -> dict:
 @api_router.get("/products")
 async def public_products():
     if db is None:
-        return [_public_product(product) for product in ASSET_PRODUCTS if product.get("published", True)]
+        products = [_public_product(product) for product in ASSET_PRODUCTS if product.get("published", True)]
+        logger.info("Product fetch source=fallback scope=public count=%d", len(products))
+        return products
     rows = await db.products.find({"published": True}, {"_id": 0, "download_file": 0, "payment_link": 0}).to_list(100)
+    logger.info(
+        "Product fetch source=mongodb database=%s collection=products scope=public count=%d",
+        db_name,
+        len(rows),
+    )
     return rows
 
 
@@ -678,6 +685,7 @@ DEFAULT_ADMIN_PASSWORD = os.environ.get("DEFAULT_ADMIN_PASSWORD")
 DEFAULT_ADMIN_NAME = os.environ.get("DEFAULT_ADMIN_NAME", "Super Admin")
 APP_ENV = os.environ.get("APP_ENV") or os.environ.get("ENVIRONMENT") or os.environ.get("ENV") or "production"
 IS_DEVELOPMENT = APP_ENV.lower() in {"dev", "development", "local"} or os.environ.get("DEBUG", "").lower() == "true"
+INITIAL_PRODUCT_SEED_KEY = "initial_asset_products_v1"
 admin_router = APIRouter(prefix="/admin", tags=["admin"])
 
 
@@ -782,21 +790,6 @@ async def admin_login(payload: AdminLoginIn):
         raise HTTPException(status_code=503, detail=mongodb_public_error(exc))
 
     try:
-        await ensure_default_admin_seeded()
-    except HTTPException as exc:
-        logger.exception("Admin login failed while seeding default admin")
-        raise HTTPException(
-            status_code=exc.status_code,
-            detail=exc.detail,
-        )
-    except Exception as exc:
-        logger.exception("Admin login failed while seeding default admin")
-        raise HTTPException(
-            status_code=503,
-            detail=mongodb_public_error(exc),
-        )
-
-    try:
         admin = await authenticate_admin(payload.email, payload.password)
     except Exception as exc:
         logger.exception("Admin login failed during authentication")
@@ -813,44 +806,6 @@ async def admin_login(payload: AdminLoginIn):
         "token_type": "bearer",
         "admin": admin_doc_to_public(admin).model_dump(),
     }
-
-
-@admin_router.post("/seed-default")
-async def admin_seed_default(seed_key: Optional[str] = Header(default=None, alias="X-Admin-Seed-Key")):
-    """Explicitly seed the default admin using a secret key.
-
-    This is intended for production recovery if a serverless startup hook has not
-    run yet. The key must match JWT_SECRET and is never returned.
-    """
-    if db is None:
-        logger.warning("Admin seed endpoint failed: database is not configured")
-        raise HTTPException(status_code=503, detail="Database is not configured")
-    if JWT_SECRET == "change-this-secret":
-        logger.warning("Admin seed endpoint rejected: JWT_SECRET is not configured")
-        raise HTTPException(status_code=503, detail="JWT_SECRET is not configured")
-    if not seed_key or not hmac.compare_digest(seed_key, JWT_SECRET):
-        logger.warning("Admin seed endpoint rejected: invalid seed key")
-        raise HTTPException(status_code=403, detail="Forbidden")
-    result = await ensure_default_admin_seeded()
-    logger.info("Admin seed endpoint completed: %s", result)
-    return {"success": True, **result}
-
-
-@admin_router.post("/reset-default-password")
-async def admin_reset_default_password(seed_key: Optional[str] = Header(default=None, alias="X-Admin-Seed-Key")):
-    """Reset the configured default admin from encrypted environment values."""
-    if db is None:
-        logger.warning("Admin password reset endpoint failed: database is not configured")
-        raise HTTPException(status_code=503, detail="Database is not configured")
-    if JWT_SECRET == "change-this-secret":
-        logger.warning("Admin password reset endpoint rejected: JWT_SECRET is not configured")
-        raise HTTPException(status_code=503, detail="JWT_SECRET is not configured")
-    if not seed_key or not hmac.compare_digest(seed_key, JWT_SECRET):
-        logger.warning("Admin password reset endpoint rejected: invalid seed key")
-        raise HTTPException(status_code=403, detail="Forbidden")
-    result = await reset_default_admin_password()
-    logger.info("Admin password reset endpoint completed for %s", result["email"])
-    return {"success": True, **result}
 
 
 @admin_router.post("/logout")
@@ -898,7 +853,13 @@ async def admin_get_page(page_id: str, current_admin: AdminBase = Depends(get_cu
 
 @admin_router.get("/products")
 async def admin_products(current_admin: AdminBase = Depends(get_current_active_admin)):
-    return await db.products.find({}, {"_id": 0}).to_list(100)
+    rows = await db.products.find({}, {"_id": 0}).to_list(100)
+    logger.info(
+        "Product fetch source=mongodb database=%s collection=products scope=admin count=%d",
+        db_name,
+        len(rows),
+    )
+    return rows
 
 
 @admin_router.get("/products/{product_id}")
@@ -982,7 +943,30 @@ async def admin_create_product(payload: ProductIn, current_admin: AdminBase = De
         "updated_at": None,
         "sold_count": 0,
     })
-    await db.products.insert_one(doc)
+    existing = await db.products.find_one({"slug": doc["slug"]})
+    if existing:
+        raise HTTPException(status_code=409, detail="Product slug already exists")
+    logger.info(
+        "Product create requested database=%s collection=products id=%s slug=%s",
+        db_name,
+        doc["id"],
+        doc["slug"],
+    )
+    try:
+        await db.products.insert_one(doc)
+    except DuplicateKeyError:
+        logger.info(
+            "Product create conflict database=%s collection=products slug=%s",
+            db_name,
+            doc["slug"],
+        )
+        raise HTTPException(status_code=409, detail="Product slug already exists")
+    logger.info(
+        "Product created database=%s collection=products id=%s slug=%s",
+        db_name,
+        doc["id"],
+        doc["slug"],
+    )
     return {"success": True, "product": doc}
 
 
@@ -998,10 +982,43 @@ async def admin_update_product(product_id: str, payload: ProductIn, current_admi
 
 @admin_router.delete("/products/{product_id}")
 async def admin_delete_product(product_id: str, current_admin: AdminBase = Depends(get_current_active_admin)):
+    product = await db.products.find_one(
+        {"id": product_id},
+        {"_id": 0, "id": 1, "slug": 1, "name": 1},
+    )
+    logger.info(
+        "Product deletion requested database=%s collection=products id=%s slug=%s",
+        db_name,
+        product_id,
+        product.get("slug") if product else None,
+    )
     result = await db.products.delete_one({"id": product_id})
+    remaining_count = await db.products.count_documents({})
+    logger.info(
+        "Product deletion completed database=%s collection=products id=%s slug=%s deleted_count=%d remaining_count=%d",
+        db_name,
+        product_id,
+        product.get("slug") if product else None,
+        result.deleted_count,
+        remaining_count,
+    )
     if result.deleted_count == 0:
-        raise HTTPException(status_code=404, detail="Product not found")
-    return {"success": True}
+        raise HTTPException(
+            status_code=404,
+            detail={
+                "success": False,
+                "message": "Product not found; no document was deleted",
+                "product_id": product_id,
+                "deleted_count": 0,
+            },
+        )
+    return {
+        "success": True,
+        "message": "Product deleted from MongoDB",
+        "product_id": product_id,
+        "slug": product.get("slug") if product else None,
+        "deleted_count": result.deleted_count,
+    }
 
 
 @admin_router.post("/testimonials")
@@ -1146,6 +1163,7 @@ async def prepare_cms_collections():
         "customers",
         "media",
         "settings",
+        "seed_state",
         "downloads",
         "coupons",
         "testimonials",
@@ -1178,111 +1196,123 @@ async def prepare_cms_collections():
         await db.products.create_index("slug", unique=True)
     except Exception:
         pass
+    try:
+        await db.seed_state.create_index("key", unique=True)
+    except Exception:
+        pass
 
 
-async def ensure_default_admin_seeded():
+async def synchronize_default_admin():
     if db is None:
-        logger.warning("Default admin seed skipped: database is not configured")
         return {"action": "skipped", "reason": "database_not_configured"}
+
     default_email = (DEFAULT_ADMIN_EMAIL or "").lower().strip()
     default_password = DEFAULT_ADMIN_PASSWORD or ""
     default_name = DEFAULT_ADMIN_NAME
-    logger.info("Admin email being seeded: %s", default_email or "<not configured>")
 
     if not default_email or not default_password:
-        logger.error("Default admin seed failed: DEFAULT_ADMIN_EMAIL or DEFAULT_ADMIN_PASSWORD is empty")
-        raise HTTPException(status_code=500, detail="Default admin environment variables are invalid")
+        raise ValueError("DEFAULT_ADMIN_EMAIL and DEFAULT_ADMIN_PASSWORD must be configured")
 
-    try:
-        existing = await db.admins.find_one({"email": default_email})
-        if existing:
-            logger.info("Default admin user already exists: %s", default_email)
-            return {"action": "exists", "email": default_email}
-
-        admin_doc = {
-            "id": str(uuid.uuid4()),
-            "name": default_name,
-            "email": default_email,
-            "role": "super_admin",
-            "permissions": ["super_admin", "admin", "editor"],
-            "hashed_password": get_password_hash(default_password),
-            "updated_at": datetime.now(timezone.utc).isoformat(),
-        }
-        admin_doc["created_at"] = datetime.now(timezone.utc).isoformat()
-        await db.admins.insert_one(admin_doc)
-        logger.info("Default admin user created: %s", default_email)
-        return {"action": "created", "email": default_email}
-    except Exception:
-        logger.exception("Failed to seed default admin")
-        raise
-
-
-async def reset_default_admin_password():
-    if db is None:
-        logger.warning("Default admin password reset skipped: database is not configured")
-        raise HTTPException(status_code=503, detail="Database is not configured")
-
-    default_email = (DEFAULT_ADMIN_EMAIL or "").lower().strip()
-    default_password = DEFAULT_ADMIN_PASSWORD or ""
-    if not default_email or not default_password:
-        logger.error("Default admin password reset failed: required environment variables are empty")
-        raise HTTPException(status_code=500, detail="Default admin environment variables are invalid")
-
-    try:
-        existing = await db.admins.find_one({"email": default_email})
-        if not existing:
-            return await ensure_default_admin_seeded()
-
+    existing = await db.admins.find_one({"email": default_email})
+    now = datetime.now(timezone.utc).isoformat()
+    if existing:
         await db.admins.update_one(
             {"email": default_email},
             {
                 "$set": {
                     "hashed_password": get_password_hash(default_password),
-                    "updated_at": datetime.now(timezone.utc).isoformat(),
+                    "updated_at": now,
                 }
             },
         )
-        logger.info("Default admin password reset completed for email %s", default_email)
-        return {"action": "password_reset", "email": default_email}
-    except HTTPException:
-        raise
-    except Exception:
-        logger.exception("Failed to reset default admin password")
-        raise
+        logger.info("Admin password synchronized")
+        return {"action": "password_synchronized", "email": default_email}
+
+    admin_doc = {
+        "id": str(uuid.uuid4()),
+        "name": default_name,
+        "email": default_email,
+        "role": "super_admin",
+        "permissions": ["super_admin", "admin", "editor"],
+        "hashed_password": get_password_hash(default_password),
+        "created_at": now,
+        "updated_at": now,
+    }
+    await db.admins.insert_one(admin_doc)
+    logger.info("Admin created")
+    return {"action": "created", "email": default_email}
 
 
-async def seed_default_admin():
-    return await ensure_default_admin_seeded()
+async def initialize_default_products():
+    seed_state = await db.seed_state.find_one({"key": INITIAL_PRODUCT_SEED_KEY})
+    existing_count = await db.products.count_documents({})
+    if seed_state:
+        logger.info(
+            "Startup product seed skipped key=%s database=%s collection=products existing_count=%d",
+            INITIAL_PRODUCT_SEED_KEY,
+            db_name,
+            existing_count,
+        )
+        return {"action": "skipped", "existing_count": existing_count}
+
+    seeded_count = 0
+    if existing_count == 0:
+        for product in ASSET_PRODUCTS:
+            result = await db.products.update_one(
+                {"slug": product["slug"]},
+                {"$setOnInsert": dict(product)},
+                upsert=True,
+            )
+            if result.upserted_id is not None:
+                seeded_count += 1
+        action = "seeded"
+    else:
+        action = "adopted_existing_catalog"
+
+    await db.seed_state.update_one(
+        {"key": INITIAL_PRODUCT_SEED_KEY},
+        {
+            "$setOnInsert": {
+                "key": INITIAL_PRODUCT_SEED_KEY,
+                "completed_at": datetime.now(timezone.utc).isoformat(),
+            }
+        },
+        upsert=True,
+    )
+    logger.info(
+        "Startup product seed completed key=%s action=%s database=%s collection=products existing_count=%d seeded_count=%d",
+        INITIAL_PRODUCT_SEED_KEY,
+        action,
+        db_name,
+        existing_count,
+        seeded_count,
+    )
+    return {
+        "action": action,
+        "existing_count": existing_count,
+        "seeded_count": seeded_count,
+    }
 
 
 @app.on_event("startup")
 async def on_startup():
     logger.info("MongoDB configuration: %s", mongodb_config_summary())
-    logger.info("Admin email being seeded: %s", (DEFAULT_ADMIN_EMAIL or "").lower().strip() or "<not configured>")
     logger.info("Razorpay configured: %s", razorpay_client is not None)
     logger.info("SMTP configured: %s", smtp_configured())
     if db is None:
         logger.warning("MongoDB connection status: not_configured")
         logger.warning("MONGO_URL and DB_NAME are not configured; using public seed-data fallbacks.")
-        logger.warning("Admin seed status: skipped database_not_configured")
         return
     try:
         await db.command("ping")
         logger.info("MongoDB connection status: connected db=%s", db_name)
     except Exception as exc:
         logger.exception("MongoDB connection status: failed category=%s", mongodb_error_category(exc))
-        logger.warning("Admin seed status: skipped mongo_connection_failed")
         if IS_DEVELOPMENT:
             logger.warning("MongoDB development error detail: %s", exc)
         return
     await prepare_cms_collections()
-    try:
-        seed_result = await seed_default_admin()
-        logger.info("Admin seed status: %s", seed_result)
-    except Exception as exc:
-        logger.exception("Admin seed status: failed")
-        if IS_DEVELOPMENT:
-            logger.warning("Admin seed development error detail: %s", exc)
+    await synchronize_default_admin()
     # Seed default content in the background to keep startup responsive.
     asyncio.create_task(_seed_db())
 
@@ -1768,17 +1798,9 @@ async def _seed_db():
             )
         logger.info("Upserted %d pages", len(PAGES))
 
-        # Seed products/assets (upsert by slug so catalog updates apply)
-        valid_slugs = [p["slug"] for p in ASSET_PRODUCTS]
-        # Remove stale products no longer in the catalog
-        await db.products.delete_many({"slug": {"$nin": valid_slugs}})
-        for product in ASSET_PRODUCTS:
-            await db.products.update_one(
-                {"slug": product["slug"]},
-                {"$set": dict(product)},
-                upsert=True,
-            )
-        logger.info("Upserted %d products", len(ASSET_PRODUCTS))
+        # Initialize the catalog once. Admin-managed products are authoritative
+        # after this marker is written, so deleted products stay deleted.
+        await initialize_default_products()
 
         # Seed blog categories
         if await db.blog_categories.count_documents({}) == 0:
