@@ -2,6 +2,19 @@
 
 This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
 
+## Local asset catalog
+
+During local development, the asset catalog uses the public production product
+endpoints when `VITE_BACKEND_URL`/`REACT_APP_BACKEND_URL` is not set. If a
+configured local backend is unavailable or returns an empty product list,
+development falls back to that same read-only catalog. Checkout and admin
+requests are not redirected by this fallback.
+
+To use the repository's built-in seed catalog instead, start FastAPI without
+`MONGO_URL` and `DB_NAME`, then point the frontend backend URL at that local
+server. FastAPI serves `ASSET_PRODUCTS` from `backend/seed_data.py` when
+MongoDB is not configured.
+
 ## Available Scripts
 
 In the project directory, you can run:

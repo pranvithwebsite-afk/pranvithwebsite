@@ -6,6 +6,8 @@ const BACKEND_URL = (
   || ''
 ).replace(/\/$/, '');
 export const API = `${BACKEND_URL}/api`;
+const DEVELOPMENT_CATALOG_API = 'https://pranvithdop.com/api';
+const USE_DEVELOPMENT_CATALOG = process.env.NODE_ENV === 'development';
 
 export const api = axios.create({
   baseURL: API,
@@ -42,9 +44,30 @@ export const fetchFAQs = async () => {
   return data;
 };
 
-export const fetchProducts = async () => {
-  const { data } = await api.get('/products');
+const fetchDevelopmentCatalog = async (path) => {
+  const { data } = await axios.get(`${DEVELOPMENT_CATALOG_API}${path}`, {
+    timeout: 15000,
+  });
   return data;
+};
+
+export const fetchProducts = async () => {
+  if (USE_DEVELOPMENT_CATALOG && !BACKEND_URL) {
+    return fetchDevelopmentCatalog('/products');
+  }
+
+  try {
+    const { data } = await api.get('/products');
+    if (USE_DEVELOPMENT_CATALOG && Array.isArray(data) && data.length === 0) {
+      return fetchDevelopmentCatalog('/products');
+    }
+    return data;
+  } catch (error) {
+    if (USE_DEVELOPMENT_CATALOG) {
+      return fetchDevelopmentCatalog('/products');
+    }
+    throw error;
+  }
 };
 
 export const fetchPageBySlug = async (slug) => {
@@ -198,8 +221,20 @@ export const createFreeOrder = async (payload) => {
 };
 
 export const fetchProductBySlug = async (slug) => {
-  const { data } = await api.get(`/products/${slug}`);
-  return data;
+  const path = `/products/${encodeURIComponent(slug)}`;
+  if (USE_DEVELOPMENT_CATALOG && !BACKEND_URL) {
+    return fetchDevelopmentCatalog(path);
+  }
+
+  try {
+    const { data } = await api.get(path);
+    return data;
+  } catch (error) {
+    if (USE_DEVELOPMENT_CATALOG) {
+      return fetchDevelopmentCatalog(path);
+    }
+    throw error;
+  }
 };
 
 export const fetchOrderAccess = async (orderId, token) => {

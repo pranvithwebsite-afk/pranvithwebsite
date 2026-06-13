@@ -23,7 +23,7 @@ const normalize = (item, index) => {
   const name = item.name || item.title || 'Asset';
   const category = item.category || 'Asset';
   const slug = item.slug;
-  const heroImage = item.hero_image || (item.images && item.images[0]);
+  const heroImage = item.hero_image || (Array.isArray(item.images) && item.images[0]);
   const word = name.toUpperCase();
   const parts = word.split(' ');
   const headline = parts.slice(0, 2).join(' ') || word;
@@ -56,6 +56,7 @@ const Assets = () => {
   const [priceFilter, setPriceFilter] = useState('all');
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [checkoutProduct, setCheckoutProduct] = useState(null);
 
   useEffect(() => {
@@ -64,9 +65,12 @@ const Assets = () => {
         const data = await fetchProducts();
         if (Array.isArray(data)) {
           setProducts(data.map((p, idx) => normalize(p, idx)));
+          setLoadError(false);
+        } else {
+          setLoadError(true);
         }
       } catch (e) {
-        // ignore
+        setLoadError(true);
       } finally {
         setLoading(false);
       }
@@ -139,6 +143,10 @@ const Assets = () => {
             {loading ? (
               <div className="flex items-center gap-2 text-white/60 text-sm" data-testid="assets-loading">
                 <Loader2 size={14} className="animate-spin" /> Loading assets...
+              </div>
+            ) : loadError ? (
+              <div className="rounded-2xl border border-rose-500/20 bg-rose-500/5 p-12 text-center text-white/70" data-testid="assets-error">
+                Assets could not be loaded. Please refresh and try again.
               </div>
             ) : filtered.length === 0 ? (
               <div className="rounded-2xl border border-white/10 bg-white/5 p-12 text-center text-white/60" data-testid="assets-empty">
