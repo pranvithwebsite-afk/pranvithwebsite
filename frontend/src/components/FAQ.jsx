@@ -2,16 +2,17 @@ import React, { useEffect, useState } from 'react';
 import { Plus, Minus } from 'lucide-react';
 import { faqs as mockFaqs } from '../data/mock';
 import { fetchFAQs } from '../lib/api';
+import { dedupeFaqs } from '../lib/utils';
 
 const FAQ = () => {
-  const [faqs, setFaqs] = useState(mockFaqs);
+  const [faqs, setFaqs] = useState(() => dedupeFaqs(mockFaqs));
   const [open, setOpen] = useState(0);
 
   useEffect(() => {
     (async () => {
       try {
         const data = await fetchFAQs();
-        if (Array.isArray(data) && data.length) setFaqs(data);
+        if (Array.isArray(data) && data.length) setFaqs(dedupeFaqs(data));
       } catch (e) {
         // fallback
       }

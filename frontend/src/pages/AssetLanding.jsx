@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { fetchProductBySlug } from '../lib/api';
+import { dedupeFaqs } from '../lib/utils';
 import CheckoutModal from '../components/CheckoutModal';
 
 const AssetLanding = () => {
@@ -76,7 +77,7 @@ const AssetLanding = () => {
 
   const features = product.features || [];
   const benefits = product.benefits || [];
-  const faqs = (landing.faqs || product.faqs || []).slice(0, 10);
+  const faqs = dedupeFaqs(landing.faqs || product.faqs || []).slice(0, 10);
   const compatibility = landing.compatibility || [];
   const marketTable = landing.market_table || [];
 

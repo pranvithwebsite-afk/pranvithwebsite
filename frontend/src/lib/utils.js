@@ -48,6 +48,28 @@ export function dedupeCatalogItems(items) {
   });
 }
 
+const normalizeFaqQuestion = (value) =>
+  String(value ?? '')
+    .normalize('NFKC')
+    .toLocaleLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, ' ')
+    .trim();
+
+export function dedupeFaqs(items) {
+  if (!Array.isArray(items)) return [];
+
+  const seenQuestions = new Set();
+
+  return items.filter((item) => {
+    const question = normalizeFaqQuestion(item?.q || item?.question);
+    if (!question) return true;
+    if (seenQuestions.has(question)) return false;
+
+    seenQuestions.add(question);
+    return true;
+  });
+}
+
 export function safePublicHref(value, fallback = '/') {
   const href = String(value || '').trim();
   if (href.startsWith('/') && !href.startsWith('//')) return href;
