@@ -3,10 +3,11 @@ import { ChevronRight, CheckCircle2, Loader2 } from 'lucide-react';
 import { courses as mockCourses } from '../data/mock';
 import { fetchCourses } from '../lib/api';
 import { payWithRazorpay } from '../lib/razorpay';
+import { dedupeCatalogItems, getCatalogItemKey } from '../lib/utils';
 import { toast } from 'sonner';
 
 const Courses = () => {
-  const [courses, setCourses] = useState(mockCourses);
+  const [courses, setCourses] = useState(() => dedupeCatalogItems(mockCourses));
   const [loading, setLoading] = useState(true);
   const [buyingId, setBuyingId] = useState(null);
 
@@ -14,7 +15,9 @@ const Courses = () => {
     (async () => {
       try {
         const data = await fetchCourses();
-        if (Array.isArray(data) && data.length) setCourses(data);
+        if (Array.isArray(data) && data.length) {
+          setCourses(dedupeCatalogItems(data));
+        }
       } catch (e) {
         // fallback to mock
       } finally {
@@ -57,9 +60,9 @@ const Courses = () => {
         </div>
 
         <div className="mt-16 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {courses.map((c) => (
+          {courses.map((c, index) => (
             <div
-              key={c.id}
+              key={getCatalogItemKey(c, index)}
               className="group relative rounded-2xl overflow-hidden bg-[#0f0830]/50 border border-violet-500/15 hover:border-violet-500/40 transition-all duration-300 hover:-translate-y-1"
             >
               <div className="relative aspect-[16/10] overflow-hidden">

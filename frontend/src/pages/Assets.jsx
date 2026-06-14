@@ -4,6 +4,7 @@ import Header from '../components/Header';
 import Footer from '../components/Footer';
 import { Search, Loader2 } from 'lucide-react';
 import { fetchProducts } from '../lib/api';
+import { dedupeCatalogItems, getCatalogItemKey } from '../lib/utils';
 import CheckoutModal from '../components/CheckoutModal';
 
 const defaultBackgrounds = [
@@ -64,7 +65,7 @@ const Assets = () => {
       try {
         const data = await fetchProducts();
         if (Array.isArray(data)) {
-          setProducts(data.map((p, idx) => normalize(p, idx)));
+          setProducts(dedupeCatalogItems(data).map((p, idx) => normalize(p, idx)));
           setLoadError(false);
         } else {
           setLoadError(true);
@@ -154,9 +155,9 @@ const Assets = () => {
               </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-6" data-testid="assets-grid">
-                {filtered.map((p) => (
+                {filtered.map((p, index) => (
                   <ProductCard
-                    key={p.id}
+                    key={getCatalogItemKey(p, index)}
                     p={p}
                     onView={() => navigate(`/assets/${p.slug}`)}
                     onBuy={() => setCheckoutProduct(p)}
