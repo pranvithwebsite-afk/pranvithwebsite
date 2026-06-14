@@ -1,5 +1,6 @@
 import React from 'react';
 import { ArrowRight, Sparkles } from 'lucide-react';
+import { safePublicHref } from '../lib/utils';
 
 const Hero = ({ pageData }) => {
   const {
@@ -32,7 +33,7 @@ const Hero = ({ pageData }) => {
 
         <div className="flex items-center justify-center gap-4 flex-wrap">
           <a
-            href={buttonUrl}
+            href={safePublicHref(buttonUrl, '/courses')}
             className="group inline-flex items-center gap-3 bg-violet-600 hover:bg-violet-500 transition-colors text-white px-7 py-3.5 rounded-full text-sm font-semibold shadow-[0_8px_30px_rgba(139,92,246,0.45)]"
           >
             {buttonText}

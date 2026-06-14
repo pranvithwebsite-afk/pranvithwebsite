@@ -36,9 +36,13 @@ def test_pages_no_typo(session, slug):
 
 
 def test_admin_login(session):
+    admin_email = os.environ.get("TEST_ADMIN_EMAIL")
+    admin_password = os.environ.get("TEST_ADMIN_PASSWORD")
+    if not admin_email or not admin_password:
+        pytest.skip("TEST_ADMIN_EMAIL and TEST_ADMIN_PASSWORD are required for the live login check")
     r = session.post(
         f"{BASE_URL}/api/admin/login",
-        json={"email": "admin@pranvithdop.com", "password": "Admin123!"},
+        json={"email": admin_email, "password": admin_password},
         timeout=30,
     )
     assert r.status_code == 200, f"Admin login failed {r.status_code}: {r.text[:200]}"

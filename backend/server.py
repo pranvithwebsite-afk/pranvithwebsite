@@ -1,4 +1,4 @@
-from fastapi import FastAPI, APIRouter, HTTPException, Depends, status, UploadFile, File
+from fastapi import FastAPI, APIRouter, HTTPException, Depends, status, UploadFile, File, Request
 from fastapi.security import OAuth2PasswordBearer
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
@@ -21,6 +21,7 @@ import ssl
 from pathlib import Path
 from pydantic import BaseModel, Field, ConfigDict, EmailStr
 from typing import Any, Dict, List, Optional
+from urllib.parse import urlparse
 import uuid
 from datetime import datetime, timedelta, timezone
 import razorpay
@@ -109,18 +110,30 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(level
 logger = logging.getLogger(__name__)
 
 
+@app.middleware("http")
+async def add_security_headers(request: Request, call_next):
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Referrer-Policy"] = "no-referrer"
+    response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+    response.headers["Cross-Origin-Resource-Policy"] = "same-site"
+    if request.url.path.startswith("/api/admin"):
+        response.headers["Cache-Control"] = "no-store"
+    return response
+
+
 @api_router.get("/health/mongodb")
 async def mongodb_health():
-    summary = mongodb_config_summary()
     if db is None:
-        return {**summary, "ok": False, "error": "not_configured"}
+        return {"ok": False, "error": "not_configured"}
     try:
         await db.command("ping")
-        return {**summary, "ok": True, "error": None}
+        return {"ok": True, "error": None}
     except Exception as exc:
         category = mongodb_error_category(exc)
         logger.warning("MongoDB health check failed: category=%s", category)
-        return {**summary, "ok": False, "error": category}
+        return {"ok": False, "error": category}
 
 
 # ---------- Models ----------
@@ -372,6 +385,7 @@ class DownloadLinkIn(BaseModel):
 
 
 class SettingsPayload(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     site_name: Optional[str] = None
     theme: Optional[str] = None
     notifications_enabled: Optional[bool] = None
@@ -380,16 +394,9 @@ class SettingsPayload(BaseModel):
     contact_email: Optional[EmailStr] = None
     contact_phone: Optional[str] = None
     contact_address: Optional[str] = None
-    razorpay_key_id: Optional[str] = None
-    razorpay_key_secret: Optional[str] = None
     meta_pixel_id: Optional[str] = None
     ga4_id: Optional[str] = None
     gtm_id: Optional[str] = None
-    whatsapp_api_key: Optional[str] = None
-    email_smtp_host: Optional[str] = None
-    email_smtp_port: Optional[int] = None
-    email_smtp_user: Optional[str] = None
-    email_smtp_password: Optional[str] = None
 
 
 class HireRequestIn(BaseModel):
@@ -477,9 +484,6 @@ async def root():
     return {
         "message": "PranvithDOP API",
         "status": "ok",
-        "db_configured": db is not None,
-        "razorpay_configured": razorpay_client is not None,
-        "smtp_configured": smtp_configured(),
     }
 
 
@@ -510,7 +514,7 @@ async def get_faqs():
 @api_router.get("/settings")
 async def public_settings():
     if db is None:
-        return SETTINGS
+        return _safe_settings(SETTINGS)
     settings_doc = await db.settings.find_one({}, {"_id": 0})
     if not settings_doc:
         return {
@@ -522,7 +526,30 @@ async def public_settings():
             "contact_phone": "+91 9059867883",
             "contact_address": "Hyderabad, India",
         }
-    return settings_doc
+    return _safe_settings(settings_doc)
+
+
+PUBLIC_SETTINGS_FIELDS = {
+    "site_name",
+    "theme",
+    "notifications_enabled",
+    "site_description",
+    "logo_url",
+    "contact_email",
+    "contact_phone",
+    "contact_address",
+    "meta_pixel_id",
+    "ga4_id",
+    "gtm_id",
+}
+
+
+def _safe_settings(settings: Optional[dict]) -> dict:
+    return {
+        key: value
+        for key, value in (settings or {}).items()
+        if key in PUBLIC_SETTINGS_FIELDS
+    }
 
 
 @api_router.get("/pages")
@@ -677,7 +704,7 @@ class TokenData(BaseModel):
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/admin/login")
-JWT_SECRET = os.environ.get("JWT_SECRET", "change-this-secret")
+JWT_SECRET = os.environ.get("JWT_SECRET", "")
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRATION_MINUTES = int(os.environ.get("JWT_EXPIRATION_MINUTES", "180"))
 DEFAULT_ADMIN_EMAIL = os.environ.get("DEFAULT_ADMIN_EMAIL")
@@ -705,6 +732,13 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 
 def get_password_hash(password: str) -> str:
     return pwd_context.hash(password)
+
+
+def _require_jwt_secret() -> str:
+    if len(JWT_SECRET) < 32:
+        logger.error("Admin authentication is unavailable: JWT_SECRET must be at least 32 characters")
+        raise HTTPException(status_code=503, detail="Admin authentication is not configured")
+    return JWT_SECRET
 
 
 async def get_admin_by_email(email: str):
@@ -745,7 +779,7 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
     to_encode = data.copy()
     expire = datetime.now(timezone.utc) + (expires_delta or timedelta(minutes=JWT_EXPIRATION_MINUTES))
     to_encode.update({"exp": expire})
-    return jwt.encode(to_encode, JWT_SECRET, algorithm=JWT_ALGORITHM)
+    return jwt.encode(to_encode, _require_jwt_secret(), algorithm=JWT_ALGORITHM)
 
 
 async def get_current_admin(token: str = Depends(oauth2_scheme)) -> AdminBase:
@@ -755,7 +789,7 @@ async def get_current_admin(token: str = Depends(oauth2_scheme)) -> AdminBase:
         headers={"WWW-Authenticate": "Bearer"},
     )
     try:
-        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        payload = jwt.decode(token, _require_jwt_secret(), algorithms=[JWT_ALGORITHM])
         token_data = TokenData(**payload)
     except JWTError:
         raise credentials_exception
@@ -895,7 +929,7 @@ async def admin_settings(current_admin: AdminBase = Depends(get_current_active_a
             "notifications_enabled": True,
             "site_description": "A modern CMS foundation for pages, products, orders, customers, media and settings.",
         }
-    return settings_doc
+    return _safe_settings(settings_doc)
 
 
 @admin_router.post("/settings")
@@ -1087,28 +1121,45 @@ async def admin_coupons(current_admin: AdminBase = Depends(get_current_active_ad
 # Vercel serverless functions can only write to /tmp at runtime.
 UPLOAD_DIR = Path(os.environ.get("UPLOAD_DIR", "/tmp/uploads" if os.environ.get("VERCEL") else str(ROOT_DIR / "uploads")))
 UPLOAD_DIR.mkdir(exist_ok=True)
+MAX_UPLOAD_BYTES = 25 * 1024 * 1024
+ALLOWED_UPLOAD_TYPES = {
+    ".gif": {"image/gif"},
+    ".jpeg": {"image/jpeg"},
+    ".jpg": {"image/jpeg"},
+    ".mp3": {"audio/mpeg"},
+    ".mp4": {"video/mp4"},
+    ".png": {"image/png"},
+    ".webm": {"video/webm"},
+    ".webp": {"image/webp"},
+    ".zip": {"application/zip", "application/x-zip-compressed"},
+}
 
 
 @admin_router.post("/upload")
 async def admin_upload_file(file: UploadFile = File(...), current_admin: AdminBase = Depends(get_current_active_admin)):
     """Upload a file and create a media record."""
     try:
-        # Generate unique filename
+        original_name = Path(file.filename or "").name
+        file_ext = Path(original_name).suffix.lower()
+        allowed_types = ALLOWED_UPLOAD_TYPES.get(file_ext)
+        if not allowed_types or file.content_type not in allowed_types:
+            raise HTTPException(status_code=415, detail="Unsupported file type")
+
+        content = await file.read(MAX_UPLOAD_BYTES + 1)
+        if len(content) > MAX_UPLOAD_BYTES:
+            raise HTTPException(status_code=413, detail="File exceeds the 25 MB upload limit")
+
         file_id = str(uuid.uuid4())
-        file_ext = os.path.splitext(file.filename)[1]
         saved_filename = f"{file_id}{file_ext}"
         file_path = UPLOAD_DIR / saved_filename
-        
-        # Save file
+
         with open(file_path, "wb") as f:
-            content = await file.read()
             f.write(content)
-        
-        # Create media record
+
         media_record = {
             "id": file_id,
-            "title": file.filename,
-            "type": file.content_type or "application/octet-stream",
+            "title": original_name,
+            "type": file.content_type,
             "url": f"/api/uploads/{saved_filename}",
             "thumbnail": None,
             "description": "",
@@ -1123,9 +1174,11 @@ async def admin_upload_file(file: UploadFile = File(...), current_admin: AdminBa
             "media": media_record,
             "message": "File uploaded successfully",
         }
-    except Exception as e:
+    except HTTPException:
+        raise
+    except Exception:
         logger.exception("File upload failed")
-        raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
+        raise HTTPException(status_code=500, detail="Upload failed")
 
 
 @admin_router.post("/media")
@@ -1344,6 +1397,24 @@ def _public_download_url(download_url: str) -> str:
     ).rstrip("/")
     if public_base and download_url.startswith("/"):
         return f"{public_base}{download_url}"
+    return download_url
+
+
+def _validated_download_url(download_url: str) -> str:
+    try:
+        parsed = urlparse(download_url)
+    except ValueError:
+        raise HTTPException(status_code=500, detail="Download URL is invalid")
+    allowed_schemes = {"https"}
+    if IS_DEVELOPMENT:
+        allowed_schemes.add("http")
+    if (
+        parsed.scheme.lower() not in allowed_schemes
+        or not parsed.hostname
+        or parsed.username
+        or parsed.password
+    ):
+        raise HTTPException(status_code=500, detail="Download URL is not allowed")
     return download_url
 
 
@@ -1672,7 +1743,11 @@ async def order_download(order_id: str, token: str):
         {"$or": [{"razorpay_order_id": order_id}, {"id": order_id}]},
         {"$inc": {"download_count": 1}, "$set": {"last_downloaded_at": datetime.now(timezone.utc).isoformat()}},
     )
-    return RedirectResponse(download_file, status_code=302)
+    return RedirectResponse(
+        _validated_download_url(download_file),
+        status_code=302,
+        headers={"Cache-Control": "no-store", "Referrer-Policy": "no-referrer"},
+    )
 
 
 @api_router.post("/payments/free-order")

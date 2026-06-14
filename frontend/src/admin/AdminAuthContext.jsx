@@ -14,6 +14,7 @@ export const AdminAuthProvider = ({ children }) => {
     setToken(null);
     setAdmin(null);
     setAdminAuthToken(null);
+    sessionStorage.removeItem('cms_admin');
     localStorage.removeItem('cms_admin');
   }, []);
 
@@ -21,11 +22,11 @@ export const AdminAuthProvider = ({ children }) => {
     setToken(authToken);
     setAdmin(adminProfile);
     setAdminAuthToken(authToken);
-    localStorage.setItem('cms_admin', JSON.stringify({ token: authToken, admin: adminProfile }));
+    sessionStorage.setItem('cms_admin', JSON.stringify({ token: authToken, admin: adminProfile }));
   }, []);
 
   useEffect(() => {
-    const stored = localStorage.getItem('cms_admin');
+    const stored = sessionStorage.getItem('cms_admin');
     if (!stored) {
       setLoading(false);
       return;

@@ -47,3 +47,15 @@ export function dedupeCatalogItems(items) {
     return true;
   });
 }
+
+export function safePublicHref(value, fallback = '/') {
+  const href = String(value || '').trim();
+  if (href.startsWith('/') && !href.startsWith('//')) return href;
+
+  try {
+    const url = new URL(href);
+    return ['http:', 'https:'].includes(url.protocol) ? url.href : fallback;
+  } catch {
+    return fallback;
+  }
+}
