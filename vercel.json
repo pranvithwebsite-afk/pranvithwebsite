@@ -31,6 +31,26 @@
       "dest": "/frontend/asset-manifest.json"
     },
     {
+      "src": "/favicon.ico",
+      "dest": "/frontend/favicon.ico"
+    },
+    {
+      "src": "/favicon-32x32.png",
+      "dest": "/frontend/favicon-32x32.png"
+    },
+    {
+      "src": "/apple-touch-icon.png",
+      "dest": "/frontend/apple-touch-icon.png"
+    },
+    {
+      "src": "/logo-512.png",
+      "dest": "/frontend/logo-512.png"
+    },
+    {
+      "src": "/manifest.json",
+      "dest": "/frontend/manifest.json"
+    },
+    {
       "handle": "filesystem"
     },
     {
