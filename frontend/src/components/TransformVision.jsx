@@ -6,39 +6,46 @@ const instagramProfileUrl =
 
 const instagramCards = [
   {
-    thumbnail: '/assets/creative-luts.png',
-    title: 'Creative LUTs',
-    type: 'Reel',
+    title: 'Editing Reel',
+    type: 'REEL',
+    coverText: 'EDIT REEL',
+    background: 'linear-gradient(145deg, #7c3aed 0%, #312e81 50%, #090516 100%)',
     instagramUrl: instagramProfileUrl,
   },
   {
-    thumbnail: '/assets/wedding-templates.png',
-    title: 'Wedding Templates',
-    type: 'Post',
+    title: 'Video Editing Tips',
+    type: 'POST',
+    coverText: 'EDITING TIPS',
+    background: 'linear-gradient(145deg, #db2777 0%, #7e22ce 48%, #12051f 100%)',
     instagramUrl: instagramProfileUrl,
   },
   {
-    thumbnail: '/assets/smooth-transition.png',
-    title: 'Smooth Transitions',
-    type: 'Video',
+    title: 'Before and After Edit',
+    type: 'VIDEO',
+    coverText: 'BEFORE / AFTER',
+    background: 'linear-gradient(135deg, #111827 0%, #111827 49%, #7c3aed 50%, #c026d3 100%)',
     instagramUrl: instagramProfileUrl,
   },
   {
-    thumbnail: '/assets/cinematic-sound-fx.png',
-    title: 'Cinematic Sound FX',
-    type: 'Reel',
+    title: 'Motion Graphics',
+    type: 'REEL',
+    coverText: 'MOTION',
+    background: 'radial-gradient(circle at 30% 25%, #f472b6 0%, #7c3aed 35%, #111827 78%)',
     instagramUrl: instagramProfileUrl,
   },
   {
-    thumbnail: '/assets/after-effects-titles.png',
-    title: 'After Effects Titles',
-    type: 'Post',
+    title: 'Client Work Preview',
+    type: 'POST',
+    coverText: 'CLIENT WORK',
+    background: 'linear-gradient(160deg, #0f172a 0%, #581c87 55%, #be185d 100%)',
+    profileImage: true,
     instagramUrl: instagramProfileUrl,
   },
   {
-    thumbnail: '/assets/color-gradient.png',
-    title: 'Color Grading',
-    type: 'Video',
+    title: 'Cinematic Edit',
+    type: 'VIDEO',
+    coverText: 'CINEMATIC',
+    background: 'linear-gradient(145deg, #020617 0%, #312e81 48%, #9333ea 100%)',
     instagramUrl: instagramProfileUrl,
   },
 ];
@@ -137,13 +144,20 @@ const TransformVision = () => {
                         rel="noopener noreferrer"
                         aria-label={`Open ${card.title} ${card.type} on Instagram`}
                         className="group relative aspect-square overflow-hidden rounded border border-white/5 bg-violet-950"
+                        style={{ background: card.background }}
                       >
-                        <img
-                          src={card.thumbnail}
-                          alt={card.title}
-                          className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-                        />
+                        {card.profileImage && (
+                          <img
+                            src="/assets/brand-profile.png"
+                            alt=""
+                            className="absolute inset-0 h-full w-full object-cover opacity-55 transition-transform duration-300 group-hover:scale-105"
+                          />
+                        )}
+                        <div className="absolute inset-0 opacity-30 [background-image:linear-gradient(rgba(255,255,255,.12)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,.12)_1px,transparent_1px)] [background-size:12px_12px]" />
                         <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/10 to-transparent" />
+                        <span className="absolute inset-x-2 top-1/2 -translate-y-1/2 text-center text-[9px] font-black leading-tight tracking-wide text-white/90">
+                          {card.coverText}
+                        </span>
                         <span className="absolute right-1 top-1 rounded bg-black/65 px-1.5 py-0.5 text-[7px] font-semibold uppercase tracking-wide">
                           {card.type}
                         </span>
