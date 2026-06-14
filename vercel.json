@@ -39,6 +39,10 @@
       "dest": "/frontend/favicon-32x32.png"
     },
     {
+      "src": "/favicon-48x48.png",
+      "dest": "/frontend/favicon-48x48.png"
+    },
+    {
       "src": "/apple-touch-icon.png",
       "dest": "/frontend/apple-touch-icon.png"
     },
