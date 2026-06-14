@@ -1,6 +1,48 @@
 import React from 'react';
 import { Instagram, ArrowRight } from 'lucide-react';
 
+const instagramProfileUrl =
+  'https://www.instagram.com/pranvith_dop?utm_source=ig_web_button_share_sheet&igsh=ZDNlZDc0MzIxNw==';
+
+const instagramCards = [
+  {
+    thumbnail: '/assets/creative-luts.png',
+    title: 'Creative LUTs',
+    type: 'Reel',
+    instagramUrl: instagramProfileUrl,
+  },
+  {
+    thumbnail: '/assets/wedding-templates.png',
+    title: 'Wedding Templates',
+    type: 'Post',
+    instagramUrl: instagramProfileUrl,
+  },
+  {
+    thumbnail: '/assets/smooth-transition.png',
+    title: 'Smooth Transitions',
+    type: 'Video',
+    instagramUrl: instagramProfileUrl,
+  },
+  {
+    thumbnail: '/assets/cinematic-sound-fx.png',
+    title: 'Cinematic Sound FX',
+    type: 'Reel',
+    instagramUrl: instagramProfileUrl,
+  },
+  {
+    thumbnail: '/assets/after-effects-titles.png',
+    title: 'After Effects Titles',
+    type: 'Post',
+    instagramUrl: instagramProfileUrl,
+  },
+  {
+    thumbnail: '/assets/color-gradient.png',
+    title: 'Color Grading',
+    type: 'Video',
+    instagramUrl: instagramProfileUrl,
+  },
+];
+
 const TransformVision = () => {
   return (
     <section className="relative py-24 overflow-hidden">
@@ -26,9 +68,9 @@ const TransformVision = () => {
                 </span>
               </button>
               <a
-                href="https://instagram.com"
+                href={instagramProfileUrl}
                 target="_blank"
-                rel="noreferrer"
+                rel="noopener noreferrer"
                 className="inline-flex items-center gap-2 bg-white/5 hover:bg-white/10 border border-white/15 text-white px-5 py-3 rounded-full text-sm font-semibold transition"
               >
                 <Instagram size={16} />
@@ -45,7 +87,7 @@ const TransformVision = () => {
                 <div className="absolute top-0 left-1/2 -translate-x-1/2 w-28 h-6 bg-black rounded-b-2xl z-20" />
                 <div className="absolute inset-0 p-4 pt-10 text-white">
                   <div className="flex items-center justify-between mb-4 text-xs">
-                    <span className="font-semibold">bb_edits00</span>
+                    <span className="font-semibold">pranvith_dop</span>
                   </div>
                   <div className="flex items-center gap-3 mb-3">
                     <div className="w-14 h-14 rounded-full overflow-hidden bg-gradient-to-br from-orange-500 to-rose-500">
@@ -78,13 +120,37 @@ const TransformVision = () => {
                     <div className="text-white/70">MASTERY VIDEO EDITING COURSE</div>
                     <div className="text-violet-300 mt-1">t.me/pranvithdop</div>
                   </div>
-                  <button className="mt-3 w-full py-2 rounded-lg bg-violet-600 text-xs font-semibold">Follow</button>
+                  <a
+                    href={instagramProfileUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-3 block w-full py-2 rounded-lg bg-violet-600 text-center text-xs font-semibold"
+                  >
+                    Follow
+                  </a>
                   <div className="mt-4 grid grid-cols-3 gap-1">
-                    {[1, 2, 3, 4, 5, 6].map((i) => (
-                      <div
-                        key={i}
-                        className="aspect-square rounded bg-gradient-to-br from-violet-700/40 to-fuchsia-700/40 border border-white/5"
-                      />
+                    {instagramCards.map((card) => (
+                      <a
+                        key={card.title}
+                        href={card.instagramUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        aria-label={`Open ${card.title} ${card.type} on Instagram`}
+                        className="group relative aspect-square overflow-hidden rounded border border-white/5 bg-violet-950"
+                      >
+                        <img
+                          src={card.thumbnail}
+                          alt={card.title}
+                          className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/10 to-transparent" />
+                        <span className="absolute right-1 top-1 rounded bg-black/65 px-1.5 py-0.5 text-[7px] font-semibold uppercase tracking-wide">
+                          {card.type}
+                        </span>
+                        <span className="absolute inset-x-1 bottom-1 line-clamp-2 text-[8px] font-semibold leading-tight text-white">
+                          {card.title}
+                        </span>
+                      </a>
                     ))}
                   </div>
                 </div>
