@@ -936,7 +936,67 @@ async def admin_orders(current_admin: AdminBase = Depends(get_current_active_adm
 
 @admin_router.get("/customers")
 async def admin_customers(current_admin: AdminBase = Depends(get_current_active_admin)):
-    return await db.customers.find({}, {"_id": 0}).to_list(100)
+    customer_rows = await db.customers.find({}, {"_id": 0}).to_list(500)
+    order_rows = await db.orders.find({}, {"_id": 0, "download_file": 0, "download_url": 0, "download_token_hash": 0, "razorpay_signature": 0}).sort("created_at", -1).to_list(1000)
+
+    grouped: Dict[str, dict] = {}
+    for customer in customer_rows:
+        email = (customer.get("email") or "").lower().strip()
+        if not email:
+            continue
+        grouped[email] = {
+            **customer,
+            "email": email,
+            "orders": [],
+            "total_spend": 0,
+        }
+
+    for order in order_rows:
+        email = (order.get("customer_email") or order.get("buyer_email") or "").lower().strip()
+        if not email:
+            continue
+        if email not in grouped:
+            grouped[email] = {
+                "id": str(uuid.uuid4()),
+                "name": order.get("customer_name") or order.get("buyer_name") or "Customer",
+                "email": email,
+                "phone": order.get("customer_phone") or order.get("buyer_phone") or "",
+                "created_at": order.get("created_at") or datetime.now(timezone.utc).isoformat(),
+                "updated_at": order.get("verified_at") or order.get("created_at"),
+                "purchased_products": [],
+                "orders": [],
+                "total_spend": 0,
+            }
+
+        product = {
+            "id": order.get("product_id"),
+            "slug": order.get("product_slug"),
+            "name": order.get("product_name") or order.get("product_title"),
+        }
+        summary = _customer_order_summary(order, product)
+        grouped[email]["orders"].append(summary)
+        if summary.get("payment_status") == "paid":
+            grouped[email]["total_spend"] += int(summary.get("amount") or 0)
+            if summary.get("product_slug") and summary["product_slug"] not in grouped[email].get("purchased_products", []):
+                grouped[email].setdefault("purchased_products", []).append(summary["product_slug"])
+
+    customers = []
+    for customer in grouped.values():
+        orders = sorted(
+            customer.get("orders", []),
+            key=lambda item: item.get("purchase_date") or item.get("created_at") or "",
+            reverse=True,
+        )
+        latest_order = orders[0] if orders else None
+        customers.append({
+            **customer,
+            "orders": orders,
+            "order_count": len(orders),
+            "latest_purchase_at": (latest_order or {}).get("purchase_date") or (latest_order or {}).get("created_at") or customer.get("updated_at") or customer.get("created_at"),
+        })
+
+    customers.sort(key=lambda item: item.get("latest_purchase_at") or "", reverse=True)
+    return customers
 
 
 @admin_router.get("/media")
@@ -1477,7 +1537,30 @@ def _product_price_paise(product: dict) -> int:
     return amount
 
 
-async def _upsert_checkout_customer(order: dict, product: dict, paid: bool = False) -> None:
+def _customer_order_summary(order: dict, product: dict) -> dict:
+    return {
+        "order_id": order.get("id"),
+        "razorpay_order_id": order.get("razorpay_order_id"),
+        "razorpay_payment_id": order.get("razorpay_payment_id"),
+        "product_id": product.get("id"),
+        "product_slug": product.get("slug") or order.get("product_slug"),
+        "product_name": order.get("product_name") or order.get("product_title") or product.get("name"),
+        "asset_slug": product.get("slug") or order.get("product_slug"),
+        "asset_title": order.get("product_name") or order.get("product_title") or product.get("name"),
+        "amount": int(order.get("amount") or 0),
+        "currency": order.get("currency", "INR"),
+        "payment_status": order.get("payment_status") or order.get("status") or "pending",
+        "status": order.get("status") or order.get("payment_status") or "pending",
+        "purchase_date": order.get("paid_at") or order.get("verified_at") or order.get("created_at"),
+        "created_at": order.get("created_at"),
+        "paid_at": order.get("paid_at"),
+        "email_sent": bool(order.get("email_sent")),
+        "email_error": order.get("email_error"),
+        "email_attempted_at": order.get("email_attempted_at"),
+    }
+
+
+async def _upsert_checkout_customer(order: dict, product: dict) -> None:
     if db is None:
         return
     now = datetime.now(timezone.utc).isoformat()
@@ -1502,22 +1585,30 @@ async def _upsert_checkout_customer(order: dict, product: dict, paid: bool = Fal
         "$set": customer_doc,
         "$setOnInsert": set_on_insert,
     }
+    order_summary = _customer_order_summary(order, product)
+    paid = order_summary.get("payment_status") == "paid"
     if paid:
-        purchase = {
-            "order_id": order.get("id"),
-            "razorpay_order_id": order.get("razorpay_order_id"),
-            "razorpay_payment_id": order.get("razorpay_payment_id"),
-            "product_id": product.get("id"),
-            "product_slug": product.get("slug"),
-            "product_name": product.get("name"),
-            "amount": order.get("amount", 0),
-            "currency": order.get("currency", "INR"),
-            "paid_at": order.get("paid_at") or now,
-        }
         update["$addToSet"] = {"purchased_products": product.get("slug")}
-        update["$inc"] = {"total_spend": int(order.get("amount") or 0)}
-        update["$push"] = {"purchase_history": purchase}
     await db.customers.update_one({"email": email}, update, upsert=True)
+    pull_conditions = []
+    if order.get("razorpay_order_id"):
+        pull_conditions.append({"razorpay_order_id": order.get("razorpay_order_id")})
+    if order.get("id"):
+        pull_conditions.append({"order_id": order.get("id")})
+    for condition in pull_conditions:
+        await db.customers.update_one(
+            {"email": email},
+            {"$pull": {"orders": condition, "purchase_history": condition}},
+        )
+    await db.customers.update_one(
+        {"email": email},
+        {"$push": {"orders": order_summary}},
+    )
+    if paid:
+        await db.customers.update_one(
+            {"email": email},
+            {"$push": {"purchase_history": order_summary}},
+        )
 
 
 def _send_download_email(to_email: str, buyer_name: str, product_name: str, payment_id: str, download_url: str) -> bool:
@@ -1652,15 +1743,21 @@ async def checkout_verify_payment(payload: PaymentVerifyIn):
     expected_sig = hmac.new(RAZORPAY_KEY_SECRET.encode("utf-8"), message, hashlib.sha256).hexdigest()
     now = datetime.now(timezone.utc).isoformat()
     if not hmac.compare_digest(expected_sig, payload.razorpay_signature):
+        failed_fields = {
+            "status": "signature_mismatch",
+            "payment_status": "failed",
+            "razorpay_payment_id": payload.razorpay_payment_id,
+            "verified_at": now,
+        }
         await db.orders.update_one(
             {"razorpay_order_id": payload.razorpay_order_id},
-            {"$set": {
-                "status": "signature_mismatch",
-                "payment_status": "failed",
-                "razorpay_payment_id": payload.razorpay_payment_id,
-                "verified_at": now,
-            }},
+            {"$set": failed_fields},
         )
+        try:
+            failed_product = await _find_checkout_product(order.get("product_id"), order.get("product_slug"))
+            await _upsert_checkout_customer({**order, **failed_fields}, failed_product)
+        except Exception:
+            logger.exception("Failed to update customer record after payment signature mismatch")
         raise HTTPException(status_code=400, detail="Invalid payment signature")
 
     product = await _find_checkout_product(order.get("product_id"), order.get("product_slug"))
@@ -1695,6 +1792,12 @@ async def checkout_verify_payment(payload: PaymentVerifyIn):
                     "email_attempted_at": now,
                 }},
             )
+            await _upsert_checkout_customer(
+                {**order, "email_sent": email_sent, "email_error": email_error, "email_attempted_at": now},
+                product,
+            )
+        else:
+            await _upsert_checkout_customer(order, product)
         return {
             "success": True,
             "order_id": payload.razorpay_order_id,
@@ -1728,7 +1831,6 @@ async def checkout_verify_payment(payload: PaymentVerifyIn):
         {"$set": paid_fields},
     )
     await db.products.update_one({"id": product.get("id")}, {"$inc": {"sold_count": 1}})
-    await _upsert_checkout_customer({**order, **paid_fields}, product, paid=True)
 
     full_download_url = _public_download_url(download_url)
     email_sent = _send_download_email(
@@ -1746,6 +1848,16 @@ async def checkout_verify_payment(payload: PaymentVerifyIn):
             "email_error": email_error,
             "email_attempted_at": now,
         }},
+    )
+    await _upsert_checkout_customer(
+        {
+            **order,
+            **paid_fields,
+            "email_sent": email_sent,
+            "email_error": email_error,
+            "email_attempted_at": now,
+        },
+        product,
     )
 
     return {
@@ -1875,6 +1987,7 @@ async def payment_free_order(payload: PaymentFreeOrderIn):
         order_doc["email_error"] = None if email_sent else "Download email could not be sent. Please use the Download Now button."
         order_doc["email_attempted_at"] = datetime.now(timezone.utc).isoformat()
     await db.orders.insert_one(order_doc)
+    await _upsert_checkout_customer(order_doc, product)
 
     return {
         "success": True,
