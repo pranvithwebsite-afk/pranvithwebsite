@@ -899,7 +899,11 @@ async def admin_dashboard(current_admin: AdminBase = Depends(get_current_active_
 
 @admin_router.get("/pages")
 async def admin_pages(current_admin: AdminBase = Depends(get_current_active_admin)):
-    return await db.pages.find({}, {"_id": 0}).to_list(100)
+    try:
+        return await db.pages.find({}, {"_id": 0}).to_list(100)
+    except Exception:
+        logger.exception("Admin pages fetch failed")
+        raise HTTPException(status_code=500, detail="Could not load pages")
 
 
 @admin_router.get("/pages/{page_id}")
@@ -931,13 +935,30 @@ async def admin_get_product(product_id: str, current_admin: AdminBase = Depends(
 
 @admin_router.get("/orders")
 async def admin_orders(current_admin: AdminBase = Depends(get_current_active_admin)):
-    return await db.orders.find({}, {"_id": 0}).sort("created_at", -1).to_list(100)
+    try:
+        return await db.orders.find(
+            {},
+            {
+                "_id": 0,
+                "download_file": 0,
+                "download_url": 0,
+                "download_token_hash": 0,
+                "razorpay_signature": 0,
+            },
+        ).sort("created_at", -1).to_list(500)
+    except Exception:
+        logger.exception("Admin orders fetch failed")
+        raise HTTPException(status_code=500, detail="Could not load orders")
 
 
 @admin_router.get("/customers")
 async def admin_customers(current_admin: AdminBase = Depends(get_current_active_admin)):
-    customer_rows = await db.customers.find({}, {"_id": 0}).to_list(500)
-    order_rows = await db.orders.find({}, {"_id": 0, "download_file": 0, "download_url": 0, "download_token_hash": 0, "razorpay_signature": 0}).sort("created_at", -1).to_list(1000)
+    try:
+        customer_rows = await db.customers.find({}, {"_id": 0}).to_list(500)
+        order_rows = await db.orders.find({}, {"_id": 0, "download_file": 0, "download_url": 0, "download_token_hash": 0, "razorpay_signature": 0}).sort("created_at", -1).to_list(1000)
+    except Exception:
+        logger.exception("Admin customers fetch failed")
+        raise HTTPException(status_code=500, detail="Could not load customers")
 
     grouped: Dict[str, dict] = {}
     for customer in customer_rows:
@@ -1001,12 +1022,20 @@ async def admin_customers(current_admin: AdminBase = Depends(get_current_active_
 
 @admin_router.get("/media")
 async def admin_media(current_admin: AdminBase = Depends(get_current_active_admin)):
-    return await db.media.find({}, {"_id": 0}).to_list(100)
+    try:
+        return await db.media.find({}, {"_id": 0}).sort("uploaded_at", -1).to_list(200)
+    except Exception:
+        logger.exception("Admin media fetch failed")
+        raise HTTPException(status_code=500, detail="Could not load media")
 
 
 @admin_router.get("/settings")
 async def admin_settings(current_admin: AdminBase = Depends(get_current_active_admin)):
-    settings_doc = await db.settings.find_one({}, {"_id": 0})
+    try:
+        settings_doc = await db.settings.find_one({}, {"_id": 0})
+    except Exception:
+        logger.exception("Admin settings fetch failed")
+        raise HTTPException(status_code=500, detail="Could not load settings")
     if not settings_doc:
         return {
             "site_name": "PranvithDOP",
@@ -1019,8 +1048,13 @@ async def admin_settings(current_admin: AdminBase = Depends(get_current_active_a
 
 @admin_router.post("/settings")
 async def admin_save_settings(payload: SettingsPayload, current_admin: AdminBase = Depends(get_current_active_admin)):
-    await db.settings.update_one({}, {"$set": payload.model_dump(exclude_none=True)}, upsert=True)
-    return {"success": True, "settings": payload.model_dump(exclude_none=True)}
+    try:
+        update_doc = payload.model_dump(exclude_none=True)
+        await db.settings.update_one({}, {"$set": update_doc}, upsert=True)
+        return {"success": True, "settings": _safe_settings(update_doc)}
+    except Exception:
+        logger.exception("Admin settings save failed")
+        raise HTTPException(status_code=500, detail="Could not save settings")
 
 
 @admin_router.post("/pages")
@@ -1208,6 +1242,7 @@ UPLOAD_DIR = Path(os.environ.get("UPLOAD_DIR", "/tmp/uploads" if os.environ.get(
 UPLOAD_DIR.mkdir(exist_ok=True)
 MAX_UPLOAD_BYTES = 25 * 1024 * 1024
 ALLOWED_UPLOAD_TYPES = {
+    ".pdf": {"application/pdf"},
     ".gif": {"image/gif"},
     ".jpeg": {"image/jpeg"},
     ".jpg": {"image/jpeg"},
@@ -1248,6 +1283,8 @@ async def admin_upload_file(file: UploadFile = File(...), current_admin: AdminBa
             "url": f"/api/uploads/{saved_filename}",
             "thumbnail": None,
             "description": "",
+            "size": len(content),
+            "filename": original_name,
             "uploaded_at": datetime.now(timezone.utc).isoformat(),
             "tags": [],
         }
@@ -1660,6 +1697,77 @@ def _send_confirmation_email(to_email: str, buyer_name: str, product_name: str, 
     return _send_download_email(to_email, buyer_name, product_name, payment_id, download_url)
 
 
+async def _fulfill_paid_order(order: dict, product: dict, payment_id: str, send_email: bool = True) -> dict:
+    now = datetime.now(timezone.utc).isoformat()
+    download_url = order.get("download_url")
+    download_token = None
+    download_token_hash = order.get("download_token_hash")
+    if not download_url or not download_token_hash:
+        download_token = secrets.token_urlsafe(32)
+        download_url = _paid_download_url(order.get("razorpay_order_id") or order.get("id"), download_token)
+        download_token_hash = _hash_download_token(download_token)
+
+    download_file = order.get("download_file") or product.get("download_file")
+    if not download_file:
+        raise HTTPException(status_code=404, detail="Download file not configured")
+
+    paid_fields = {
+        "status": "paid",
+        "payment_status": "paid",
+        "razorpay_payment_id": payment_id,
+        "verified_at": order.get("verified_at") or now,
+        "paid_at": order.get("paid_at") or now,
+        "download_token_hash": download_token_hash,
+        "download_file": download_file,
+        "download_url": download_url,
+    }
+
+    await db.orders.update_one(
+        {"$or": [{"razorpay_order_id": order.get("razorpay_order_id")}, {"id": order.get("id")}]},
+        {"$set": paid_fields},
+    )
+    await db.products.update_one({"id": product.get("id")}, {"$inc": {"sold_count": 1}})
+
+    email_sent = bool(order.get("email_sent"))
+    email_error = order.get("email_error")
+    email_attempted_at = order.get("email_attempted_at")
+    buyer_email = (order.get("customer_email") or order.get("buyer_email") or "").lower().strip()
+    if send_email and buyer_email and not email_sent:
+        email_sent = _send_download_email(
+            buyer_email,
+            order.get("customer_name") or order.get("buyer_name", "there"),
+            order.get("product_name") or product.get("name", "your asset"),
+            payment_id,
+            _public_download_url(download_url),
+        )
+        email_error = None if email_sent else "Download email could not be sent. Please use the Download Now button."
+        email_attempted_at = now
+        await db.orders.update_one(
+            {"$or": [{"razorpay_order_id": order.get("razorpay_order_id")}, {"id": order.get("id")}]},
+            {"$set": {
+                "email_sent": email_sent,
+                "email_error": email_error,
+                "email_attempted_at": email_attempted_at,
+            }},
+        )
+
+    fulfilled_order = {
+        **order,
+        **paid_fields,
+        "email_sent": email_sent,
+        "email_error": email_error,
+        "email_attempted_at": email_attempted_at,
+    }
+    await _upsert_checkout_customer(fulfilled_order, product)
+    return {
+        "order": fulfilled_order,
+        "download_token": download_token,
+        "download_url": download_url,
+        "email_sent": email_sent,
+        "email_error": email_error,
+    }
+
+
 @api_router.post("/checkout/create-order")
 async def checkout_create_order(payload: PaymentCreateOrderIn):
     if db is None:
@@ -1809,55 +1917,15 @@ async def checkout_verify_payment(payload: PaymentVerifyIn):
             "email_error": email_error,
         }
 
-    download_file = product.get("download_file")
-    if not download_file:
-        raise HTTPException(status_code=404, detail="Download file not configured")
-
-    download_token = secrets.token_urlsafe(32)
-    download_url = _paid_download_url(order["razorpay_order_id"], download_token)
-    paid_fields = {
-        "status": "paid",
-        "payment_status": "paid",
-        "razorpay_payment_id": payload.razorpay_payment_id,
-        "razorpay_signature": payload.razorpay_signature,
-        "verified_at": now,
-        "paid_at": now,
-        "download_token_hash": _hash_download_token(download_token),
-        "download_file": download_file,
-        "download_url": download_url,
-    }
     await db.orders.update_one(
         {"razorpay_order_id": payload.razorpay_order_id},
-        {"$set": paid_fields},
+        {"$set": {"razorpay_signature": payload.razorpay_signature}},
     )
-    await db.products.update_one({"id": product.get("id")}, {"$inc": {"sold_count": 1}})
-
-    full_download_url = _public_download_url(download_url)
-    email_sent = _send_download_email(
-        buyer_email,
-        order.get("customer_name") or order.get("buyer_name", "there"),
-        order.get("product_name") or product.get("name", "your asset"),
-        payload.razorpay_payment_id,
-        full_download_url,
-    )
-    email_error = None if email_sent else "Download email could not be sent. Please use the Download Now button."
-    await db.orders.update_one(
-        {"razorpay_order_id": payload.razorpay_order_id},
-        {"$set": {
-            "email_sent": email_sent,
-            "email_error": email_error,
-            "email_attempted_at": now,
-        }},
-    )
-    await _upsert_checkout_customer(
-        {
-            **order,
-            **paid_fields,
-            "email_sent": email_sent,
-            "email_error": email_error,
-            "email_attempted_at": now,
-        },
+    fulfillment = await _fulfill_paid_order(
+        {**order, "razorpay_signature": payload.razorpay_signature},
         product,
+        payload.razorpay_payment_id,
+        send_email=True,
     )
 
     return {
@@ -1866,10 +1934,72 @@ async def checkout_verify_payment(payload: PaymentVerifyIn):
         "payment_id": payload.razorpay_payment_id,
         "product_slug": product.get("slug"),
         "product_name": product.get("name"),
-        "download_url": download_url,
-        "download_token": download_token,
-        "email_sent": email_sent,
-        "email_error": email_error,
+        "download_url": fulfillment["download_url"],
+        "download_token": fulfillment["download_token"],
+        "email_sent": fulfillment["email_sent"],
+        "email_error": fulfillment["email_error"],
+    }
+
+
+@api_router.post("/webhooks/razorpay")
+async def razorpay_webhook(request: Request):
+    if db is None:
+        raise HTTPException(status_code=500, detail="Database not configured")
+
+    body = await request.body()
+    webhook_secret = os.environ.get("RAZORPAY_WEBHOOK_SECRET", "")
+    signature = request.headers.get("X-Razorpay-Signature", "")
+    if webhook_secret:
+        expected = hmac.new(webhook_secret.encode("utf-8"), body, hashlib.sha256).hexdigest()
+        if not signature or not hmac.compare_digest(expected, signature):
+            raise HTTPException(status_code=400, detail="Invalid webhook signature")
+
+    event_id = request.headers.get("X-Razorpay-Event-Id") or hashlib.sha256(body).hexdigest()
+    existing_event = await db.webhook_events.find_one({"id": event_id}, {"_id": 0, "id": 1})
+    if existing_event:
+        return {"success": True, "duplicate": True}
+
+    try:
+        payload = json.loads(body.decode("utf-8"))
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=400, detail="Invalid webhook payload")
+
+    await db.webhook_events.insert_one({
+        "id": event_id,
+        "provider": "razorpay",
+        "event": payload.get("event"),
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    })
+
+    event = payload.get("event")
+    if event not in {"payment.captured", "order.paid"}:
+        return {"success": True, "ignored": True}
+
+    payment_entity = (((payload.get("payload") or {}).get("payment") or {}).get("entity") or {})
+    order_entity = (((payload.get("payload") or {}).get("order") or {}).get("entity") or {})
+    razorpay_order_id = payment_entity.get("order_id") or order_entity.get("id")
+    razorpay_payment_id = payment_entity.get("id")
+    if not razorpay_order_id:
+        logger.warning("Razorpay webhook missing order id event=%s event_id=%s", event, event_id)
+        return {"success": True, "ignored": True}
+
+    order = await db.orders.find_one({"razorpay_order_id": razorpay_order_id}, {"_id": 0})
+    if not order:
+        logger.warning("Razorpay webhook order not found razorpay_order_id=%s event_id=%s", razorpay_order_id, event_id)
+        return {"success": True, "ignored": True}
+
+    product = await _find_checkout_product(order.get("product_id"), order.get("product_slug"))
+    fulfillment = await _fulfill_paid_order(
+        order,
+        product,
+        razorpay_payment_id or order.get("razorpay_payment_id") or "",
+        send_email=True,
+    )
+    return {
+        "success": True,
+        "order_id": razorpay_order_id,
+        "payment_id": razorpay_payment_id or order.get("razorpay_payment_id"),
+        "email_sent": fulfillment["email_sent"],
     }
 
 

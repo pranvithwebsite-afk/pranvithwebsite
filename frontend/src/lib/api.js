@@ -282,11 +282,12 @@ export const deleteAdminProduct = async (productId) => {
 };
 
 // Admin Media Management
-export const uploadAdminFile = async (file) => {
+export const uploadAdminFile = async (file, onUploadProgress) => {
   const formData = new FormData();
   formData.append('file', file);
   const { data } = await adminApi.post('/admin/upload', formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
+    onUploadProgress,
   });
   return data;
 };

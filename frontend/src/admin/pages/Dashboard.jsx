@@ -11,11 +11,18 @@ const metrics = [
 const Dashboard = () => {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
   useEffect(() => {
     fetchAdminDashboardStats()
-      .then(setStats)
-      .catch(() => {})
+      .then((data) => {
+        setStats(data);
+        setError('');
+      })
+      .catch((err) => {
+        console.error('[admin/dashboard] Failed to load dashboard stats', err?.response?.data?.detail || err?.message || err);
+        setError('Dashboard stats could not be loaded.');
+      })
       .finally(() => setLoading(false));
   }, []);
 
@@ -32,10 +39,12 @@ const Dashboard = () => {
           </div>
           <div className="rounded-2xl bg-slate-950 px-4 py-3 text-slate-300">
             <p className="text-xs uppercase tracking-[0.3em] text-slate-500">Current role</p>
-            <p className="mt-2 text-lg font-medium text-white">Super Admin</p>
+            <p className="mt-2 text-lg font-medium text-white">{stats?.role || 'Admin'}</p>
           </div>
         </div>
       </div>
+
+      {error && <div className="rounded-3xl border border-rose-500/20 bg-rose-500/10 p-5 text-rose-100">{error}</div>}
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {metrics.map((metric) => {

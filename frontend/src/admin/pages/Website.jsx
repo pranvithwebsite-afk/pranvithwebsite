@@ -1,7 +1,21 @@
 import React, { useEffect, useState } from 'react';
 import { ChevronDown, ChevronUp, Save, X } from 'lucide-react';
-import { fetchAdminPages, fetchAdminPage, updateAdminPage } from '../../lib/api';
+import { createAdminPage, fetchAdminPages, fetchAdminPage, updateAdminPage } from '../../lib/api';
 import { toast } from 'sonner';
+
+const requiredPages = [
+  { title: 'Home', slug: 'home', path: '/' },
+  { title: 'Courses', slug: 'courses', path: '/courses' },
+  { title: 'About', slug: 'about', path: '/about' },
+  { title: 'Assets', slug: 'assets', path: '/assets' },
+  { title: 'Our Works', slug: 'works', path: '/works' },
+  { title: 'Hire From Us', slug: 'hire', path: '/hire' },
+];
+
+const mergeRequiredPages = (items) => requiredPages.map((required) => {
+  const existing = items.find((page) => (page.slug || '') === required.slug || page.title === required.title);
+  return existing ? { ...required, ...existing, path: required.path } : { ...required, missing: true, published: false };
+});
 
 const Website = () => {
   const [pages, setPages] = useState([]);
@@ -18,10 +32,11 @@ const Website = () => {
     try {
       setLoading(true);
       const data = await fetchAdminPages();
-      setPages(Array.isArray(data) ? data : []);
+      setPages(mergeRequiredPages(Array.isArray(data) ? data : []));
     } catch (error) {
+      console.error('[admin/website] Failed to load pages', error?.response?.data?.detail || error?.message || error);
       toast.error('Failed to load pages');
-      setPages([]);
+      setPages(mergeRequiredPages([]));
     } finally {
       setLoading(false);
     }
@@ -29,8 +44,20 @@ const Website = () => {
 
   const openEditor = async (page) => {
     try {
-      const fullPage = await fetchAdminPage(page.id);
-      setEditingPage(page.id);
+      let pageId = page.id;
+      if (!pageId) {
+        const created = await createAdminPage({
+          slug: page.slug,
+          title: page.title,
+          sections: {},
+          seo_title: page.title,
+          seo_description: '',
+          published: false,
+        });
+        pageId = created?.page?.id;
+      }
+      const fullPage = await fetchAdminPage(pageId);
+      setEditingPage(pageId);
       setFormData({ ...fullPage });
     } catch (error) {
       toast.error('Failed to load page details');
@@ -110,10 +137,10 @@ const Website = () => {
           {pages.map((page) => (
             <div key={page.id} className="rounded-3xl border border-slate-800 bg-slate-950 p-5">
               <h2 className="text-lg font-semibold text-white">{page.title}</h2>
-              <p className="mt-2 text-sm text-slate-500">/{page.slug}</p>
+              <p className="mt-2 text-sm text-slate-500">{page.path || `/${page.slug}`}</p>
               <p className="mt-2 text-xs text-slate-500">
                 Status: <span className={page.published ? 'text-green-400' : 'text-yellow-400'}>
-                  {page.published ? 'Published' : 'Draft'}
+                  {page.missing ? 'Not created' : page.published ? 'Published' : 'Draft'}
                 </span>
               </p>
               <button

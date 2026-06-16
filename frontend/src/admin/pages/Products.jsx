@@ -37,6 +37,7 @@ const Products = () => {
   const [showForm, setShowForm] = useState(false);
   const [formData, setFormData] = useState(defaultProductForm);
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
 
   useEffect(() => {
     loadProducts();
@@ -47,9 +48,12 @@ const Products = () => {
       setLoading(true);
       const data = await fetchAdminProducts();
       setProducts(Array.isArray(data) ? data : []);
+      setError('');
     } catch (error) {
+      console.error('[admin/products] Failed to load products', error?.response?.data?.detail || error?.message || error);
       toast.error('Failed to load products');
       setProducts([]);
+      setError('Products could not be loaded.');
     } finally {
       setLoading(false);
     }
@@ -169,6 +173,8 @@ const Products = () => {
 
       {loading ? (
         <div className="text-center text-slate-400">Loading products...</div>
+      ) : error ? (
+        <div className="rounded-3xl border border-rose-500/20 bg-rose-500/10 p-5 text-rose-100">{error}</div>
       ) : products.length === 0 ? (
         <div className="text-center text-slate-400">No products. Add one to get started!</div>
       ) : (
