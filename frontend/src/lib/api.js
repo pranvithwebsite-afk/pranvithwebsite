@@ -1,13 +1,76 @@
 import axios from 'axios';
 
-const BACKEND_URL = (
+const normalizeBackendUrl = (value) => {
+  const base = String(value || '').trim().replace(/\/$/, '');
+  return base.endsWith('/api') ? base.slice(0, -4) : base;
+};
+
+const BACKEND_URL = normalizeBackendUrl(
   process.env.VITE_BACKEND_URL
   || process.env.REACT_APP_BACKEND_URL
   || ''
-).replace(/\/$/, '');
+);
 export const API = `${BACKEND_URL}/api`;
 const DEVELOPMENT_CATALOG_API = 'https://pranvithdop.com/api';
 const USE_DEVELOPMENT_CATALOG = process.env.NODE_ENV === 'development';
+
+const FALLBACK_PRODUCTS = [
+  {
+    id: 'fallback-vo',
+    slug: 'vo',
+    name: 'VO Asset',
+    title: 'VO Asset',
+    category: 'Asset',
+    price: 0,
+    sale_price: 0,
+    is_free: true,
+    description: 'A PranvithDOP asset. Live catalog details load from the backend when available.',
+    hero_image: '/assets/brand-profile.png',
+    images: ['/assets/brand-profile.png'],
+    published: true,
+    created_at: '2026-01-01T00:00:00+00:00',
+  },
+  {
+    id: 'fallback-creative-lut-pack',
+    slug: 'creative-lut-pack',
+    name: 'Creative LUT Pack',
+    title: 'Creative LUT Pack',
+    category: 'LUTs',
+    price: 499,
+    sale_price: 499,
+    is_free: false,
+    description: 'Premium color looks for editors.',
+    hero_image: '/assets/creative-luts.png',
+    images: ['/assets/creative-luts.png'],
+    published: true,
+    created_at: '2026-01-01T00:00:00+00:00',
+  },
+  {
+    id: 'fallback-cinematic-sound-fx-pack',
+    slug: 'cinematic-sound-fx-pack',
+    name: 'Cinematic Sound FX Pack',
+    title: 'Cinematic Sound FX Pack',
+    category: 'Sound',
+    price: 299,
+    sale_price: 299,
+    is_free: false,
+    description: 'Cinematic sound effects for video edits.',
+    hero_image: '/assets/cinematic-sound-fx.png',
+    images: ['/assets/cinematic-sound-fx.png'],
+    published: true,
+    created_at: '2026-01-01T00:00:00+00:00',
+  },
+];
+
+const logApiError = (label, error) => {
+  const status = error?.response?.status;
+  const detail = error?.response?.data?.detail || error?.message || error;
+  console.error(`[api] ${label} failed`, {
+    baseURL: API || '/api',
+    status,
+    detail,
+  });
+};
 
 export const api = axios.create({
   baseURL: API,
@@ -51,22 +114,40 @@ const fetchDevelopmentCatalog = async (path) => {
   return data;
 };
 
+const getFallbackProductBySlug = (slug) =>
+  FALLBACK_PRODUCTS.find((product) => product.slug === slug);
+
 export const fetchProducts = async () => {
   if (USE_DEVELOPMENT_CATALOG && !BACKEND_URL) {
-    return fetchDevelopmentCatalog('/products');
+    try {
+      return await fetchDevelopmentCatalog('/products');
+    } catch (error) {
+      logApiError('development catalog products fallback', error);
+      return FALLBACK_PRODUCTS;
+    }
   }
 
   try {
     const { data } = await api.get('/products');
     if (USE_DEVELOPMENT_CATALOG && Array.isArray(data) && data.length === 0) {
-      return fetchDevelopmentCatalog('/products');
+      try {
+        return await fetchDevelopmentCatalog('/products');
+      } catch (error) {
+        logApiError('development catalog products fallback', error);
+        return FALLBACK_PRODUCTS;
+      }
     }
     return data;
   } catch (error) {
+    logApiError('products request', error);
     if (USE_DEVELOPMENT_CATALOG) {
-      return fetchDevelopmentCatalog('/products');
+      try {
+        return await fetchDevelopmentCatalog('/products');
+      } catch (fallbackError) {
+        logApiError('development catalog products fallback', fallbackError);
+      }
     }
-    throw error;
+    return FALLBACK_PRODUCTS;
   }
 };
 
@@ -223,16 +304,30 @@ export const createFreeOrder = async (payload) => {
 export const fetchProductBySlug = async (slug) => {
   const path = `/products/${encodeURIComponent(slug)}`;
   if (USE_DEVELOPMENT_CATALOG && !BACKEND_URL) {
-    return fetchDevelopmentCatalog(path);
+    try {
+      return await fetchDevelopmentCatalog(path);
+    } catch (error) {
+      logApiError(`development catalog product fallback slug=${slug}`, error);
+      const fallbackProduct = getFallbackProductBySlug(slug);
+      if (fallbackProduct) return fallbackProduct;
+      throw error;
+    }
   }
 
   try {
     const { data } = await api.get(path);
     return data;
   } catch (error) {
+    logApiError(`product request slug=${slug}`, error);
     if (USE_DEVELOPMENT_CATALOG) {
-      return fetchDevelopmentCatalog(path);
+      try {
+        return await fetchDevelopmentCatalog(path);
+      } catch (fallbackError) {
+        logApiError(`development catalog product fallback slug=${slug}`, fallbackError);
+      }
     }
+    const fallbackProduct = getFallbackProductBySlug(slug);
+    if (fallbackProduct) return fallbackProduct;
     throw error;
   }
 };

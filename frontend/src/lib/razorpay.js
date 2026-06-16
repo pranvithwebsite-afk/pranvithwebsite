@@ -31,7 +31,7 @@ const loadScript = () =>
  * @param {string} opts.itemName
  * @param {Object} [opts.prefill]      { name, email, contact }
  * @param {string} [opts.productSlug]
- * @returns {Promise<{success: boolean, paymentId?: string, orderId?: string, downloadToken?: string, productSlug?: string, error?: string}>}
+ * @returns {Promise<{success: boolean, paymentId?: string, orderId?: string, downloadToken?: string, productSlug?: string, emailSent?: boolean, emailError?: string, error?: string}>}
  */
 export async function payWithRazorpay({ amountRupees, itemId, itemName, productSlug, prefill = {} }) {
   if (!RAZORPAY_KEY_ID) {
@@ -78,6 +78,8 @@ export async function payWithRazorpay({ amountRupees, itemId, itemName, productS
             razorpay_order_id: response.razorpay_order_id,
             razorpay_payment_id: response.razorpay_payment_id,
             razorpay_signature: response.razorpay_signature,
+            buyer_email: prefill.email || '',
+            asset_slug: productSlug || '',
           });
           resolve({
             success: !!data?.success,
@@ -85,6 +87,8 @@ export async function payWithRazorpay({ amountRupees, itemId, itemName, productS
             orderId: response.razorpay_order_id,
             productSlug: data?.product_slug,
             downloadToken: data?.download_token || new URLSearchParams((data?.download_url || '').split('?')[1] || '').get('token'),
+            emailSent: !!data?.email_sent,
+            emailError: data?.email_error,
           });
         } catch (err) {
           const msg = err?.response?.data?.detail || 'Verification failed';

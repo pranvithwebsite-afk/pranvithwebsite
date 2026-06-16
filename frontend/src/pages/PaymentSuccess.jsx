@@ -76,8 +76,18 @@ const PaymentSuccess = () => {
             <p className="mx-auto mt-5 max-w-2xl text-sm leading-relaxed text-white/70 md:text-base">
               {loading
                 ? 'Verifying your payment and download access...'
-                : error || `Thanks for buying ${product?.name || order?.product_name || 'this product'}. Your payment has been verified.`}
+                : error || (
+                  order?.email_error
+                    ? `Thanks for buying ${product?.name || order?.product_name || 'this product'}. Your payment has been verified.`
+                    : `Thanks for buying ${product?.name || order?.product_name || 'this product'}. Your payment has been verified. Your download link has been sent to your email.`
+                )}
             </p>
+
+            {verified && order.email_error && (
+              <p className="mx-auto mt-4 max-w-2xl rounded-xl border border-amber-400/20 bg-amber-400/10 px-4 py-3 text-sm text-amber-100">
+                {order.email_error}
+              </p>
+            )}
 
             {loading && (
               <div className="mt-8 flex justify-center text-white/60">
@@ -104,7 +114,7 @@ const PaymentSuccess = () => {
                   rel="noopener noreferrer"
                   className="inline-flex items-center justify-center gap-2 rounded-full bg-violet-600 px-8 py-3.5 text-sm font-semibold uppercase tracking-wider text-white transition hover:bg-violet-500"
                 >
-                  <Download size={16} /> Download files
+                  <Download size={16} /> Download Now
                 </a>
               )}
               <Link

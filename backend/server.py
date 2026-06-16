@@ -100,7 +100,7 @@ def smtp_configured() -> bool:
         os.environ.get("SMTP_PORT"),
         os.environ.get("SMTP_USER"),
         os.environ.get("SMTP_PASS"),
-        os.environ.get("SMTP_FROM") or os.environ.get("SMTP_USER"),
+        os.environ.get("FROM_EMAIL") or os.environ.get("SMTP_FROM") or os.environ.get("SMTP_USER"),
     ])
 
 app = FastAPI(title='PranvithDOP API')
@@ -437,6 +437,8 @@ class PaymentVerifyIn(BaseModel):
     razorpay_order_id: str
     razorpay_payment_id: str
     razorpay_signature: str
+    buyer_email: Optional[EmailStr] = None
+    asset_slug: Optional[str] = None
 
 
 class PaymentFreeOrderIn(BaseModel):
@@ -585,13 +587,22 @@ async def public_products():
         products = [_public_product(product) for product in ASSET_PRODUCTS if product.get("published", True)]
         logger.info("Product fetch source=fallback scope=public count=%d", len(products))
         return products
-    rows = await db.products.find({"published": True}, {"_id": 0, "download_file": 0, "payment_link": 0}).to_list(100)
-    logger.info(
-        "Product fetch source=mongodb database=%s collection=products scope=public count=%d",
-        db_name,
-        len(rows),
-    )
-    return rows
+    try:
+        rows = await db.products.find({"published": True}, {"_id": 0, "download_file": 0, "payment_link": 0}).to_list(100)
+        logger.info(
+            "Product fetch source=mongodb database=%s collection=products scope=public count=%d",
+            db_name,
+            len(rows),
+        )
+        return rows
+    except Exception as exc:
+        logger.exception(
+            "Public products endpoint failed; falling back to seeded catalog. database=%s collection=products error_type=%s",
+            db_name,
+            type(exc).__name__,
+        )
+        products = [_public_product(product) for product in ASSET_PRODUCTS if product.get("published", True)]
+        return products
 
 
 @api_router.get("/products/{slug}")
@@ -601,10 +612,24 @@ async def public_product_by_slug(slug: str):
         if not product:
             raise HTTPException(status_code=404, detail="Product not found")
         return _public_product(product)
-    product = await db.products.find_one({"slug": slug, "published": True}, {"_id": 0, "download_file": 0, "payment_link": 0})
-    if not product:
-        raise HTTPException(status_code=404, detail="Product not found")
-    return product
+    try:
+        product = await db.products.find_one({"slug": slug, "published": True}, {"_id": 0, "download_file": 0, "payment_link": 0})
+        if not product:
+            raise HTTPException(status_code=404, detail="Product not found")
+        return product
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception(
+            "Public product detail endpoint failed; falling back to seeded catalog. database=%s collection=products slug=%s error_type=%s",
+            db_name,
+            slug,
+            type(exc).__name__,
+        )
+        product = next((product for product in ASSET_PRODUCTS if product.get("slug") == slug and product.get("published", True)), None)
+        if not product:
+            raise HTTPException(status_code=404, detail="Product not found")
+        return _public_product(product)
 
 
 @api_router.get("/blog-posts")
@@ -1495,28 +1520,29 @@ async def _upsert_checkout_customer(order: dict, product: dict, paid: bool = Fal
     await db.customers.update_one({"email": email}, update, upsert=True)
 
 
-def _send_confirmation_email(to_email: str, buyer_name: str, product_name: str, payment_id: str, download_url: str) -> bool:
+def _send_download_email(to_email: str, buyer_name: str, product_name: str, payment_id: str, download_url: str) -> bool:
     smtp_host = os.environ.get("SMTP_HOST")
     smtp_port = int(os.environ.get("SMTP_PORT", "587") or "587")
     smtp_user = os.environ.get("SMTP_USER")
     smtp_pass = os.environ.get("SMTP_PASS")
-    smtp_from = os.environ.get("SMTP_FROM") or smtp_user
+    smtp_from = os.environ.get("FROM_EMAIL") or os.environ.get("SMTP_FROM") or smtp_user
     if not all([smtp_host, smtp_port, smtp_user, smtp_pass, smtp_from]):
-        logger.warning("SMTP is not fully configured; confirmation email skipped")
+        logger.warning("SMTP is not fully configured; download email skipped")
         return False
 
     msg = EmailMessage()
-    msg["Subject"] = f"Your {product_name} download is ready"
+    msg["Subject"] = "Your download is ready - PranvithDOP"
     msg["From"] = smtp_from
     msg["To"] = to_email
     msg.set_content(
         "\n".join([
             f"Hi {buyer_name},",
             "",
-            "Thank you for your purchase.",
-            f"Product: {product_name}",
+            "Thank you for your purchase from PranvithDOP.",
+            f"Your download for {product_name} is ready.",
             f"Payment ID: {payment_id}",
-            f"Download: {download_url}",
+            "",
+            f"Download link: {download_url}",
             "",
             "This download link is protected and should not be shared.",
         ])
@@ -1535,8 +1561,12 @@ def _send_confirmation_email(to_email: str, buyer_name: str, product_name: str, 
                 server.send_message(msg)
         return True
     except Exception:
-        logger.exception("confirmation email failed")
+        logger.exception("download email failed")
         return False
+
+
+def _send_confirmation_email(to_email: str, buyer_name: str, product_name: str, payment_id: str, download_url: str) -> bool:
+    return _send_download_email(to_email, buyer_name, product_name, payment_id, download_url)
 
 
 @api_router.post("/checkout/create-order")
@@ -1634,7 +1664,37 @@ async def checkout_verify_payment(payload: PaymentVerifyIn):
         raise HTTPException(status_code=400, detail="Invalid payment signature")
 
     product = await _find_checkout_product(order.get("product_id"), order.get("product_slug"))
+    if payload.asset_slug and payload.asset_slug != product.get("slug"):
+        raise HTTPException(status_code=400, detail="Payment does not match this asset")
+
+    order_email = (order.get("customer_email") or order.get("buyer_email") or "").lower().strip()
+    payload_email = str(payload.buyer_email).lower().strip() if payload.buyer_email else ""
+    if payload_email and order_email and payload_email != order_email:
+        raise HTTPException(status_code=400, detail="Payment does not match this buyer email")
+    buyer_email = order_email or payload_email
+    if not buyer_email:
+        raise HTTPException(status_code=400, detail="Buyer email is required")
+
     if order.get("status") == "paid" or order.get("payment_status") == "paid":
+        email_sent = bool(order.get("email_sent"))
+        email_error = order.get("email_error")
+        if not email_sent and order.get("download_url"):
+            email_sent = _send_download_email(
+                buyer_email,
+                order.get("customer_name") or order.get("buyer_name", "there"),
+                order.get("product_name") or product.get("name", "your asset"),
+                order.get("razorpay_payment_id") or payload.razorpay_payment_id,
+                _public_download_url(order.get("download_url")),
+            )
+            email_error = None if email_sent else "Download email could not be sent. Please use the Download Now button."
+            await db.orders.update_one(
+                {"razorpay_order_id": payload.razorpay_order_id},
+                {"$set": {
+                    "email_sent": email_sent,
+                    "email_error": email_error,
+                    "email_attempted_at": now,
+                }},
+            )
         return {
             "success": True,
             "order_id": payload.razorpay_order_id,
@@ -1642,7 +1702,8 @@ async def checkout_verify_payment(payload: PaymentVerifyIn):
             "product_slug": product.get("slug"),
             "product_name": product.get("name"),
             "download_url": order.get("download_url"),
-            "email_sent": False,
+            "email_sent": email_sent,
+            "email_error": email_error,
         }
 
     download_file = product.get("download_file")
@@ -1670,12 +1731,21 @@ async def checkout_verify_payment(payload: PaymentVerifyIn):
     await _upsert_checkout_customer({**order, **paid_fields}, product, paid=True)
 
     full_download_url = _public_download_url(download_url)
-    email_sent = _send_confirmation_email(
-        order.get("customer_email") or order.get("buyer_email", ""),
+    email_sent = _send_download_email(
+        buyer_email,
         order.get("customer_name") or order.get("buyer_name", "there"),
         order.get("product_name") or product.get("name", "your asset"),
         payload.razorpay_payment_id,
         full_download_url,
+    )
+    email_error = None if email_sent else "Download email could not be sent. Please use the Download Now button."
+    await db.orders.update_one(
+        {"razorpay_order_id": payload.razorpay_order_id},
+        {"$set": {
+            "email_sent": email_sent,
+            "email_error": email_error,
+            "email_attempted_at": now,
+        }},
     )
 
     return {
@@ -1687,6 +1757,7 @@ async def checkout_verify_payment(payload: PaymentVerifyIn):
         "download_url": download_url,
         "download_token": download_token,
         "email_sent": email_sent,
+        "email_error": email_error,
     }
 
 
@@ -1719,6 +1790,8 @@ async def order_access(order_id: str, token: str):
         "currency": order.get("currency", "INR"),
         "payment_status": order.get("payment_status"),
         "download_url": _paid_download_url(order_id, token),
+        "email_sent": bool(order.get("email_sent")),
+        "email_error": order.get("email_error"),
         "created_at": order.get("created_at"),
     }
 
@@ -1789,6 +1862,18 @@ async def payment_free_order(payload: PaymentFreeOrderIn):
         "download_file": download_file,
         "download_url": download_url,
     }
+    buyer_email = str(payload.email).lower().strip() if payload.email else ""
+    if buyer_email:
+        email_sent = _send_download_email(
+            buyer_email,
+            payload.name.strip() if payload.name else "there",
+            product.get("name", "your asset"),
+            "Free download",
+            _public_download_url(download_url),
+        )
+        order_doc["email_sent"] = email_sent
+        order_doc["email_error"] = None if email_sent else "Download email could not be sent. Please use the Download Now button."
+        order_doc["email_attempted_at"] = datetime.now(timezone.utc).isoformat()
     await db.orders.insert_one(order_doc)
 
     return {
@@ -1798,6 +1883,8 @@ async def payment_free_order(payload: PaymentFreeOrderIn):
         "product_name": product.get("name"),
         "download_url": download_url,
         "download_token": download_token,
+        "email_sent": bool(order_doc.get("email_sent")),
+        "email_error": order_doc.get("email_error"),
     }
 
 

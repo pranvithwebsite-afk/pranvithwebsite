@@ -18,12 +18,16 @@ const defaultBackgrounds = [
   'linear-gradient(135deg, #0ea5e9 0%, #1e3a8a 100%)',
 ];
 
-const normalize = (item, index) => {
-  const price = item.sale_price ?? item.price ?? 0;
-  const original = item.price && item.sale_price && item.price > item.sale_price ? item.price : null;
+const normalize = (item = {}, index) => {
+  const numericPrice = Number(item.price ?? 0);
+  const numericSalePrice = item.sale_price == null ? null : Number(item.sale_price);
+  const price = Number.isFinite(numericSalePrice) && numericSalePrice >= 0
+    ? numericSalePrice
+    : (Number.isFinite(numericPrice) && numericPrice >= 0 ? numericPrice : 0);
+  const original = Number.isFinite(numericPrice) && Number.isFinite(numericSalePrice) && numericPrice > numericSalePrice ? numericPrice : null;
   const name = item.name || item.title || 'Asset';
   const category = item.category || 'Asset';
-  const slug = item.slug;
+  const slug = item.slug || item.id || `asset-${index}`;
   const heroImage = item.hero_image || (Array.isArray(item.images) && item.images[0]);
   const word = name.toUpperCase();
   const parts = word.split(' ');
@@ -35,7 +39,7 @@ const normalize = (item, index) => {
     name,
     title: name,
     category,
-    sale_price: item.sale_price,
+    sale_price: Number.isFinite(numericSalePrice) ? numericSalePrice : undefined,
     price,
     original,
     isFree: price === 0 || item.is_free,
@@ -65,12 +69,17 @@ const Assets = () => {
       try {
         const data = await fetchProducts();
         if (Array.isArray(data)) {
-          setProducts(dedupeCatalogItems(data).map((p, idx) => normalize(p, idx)));
+          setProducts(dedupeCatalogItems(data.filter(Boolean)).map((p, idx) => normalize(p, idx)));
           setLoadError(false);
         } else {
+          console.error('[assets] Expected /products to return an array', { received: data });
           setLoadError(true);
         }
       } catch (e) {
+        console.error('[assets] Product catalog failed to load', {
+          status: e?.response?.status,
+          detail: e?.response?.data?.detail || e?.message || e,
+        });
         setLoadError(true);
       } finally {
         setLoading(false);

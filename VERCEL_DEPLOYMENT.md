@@ -26,7 +26,7 @@ SMTP_HOST=smtp.example.com
 SMTP_PORT=587
 SMTP_USER=your_smtp_username
 SMTP_PASS=your_smtp_password
-SMTP_FROM="PranvithDOP <no-reply@pranvithdop.com>"
+FROM_EMAIL="PranvithDOP <no-reply@pranvithdop.com>"
 CORS_ORIGINS=https://pranvithdop.com,https://www.pranvithdop.com
 JWT_EXPIRATION_MINUTES=180
 ```
@@ -35,15 +35,15 @@ JWT_EXPIRATION_MINUTES=180
 
 `RAZORPAY_KEY_SECRET` must only be set for the backend environment. The frontend receives only `VITE_RAZORPAY_KEY_ID`. `FRONTEND_URL` is used to create absolute protected download links in confirmation emails.
 
-SMTP is optional. If `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, and `SMTP_FROM` are all configured, a successful payment sends the protected download link to the checkout email address. If they are omitted, checkout and download access continue to work and the backend logs that email delivery was skipped.
+SMTP is optional. If `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, and `FROM_EMAIL` are all configured, a successful payment sends the protected download link to the checkout email address. If they are omitted, checkout and download access continue to work and the backend logs that email delivery was skipped.
 
 ## Guest Checkout Flow
 
 1. The asset Buy Now button opens the checkout modal and collects name, email, and phone.
 2. `POST /api/checkout/create-order` calculates the amount from MongoDB and creates the Razorpay order.
 3. Razorpay Checkout uses the submitted customer details as prefill values.
-4. `POST /api/checkout/verify-payment` validates the Razorpay HMAC signature and marks the MongoDB order paid.
-5. The payment success page calls `GET /api/orders/{order_id}/access?token=...` before displaying the download button.
+4. `POST /api/checkout/verify-payment` receives `buyer_email` and `asset_slug`, validates the Razorpay HMAC signature, confirms the order matches the buyer and asset, marks the MongoDB order paid, and sends the protected download link by backend SMTP.
+5. The payment success page calls `GET /api/orders/{order_id}/access?token=...` before displaying the Download Now button and email delivery status.
 6. `GET /api/orders/{order_id}/download?token=...` verifies paid status and the protected token before redirecting to the private asset URL.
 
 ## Deploy From GitHub
