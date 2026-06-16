@@ -1,6 +1,7 @@
 import React from 'react';
 import { CheckCircle2, ChevronRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { handleImageError, safeImageSrc } from '../lib/utils';
 
 const formatPrice = (price) =>
   new Intl.NumberFormat('en-IN', {
@@ -13,9 +14,10 @@ const CourseCard = ({ course }) => (
   <article className="group relative overflow-hidden rounded-2xl border border-violet-500/15 bg-[#0f0830]/50 transition-all duration-300 hover:-translate-y-1 hover:border-violet-500/40">
     <div className="relative aspect-[16/10] overflow-hidden">
       <img
-        src={course.image}
+        src={safeImageSrc(course.image)}
         alt={course.title}
         className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+        onError={handleImageError}
       />
       <div className="absolute inset-0 bg-gradient-to-t from-[#070314] via-[#070314]/30 to-transparent" />
       <div className="absolute right-3 top-3 rounded-full bg-violet-600 px-3 py-1 text-[11px] font-bold tracking-wider text-white">

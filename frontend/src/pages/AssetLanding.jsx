@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { fetchProductBySlug } from '../lib/api';
-import { dedupeFaqs } from '../lib/utils';
+import { dedupeFaqs, handleImageError, safeImageSrc } from '../lib/utils';
 import CheckoutModal from '../components/CheckoutModal';
 
 const AssetLanding = () => {
@@ -69,7 +69,7 @@ const AssetLanding = () => {
   const isFree = product.is_free || (product.sale_price ?? product.price ?? 0) === 0;
   const price = product.sale_price ?? product.price ?? 0;
   const landing = product.landing_content || {};
-  const heroImage = product.hero_image || (product.images && product.images[0]);
+  const heroImage = safeImageSrc(product.hero_image || (product.images && product.images[0]));
 
   const onPrimaryCta = () => {
     setCheckoutOpen(true);
@@ -132,7 +132,7 @@ const AssetLanding = () => {
 
               <div className="rounded-[2rem] border border-white/10 bg-[#090712] overflow-hidden shadow-[0_30px_80px_rgba(0,0,0,0.35)]">
                 {heroImage ? (
-                  <img src={heroImage} alt={product.name} className="w-full aspect-[4/5] object-cover" data-testid="asset-hero-image" />
+                  <img src={heroImage} alt={product.name} className="w-full aspect-[4/5] object-cover" data-testid="asset-hero-image" onError={handleImageError} />
                 ) : (
                   <div className="w-full aspect-[4/5] bg-gradient-to-br from-violet-700 to-fuchsia-900 flex items-center justify-center text-2xl font-black text-white px-6 text-center">
                     {product.name}

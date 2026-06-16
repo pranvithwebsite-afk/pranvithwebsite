@@ -1,6 +1,7 @@
 import React from 'react';
 import { Play } from 'lucide-react';
 import { ourWorks } from '../data/mock';
+import { handleImageError, safeImageSrc } from '../lib/utils';
 
 const OurWorks = () => {
   const items = [...ourWorks, ...ourWorks];
@@ -27,7 +28,7 @@ const OurWorks = () => {
               key={`${w.id}-${idx}`}
               className="relative w-[300px] h-[170px] rounded-xl overflow-hidden bg-[#0f0830] border border-white/10 shrink-0 group cursor-pointer"
             >
-              <img src={w.thumb} alt="work" className="absolute inset-0 w-full h-full object-cover opacity-50 group-hover:opacity-90 transition" />
+              <img src={safeImageSrc(w.thumb)} alt="work" className="absolute inset-0 w-full h-full object-cover opacity-50 group-hover:opacity-90 transition" onError={handleImageError} />
               <div className="absolute inset-0 bg-gradient-to-t from-[#070314] to-transparent" />
               <button className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition">
                 <div className="w-12 h-12 rounded-full bg-violet-600/95 flex items-center justify-center">

@@ -4,6 +4,7 @@ import { Link, Navigate, useParams } from 'react-router-dom';
 import Footer from '../components/Footer';
 import Header from '../components/Header';
 import { courses } from '../data/mock';
+import { handleImageError, safeImageSrc } from '../lib/utils';
 
 const formatPrice = (price) =>
   new Intl.NumberFormat('en-IN', {
@@ -25,7 +26,7 @@ const CourseDetails = () => {
       <Header />
       <section className="mx-auto grid max-w-7xl gap-10 px-6 pb-24 pt-32 lg:grid-cols-2 lg:items-center">
         <div className="overflow-hidden rounded-3xl border border-violet-500/20">
-          <img src={course.image} alt={course.title} className="aspect-[16/10] h-full w-full object-cover" />
+          <img src={safeImageSrc(course.image)} alt={course.title} className="aspect-[16/10] h-full w-full object-cover" onError={handleImageError} />
         </div>
         <div>
           <Link to="/courses" className="mb-6 inline-flex items-center gap-2 text-sm text-violet-400 hover:text-violet-300">

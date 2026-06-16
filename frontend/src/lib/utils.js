@@ -81,3 +81,25 @@ export function safePublicHref(value, fallback = '/') {
     return fallback;
   }
 }
+
+export const FALLBACK_IMAGE = '/assets/brand-profile.png';
+
+export function safeImageSrc(value, fallback = FALLBACK_IMAGE) {
+  const src = String(value || '').trim();
+  if (!src) return fallback;
+  if (src.startsWith('/') && !src.startsWith('//')) return src;
+
+  try {
+    const url = new URL(src);
+    return ['http:', 'https:'].includes(url.protocol) ? url.href : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+export function handleImageError(event, fallback = FALLBACK_IMAGE) {
+  const img = event?.currentTarget;
+  if (!img || img.dataset.fallbackApplied === 'true') return;
+  img.dataset.fallbackApplied = 'true';
+  img.src = fallback;
+}

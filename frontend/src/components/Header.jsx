@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Menu, X } from 'lucide-react';
 import { navLinks } from '../data/mock';
+import { FALLBACK_IMAGE, handleImageError } from '../lib/utils';
 
 const Header = () => {
   const location = useLocation();
@@ -24,9 +25,10 @@ const Header = () => {
         <Link to="/" className="flex items-center gap-2 shrink-0" data-testid="header-brand">
           <div className="w-9 h-9 rounded-full overflow-hidden ring-2 ring-violet-500/40 bg-gradient-to-br from-rose-500 to-orange-500">
             <img
-              src="/assets/brand-profile.png"
+              src={FALLBACK_IMAGE}
               alt="PranvithDOP"
               className="w-full h-full object-cover"
+              onError={handleImageError}
             />
           </div>
           <span className="text-white font-bold text-lg tracking-tight">PranvithDOP</span>

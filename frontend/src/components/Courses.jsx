@@ -3,7 +3,7 @@ import { ChevronRight, CheckCircle2, Loader2 } from 'lucide-react';
 import { courses as mockCourses } from '../data/mock';
 import { fetchCourses } from '../lib/api';
 import { payWithRazorpay } from '../lib/razorpay';
-import { dedupeCatalogItems, getCatalogItemKey } from '../lib/utils';
+import { dedupeCatalogItems, getCatalogItemKey, handleImageError, safeImageSrc } from '../lib/utils';
 import { toast } from 'sonner';
 
 const Courses = () => {
@@ -67,9 +67,10 @@ const Courses = () => {
             >
               <div className="relative aspect-[16/10] overflow-hidden">
                 <img
-                  src={c.image}
+                  src={safeImageSrc(c.image)}
                   alt={c.title}
                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                  onError={handleImageError}
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-[#070314] via-[#070314]/30 to-transparent" />
                 <div className="absolute top-3 right-3 px-3 py-1 rounded-full bg-violet-600 text-white text-[11px] font-bold tracking-wider">

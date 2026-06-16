@@ -4,7 +4,7 @@ import Header from '../components/Header';
 import Footer from '../components/Footer';
 import { Search, Loader2 } from 'lucide-react';
 import { fetchProducts } from '../lib/api';
-import { dedupeCatalogItems, getCatalogItemKey } from '../lib/utils';
+import { FALLBACK_IMAGE, dedupeCatalogItems, getCatalogItemKey, handleImageError, safeImageSrc } from '../lib/utils';
 import CheckoutModal from '../components/CheckoutModal';
 
 const defaultBackgrounds = [
@@ -28,7 +28,7 @@ const normalize = (item = {}, index) => {
   const name = item.name || item.title || 'Asset';
   const category = item.category || 'Asset';
   const slug = item.slug || item.id || `asset-${index}`;
-  const heroImage = item.hero_image || (Array.isArray(item.images) && item.images[0]);
+  const heroImage = safeImageSrc(item.hero_image || (Array.isArray(item.images) && item.images[0]), FALLBACK_IMAGE);
   const word = name.toUpperCase();
   const parts = word.split(' ');
   const headline = parts.slice(0, 2).join(' ') || word;
@@ -227,7 +227,7 @@ const ProductCard = ({ p, onView, onBuy }) => (
   >
     <div className="relative aspect-[4/5] overflow-hidden">
       {p.image ? (
-        <img src={p.image} alt={p.title} className="absolute inset-0 w-full h-full object-cover" />
+        <img src={safeImageSrc(p.image)} alt={p.title} className="absolute inset-0 w-full h-full object-cover" onError={handleImageError} />
       ) : (
         <div className="absolute inset-0" style={{ background: p.bg }} />
       )}

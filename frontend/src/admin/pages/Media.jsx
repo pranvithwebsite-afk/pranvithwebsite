@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Upload, Copy, Trash2, Loader2, Image as ImageIcon } from 'lucide-react';
 import { fetchAdminMedia, uploadAdminFile, deleteAdminMedia } from '../../lib/api';
 import { toast } from 'sonner';
+import { handleImageError, safeImageSrc } from '../../lib/utils';
 
 const Media = () => {
   const [media, setMedia] = useState([]);
@@ -159,9 +160,10 @@ const MediaCard = ({ item, onDelete, onCopyUrl }) => {
       <div className="relative aspect-square bg-slate-900 flex items-center justify-center overflow-hidden group">
         {isImage ? (
           <img
-            src={item.url}
+            src={safeImageSrc(item.url)}
             alt={item.title}
             className="w-full h-full object-cover group-hover:scale-105 transition"
+            onError={handleImageError}
           />
         ) : isVideo ? (
           <video

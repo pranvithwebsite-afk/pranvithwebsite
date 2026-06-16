@@ -4,6 +4,7 @@ import Header from '../components/Header';
 import Footer from '../components/Footer';
 import { AlertCircle, ArrowRight, CheckCircle2, Download, Loader2 } from 'lucide-react';
 import { fetchOrderAccess, fetchProductBySlug } from '../lib/api';
+import { handleImageError, safeImageSrc } from '../lib/utils';
 
 const PaymentSuccess = () => {
   const [searchParams] = useSearchParams();
@@ -53,7 +54,7 @@ const PaymentSuccess = () => {
     };
   }, [orderId, slug, token]);
 
-  const heroImage = product?.hero_image || (product?.images && product.images[0]);
+  const heroImage = safeImageSrc(product?.hero_image || (product?.images && product.images[0]));
   const verified = order?.verified && order?.payment_status === 'paid';
 
   return (
@@ -97,7 +98,7 @@ const PaymentSuccess = () => {
 
             {heroImage && (
               <div className="mx-auto mt-10 max-w-sm overflow-hidden rounded-3xl border border-white/10">
-                <img src={heroImage} alt={product?.name || 'Purchased product'} className="aspect-[4/5] w-full object-cover" />
+                <img src={heroImage} alt={product?.name || 'Purchased product'} className="aspect-[4/5] w-full object-cover" onError={handleImageError} />
               </div>
             )}
 

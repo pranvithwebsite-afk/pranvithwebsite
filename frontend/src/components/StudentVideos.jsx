@@ -1,6 +1,7 @@
 import React from 'react';
 import { Play } from 'lucide-react';
 import { studentVideos } from '../data/mock';
+import { handleImageError, safeImageSrc } from '../lib/utils';
 
 const StudentVideos = () => {
   // Duplicate items for marquee
@@ -31,7 +32,7 @@ const StudentVideos = () => {
               key={`${s.id}-${idx}`}
               className="relative w-[280px] h-[420px] rounded-2xl overflow-hidden border border-violet-500/20 bg-[#0f0830] shrink-0 group cursor-pointer"
             >
-              <img src={s.thumb} alt={s.name} className="absolute inset-0 w-full h-full object-cover opacity-70 group-hover:opacity-100 transition" />
+              <img src={safeImageSrc(s.thumb)} alt={s.name} className="absolute inset-0 w-full h-full object-cover opacity-70 group-hover:opacity-100 transition" onError={handleImageError} />
               <div className="absolute inset-0 bg-gradient-to-t from-[#070314] via-[#070314]/40 to-transparent" />
               <button className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-14 h-14 rounded-full bg-violet-600/90 shadow-[0_0_40px_rgba(139,92,246,0.6)] flex items-center justify-center group-hover:scale-110 transition">
                 <Play size={20} className="text-white ml-0.5" fill="white" />

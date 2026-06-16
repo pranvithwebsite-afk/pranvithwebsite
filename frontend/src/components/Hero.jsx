@@ -1,6 +1,6 @@
 import React from 'react';
 import { ArrowRight, Sparkles } from 'lucide-react';
-import { safePublicHref } from '../lib/utils';
+import { handleImageError, safeImageSrc, safePublicHref } from '../lib/utils';
 
 const Hero = ({ pageData }) => {
   const {
@@ -59,9 +59,10 @@ const Hero = ({ pageData }) => {
           <div className="relative rounded-3xl border border-violet-500/30 bg-gradient-to-br from-[#1a0a3a] via-[#0f0625] to-[#0a0518] p-1 overflow-hidden">
             <div className="relative aspect-[16/8] rounded-[20px] overflow-hidden bg-gradient-to-br from-[#1e0a45] to-[#0a0518]">
               <img
-                src={image}
+                src={safeImageSrc(image)}
                 alt="video editor"
                 className="absolute inset-0 w-full h-full object-cover opacity-30"
+                onError={handleImageError}
               />
               <div className="absolute inset-0 bg-gradient-to-r from-[#1a0a3a]/90 via-transparent to-[#1a0a3a]/90" />
             </div>

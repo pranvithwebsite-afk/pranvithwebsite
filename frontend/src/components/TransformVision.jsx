@@ -1,5 +1,6 @@
 import React from 'react';
 import { Instagram, ArrowRight } from 'lucide-react';
+import { FALLBACK_IMAGE, handleImageError } from '../lib/utils';
 
 const instagramProfileUrl =
   'https://www.instagram.com/pranvith_dop?utm_source=ig_web_button_share_sheet&igsh=ZDNlZDc0MzIxNw==';
@@ -99,9 +100,10 @@ const TransformVision = () => {
                   <div className="flex items-center gap-3 mb-3">
                     <div className="w-14 h-14 rounded-full overflow-hidden bg-gradient-to-br from-orange-500 to-rose-500">
                       <img
-                        src="/assets/brand-profile.png"
+                        src={FALLBACK_IMAGE}
                         alt="PranvithDOP"
                         className="w-full h-full object-cover"
+                        onError={handleImageError}
                       />
                     </div>
                     <div className="flex-1">
@@ -148,9 +150,10 @@ const TransformVision = () => {
                       >
                         {card.profileImage && (
                           <img
-                            src="/assets/brand-profile.png"
+                            src={FALLBACK_IMAGE}
                             alt=""
                             className="absolute inset-0 h-full w-full object-cover opacity-55 transition-transform duration-300 group-hover:scale-105"
+                            onError={handleImageError}
                           />
                         )}
                         <div className="absolute inset-0 opacity-30 [background-image:linear-gradient(rgba(255,255,255,.12)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,.12)_1px,transparent_1px)] [background-size:12px_12px]" />
