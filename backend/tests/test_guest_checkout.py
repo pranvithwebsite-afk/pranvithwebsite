@@ -42,7 +42,10 @@ class FakeDatabase:
 
 
 class FakeRazorpayOrders:
+    created_payloads = []
+
     def create(self, payload):
+        self.created_payloads.append(payload)
         return {
             "id": "order_guest_checkout",
             "amount": payload["amount"],
@@ -70,8 +73,10 @@ class FakeRazorpayPayments:
 
 
 class FakeRazorpayClient:
-    order = FakeRazorpayOrders()
-    payment = FakeRazorpayPayments()
+    def __init__(self):
+        self.order = FakeRazorpayOrders()
+        self.order.created_payloads = []
+        self.payment = FakeRazorpayPayments()
 
 
 def test_guest_checkout_verification_and_download(monkeypatch):
@@ -101,6 +106,16 @@ def test_guest_checkout_verification_and_download(monkeypatch):
     )))
     assert created["order_id"] == "order_guest_checkout"
     assert created["amount"] == 49900
+    razorpay_payload = server.razorpay_client.order.created_payloads[0]
+    assert razorpay_payload["amount"] == 49900
+    assert razorpay_payload["currency"] == "INR"
+    assert razorpay_payload["notes"]["local_order_id"]
+    assert razorpay_payload["notes"]["product_name"] == product["name"]
+    assert razorpay_payload["notes"]["product_slug"] == product["slug"]
+    assert razorpay_payload["notes"]["customer_name"] == "Guest Buyer"
+    assert razorpay_payload["notes"]["customer_email"] == "buyer@example.com"
+    assert razorpay_payload["notes"]["customer_phone"] == "+919876543210"
+    assert fake_db.orders.documents[0]["id"] == razorpay_payload["notes"]["local_order_id"]
 
     payment_id = "pay_guest_checkout"
     signature = hmac.new(

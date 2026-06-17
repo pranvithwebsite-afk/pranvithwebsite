@@ -20,6 +20,7 @@ DEFAULT_ADMIN_PASSWORD=your_admin_password
 DEFAULT_ADMIN_NAME=Pranvith
 RAZORPAY_KEY_ID=your_razorpay_key_id
 RAZORPAY_KEY_SECRET=your_razorpay_key_secret
+RAZORPAY_WEBHOOK_SECRET=your_webhook_secret_from_razorpay
 VITE_RAZORPAY_KEY_ID=your_razorpay_key_id
 PUBLIC_SITE_URL=https://pranvithdop.com
 FRONTEND_URL=https://pranvithdop.com

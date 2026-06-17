@@ -1544,6 +1544,10 @@ async def prepare_cms_collections():
     except Exception:
         pass
     try:
+        await db.webhook_events.create_index("id", unique=True)
+    except Exception:
+        pass
+    try:
         await db.seed_state.create_index("key", unique=True)
     except Exception:
         pass
@@ -2107,6 +2111,38 @@ def _is_paid_razorpay_order(razorpay_order: Optional[dict], order: dict) -> tupl
     return True, ""
 
 
+def _is_captured_webhook_payment(payment: dict, order: dict) -> tuple[bool, str]:
+    if not payment:
+        return False, "Webhook payment payload missing"
+    if payment.get("order_id") != order.get("razorpay_order_id"):
+        return False, "Webhook payment order mismatch"
+    if payment.get("status") != "captured":
+        return False, f"Webhook payment is {payment.get('status') or 'not captured'}"
+    if payment.get("captured") is not True:
+        return False, "Webhook payment was not captured"
+    if int(payment.get("amount") or 0) != _expected_order_amount(order):
+        return False, "Webhook payment amount mismatch"
+    if (payment.get("currency") or "").upper() != (order.get("currency") or "INR").upper():
+        return False, "Webhook payment currency mismatch"
+    return True, ""
+
+
+def _is_paid_webhook_order(razorpay_order: dict, order: dict) -> tuple[bool, str]:
+    if not razorpay_order:
+        return False, "Webhook order payload missing"
+    if razorpay_order.get("id") != order.get("razorpay_order_id"):
+        return False, "Webhook order mismatch"
+    if razorpay_order.get("status") != "paid":
+        return False, f"Webhook order is {razorpay_order.get('status') or 'not paid'}"
+    amount_paid = razorpay_order.get("amount_paid", razorpay_order.get("amount"))
+    if int(amount_paid or 0) != _expected_order_amount(order):
+        return False, "Webhook order paid amount mismatch"
+    webhook_currency = (razorpay_order.get("currency") or order.get("currency") or "INR").upper()
+    if webhook_currency != (order.get("currency") or "INR").upper():
+        return False, "Webhook order currency mismatch"
+    return True, ""
+
+
 async def _verify_razorpay_paid_order(order: dict, razorpay_payment_id: str) -> dict:
     payment = await _fetch_razorpay_payment(razorpay_payment_id)
     payment_ok, payment_error = _is_captured_payment_for_order(payment, order)
@@ -2285,7 +2321,10 @@ async def checkout_create_order(payload: PaymentCreateOrderIn):
     phone = _normalize_phone(payload.phone)
     product = await _find_checkout_product(payload.product_id, payload.product_slug)
     amount = _product_price_paise(product)
+    local_order_id = str(uuid.uuid4())
     receipt = f"asset_{uuid.uuid4().hex[:24]}"
+    customer_name = payload.name.strip()
+    customer_email = str(payload.email).lower().strip()
 
     try:
         razorpay_order = razorpay_client.order.create({
@@ -2294,10 +2333,13 @@ async def checkout_create_order(payload: PaymentCreateOrderIn):
             "receipt": receipt,
             "payment_capture": 1,
             "notes": {
+                "local_order_id": local_order_id,
                 "product_id": product.get("id", ""),
-                "product_slug": product.get("slug", ""),
                 "product_name": product.get("name", ""),
-                "buyer_email": str(payload.email).lower().strip(),
+                "product_slug": product.get("slug", ""),
+                "customer_name": customer_name,
+                "customer_email": customer_email,
+                "customer_phone": phone,
             },
         })
     except razorpay.errors.BadRequestError as e:
@@ -2311,7 +2353,7 @@ async def checkout_create_order(payload: PaymentCreateOrderIn):
         raise HTTPException(status_code=500, detail="Could not create order")
 
     order_doc = {
-        "id": str(uuid.uuid4()),
+        "id": local_order_id,
         "razorpay_order_id": razorpay_order.get("id"),
         "amount": razorpay_order.get("amount"),
         "currency": razorpay_order.get("currency", "INR"),
@@ -2322,11 +2364,11 @@ async def checkout_create_order(payload: PaymentCreateOrderIn):
         "product_title": product.get("name"),
         "status": "pending",
         "payment_status": "pending",
-        "customer_name": payload.name.strip(),
-        "customer_email": str(payload.email).lower().strip(),
+        "customer_name": customer_name,
+        "customer_email": customer_email,
         "customer_phone": phone,
-        "buyer_name": payload.name.strip(),
-        "buyer_email": str(payload.email).lower().strip(),
+        "buyer_name": customer_name,
+        "buyer_email": customer_email,
         "buyer_phone": phone,
         "created_at": datetime.now(timezone.utc).isoformat(),
         "source": "razorpay_checkout",
@@ -2515,30 +2557,41 @@ async def razorpay_webhook(request: Request):
     body = await request.body()
     webhook_secret = os.environ.get("RAZORPAY_WEBHOOK_SECRET", "")
     signature = request.headers.get("X-Razorpay-Signature", "")
-    if webhook_secret:
-        expected = hmac.new(webhook_secret.encode("utf-8"), body, hashlib.sha256).hexdigest()
-        if not signature or not hmac.compare_digest(expected, signature):
-            raise HTTPException(status_code=400, detail="Invalid webhook signature")
+    if not webhook_secret:
+        logger.error("Razorpay webhook rejected: RAZORPAY_WEBHOOK_SECRET is not configured")
+        raise HTTPException(status_code=503, detail="Razorpay webhook is not configured")
+    expected = hmac.new(webhook_secret.encode("utf-8"), body, hashlib.sha256).hexdigest()
+    if not signature or not hmac.compare_digest(expected, signature):
+        raise HTTPException(status_code=400, detail="Invalid webhook signature")
 
     event_id = request.headers.get("X-Razorpay-Event-Id") or hashlib.sha256(body).hexdigest()
-    existing_event = await db.webhook_events.find_one({"id": event_id}, {"_id": 0, "id": 1})
+    existing_event = await db.webhook_events.find_one({"id": event_id}, {"_id": 0, "id": 1, "status": 1})
     if existing_event:
-        return {"success": True, "duplicate": True}
+        return {"success": True, "duplicate": True, "status": existing_event.get("status")}
 
     try:
         payload = json.loads(body.decode("utf-8"))
     except json.JSONDecodeError:
         raise HTTPException(status_code=400, detail="Invalid webhook payload")
 
-    await db.webhook_events.insert_one({
+    event = payload.get("event")
+    event_doc = {
         "id": event_id,
         "provider": "razorpay",
-        "event": payload.get("event"),
+        "event": event,
+        "status": "received",
         "created_at": datetime.now(timezone.utc).isoformat(),
-    })
+    }
+    try:
+        await db.webhook_events.insert_one(event_doc)
+    except DuplicateKeyError:
+        return {"success": True, "duplicate": True, "status": "received"}
 
-    event = payload.get("event")
-    if event not in {"payment.captured", "order.paid", "payment.failed"}:
+    if event not in {"payment.captured", "order.paid", "payment.failed", "order.cancelled"}:
+        await db.webhook_events.update_one(
+            {"id": event_id},
+            {"$set": {"status": "ignored", "processed_at": datetime.now(timezone.utc).isoformat()}},
+        )
         return {"success": True, "ignored": True}
 
     payment_entity = (((payload.get("payload") or {}).get("payment") or {}).get("entity") or {})
@@ -2547,30 +2600,102 @@ async def razorpay_webhook(request: Request):
     razorpay_payment_id = payment_entity.get("id")
     if not razorpay_order_id:
         logger.warning("Razorpay webhook missing order id event=%s event_id=%s", event, event_id)
+        await db.webhook_events.update_one(
+            {"id": event_id},
+            {"$set": {"status": "ignored", "reason": "missing_order_id", "processed_at": datetime.now(timezone.utc).isoformat()}},
+        )
         return {"success": True, "ignored": True}
 
     order = await db.orders.find_one({"razorpay_order_id": razorpay_order_id}, {"_id": 0})
     if not order:
         logger.warning("Razorpay webhook order not found razorpay_order_id=%s event_id=%s", razorpay_order_id, event_id)
+        await db.webhook_events.update_one(
+            {"id": event_id},
+            {
+                "$set": {
+                    "status": "ignored",
+                    "razorpay_order_id": razorpay_order_id,
+                    "razorpay_payment_id": razorpay_payment_id,
+                    "reason": "order_not_found",
+                    "processed_at": datetime.now(timezone.utc).isoformat(),
+                }
+            },
+        )
         return {"success": True, "ignored": True}
 
-    if event == "payment.failed":
+    if event in {"payment.failed", "order.cancelled"}:
         reason = payment_entity.get("error_description") or payment_entity.get("error_reason") or "Razorpay payment failed"
-        corrected = await _mark_order_not_paid(order, "failed", reason, razorpay_payment_id)
+        if event == "order.cancelled":
+            reason = "Razorpay order cancelled"
+        corrected = await _mark_order_not_paid(order, "failed" if event == "payment.failed" else "cancelled", reason, razorpay_payment_id)
+        await db.webhook_events.update_one(
+            {"id": event_id},
+            {
+                "$set": {
+                    "status": "processed",
+                    "razorpay_order_id": razorpay_order_id,
+                    "razorpay_payment_id": razorpay_payment_id,
+                    "local_status": corrected.get("payment_status"),
+                    "email_sent": False,
+                    "processed_at": datetime.now(timezone.utc).isoformat(),
+                }
+            },
+        )
         return {
             "success": True,
             "order_id": razorpay_order_id,
             "payment_id": razorpay_payment_id,
             "payment_status": corrected.get("payment_status"),
+            "email_sent": False,
         }
 
-    sync_result = await _sync_order_with_razorpay(order, send_email=True)
+    if event == "payment.captured":
+        verified, reason = _is_captured_webhook_payment(payment_entity, order)
+        payment_id = razorpay_payment_id
+    else:
+        verified, reason = _is_paid_webhook_order(order_entity, order)
+        payment_id = razorpay_payment_id or order.get("razorpay_payment_id") or order_entity.get("payment_id") or "order.paid"
+
+    if not verified:
+        logger.warning("Razorpay webhook verification failed event=%s order_id=%s reason=%s", event, razorpay_order_id, reason)
+        await db.webhook_events.update_one(
+            {"id": event_id},
+            {
+                "$set": {
+                    "status": "rejected",
+                    "razorpay_order_id": razorpay_order_id,
+                    "razorpay_payment_id": payment_id,
+                    "reason": reason,
+                    "processed_at": datetime.now(timezone.utc).isoformat(),
+                }
+            },
+        )
+        raise HTTPException(status_code=400, detail=reason)
+
+    product = await _find_checkout_product(order.get("product_id"), order.get("product_slug"))
+    fulfillment = await _fulfill_paid_order(order, product, payment_id, send_email=True)
+    fulfilled_order = fulfillment.get("order") or {}
+    await db.webhook_events.update_one(
+        {"id": event_id},
+        {
+            "$set": {
+                "status": "processed",
+                "razorpay_order_id": razorpay_order_id,
+                "razorpay_payment_id": payment_id,
+                "local_status": fulfilled_order.get("payment_status"),
+                "email_sent": bool(fulfilled_order.get("email_sent")),
+                "email_delivery_status": fulfilled_order.get("email_delivery_status"),
+                "processed_at": datetime.now(timezone.utc).isoformat(),
+            }
+        },
+    )
     return {
         "success": True,
         "order_id": razorpay_order_id,
-        "payment_id": razorpay_payment_id or order.get("razorpay_payment_id"),
-        "verified_paid": sync_result.get("verified_paid"),
-        "email_sent": bool((sync_result.get("order") or {}).get("email_sent")),
+        "payment_id": payment_id,
+        "verified_paid": True,
+        "email_sent": bool(fulfilled_order.get("email_sent")),
+        "email_delivery_status": fulfilled_order.get("email_delivery_status"),
     }
 
 

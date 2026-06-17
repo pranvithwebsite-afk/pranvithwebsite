@@ -179,6 +179,7 @@ const Products = () => {
         <div>
           <h1 className="text-3xl font-semibold text-white">Products</h1>
           <p className="mt-3 text-slate-400">Manage your product catalog.</p>
+          <p className="mt-2 text-sm text-slate-500">Products are stored in website CMS. Razorpay Orders are created automatically during checkout.</p>
         </div>
         <button
           onClick={openNewForm}
