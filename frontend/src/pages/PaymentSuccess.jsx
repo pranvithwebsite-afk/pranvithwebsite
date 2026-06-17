@@ -55,7 +55,7 @@ const PaymentSuccess = () => {
   }, [orderId, slug, token]);
 
   const heroImage = safeImageSrc(product?.hero_image || (product?.images && product.images[0]));
-  const verified = order?.verified && order?.payment_status === 'paid';
+  const verified = order?.verified_paid === true && order?.payment_status === 'paid';
 
   return (
     <main className="min-h-screen bg-[#070314] text-white">

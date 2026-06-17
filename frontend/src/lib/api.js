@@ -206,6 +206,16 @@ export const fetchAdminCustomers = async () => {
   return data;
 };
 
+export const resendDownloadEmail = async (orderId) => {
+  const { data } = await adminApi.post(`/admin/orders/${encodeURIComponent(orderId)}/resend-download-email`);
+  return data;
+};
+
+export const syncRazorpayStatus = async (orderId) => {
+  const { data } = await adminApi.post(`/admin/orders/${encodeURIComponent(orderId)}/sync-razorpay-status`);
+  return data;
+};
+
 export const fetchAdminMedia = async () => {
   const { data } = await adminApi.get('/admin/media');
   return data;

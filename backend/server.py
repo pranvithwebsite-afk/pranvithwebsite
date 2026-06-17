@@ -936,7 +936,7 @@ async def admin_get_product(product_id: str, current_admin: AdminBase = Depends(
 @admin_router.get("/orders")
 async def admin_orders(current_admin: AdminBase = Depends(get_current_active_admin)):
     try:
-        return await db.orders.find(
+        rows = await db.orders.find(
             {},
             {
                 "_id": 0,
@@ -946,9 +946,105 @@ async def admin_orders(current_admin: AdminBase = Depends(get_current_active_adm
                 "razorpay_signature": 0,
             },
         ).sort("created_at", -1).to_list(500)
+        return [_public_order_payload(row) for row in rows]
     except Exception:
         logger.exception("Admin orders fetch failed")
         raise HTTPException(status_code=500, detail="Could not load orders")
+
+
+@admin_router.post("/orders/{order_id}/resend-download-email")
+async def admin_resend_download_email(order_id: str, current_admin: AdminBase = Depends(get_current_active_admin)):
+    if db is None:
+        raise HTTPException(status_code=500, detail="Database not configured")
+
+    order_filter = {"$or": [{"razorpay_order_id": order_id}, {"id": order_id}]}
+    order = await db.orders.find_one(order_filter, {"_id": 0})
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+    if order.get("payment_status") != "paid":
+        raise HTTPException(status_code=400, detail="Download email can only be sent for paid orders")
+    if order.get("razorpay_order_id"):
+        payment_id = order.get("razorpay_payment_id")
+        if not payment_id:
+            await _mark_order_not_paid(order, "failed", "No Razorpay payment ID found for paid order")
+            raise HTTPException(status_code=400, detail="Razorpay payment was not verified")
+        verification = await _verify_razorpay_paid_order(order, payment_id)
+        if not verification.get("verified"):
+            await _mark_order_not_paid(order, "failed", verification.get("error") or "Razorpay payment was not verified", payment_id)
+            raise HTTPException(status_code=400, detail="Razorpay payment was not verified")
+
+    buyer_email = (order.get("customer_email") or order.get("buyer_email") or "").lower().strip()
+    if not buyer_email:
+        error = "Customer email is missing"
+        now = datetime.now(timezone.utc).isoformat()
+        update_fields = _email_delivery_update(False, error, now)
+        await db.orders.update_one(order_filter, {"$set": update_fields})
+        raise HTTPException(status_code=400, detail=error)
+
+    product = await _find_checkout_product(order.get("product_id"), order.get("product_slug"))
+    download_file = order.get("download_file") or product.get("download_file")
+    if not download_file:
+        error = "Download file not configured"
+        now = datetime.now(timezone.utc).isoformat()
+        update_fields = _email_delivery_update(False, error, now)
+        await db.orders.update_one(order_filter, {"$set": update_fields})
+        await _upsert_checkout_customer({**order, **update_fields}, product)
+        raise HTTPException(status_code=404, detail=error)
+
+    download_token = secrets.token_urlsafe(32)
+    public_order_id = order.get("razorpay_order_id") or order.get("id")
+    download_url = _paid_download_url(public_order_id, download_token)
+    base_fields = {
+        "download_token_hash": _hash_download_token(download_token),
+        "download_file": download_file,
+        "download_url": download_url,
+    }
+
+    result = _send_download_email(
+        buyer_email,
+        order.get("customer_name") or order.get("buyer_name") or "there",
+        order.get("product_name") or order.get("product_title") or product.get("name", "your asset"),
+        order.get("razorpay_payment_id") or "paid order",
+        _public_download_url(download_url),
+    )
+    sent, error = _normalize_email_result(result)
+    now = datetime.now(timezone.utc).isoformat()
+    update_fields = {
+        **base_fields,
+        **_email_delivery_update(sent, error, now),
+    }
+    if sent:
+        update_fields["email_delivery_sent_at"] = now
+
+    await db.orders.update_one(order_filter, {"$set": update_fields})
+    updated_order = {**order, **update_fields}
+    await _upsert_checkout_customer(updated_order, product)
+
+    if not sent:
+        raise HTTPException(status_code=502, detail=error or "Download email could not be sent")
+
+    return {
+        "success": True,
+        "message": "Download email resent successfully.",
+        "order": _public_order_payload(updated_order),
+    }
+
+
+@admin_router.post("/orders/{order_id}/sync-razorpay-status")
+async def admin_sync_razorpay_status(order_id: str, current_admin: AdminBase = Depends(get_current_active_admin)):
+    if db is None:
+        raise HTTPException(status_code=500, detail="Database not configured")
+
+    order = await db.orders.find_one({"$or": [{"razorpay_order_id": order_id}, {"id": order_id}]}, {"_id": 0})
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+    sync_result = await _sync_order_with_razorpay(order, send_email=True)
+    return {
+        "success": True,
+        "verified_paid": sync_result.get("verified_paid"),
+        "reason": sync_result.get("reason"),
+        "order": _public_order_payload(sync_result.get("order") or {}),
+    }
 
 
 @admin_router.get("/customers")
@@ -1575,6 +1671,12 @@ def _product_price_paise(product: dict) -> int:
 
 
 def _customer_order_summary(order: dict, product: dict) -> dict:
+    email_delivery_status = order.get("email_delivery_status")
+    if not email_delivery_status:
+        email_delivery_status = "sent" if order.get("email_sent") else ("failed" if order.get("email_error") else "pending")
+    email_delivery_error = order.get("email_delivery_error")
+    if email_delivery_error is None:
+        email_delivery_error = order.get("email_error")
     return {
         "order_id": order.get("id"),
         "razorpay_order_id": order.get("razorpay_order_id"),
@@ -1591,9 +1693,12 @@ def _customer_order_summary(order: dict, product: dict) -> dict:
         "purchase_date": order.get("paid_at") or order.get("verified_at") or order.get("created_at"),
         "created_at": order.get("created_at"),
         "paid_at": order.get("paid_at"),
-        "email_sent": bool(order.get("email_sent")),
-        "email_error": order.get("email_error"),
+        "email_delivery_status": email_delivery_status,
+        "email_delivery_error": email_delivery_error,
+        "email_sent": email_delivery_status == "sent",
+        "email_error": email_delivery_error,
         "email_attempted_at": order.get("email_attempted_at"),
+        "email_delivery_attempted_at": order.get("email_delivery_attempted_at") or order.get("email_attempted_at"),
     }
 
 
@@ -1648,15 +1753,52 @@ async def _upsert_checkout_customer(order: dict, product: dict) -> None:
         )
 
 
-def _send_download_email(to_email: str, buyer_name: str, product_name: str, payment_id: str, download_url: str) -> bool:
+def _email_delivery_update(sent: bool, error: Optional[str], attempted_at: str) -> dict:
+    return {
+        "email_delivery_status": "sent" if sent else "failed",
+        "email_delivery_error": None if sent else error,
+        "email_delivery_attempted_at": attempted_at,
+        "email_sent": sent,
+        "email_error": None if sent else error,
+        "email_attempted_at": attempted_at,
+    }
+
+
+def _normalize_email_result(result: Any) -> tuple[bool, Optional[str]]:
+    if isinstance(result, bool):
+        return result, None if result else "Download email could not be sent. Please use the Download Now button."
+    if isinstance(result, dict):
+        sent = bool(result.get("sent"))
+        return sent, None if sent else (result.get("error") or "Download email could not be sent. Please use the Download Now button.")
+    return False, "Download email could not be sent. Please use the Download Now button."
+
+
+def _public_order_payload(order: dict) -> dict:
+    hidden_fields = {"_id", "download_file", "download_url", "download_token_hash", "razorpay_signature"}
+    return {key: value for key, value in order.items() if key not in hidden_fields}
+
+
+def _smtp_error_message(exc: Exception) -> str:
+    detail = str(exc).strip()
+    return f"{type(exc).__name__}: {detail}" if detail else type(exc).__name__
+
+
+def _send_download_email(to_email: str, buyer_name: str, product_name: str, payment_id: str, download_url: str) -> dict:
     smtp_host = os.environ.get("SMTP_HOST")
-    smtp_port = int(os.environ.get("SMTP_PORT", "587") or "587")
+    smtp_port_value = os.environ.get("SMTP_PORT", "587") or "587"
+    try:
+        smtp_port = int(smtp_port_value)
+    except (TypeError, ValueError):
+        error = "SMTP_PORT is invalid"
+        logger.warning("Download email skipped: %s", error)
+        return {"sent": False, "error": error}
     smtp_user = os.environ.get("SMTP_USER")
     smtp_pass = os.environ.get("SMTP_PASS")
     smtp_from = os.environ.get("FROM_EMAIL") or os.environ.get("SMTP_FROM") or smtp_user
     if not all([smtp_host, smtp_port, smtp_user, smtp_pass, smtp_from]):
-        logger.warning("SMTP is not fully configured; download email skipped")
-        return False
+        error = "SMTP is not fully configured"
+        logger.warning("Download email skipped: %s", error)
+        return {"sent": False, "error": error}
 
     msg = EmailMessage()
     msg["Subject"] = "Your download is ready - PranvithDOP"
@@ -1666,13 +1808,16 @@ def _send_download_email(to_email: str, buyer_name: str, product_name: str, paym
         "\n".join([
             f"Hi {buyer_name},",
             "",
-            "Thank you for your purchase from PranvithDOP.",
-            f"Your download for {product_name} is ready.",
-            f"Payment ID: {payment_id}",
+            "Thank you for your purchase.",
             "",
-            f"Download link: {download_url}",
+            "Your download is ready:",
+            download_url,
             "",
-            "This download link is protected and should not be shared.",
+            "Product:",
+            product_name,
+            "",
+            "Regards,",
+            "PranvithDOP",
         ])
     )
 
@@ -1687,18 +1832,197 @@ def _send_download_email(to_email: str, buyer_name: str, product_name: str, paym
                 server.starttls(context=context)
                 server.login(smtp_user, smtp_pass)
                 server.send_message(msg)
-        return True
-    except Exception:
-        logger.exception("download email failed")
-        return False
+        logger.info("Download email sent via SMTP to=%s product=%s payment_id=%s", to_email, product_name, payment_id)
+        return {"sent": True, "error": None}
+    except Exception as exc:
+        error = _smtp_error_message(exc)
+        logger.exception("Download email SMTP failure to=%s product=%s payment_id=%s error=%s", to_email, product_name, payment_id, error)
+        return {"sent": False, "error": error}
 
 
 def _send_confirmation_email(to_email: str, buyer_name: str, product_name: str, payment_id: str, download_url: str) -> bool:
     return _send_download_email(to_email, buyer_name, product_name, payment_id, download_url)
 
 
+def _razorpay_public_error(exc: Exception) -> str:
+    detail = str(exc).strip()
+    if not detail:
+        return "Razorpay verification failed"
+    return detail[:240]
+
+
+def _extract_razorpay_items(response: Any) -> list:
+    if isinstance(response, dict):
+        items = response.get("items")
+        return items if isinstance(items, list) else []
+    return []
+
+
+async def _fetch_razorpay_order(razorpay_order_id: str) -> Optional[dict]:
+    if razorpay_client is None:
+        raise HTTPException(status_code=500, detail="Payment gateway not configured")
+    try:
+        return razorpay_client.order.fetch(razorpay_order_id)
+    except Exception as exc:
+        logger.exception("Razorpay order fetch failed order_id=%s", razorpay_order_id)
+        raise HTTPException(status_code=502, detail=_razorpay_public_error(exc))
+
+
+async def _fetch_razorpay_order_payments(razorpay_order_id: str) -> list:
+    if razorpay_client is None:
+        raise HTTPException(status_code=500, detail="Payment gateway not configured")
+    try:
+        return _extract_razorpay_items(razorpay_client.order.payments(razorpay_order_id))
+    except Exception as exc:
+        logger.exception("Razorpay order payments fetch failed order_id=%s", razorpay_order_id)
+        raise HTTPException(status_code=502, detail=_razorpay_public_error(exc))
+
+
+async def _fetch_razorpay_payment(razorpay_payment_id: str) -> dict:
+    if razorpay_client is None:
+        raise HTTPException(status_code=500, detail="Payment gateway not configured")
+    try:
+        return razorpay_client.payment.fetch(razorpay_payment_id)
+    except Exception as exc:
+        logger.exception("Razorpay payment fetch failed payment_id=%s", razorpay_payment_id)
+        raise HTTPException(status_code=502, detail=_razorpay_public_error(exc))
+
+
+def _expected_order_amount(order: dict) -> int:
+    return int(order.get("amount") or 0)
+
+
+def _is_captured_payment_for_order(payment: dict, order: dict) -> tuple[bool, str]:
+    stored_order_id = order.get("razorpay_order_id")
+    expected_amount = _expected_order_amount(order)
+    expected_currency = (order.get("currency") or "INR").upper()
+    if not payment:
+        return False, "Razorpay payment not found"
+    if payment.get("order_id") != stored_order_id:
+        return False, "Razorpay payment order mismatch"
+    if payment.get("status") != "captured":
+        return False, f"Razorpay payment is {payment.get('status') or 'not captured'}"
+    if payment.get("captured") is not True:
+        return False, "Razorpay payment was not captured"
+    if int(payment.get("amount") or 0) != expected_amount:
+        return False, "Razorpay payment amount mismatch"
+    if (payment.get("currency") or "").upper() != expected_currency:
+        return False, "Razorpay payment currency mismatch"
+    if expected_currency != "INR":
+        return False, "Razorpay payment currency must be INR"
+    return True, ""
+
+
+def _is_paid_razorpay_order(razorpay_order: Optional[dict], order: dict) -> tuple[bool, str]:
+    if not razorpay_order:
+        return False, "Razorpay order not found"
+    expected_amount = _expected_order_amount(order)
+    if razorpay_order.get("id") != order.get("razorpay_order_id"):
+        return False, "Razorpay order mismatch"
+    if razorpay_order.get("status") != "paid":
+        return False, f"Razorpay order is {razorpay_order.get('status') or 'not paid'}"
+    if int(razorpay_order.get("amount_paid") or 0) != expected_amount:
+        return False, "Razorpay order paid amount mismatch"
+    return True, ""
+
+
+async def _verify_razorpay_paid_order(order: dict, razorpay_payment_id: str) -> dict:
+    payment = await _fetch_razorpay_payment(razorpay_payment_id)
+    payment_ok, payment_error = _is_captured_payment_for_order(payment, order)
+    if not payment_ok:
+        return {"verified": False, "payment": payment, "razorpay_order": None, "error": payment_error}
+
+    razorpay_order = await _fetch_razorpay_order(order.get("razorpay_order_id"))
+    order_ok, order_error = _is_paid_razorpay_order(razorpay_order, order)
+    if not order_ok:
+        return {"verified": False, "payment": payment, "razorpay_order": razorpay_order, "error": order_error}
+
+    return {"verified": True, "payment": payment, "razorpay_order": razorpay_order, "error": None}
+
+
+async def _mark_order_not_paid(order: dict, payment_status: str, reason: str, payment_id: Optional[str] = None) -> dict:
+    now = datetime.now(timezone.utc).isoformat()
+    order_filter = {"$or": [{"razorpay_order_id": order.get("razorpay_order_id")}, {"id": order.get("id")}]}
+    update_fields = {
+        "status": payment_status,
+        "payment_status": payment_status,
+        "payment_failure_reason": reason,
+        "verified_at": now,
+        "email_delivery_status": "pending",
+        "email_delivery_error": "Payment not verified; download email blocked.",
+        "email_sent": False,
+        "email_error": "Payment not verified; download email blocked.",
+    }
+    if payment_id:
+        update_fields["razorpay_payment_id"] = payment_id
+    await db.orders.update_one(
+        order_filter,
+        {
+            "$set": update_fields,
+            "$unset": {
+                "paid_at": "",
+                "download_token_hash": "",
+                "download_url": "",
+            },
+        },
+    )
+    corrected_order = {**order, **update_fields}
+    corrected_order.pop("paid_at", None)
+    corrected_order.pop("download_token_hash", None)
+    corrected_order.pop("download_url", None)
+    try:
+        product = await _find_checkout_product(order.get("product_id"), order.get("product_slug"))
+        await _upsert_checkout_customer(corrected_order, product)
+    except Exception:
+        logger.exception("Failed to update customer record after marking order not paid")
+    return corrected_order
+
+
+async def _sync_order_with_razorpay(order: dict, send_email: bool = True) -> dict:
+    if not order.get("razorpay_order_id"):
+        raise HTTPException(status_code=400, detail="Order is not a Razorpay checkout order")
+
+    razorpay_order = await _fetch_razorpay_order(order.get("razorpay_order_id"))
+    payments = await _fetch_razorpay_order_payments(order.get("razorpay_order_id"))
+    captured_payment = None
+    failed_payment = None
+    for payment in payments:
+        payment_ok, _ = _is_captured_payment_for_order(payment, order)
+        if payment_ok:
+            captured_payment = payment
+            break
+        if payment.get("status") == "failed":
+            failed_payment = payment
+
+    if captured_payment:
+        order_ok, order_error = _is_paid_razorpay_order(razorpay_order, order)
+        if not order_ok:
+            corrected = await _mark_order_not_paid(order, "failed", order_error, captured_payment.get("id"))
+            return {"verified_paid": False, "order": corrected, "reason": order_error}
+        product = await _find_checkout_product(order.get("product_id"), order.get("product_slug"))
+        fulfillment = await _fulfill_paid_order(order, product, captured_payment.get("id"), send_email=send_email)
+        return {"verified_paid": True, "order": fulfillment["order"], "reason": None}
+
+    razorpay_status = razorpay_order.get("status") if razorpay_order else None
+    if failed_payment:
+        reason = failed_payment.get("error_description") or failed_payment.get("error_reason") or "Razorpay payment failed"
+        corrected = await _mark_order_not_paid(order, "failed", reason, failed_payment.get("id"))
+        return {"verified_paid": False, "order": corrected, "reason": reason}
+
+    if order.get("payment_status") == "paid" or order.get("status") == "paid":
+        reason = "No captured Razorpay payment found"
+        corrected = await _mark_order_not_paid(order, "failed", reason, order.get("razorpay_payment_id"))
+        return {"verified_paid": False, "order": corrected, "reason": reason}
+
+    next_status = "pending"
+    reason = f"Razorpay order is {razorpay_status or 'not paid'}"
+    corrected = await _mark_order_not_paid(order, next_status, reason, order.get("razorpay_payment_id"))
+    return {"verified_paid": False, "order": corrected, "reason": reason}
+
+
 async def _fulfill_paid_order(order: dict, product: dict, payment_id: str, send_email: bool = True) -> dict:
     now = datetime.now(timezone.utc).isoformat()
+    was_paid = order.get("status") == "paid" or order.get("payment_status") == "paid"
     download_url = order.get("download_url")
     download_token = None
     download_token_hash = order.get("download_token_hash")
@@ -1726,34 +2050,39 @@ async def _fulfill_paid_order(order: dict, product: dict, payment_id: str, send_
         {"$or": [{"razorpay_order_id": order.get("razorpay_order_id")}, {"id": order.get("id")}]},
         {"$set": paid_fields},
     )
-    await db.products.update_one({"id": product.get("id")}, {"$inc": {"sold_count": 1}})
+    if not was_paid:
+        await db.products.update_one({"id": product.get("id")}, {"$inc": {"sold_count": 1}})
 
-    email_sent = bool(order.get("email_sent"))
-    email_error = order.get("email_error")
-    email_attempted_at = order.get("email_attempted_at")
+    email_delivery_status = order.get("email_delivery_status") or ("sent" if order.get("email_sent") else ("failed" if order.get("email_error") else "pending"))
+    email_sent = email_delivery_status == "sent"
+    email_error = order.get("email_delivery_error") if order.get("email_delivery_error") is not None else order.get("email_error")
+    email_attempted_at = order.get("email_delivery_attempted_at") or order.get("email_attempted_at")
     buyer_email = (order.get("customer_email") or order.get("buyer_email") or "").lower().strip()
     if send_email and buyer_email and not email_sent:
-        email_sent = _send_download_email(
+        result = _send_download_email(
             buyer_email,
             order.get("customer_name") or order.get("buyer_name", "there"),
             order.get("product_name") or product.get("name", "your asset"),
             payment_id,
             _public_download_url(download_url),
         )
-        email_error = None if email_sent else "Download email could not be sent. Please use the Download Now button."
+        email_sent, email_error = _normalize_email_result(result)
         email_attempted_at = now
+        email_update = _email_delivery_update(email_sent, email_error, email_attempted_at)
+        if email_sent:
+            email_update["email_delivery_sent_at"] = now
         await db.orders.update_one(
             {"$or": [{"razorpay_order_id": order.get("razorpay_order_id")}, {"id": order.get("id")}]},
-            {"$set": {
-                "email_sent": email_sent,
-                "email_error": email_error,
-                "email_attempted_at": email_attempted_at,
-            }},
+            {"$set": email_update},
         )
+        email_delivery_status = email_update["email_delivery_status"]
 
     fulfilled_order = {
         **order,
         **paid_fields,
+        "email_delivery_status": email_delivery_status,
+        "email_delivery_error": email_error,
+        "email_delivery_attempted_at": email_attempted_at,
         "email_sent": email_sent,
         "email_error": email_error,
         "email_attempted_at": email_attempted_at,
@@ -1765,6 +2094,8 @@ async def _fulfill_paid_order(order: dict, product: dict, payment_id: str, send_
         "download_url": download_url,
         "email_sent": email_sent,
         "email_error": email_error,
+        "email_delivery_status": email_delivery_status,
+        "email_delivery_error": email_error,
     }
 
 
@@ -1823,6 +2154,10 @@ async def checkout_create_order(payload: PaymentCreateOrderIn):
         "buyer_phone": phone,
         "created_at": datetime.now(timezone.utc).isoformat(),
         "source": "razorpay_checkout",
+        "email_delivery_status": "pending",
+        "email_delivery_error": None,
+        "email_sent": False,
+        "email_error": None,
     }
     await db.orders.insert_one(order_doc)
     await _upsert_checkout_customer(order_doc, product)
@@ -1833,6 +2168,22 @@ async def checkout_create_order(payload: PaymentCreateOrderIn):
         "currency": razorpay_order.get("currency", "INR"),
         "key_id": RAZORPAY_KEY_ID,
         "product_name": product.get("name"),
+    }
+
+
+@api_router.post("/checkout/{order_id}/cancel")
+async def checkout_cancel(order_id: str):
+    if db is None:
+        raise HTTPException(status_code=500, detail="Database not configured")
+    order = await db.orders.find_one({"razorpay_order_id": order_id}, {"_id": 0})
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+    if order.get("payment_status") == "paid":
+        return {"success": True, "status": "paid"}
+    corrected_order = await _mark_order_not_paid(order, "cancelled", "Checkout dismissed before payment capture")
+    return {
+        "success": True,
+        "status": corrected_order.get("payment_status"),
     }
 
 
@@ -1847,14 +2198,23 @@ async def checkout_verify_payment(payload: PaymentVerifyIn):
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
 
-    message = f"{payload.razorpay_order_id}|{payload.razorpay_payment_id}".encode("utf-8")
+    stored_razorpay_order_id = order.get("razorpay_order_id")
+    if payload.razorpay_order_id != stored_razorpay_order_id:
+        raise HTTPException(status_code=400, detail="Payment does not match this order")
+
+    message = f"{stored_razorpay_order_id}|{payload.razorpay_payment_id}".encode("utf-8")
     expected_sig = hmac.new(RAZORPAY_KEY_SECRET.encode("utf-8"), message, hashlib.sha256).hexdigest()
     now = datetime.now(timezone.utc).isoformat()
     if not hmac.compare_digest(expected_sig, payload.razorpay_signature):
         failed_fields = {
-            "status": "signature_mismatch",
+            "status": "failed",
             "payment_status": "failed",
             "razorpay_payment_id": payload.razorpay_payment_id,
+            "payment_failure_reason": "Invalid payment signature",
+            "email_delivery_status": "pending",
+            "email_delivery_error": "Payment not verified; download email blocked.",
+            "email_sent": False,
+            "email_error": "Payment not verified; download email blocked.",
             "verified_at": now,
         }
         await db.orders.update_one(
@@ -1880,34 +2240,59 @@ async def checkout_verify_payment(payload: PaymentVerifyIn):
     if not buyer_email:
         raise HTTPException(status_code=400, detail="Buyer email is required")
 
+    verification = await _verify_razorpay_paid_order(order, payload.razorpay_payment_id)
+    if not verification.get("verified"):
+        corrected_order = await _mark_order_not_paid(
+            order,
+            "failed",
+            verification.get("error") or "Razorpay payment was not verified",
+            payload.razorpay_payment_id,
+        )
+        logger.warning(
+            "Razorpay checkout verification rejected order_id=%s payment_id=%s reason=%s",
+            stored_razorpay_order_id,
+            payload.razorpay_payment_id,
+            verification.get("error"),
+        )
+        return {
+            "success": False,
+            "verified_paid": False,
+            "order_id": stored_razorpay_order_id,
+            "payment_id": payload.razorpay_payment_id,
+            "payment_status": corrected_order.get("payment_status"),
+            "error": verification.get("error") or "Payment was not captured",
+        }
+
     if order.get("status") == "paid" or order.get("payment_status") == "paid":
-        email_sent = bool(order.get("email_sent"))
-        email_error = order.get("email_error")
+        email_delivery_status = order.get("email_delivery_status") or ("sent" if order.get("email_sent") else ("failed" if order.get("email_error") else "pending"))
+        email_sent = email_delivery_status == "sent"
+        email_error = order.get("email_delivery_error") if order.get("email_delivery_error") is not None else order.get("email_error")
         if not email_sent and order.get("download_url"):
-            email_sent = _send_download_email(
+            result = _send_download_email(
                 buyer_email,
                 order.get("customer_name") or order.get("buyer_name", "there"),
                 order.get("product_name") or product.get("name", "your asset"),
                 order.get("razorpay_payment_id") or payload.razorpay_payment_id,
                 _public_download_url(order.get("download_url")),
             )
-            email_error = None if email_sent else "Download email could not be sent. Please use the Download Now button."
+            email_sent, email_error = _normalize_email_result(result)
+            email_update = _email_delivery_update(email_sent, email_error, now)
+            if email_sent:
+                email_update["email_delivery_sent_at"] = now
             await db.orders.update_one(
                 {"razorpay_order_id": payload.razorpay_order_id},
-                {"$set": {
-                    "email_sent": email_sent,
-                    "email_error": email_error,
-                    "email_attempted_at": now,
-                }},
+                {"$set": email_update},
             )
             await _upsert_checkout_customer(
-                {**order, "email_sent": email_sent, "email_error": email_error, "email_attempted_at": now},
+                {**order, **email_update},
                 product,
             )
+            email_delivery_status = email_update["email_delivery_status"]
         else:
             await _upsert_checkout_customer(order, product)
         return {
             "success": True,
+            "verified_paid": True,
             "order_id": payload.razorpay_order_id,
             "payment_id": order.get("razorpay_payment_id") or payload.razorpay_payment_id,
             "product_slug": product.get("slug"),
@@ -1915,6 +2300,8 @@ async def checkout_verify_payment(payload: PaymentVerifyIn):
             "download_url": order.get("download_url"),
             "email_sent": email_sent,
             "email_error": email_error,
+            "email_delivery_status": email_delivery_status,
+            "email_delivery_error": email_error,
         }
 
     await db.orders.update_one(
@@ -1930,6 +2317,7 @@ async def checkout_verify_payment(payload: PaymentVerifyIn):
 
     return {
         "success": True,
+        "verified_paid": True,
         "order_id": payload.razorpay_order_id,
         "payment_id": payload.razorpay_payment_id,
         "product_slug": product.get("slug"),
@@ -1938,6 +2326,8 @@ async def checkout_verify_payment(payload: PaymentVerifyIn):
         "download_token": fulfillment["download_token"],
         "email_sent": fulfillment["email_sent"],
         "email_error": fulfillment["email_error"],
+        "email_delivery_status": fulfillment["email_delivery_status"],
+        "email_delivery_error": fulfillment["email_delivery_error"],
     }
 
 
@@ -1972,7 +2362,7 @@ async def razorpay_webhook(request: Request):
     })
 
     event = payload.get("event")
-    if event not in {"payment.captured", "order.paid"}:
+    if event not in {"payment.captured", "order.paid", "payment.failed"}:
         return {"success": True, "ignored": True}
 
     payment_entity = (((payload.get("payload") or {}).get("payment") or {}).get("entity") or {})
@@ -1988,18 +2378,23 @@ async def razorpay_webhook(request: Request):
         logger.warning("Razorpay webhook order not found razorpay_order_id=%s event_id=%s", razorpay_order_id, event_id)
         return {"success": True, "ignored": True}
 
-    product = await _find_checkout_product(order.get("product_id"), order.get("product_slug"))
-    fulfillment = await _fulfill_paid_order(
-        order,
-        product,
-        razorpay_payment_id or order.get("razorpay_payment_id") or "",
-        send_email=True,
-    )
+    if event == "payment.failed":
+        reason = payment_entity.get("error_description") or payment_entity.get("error_reason") or "Razorpay payment failed"
+        corrected = await _mark_order_not_paid(order, "failed", reason, razorpay_payment_id)
+        return {
+            "success": True,
+            "order_id": razorpay_order_id,
+            "payment_id": razorpay_payment_id,
+            "payment_status": corrected.get("payment_status"),
+        }
+
+    sync_result = await _sync_order_with_razorpay(order, send_email=True)
     return {
         "success": True,
         "order_id": razorpay_order_id,
         "payment_id": razorpay_payment_id or order.get("razorpay_payment_id"),
-        "email_sent": fulfillment["email_sent"],
+        "verified_paid": sync_result.get("verified_paid"),
+        "email_sent": bool((sync_result.get("order") or {}).get("email_sent")),
     }
 
 
@@ -2012,6 +2407,20 @@ def _validate_download_access(order: Optional[dict], token: str) -> dict:
     return order
 
 
+async def _ensure_verified_paid_download_order(order: dict) -> dict:
+    if not order.get("razorpay_order_id"):
+        return order
+    payment_id = order.get("razorpay_payment_id")
+    if not payment_id:
+        await _mark_order_not_paid(order, "failed", "No Razorpay payment ID found for paid order")
+        raise HTTPException(status_code=403, detail="Download is available only after successful payment")
+    verification = await _verify_razorpay_paid_order(order, payment_id)
+    if not verification.get("verified"):
+        await _mark_order_not_paid(order, "failed", verification.get("error") or "Razorpay payment was not verified", payment_id)
+        raise HTTPException(status_code=403, detail="Download is available only after successful payment")
+    return order
+
+
 @api_router.get("/orders/{order_id}/access")
 async def order_access(order_id: str, token: str):
     if db is None:
@@ -2020,8 +2429,10 @@ async def order_access(order_id: str, token: str):
         {"$or": [{"razorpay_order_id": order_id}, {"id": order_id}]}, {"_id": 0}
     )
     order = _validate_download_access(order, token)
+    order = await _ensure_verified_paid_download_order(order)
     return {
         "verified": True,
+        "verified_paid": True,
         "order_id": order.get("razorpay_order_id") or order.get("id"),
         "payment_id": order.get("razorpay_payment_id"),
         "product_id": order.get("product_id"),
@@ -2046,6 +2457,7 @@ async def order_download(order_id: str, token: str):
         {"$or": [{"razorpay_order_id": order_id}, {"id": order_id}]}, {"_id": 0}
     )
     order = _validate_download_access(order, token)
+    order = await _ensure_verified_paid_download_order(order)
 
     download_file = order.get("download_file")
     if not download_file:
@@ -2103,19 +2515,25 @@ async def payment_free_order(payload: PaymentFreeOrderIn):
         "download_token_hash": _hash_download_token(download_token),
         "download_file": download_file,
         "download_url": download_url,
+        "email_delivery_status": "pending",
+        "email_delivery_error": None,
+        "email_sent": False,
+        "email_error": None,
     }
     buyer_email = str(payload.email).lower().strip() if payload.email else ""
     if buyer_email:
-        email_sent = _send_download_email(
+        result = _send_download_email(
             buyer_email,
             payload.name.strip() if payload.name else "there",
             product.get("name", "your asset"),
             "Free download",
             _public_download_url(download_url),
         )
-        order_doc["email_sent"] = email_sent
-        order_doc["email_error"] = None if email_sent else "Download email could not be sent. Please use the Download Now button."
-        order_doc["email_attempted_at"] = datetime.now(timezone.utc).isoformat()
+        email_sent, email_error = _normalize_email_result(result)
+        now = datetime.now(timezone.utc).isoformat()
+        order_doc.update(_email_delivery_update(email_sent, email_error, now))
+        if email_sent:
+            order_doc["email_delivery_sent_at"] = now
     await db.orders.insert_one(order_doc)
     await _upsert_checkout_customer(order_doc, product)
 
@@ -2128,6 +2546,8 @@ async def payment_free_order(payload: PaymentFreeOrderIn):
         "download_token": download_token,
         "email_sent": bool(order_doc.get("email_sent")),
         "email_error": order_doc.get("email_error"),
+        "email_delivery_status": order_doc.get("email_delivery_status"),
+        "email_delivery_error": order_doc.get("email_delivery_error"),
     }
 
 

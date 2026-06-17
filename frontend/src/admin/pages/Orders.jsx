@@ -1,8 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Mail, Phone, Search, User } from 'lucide-react';
-import { fetchAdminOrders } from '../../lib/api';
+import { Mail, Phone, RefreshCw, Search, User } from 'lucide-react';
+import { toast } from 'sonner';
+import { fetchAdminOrders, resendDownloadEmail, syncRazorpayStatus } from '../../lib/api';
 
-const statusOptions = ['all', 'pending', 'paid', 'failed'];
+const statusOptions = ['all', 'pending', 'paid', 'failed', 'cancelled'];
 
 const formatAmount = (amount = 0, currency = 'INR') =>
   new Intl.NumberFormat('en-IN', {
@@ -19,6 +20,11 @@ const formatDate = (value) => {
 };
 
 const normalizeStatus = (order) => String(order?.payment_status || order?.status || 'pending').toLowerCase();
+const emailDeliveryStatus = (order) => {
+  if (normalizeStatus(order) !== 'paid') return 'pending';
+  return String(order?.email_delivery_status || (order?.email_sent ? 'sent' : (order?.email_delivery_error || order?.email_error ? 'failed' : 'pending'))).toLowerCase();
+};
+const emailDeliveryError = (order) => order?.email_delivery_error || order?.email_error || '';
 
 const Orders = () => {
   const [orders, setOrders] = useState([]);
@@ -26,9 +32,12 @@ const Orders = () => {
   const [error, setError] = useState('');
   const [query, setQuery] = useState('');
   const [status, setStatus] = useState('all');
+  const [resendingOrderId, setResendingOrderId] = useState('');
+  const [syncingOrderId, setSyncingOrderId] = useState('');
 
-  useEffect(() => {
-    fetchAdminOrders()
+  const loadOrders = () => {
+    setLoading(true);
+    return fetchAdminOrders()
       .then((data) => {
         setOrders(Array.isArray(data) ? data : []);
         setError('');
@@ -39,7 +48,45 @@ const Orders = () => {
         setError('Orders could not be loaded.');
       })
       .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    loadOrders();
   }, []);
+
+  const handleResend = async (order) => {
+    const orderId = order?.razorpay_order_id || order?.id;
+    if (!orderId) return;
+    setResendingOrderId(orderId);
+    try {
+      await resendDownloadEmail(orderId);
+      toast.success('Download email resent successfully.');
+      await loadOrders();
+    } catch (err) {
+      const message = err?.response?.data?.detail || err?.message || 'Download email could not be resent.';
+      toast.error(message);
+      await loadOrders();
+    } finally {
+      setResendingOrderId('');
+    }
+  };
+
+  const handleSync = async (order) => {
+    const orderId = order?.razorpay_order_id || order?.id;
+    if (!orderId) return;
+    setSyncingOrderId(orderId);
+    try {
+      const result = await syncRazorpayStatus(orderId);
+      toast.success(result?.verified_paid ? 'Razorpay status synced: paid.' : 'Razorpay status synced.');
+      await loadOrders();
+    } catch (err) {
+      const message = err?.response?.data?.detail || err?.message || 'Could not sync Razorpay status.';
+      toast.error(message);
+      await loadOrders();
+    } finally {
+      setSyncingOrderId('');
+    }
+  };
 
   const filteredOrders = useMemo(() => {
     const search = query.trim().toLowerCase();
@@ -99,7 +146,19 @@ const Orders = () => {
             <div key={`skeleton-${index}`} className="h-56 animate-pulse rounded-3xl border border-slate-800 bg-slate-950" />
           ))
         ) : filteredOrders.length > 0 ? (
-          filteredOrders.map((order) => <OrderCard key={order.id || order.razorpay_order_id} order={order} />)
+          filteredOrders.map((order) => {
+            const orderId = order.razorpay_order_id || order.id;
+            return (
+              <OrderCard
+                key={order.id || order.razorpay_order_id}
+                order={order}
+                onResend={handleResend}
+                onSync={handleSync}
+                isResending={resendingOrderId === orderId}
+                isSyncing={syncingOrderId === orderId}
+              />
+            );
+          })
         ) : (
           <div className="rounded-3xl border border-slate-800 bg-slate-950 p-5 text-slate-400">No orders match these filters.</div>
         )}
@@ -108,8 +167,10 @@ const Orders = () => {
   );
 };
 
-const OrderCard = ({ order }) => {
+const OrderCard = ({ order, onResend, onSync, isResending, isSyncing }) => {
   const paymentStatus = normalizeStatus(order);
+  const deliveryStatus = emailDeliveryStatus(order);
+  const deliveryError = emailDeliveryError(order);
   const statusClass = paymentStatus === 'paid'
     ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-200'
     : paymentStatus === 'failed'
@@ -146,10 +207,30 @@ const OrderCard = ({ order }) => {
           <Info label="Razorpay order ID" value={order.razorpay_order_id || 'N/A'} />
           <Info label="Razorpay payment ID" value={order.razorpay_payment_id || 'N/A'} />
           <Info label="Purchase date" value={formatDate(order.paid_at || order.verified_at || order.created_at)} />
-          <Info label="Email delivery" value={order.email_sent ? 'Sent' : (order.email_error ? 'Failed' : 'Pending')} />
+          <Info label="Email delivery" value={deliveryStatus} />
+          <div className="mt-4 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => onResend(order)}
+              disabled={isResending || paymentStatus !== 'paid'}
+              className="inline-flex h-10 items-center gap-2 rounded-2xl border border-violet-500/30 bg-violet-500/10 px-4 text-sm font-semibold text-violet-100 transition hover:bg-violet-500/20 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <RefreshCw size={15} className={isResending ? 'animate-spin' : ''} />
+              {isResending ? 'Resending...' : 'Resend Download Email'}
+            </button>
+            <button
+              type="button"
+              onClick={() => onSync(order)}
+              disabled={isSyncing || !order.razorpay_order_id}
+              className="inline-flex h-10 items-center gap-2 rounded-2xl border border-slate-700 bg-slate-800 px-4 text-sm font-semibold text-slate-100 transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <RefreshCw size={15} className={isSyncing ? 'animate-spin' : ''} />
+              {isSyncing ? 'Syncing...' : 'Sync with Razorpay'}
+            </button>
+          </div>
         </div>
       </div>
-      {order.email_error && <p className="mt-4 rounded-2xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">{order.email_error}</p>}
+      {deliveryError && <p className="mt-4 rounded-2xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">{deliveryError}</p>}
     </article>
   );
 };

@@ -60,6 +60,19 @@ export async function payWithRazorpay({ amountRupees, itemId, itemName, productS
 
   // 2. Open Razorpay modal
   return new Promise((resolve) => {
+    let settled = false;
+    const settle = (value) => {
+      if (settled) return;
+      settled = true;
+      resolve(value);
+    };
+    const markCancelled = async () => {
+      try {
+        await api.post(`/checkout/${encodeURIComponent(order.order_id)}/cancel`);
+      } catch (_) {
+        // Cancellation tracking is best-effort; payment verification remains server-side.
+      }
+    };
     const rzp = new window.Razorpay({
       key: order.key_id || RAZORPAY_KEY_ID,
       amount: order.amount,
@@ -70,7 +83,10 @@ export async function payWithRazorpay({ amountRupees, itemId, itemName, productS
       prefill,
       theme: { color: '#7c3aed' },
       modal: {
-        ondismiss: () => resolve({ success: false, error: 'cancelled' }),
+        ondismiss: async () => {
+          await markCancelled();
+          settle({ success: false, error: 'cancelled', cancelled: true, orderId: order.order_id });
+        },
       },
       handler: async (response) => {
         try {
@@ -81,19 +97,24 @@ export async function payWithRazorpay({ amountRupees, itemId, itemName, productS
             buyer_email: prefill.email || '',
             asset_slug: productSlug || '',
           });
-          resolve({
-            success: !!data?.success,
+          const verifiedPaid = data?.verified_paid === true;
+          settle({
+            success: !!data?.success && verifiedPaid,
+            verifiedPaid,
             paymentId: response.razorpay_payment_id,
             orderId: response.razorpay_order_id,
             productSlug: data?.product_slug,
-            downloadToken: data?.download_token || new URLSearchParams((data?.download_url || '').split('?')[1] || '').get('token'),
+            downloadToken: verifiedPaid ? (data?.download_token || new URLSearchParams((data?.download_url || '').split('?')[1] || '').get('token')) : '',
             emailSent: !!data?.email_sent,
             emailError: data?.email_error,
+            failed: !verifiedPaid,
+            error: verifiedPaid ? '' : (data?.error || 'Payment was not verified.'),
           });
         } catch (err) {
           const msg = err?.response?.data?.detail || 'Verification failed';
-          resolve({
+          settle({
             success: false,
+            verifiedPaid: false,
             failed: true,
             orderId: response.razorpay_order_id,
             error: typeof msg === 'string' ? msg : 'Verification failed',
@@ -104,7 +125,7 @@ export async function payWithRazorpay({ amountRupees, itemId, itemName, productS
 
     rzp.on('payment.failed', (resp) => {
       const reason = resp?.error?.description || 'Payment failed';
-      resolve({ success: false, error: reason, failed: true, orderId: order.order_id });
+      settle({ success: false, verifiedPaid: false, error: reason, failed: true, orderId: order.order_id });
     });
 
     rzp.open();
