@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { Save } from 'lucide-react';
+import { Activity, Save } from 'lucide-react';
 import { toast } from 'sonner';
-import { fetchAdminSettings, saveAdminSettings } from '../../lib/api';
+import { fetchAdminRazorpayHealth, fetchAdminSettings, saveAdminSettings } from '../../lib/api';
 
 const defaultSettings = {
   site_name: '',
@@ -37,6 +37,9 @@ const Settings = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [loadError, setLoadError] = useState('');
+  const [checkingRazorpay, setCheckingRazorpay] = useState(false);
+  const [razorpayHealth, setRazorpayHealth] = useState(null);
+  const [razorpayHealthError, setRazorpayHealthError] = useState('');
 
   useEffect(() => {
     fetchAdminSettings()
@@ -79,6 +82,32 @@ const Settings = () => {
       toast.error(error?.response?.data?.detail || 'Unable to save settings');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const checkRazorpayHealth = async () => {
+    setCheckingRazorpay(true);
+    setRazorpayHealthError('');
+    try {
+      const data = await fetchAdminRazorpayHealth();
+      setRazorpayHealth(data);
+      if (
+        data?.razorpay_key_id_present
+        && data?.razorpay_key_secret_present
+        && data?.razorpay_key_mode === 'live'
+      ) {
+        toast.success('Razorpay live keys are present');
+      } else {
+        toast.warning('Razorpay configuration needs attention');
+      }
+    } catch (error) {
+      const message = error?.response?.status === 401
+        ? 'Please login again. Admin authentication expired.'
+        : (error?.response?.data?.detail || 'Unable to check Razorpay health');
+      setRazorpayHealthError(message);
+      toast.error(message);
+    } finally {
+      setCheckingRazorpay(false);
     }
   };
 
@@ -153,9 +182,52 @@ const Settings = () => {
         </form>
       )}
 
+      <div className="rounded-3xl border border-slate-800 bg-slate-950 p-6">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <h2 className="text-xl font-semibold text-white">Razorpay Health</h2>
+            <p className="mt-2 text-sm text-slate-400">Checks whether backend Razorpay live keys are present without showing any key or secret.</p>
+          </div>
+          <button
+            type="button"
+            onClick={checkRazorpayHealth}
+            disabled={checkingRazorpay}
+            className="inline-flex items-center justify-center gap-2 rounded-2xl bg-violet-600 px-5 py-3 text-sm font-semibold text-white hover:bg-violet-500 disabled:opacity-50"
+          >
+            <Activity size={16} />
+            {checkingRazorpay ? 'Checking...' : 'Check Razorpay Health'}
+          </button>
+        </div>
+
+        {razorpayHealthError && (
+          <p className="mt-4 rounded-2xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-100">{razorpayHealthError}</p>
+        )}
+
+        {razorpayHealth && (
+          <div className="mt-5 grid gap-3 text-sm sm:grid-cols-3">
+            <HealthItem label="Key ID Present" value={razorpayHealth.razorpay_key_id_present ? 'Yes' : 'No'} ok={!!razorpayHealth.razorpay_key_id_present} />
+            <HealthItem label="Key Secret Present" value={razorpayHealth.razorpay_key_secret_present ? 'Yes' : 'No'} ok={!!razorpayHealth.razorpay_key_secret_present} />
+            <HealthItem label="Mode" value={razorpayHealth.razorpay_key_mode || 'unknown'} ok={razorpayHealth.razorpay_key_mode === 'live'} />
+          </div>
+        )}
+
+        {razorpayHealth?.razorpay_key_id_present && razorpayHealth?.razorpay_key_secret_present && razorpayHealth?.razorpay_key_mode === 'live' && (
+          <p className="mt-4 rounded-2xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
+            If checkout still shows Razorpay authentication failed, the Key Secret may not match the Key ID, or the key may be regenerated/deactivated.
+          </p>
+        )}
+      </div>
+
     </section>
   );
 };
+
+const HealthItem = ({ label, value, ok }) => (
+  <div className="rounded-2xl border border-slate-800 bg-slate-900 px-4 py-3">
+    <p className="text-xs text-slate-500">{label}</p>
+    <p className={`mt-1 font-semibold ${ok ? 'text-emerald-300' : 'text-amber-300'}`}>{value}</p>
+  </div>
+);
 
 const Field = ({ label, error, children }) => (
   <label className="block text-sm text-slate-200">

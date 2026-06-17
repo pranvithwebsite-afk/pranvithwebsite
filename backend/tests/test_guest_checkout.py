@@ -16,7 +16,20 @@ class FakeCollection:
         self.documents = list(documents or [])
 
     async def find_one(self, query, projection=None):
-        return next((dict(item) for item in self.documents if _matches(item, query)), None)
+        document = next((dict(item) for item in self.documents if _matches(item, query)), None)
+        if document is None or not projection:
+            return document
+        if any(value == 0 for value in projection.values()):
+            return {
+                key: value
+                for key, value in document.items()
+                if projection.get(key, 1) != 0
+            }
+        return {
+            key: document.get(key)
+            for key, include in projection.items()
+            if include and key in document
+        }
 
     async def insert_one(self, document):
         self.documents.append(dict(document))
@@ -77,6 +90,16 @@ class FakeRazorpayClient:
         self.order = FakeRazorpayOrders()
         self.order.created_payloads = []
         self.payment = FakeRazorpayPayments()
+
+
+class AuthFailingRazorpayOrders:
+    def create(self, payload):
+        raise Exception("Authentication failed")
+
+
+class AuthFailingRazorpayClient:
+    def __init__(self):
+        self.order = AuthFailingRazorpayOrders()
 
 
 def test_guest_checkout_verification_and_download(monkeypatch):
@@ -155,6 +178,170 @@ def test_paid_download_url_falls_back_to_public_domain(monkeypatch):
     assert server._paid_download_url("order_123", "token_456") == (
         "https://pranvithdop.com/api/orders/order_123/download?token=token_456"
     )
+
+
+def test_razorpay_key_mode_detection():
+    assert server.razorpay_key_mode("rzp_live_abc123") == "live"
+    assert server.razorpay_key_mode("rzp_test_abc123") == "test"
+    assert server.razorpay_key_mode("not-a-razorpay-key") == "unknown"
+    assert server.razorpay_key_mode("") == "unknown"
+
+
+def test_admin_razorpay_health_does_not_expose_secrets(monkeypatch):
+    monkeypatch.setattr(server, "RAZORPAY_KEY_ID", "rzp_live_publicid")
+    monkeypatch.setattr(server, "RAZORPAY_KEY_SECRET", "super-secret-value")
+
+    response = asyncio.run(server.admin_razorpay_health(None))
+
+    assert response == {
+        "success": True,
+        "razorpay_key_id_present": True,
+        "razorpay_key_secret_present": True,
+        "razorpay_key_mode": "live",
+    }
+    assert "rzp_live_publicid" not in str(response)
+    assert "super-secret-value" not in str(response)
+
+
+def test_checkout_create_order_rejects_missing_razorpay_key(monkeypatch):
+    product = {
+        "id": "asset-1",
+        "slug": "creative-luts",
+        "name": "Creative LUTs",
+        "price": 499,
+        "published": True,
+        "download_file": "https://files.example.com/creative-luts.zip",
+    }
+    monkeypatch.setattr(server, "db", FakeDatabase(product))
+    monkeypatch.setattr(server, "RAZORPAY_KEY_ID", "")
+    monkeypatch.setattr(server, "RAZORPAY_KEY_SECRET", "secret")
+    monkeypatch.setattr(server, "razorpay_client", FakeRazorpayClient())
+
+    try:
+        asyncio.run(server.checkout_create_order(server.PaymentCreateOrderIn(
+            product_id=product["id"],
+            product_slug=product["slug"],
+            name="Guest Buyer",
+            email="buyer@example.com",
+            phone="+91 98765 43210",
+        )))
+    except server.HTTPException as exc:
+        assert exc.status_code == 502
+        assert exc.detail == server.RAZORPAY_AUTH_ERROR_MESSAGE
+    else:
+        raise AssertionError("Expected checkout to reject missing Razorpay key")
+
+
+def test_checkout_create_order_rejects_missing_razorpay_secret(monkeypatch):
+    product = {
+        "id": "asset-1",
+        "slug": "creative-luts",
+        "name": "Creative LUTs",
+        "price": 499,
+        "published": True,
+        "download_file": "https://files.example.com/creative-luts.zip",
+    }
+    monkeypatch.setattr(server, "db", FakeDatabase(product))
+    monkeypatch.setattr(server, "RAZORPAY_KEY_ID", "rzp_live_key")
+    monkeypatch.setattr(server, "RAZORPAY_KEY_SECRET", "")
+    monkeypatch.setattr(server, "razorpay_client", FakeRazorpayClient())
+
+    try:
+        asyncio.run(server.checkout_create_order(server.PaymentCreateOrderIn(
+            product_id=product["id"],
+            product_slug=product["slug"],
+            name="Guest Buyer",
+            email="buyer@example.com",
+            phone="+91 98765 43210",
+        )))
+    except server.HTTPException as exc:
+        assert exc.status_code == 502
+        assert exc.detail == server.RAZORPAY_AUTH_ERROR_MESSAGE
+    else:
+        raise AssertionError("Expected checkout to reject missing Razorpay secret")
+
+
+def test_checkout_create_order_maps_razorpay_auth_failure(monkeypatch):
+    product = {
+        "id": "asset-1",
+        "slug": "creative-luts",
+        "name": "Creative LUTs",
+        "price": 499,
+        "published": True,
+        "download_file": "https://files.example.com/creative-luts.zip",
+    }
+    monkeypatch.setattr(server, "db", FakeDatabase(product))
+    monkeypatch.setattr(server, "RAZORPAY_KEY_ID", "rzp_live_key")
+    monkeypatch.setattr(server, "RAZORPAY_KEY_SECRET", "secret")
+    monkeypatch.setattr(server, "razorpay_client", AuthFailingRazorpayClient())
+
+    try:
+        asyncio.run(server.checkout_create_order(server.PaymentCreateOrderIn(
+            product_id=product["id"],
+            product_slug=product["slug"],
+            name="Guest Buyer",
+            email="buyer@example.com",
+            phone="+91 98765 43210",
+        )))
+    except server.HTTPException as exc:
+        assert exc.status_code == 502
+        assert exc.detail == server.RAZORPAY_AUTH_ERROR_MESSAGE
+    else:
+        raise AssertionError("Expected checkout to map Razorpay auth failure")
+
+
+def test_checkout_create_order_uses_sale_price(monkeypatch):
+    product = {
+        "id": "asset-1",
+        "slug": "creative-luts",
+        "name": "Creative LUTs",
+        "price": 499,
+        "sale_price": 399,
+        "published": True,
+        "download_file": "https://files.example.com/creative-luts.zip",
+    }
+    fake_client = FakeRazorpayClient()
+    monkeypatch.setattr(server, "db", FakeDatabase(product))
+    monkeypatch.setattr(server, "razorpay_client", fake_client)
+    monkeypatch.setattr(server, "RAZORPAY_KEY_ID", "rzp_live_key")
+    monkeypatch.setattr(server, "RAZORPAY_KEY_SECRET", "secret")
+
+    created = asyncio.run(server.checkout_create_order(server.PaymentCreateOrderIn(
+        product_id=product["id"],
+        product_slug=product["slug"],
+        name="Guest Buyer",
+        email="buyer@example.com",
+        phone="+91 98765 43210",
+    )))
+
+    assert created["amount"] == 39900
+    assert fake_client.order.created_payloads[0]["amount"] == 39900
+    assert fake_client.order.created_payloads[0]["currency"] == "INR"
+
+
+def test_public_product_api_hides_payment_link_metadata_and_download_file(monkeypatch):
+    product = {
+        "id": "asset-1",
+        "slug": "creative-luts",
+        "name": "Creative LUTs",
+        "price": 499,
+        "published": True,
+        "download_file": "https://files.example.com/creative-luts.zip",
+        "payment_link": "https://rzp.io/example",
+        "razorpay_payment_link_id": "plink_123",
+        "razorpay_payment_link_url": "https://rzp.io/i/example",
+        "razorpay_payment_link_status": "created",
+    }
+    monkeypatch.setattr(server, "db", FakeDatabase(product))
+
+    response = asyncio.run(server.public_product_by_slug(product["slug"]))
+
+    assert response["slug"] == product["slug"]
+    assert "download_file" not in response
+    assert "payment_link" not in response
+    assert "razorpay_payment_link_id" not in response
+    assert "razorpay_payment_link_url" not in response
+    assert "razorpay_payment_link_status" not in response
 
 
 def test_guest_checkout_rejects_mismatched_asset_after_signature(monkeypatch):

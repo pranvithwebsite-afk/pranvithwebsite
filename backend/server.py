@@ -87,12 +87,57 @@ def mongodb_public_error(exc: Exception) -> str:
 # Razorpay client (lazy / safe-init)
 RAZORPAY_KEY_ID = os.environ.get('RAZORPAY_KEY_ID', '')
 RAZORPAY_KEY_SECRET = os.environ.get('RAZORPAY_KEY_SECRET', '')
+RAZORPAY_AUTH_ERROR_MESSAGE = "Payment gateway authentication failed. Check Razorpay live keys in Vercel."
 razorpay_client = None
 if RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET:
     try:
         razorpay_client = razorpay.Client(auth=(RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET))
     except Exception as _e:
         razorpay_client = None
+
+
+def razorpay_key_mode(key_id: Optional[str] = None) -> str:
+    key = key_id if key_id is not None else RAZORPAY_KEY_ID
+    if key.startswith("rzp_live_"):
+        return "live"
+    if key.startswith("rzp_test_"):
+        return "test"
+    return "unknown"
+
+
+def razorpay_config_summary() -> dict:
+    return {
+        "razorpay_key_id_present": bool(RAZORPAY_KEY_ID),
+        "razorpay_key_secret_present": bool(RAZORPAY_KEY_SECRET),
+        "razorpay_key_mode": razorpay_key_mode(),
+    }
+
+
+def _is_razorpay_auth_error(exc: Exception) -> bool:
+    message = str(exc).lower()
+    return any(term in message for term in [
+        "authentication",
+        "authenticate",
+        "unauthorized",
+        "invalid api key",
+        "key id",
+        "key_secret",
+        "key secret",
+    ])
+
+
+def _razorpay_error_summary(exc: Exception) -> dict:
+    return {
+        "error_type": type(exc).__name__,
+        "status_code": getattr(exc, "status_code", None) or getattr(exc, "status", None),
+    }
+
+
+def _require_razorpay_client():
+    if not RAZORPAY_KEY_ID or not RAZORPAY_KEY_SECRET or razorpay_client is None:
+        logger.warning("Razorpay credentials unavailable or incomplete summary=%s", razorpay_config_summary())
+        raise HTTPException(status_code=502, detail=RAZORPAY_AUTH_ERROR_MESSAGE)
+    return razorpay_client
 
 
 def smtp_configured() -> bool:
@@ -913,6 +958,14 @@ async def admin_dashboard(current_admin: AdminBase = Depends(get_current_active_
     }
 
 
+@admin_router.get("/debug/razorpay-health")
+async def admin_razorpay_health(current_admin: AdminBase = Depends(get_current_active_admin)):
+    return {
+        "success": True,
+        **razorpay_config_summary(),
+    }
+
+
 @admin_router.get("/pages")
 async def admin_pages(current_admin: AdminBase = Depends(get_current_active_admin)):
     try:
@@ -1098,14 +1151,15 @@ async def admin_sync_razorpay_status(order_id: str, current_admin: AdminBase = D
         raise HTTPException(status_code=400, detail="Order does not have a Razorpay order ID")
     if not RAZORPAY_KEY_ID or not RAZORPAY_KEY_SECRET or razorpay_client is None:
         logger.warning(
-            "Razorpay sync failed local_order_id=%s razorpay_order_id=%s error=%s",
+            "Razorpay sync failed local_order_id=%s razorpay_order_id=%s error=%s summary=%s",
             order.get("id"),
             order.get("razorpay_order_id"),
-            "Payment gateway not configured",
+            RAZORPAY_AUTH_ERROR_MESSAGE,
+            razorpay_config_summary(),
         )
         return JSONResponse(
             status_code=400,
-            content={"success": False, "message": "Razorpay sync failed", "details": "Payment gateway not configured"},
+            content={"success": False, "message": "Razorpay sync failed", "details": RAZORPAY_AUTH_ERROR_MESSAGE},
         )
 
     try:
@@ -1848,8 +1902,7 @@ def _payment_link_reference(product: dict) -> str:
 
 
 async def _create_razorpay_payment_link_for_product(product: dict, force: bool = False) -> dict:
-    if razorpay_client is None:
-        raise HTTPException(status_code=500, detail="Payment gateway not configured")
+    client = _require_razorpay_client()
     if product.get("razorpay_payment_link_id") and not force:
         return {
             "created": False,
@@ -1877,10 +1930,13 @@ async def _create_razorpay_payment_link_for_product(product: dict, force: bool =
         },
     }
     try:
-        payment_link = razorpay_client.payment_link.create(payload)
+        payment_link = client.payment_link.create(payload)
     except HTTPException:
         raise
     except Exception as exc:
+        if _is_razorpay_auth_error(exc):
+            logger.warning("Razorpay Payment Link authentication failed product_id=%s slug=%s config=%s error=%s", product.get("id"), product.get("slug"), razorpay_config_summary(), _razorpay_error_summary(exc))
+            raise HTTPException(status_code=502, detail=RAZORPAY_AUTH_ERROR_MESSAGE)
         logger.exception("Razorpay Payment Link creation failed product_id=%s slug=%s", product.get("id"), product.get("slug"))
         raise HTTPException(status_code=502, detail=_razorpay_public_error(exc))
     fields = _payment_link_fields(payment_link)
@@ -1891,11 +1947,13 @@ async def _refresh_razorpay_payment_link_for_product(product: dict) -> dict:
     payment_link_id = product.get("razorpay_payment_link_id")
     if not payment_link_id:
         raise HTTPException(status_code=404, detail="Razorpay Payment Link is not configured for this product")
-    if razorpay_client is None:
-        raise HTTPException(status_code=500, detail="Payment gateway not configured")
+    client = _require_razorpay_client()
     try:
-        payment_link = razorpay_client.payment_link.fetch(payment_link_id)
+        payment_link = client.payment_link.fetch(payment_link_id)
     except Exception as exc:
+        if _is_razorpay_auth_error(exc):
+            logger.warning("Razorpay Payment Link refresh authentication failed product_id=%s payment_link_id=%s config=%s error=%s", product.get("id"), payment_link_id, razorpay_config_summary(), _razorpay_error_summary(exc))
+            raise HTTPException(status_code=502, detail=RAZORPAY_AUTH_ERROR_MESSAGE)
         logger.exception("Razorpay Payment Link refresh failed product_id=%s payment_link_id=%s", product.get("id"), payment_link_id)
         raise HTTPException(status_code=502, detail=_razorpay_public_error(exc))
     fields = _payment_link_fields(payment_link)
@@ -2157,31 +2215,37 @@ def _extract_razorpay_items(response: Any) -> list:
 
 
 async def _fetch_razorpay_order(razorpay_order_id: str) -> Optional[dict]:
-    if razorpay_client is None:
-        raise HTTPException(status_code=500, detail="Payment gateway not configured")
+    client = _require_razorpay_client()
     try:
-        return razorpay_client.order.fetch(razorpay_order_id)
+        return client.order.fetch(razorpay_order_id)
     except Exception as exc:
+        if _is_razorpay_auth_error(exc):
+            logger.warning("Razorpay order fetch authentication failed order_id=%s config=%s error=%s", razorpay_order_id, razorpay_config_summary(), _razorpay_error_summary(exc))
+            raise HTTPException(status_code=502, detail=RAZORPAY_AUTH_ERROR_MESSAGE)
         logger.exception("Razorpay order fetch failed order_id=%s", razorpay_order_id)
         raise HTTPException(status_code=502, detail=_razorpay_public_error(exc))
 
 
 async def _fetch_razorpay_order_payments(razorpay_order_id: str) -> list:
-    if razorpay_client is None:
-        raise HTTPException(status_code=500, detail="Payment gateway not configured")
+    client = _require_razorpay_client()
     try:
-        return _extract_razorpay_items(razorpay_client.order.payments(razorpay_order_id))
+        return _extract_razorpay_items(client.order.payments(razorpay_order_id))
     except Exception as exc:
+        if _is_razorpay_auth_error(exc):
+            logger.warning("Razorpay order payments authentication failed order_id=%s config=%s error=%s", razorpay_order_id, razorpay_config_summary(), _razorpay_error_summary(exc))
+            raise HTTPException(status_code=502, detail=RAZORPAY_AUTH_ERROR_MESSAGE)
         logger.exception("Razorpay order payments fetch failed order_id=%s", razorpay_order_id)
         raise HTTPException(status_code=502, detail=_razorpay_public_error(exc))
 
 
 async def _fetch_razorpay_payment(razorpay_payment_id: str) -> dict:
-    if razorpay_client is None:
-        raise HTTPException(status_code=500, detail="Payment gateway not configured")
+    client = _require_razorpay_client()
     try:
-        return razorpay_client.payment.fetch(razorpay_payment_id)
+        return client.payment.fetch(razorpay_payment_id)
     except Exception as exc:
+        if _is_razorpay_auth_error(exc):
+            logger.warning("Razorpay payment fetch authentication failed payment_id=%s config=%s error=%s", razorpay_payment_id, razorpay_config_summary(), _razorpay_error_summary(exc))
+            raise HTTPException(status_code=502, detail=RAZORPAY_AUTH_ERROR_MESSAGE)
         logger.exception("Razorpay payment fetch failed payment_id=%s", razorpay_payment_id)
         raise HTTPException(status_code=502, detail=_razorpay_public_error(exc))
 
@@ -2575,8 +2639,7 @@ async def _fulfill_paid_order(order: dict, product: dict, payment_id: str, send_
 async def checkout_create_order(payload: PaymentCreateOrderIn):
     if db is None:
         raise HTTPException(status_code=500, detail="Database not configured")
-    if razorpay_client is None:
-        raise HTTPException(status_code=500, detail="Payment gateway not configured")
+    client = _require_razorpay_client()
 
     phone = _normalize_phone(payload.phone)
     product = await _find_checkout_product(payload.product_id, payload.product_slug)
@@ -2587,7 +2650,7 @@ async def checkout_create_order(payload: PaymentCreateOrderIn):
     customer_email = str(payload.email).lower().strip()
 
     try:
-        razorpay_order = razorpay_client.order.create({
+        razorpay_order = client.order.create({
             "amount": amount,
             "currency": "INR",
             "receipt": receipt,
@@ -2603,12 +2666,18 @@ async def checkout_create_order(payload: PaymentCreateOrderIn):
             },
         })
     except razorpay.errors.BadRequestError as e:
+        if _is_razorpay_auth_error(e):
+            logger.warning("Razorpay order create authentication failed config=%s error=%s", razorpay_config_summary(), _razorpay_error_summary(e))
+            raise HTTPException(status_code=502, detail=RAZORPAY_AUTH_ERROR_MESSAGE)
         logger.exception("Razorpay bad request")
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=_razorpay_public_error(e))
     except razorpay.errors.ServerError:
         logger.exception("Razorpay server error")
         raise HTTPException(status_code=502, detail="Payment gateway error")
-    except Exception:
+    except Exception as exc:
+        if _is_razorpay_auth_error(exc):
+            logger.warning("Razorpay order create authentication failed config=%s error=%s", razorpay_config_summary(), _razorpay_error_summary(exc))
+            raise HTTPException(status_code=502, detail=RAZORPAY_AUTH_ERROR_MESSAGE)
         logger.exception("Razorpay order failure")
         raise HTTPException(status_code=500, detail="Could not create order")
 
@@ -2670,7 +2739,8 @@ async def checkout_verify_payment(payload: PaymentVerifyIn):
     if db is None:
         raise HTTPException(status_code=500, detail="Database not configured")
     if not RAZORPAY_KEY_SECRET:
-        raise HTTPException(status_code=500, detail="Payment gateway not configured")
+        logger.warning("Razorpay payment verification unavailable summary=%s", razorpay_config_summary())
+        raise HTTPException(status_code=502, detail=RAZORPAY_AUTH_ERROR_MESSAGE)
 
     order = await db.orders.find_one({"razorpay_order_id": payload.razorpay_order_id}, {"_id": 0})
     if not order:

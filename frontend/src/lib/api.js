@@ -226,6 +226,11 @@ export const fetchAdminSettings = async () => {
   return data;
 };
 
+export const fetchAdminRazorpayHealth = async () => {
+  const { data } = await adminApi.get('/admin/debug/razorpay-health');
+  return data;
+};
+
 export const saveAdminSettings = async (payload) => {
   const { data } = await adminApi.post('/admin/settings', payload);
   return data;

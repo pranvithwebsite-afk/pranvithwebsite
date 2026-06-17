@@ -2,6 +2,7 @@
 import { api } from './api';
 
 const RAZORPAY_KEY_ID = process.env.VITE_RAZORPAY_KEY_ID || process.env.REACT_APP_RAZORPAY_KEY_ID;
+const RAZORPAY_AUTH_ERROR = 'Razorpay authentication failed. Check live keys in Vercel and redeploy.';
 
 const SCRIPT_SRC = 'https://checkout.razorpay.com/v1/checkout.js';
 
@@ -55,7 +56,10 @@ export async function payWithRazorpay({ amountRupees, itemId, itemName, productS
     order = data;
   } catch (err) {
     const msg = err?.response?.data?.detail || 'Could not create order';
-    return { success: false, error: typeof msg === 'string' ? msg : 'Could not create order' };
+    const safeMessage = typeof msg === 'string' && msg.toLowerCase().includes('authentication failed')
+      ? RAZORPAY_AUTH_ERROR
+      : msg;
+    return { success: false, error: typeof safeMessage === 'string' ? safeMessage : 'Could not create order' };
   }
 
   // 2. Open Razorpay modal
@@ -125,7 +129,8 @@ export async function payWithRazorpay({ amountRupees, itemId, itemName, productS
 
     rzp.on('payment.failed', (resp) => {
       const reason = resp?.error?.description || 'Payment failed';
-      settle({ success: false, verifiedPaid: false, error: reason, failed: true, orderId: order.order_id });
+      const safeReason = String(reason).toLowerCase().includes('authentication failed') ? RAZORPAY_AUTH_ERROR : reason;
+      settle({ success: false, verifiedPaid: false, error: safeReason, failed: true, orderId: order.order_id });
     });
 
     rzp.open();
