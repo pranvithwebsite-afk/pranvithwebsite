@@ -1780,38 +1780,86 @@ async def _upsert_checkout_customer(order: dict, product: dict) -> None:
     set_on_insert = {
         "id": str(uuid.uuid4()),
         "created_at": now,
-        "purchased_products": [],
-        "total_spend": 0,
-        "purchase_history": [],
     }
-    update: Dict[str, Any] = {
-        "$set": customer_doc,
-        "$setOnInsert": set_on_insert,
-    }
-    order_summary = _customer_order_summary(order, product)
-    paid = order_summary.get("payment_status") == "paid"
-    if paid:
-        update["$addToSet"] = {"purchased_products": product.get("slug")}
-    await db.customers.update_one({"email": email}, update, upsert=True)
-    pull_conditions = []
-    if order.get("razorpay_order_id"):
-        pull_conditions.append({"razorpay_order_id": order.get("razorpay_order_id")})
-    if order.get("id"):
-        pull_conditions.append({"order_id": order.get("id")})
-    for condition in pull_conditions:
-        await db.customers.update_one(
-            {"email": email},
-            {"$pull": {"orders": condition, "purchase_history": condition}},
-        )
     await db.customers.update_one(
         {"email": email},
-        {"$push": {"orders": order_summary}},
+        {"$set": customer_doc, "$setOnInsert": set_on_insert},
+        upsert=True,
     )
-    if paid:
-        await db.customers.update_one(
-            {"email": email},
-            {"$push": {"purchase_history": order_summary}},
-        )
+
+    await _rebuild_customer_purchase_summary(email, fallback_order=order, fallback_product=product)
+
+
+async def _rebuild_customer_purchase_summary(email: str, fallback_order: Optional[dict] = None, fallback_product: Optional[dict] = None) -> None:
+    if db is None:
+        return
+    normalized_email = (email or "").lower().strip()
+    if not normalized_email:
+        return
+
+    order_rows = []
+    try:
+        order_rows = await db.orders.find(
+            {
+                "$or": [
+                    {"customer_email": normalized_email},
+                    {"buyer_email": normalized_email},
+                ]
+            },
+            {"_id": 0},
+        ).sort("created_at", -1).to_list(1000)
+    except AttributeError:
+        if fallback_order:
+            order_rows = [fallback_order]
+    except Exception:
+        logger.exception("Customer purchase summary rebuild failed while loading orders email=%s", normalized_email)
+        if fallback_order:
+            order_rows = [fallback_order]
+        else:
+            raise
+
+    seen_orders = set()
+    summaries = []
+    paid_summaries = []
+    purchased_products = []
+    total_spend = 0
+
+    for order_row in order_rows:
+        key = order_row.get("razorpay_order_id") or order_row.get("id")
+        if key and key in seen_orders:
+            continue
+        if key:
+            seen_orders.add(key)
+        product = {
+            "id": order_row.get("product_id") or (fallback_product or {}).get("id"),
+            "slug": order_row.get("product_slug") or (fallback_product or {}).get("slug"),
+            "name": order_row.get("product_name") or order_row.get("product_title") or (fallback_product or {}).get("name"),
+        }
+        summary = _customer_order_summary(order_row, product)
+        summaries.append(summary)
+        if summary.get("payment_status") == "paid":
+            paid_summaries.append(summary)
+            total_spend += int(summary.get("amount") or 0)
+            slug = summary.get("product_slug") or summary.get("asset_slug")
+            if slug and slug not in purchased_products:
+                purchased_products.append(slug)
+
+    summaries.sort(key=lambda item: item.get("purchase_date") or item.get("created_at") or "", reverse=True)
+    paid_summaries.sort(key=lambda item: item.get("purchase_date") or item.get("created_at") or "", reverse=True)
+
+    await db.customers.update_one(
+        {"email": normalized_email},
+        {"$set": {
+            "orders": summaries,
+            "purchase_history": paid_summaries,
+            "purchased_products": purchased_products,
+            "total_spend": total_spend,
+            "total_paid": total_spend,
+            "order_count": len(summaries),
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }},
+        upsert=True,
+    )
 
 
 def _email_delivery_update(sent: bool, error: Optional[str], attempted_at: str) -> dict:
