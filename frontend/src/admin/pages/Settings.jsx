@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { RefreshCw, Save } from 'lucide-react';
+import { Save } from 'lucide-react';
 import { toast } from 'sonner';
-import { fetchAdminEnvCheck, fetchAdminSettings, saveAdminSettings } from '../../lib/api';
+import { fetchAdminSettings, saveAdminSettings } from '../../lib/api';
 
 const defaultSettings = {
   site_name: '',
@@ -37,8 +37,6 @@ const Settings = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [loadError, setLoadError] = useState('');
-  const [checkingEnv, setCheckingEnv] = useState(false);
-  const [envCheck, setEnvCheck] = useState(null);
 
   useEffect(() => {
     fetchAdminSettings()
@@ -81,20 +79,6 @@ const Settings = () => {
       toast.error(error?.response?.data?.detail || 'Unable to save settings');
     } finally {
       setSaving(false);
-    }
-  };
-
-  const handleEnvCheck = async () => {
-    setCheckingEnv(true);
-    try {
-      const result = await fetchAdminEnvCheck();
-      setEnvCheck(result);
-      toast.success('Environment check loaded');
-    } catch (error) {
-      console.error('[admin/settings] Failed to check env variables', error?.response?.data?.detail || error?.message || error);
-      toast.error(error?.response?.data?.detail || 'Unable to check environment variables');
-    } finally {
-      setCheckingEnv(false);
     }
   };
 
@@ -169,46 +153,6 @@ const Settings = () => {
         </form>
       )}
 
-      <div className="rounded-3xl border border-amber-500/20 bg-slate-950 p-6">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <h2 className="text-xl font-semibold text-white">Environment Check</h2>
-            <p className="mt-2 text-sm text-amber-200">Temporary debug tool. Remove after testing.</p>
-          </div>
-          <button
-            type="button"
-            onClick={handleEnvCheck}
-            disabled={checkingEnv}
-            className="inline-flex items-center justify-center gap-2 rounded-2xl bg-amber-500 px-5 py-3 text-sm font-semibold text-slate-950 hover:bg-amber-400 disabled:opacity-50"
-          >
-            <RefreshCw size={16} className={checkingEnv ? 'animate-spin' : ''} />
-            {checkingEnv ? 'Checking...' : 'Check Env Variables'}
-          </button>
-        </div>
-
-        {envCheck?.checks && (
-          <div className="mt-5 overflow-x-auto rounded-2xl border border-slate-800">
-            <table className="min-w-full divide-y divide-slate-800 text-sm">
-              <thead className="bg-slate-900 text-left text-slate-300">
-                <tr>
-                  <th className="px-4 py-3 font-semibold">Variable</th>
-                  <th className="px-4 py-3 font-semibold">Value</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-800 text-slate-200">
-                {Object.entries(envCheck.checks).map(([key, value]) => (
-                  <tr key={key}>
-                    <td className="px-4 py-3 font-mono text-xs text-slate-400">{key}</td>
-                    <td className={`px-4 py-3 font-mono text-xs ${value === 'MISSING' ? 'text-rose-300' : 'text-emerald-300'}`}>
-                      {value}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
     </section>
   );
 };

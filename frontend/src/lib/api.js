@@ -231,11 +231,6 @@ export const saveAdminSettings = async (payload) => {
   return data;
 };
 
-export const fetchAdminEnvCheck = async () => {
-  const { data } = await adminApi.get('/admin/debug/env-check');
-  return data;
-};
-
 export const adminLogout = async () => {
   const { data } = await adminApi.post('/admin/logout');
   return data;

@@ -740,66 +740,11 @@ IS_DEVELOPMENT = APP_ENV.lower() in {"dev", "development", "local"} or os.enviro
 INITIAL_PRODUCT_SEED_KEY = "initial_asset_products_v1"
 admin_router = APIRouter(prefix="/admin", tags=["admin"])
 
-ENV_CHECK_SECRET_KEYS = {
-    "DATABASE_URL",
-    "MONGO_URL",
-    "RAZORPAY_KEY_SECRET",
-    "SMTP_PASS",
-    "JWT_SECRET",
-}
-ENV_CHECK_KEYS = [
-    "VITE_RAZORPAY_KEY_ID",
-    "RAZORPAY_KEY_ID",
-    "RAZORPAY_KEY_SECRET",
-    "SMTP_HOST",
-    "SMTP_PORT",
-    "SMTP_USER",
-    "SMTP_PASS",
-    "FROM_EMAIL",
-    "JWT_SECRET",
-    "DATABASE_URL",
-    "MONGO_URL",
-    "FRONTEND_URL",
-    "PUBLIC_SITE_URL",
-]
-
 
 def development_detail(public_message: str, detail: Optional[Any] = None) -> str:
     if IS_DEVELOPMENT and detail:
         return f"{public_message}: {detail}"
     return public_message
-
-
-def mask_env_value(value: str) -> str:
-    if len(value) <= 4:
-        return "*" * len(value)
-    if len(value) <= 8:
-        return f"{value[:1]}***{value[-1:]}"
-    return f"{value[:4]}****{value[-4:]}"
-
-
-def build_env_check() -> dict:
-    env_status = {}
-    for key in ENV_CHECK_KEYS:
-        value = os.environ.get(key, "")
-        if not value:
-            env_status[key] = "MISSING"
-        elif key in ENV_CHECK_SECRET_KEYS:
-            env_status[key] = "SET"
-        else:
-            env_status[key] = mask_env_value(value)
-    return env_status
-
-
-def detectable_environment() -> str:
-    value = (os.environ.get("VERCEL_ENV") or APP_ENV or "").lower()
-    if value in {"production", "prod"}:
-        return "production"
-    if value in {"preview", "staging", "test", "testing"}:
-        return value
-    if value in {"dev", "development", "local"} or IS_DEVELOPMENT:
-        return "local"
-    return value or "unknown"
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
@@ -949,17 +894,6 @@ async def admin_dashboard(current_admin: AdminBase = Depends(get_current_active_
         "totalCustomers": customers_count,
         "pages": pages_count,
         "role": current_admin.role,
-    }
-
-
-@admin_router.get("/debug/env-check")
-async def admin_debug_env_check(current_admin: AdminBase = Depends(get_current_active_admin)):
-    # TODO: Remove this temporary admin debug endpoint after environment testing is complete.
-    return {
-        "success": True,
-        "environment": detectable_environment(),
-        "checks": build_env_check(),
-        "warning": "Temporary debug tool. Remove after testing.",
     }
 
 
