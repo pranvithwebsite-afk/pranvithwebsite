@@ -2,7 +2,7 @@ from fastapi import FastAPI, APIRouter, HTTPException, Depends, status, UploadFi
 from fastapi.security import OAuth2PasswordBearer
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
-from starlette.responses import RedirectResponse
+from starlette.responses import JSONResponse, RedirectResponse
 from motor.motor_asyncio import AsyncIOMotorClient
 from pymongo.errors import DuplicateKeyError, OperationFailure, ServerSelectionTimeoutError
 from passlib.context import CryptContext
@@ -1033,17 +1033,78 @@ async def admin_resend_download_email(order_id: str, current_admin: AdminBase = 
 @admin_router.post("/orders/{order_id}/sync-razorpay-status")
 async def admin_sync_razorpay_status(order_id: str, current_admin: AdminBase = Depends(get_current_active_admin)):
     if db is None:
-        raise HTTPException(status_code=500, detail="Database not configured")
+        return JSONResponse(
+            status_code=503,
+            content={"success": False, "message": "Razorpay sync failed", "details": "Database not configured"},
+        )
 
-    order = await db.orders.find_one({"$or": [{"razorpay_order_id": order_id}, {"id": order_id}]}, {"_id": 0})
+    try:
+        order = await db.orders.find_one({"$or": [{"razorpay_order_id": order_id}, {"id": order_id}]}, {"_id": 0})
+    except Exception as exc:
+        safe_detail = mongodb_public_error(exc)
+        logger.exception("Razorpay sync order lookup failed local_order_id=%s error=%s", order_id, safe_detail)
+        return JSONResponse(
+            status_code=503,
+            content={"success": False, "message": "Razorpay sync failed", "details": safe_detail},
+        )
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
-    sync_result = await _sync_order_with_razorpay(order, send_email=True)
+    if not order.get("razorpay_order_id"):
+        raise HTTPException(status_code=400, detail="Order does not have a Razorpay order ID")
+    if not RAZORPAY_KEY_ID or not RAZORPAY_KEY_SECRET or razorpay_client is None:
+        logger.warning(
+            "Razorpay sync failed local_order_id=%s razorpay_order_id=%s error=%s",
+            order.get("id"),
+            order.get("razorpay_order_id"),
+            "Payment gateway not configured",
+        )
+        return JSONResponse(
+            status_code=400,
+            content={"success": False, "message": "Razorpay sync failed", "details": "Payment gateway not configured"},
+        )
+
+    try:
+        sync_result = await _sync_order_with_razorpay(order, send_email=False)
+    except HTTPException as exc:
+        safe_detail = exc.detail if isinstance(exc.detail, str) else "Razorpay sync failed"
+        logger.warning(
+            "Razorpay sync failed local_order_id=%s razorpay_order_id=%s error=%s",
+            order.get("id"),
+            order.get("razorpay_order_id"),
+            safe_detail,
+        )
+        return JSONResponse(
+            status_code=exc.status_code if exc.status_code < 500 else 502,
+            content={"success": False, "message": "Razorpay sync failed", "details": safe_detail},
+        )
+    except Exception as exc:
+        safe_detail = _razorpay_public_error(exc)
+        logger.exception(
+            "Razorpay sync crashed local_order_id=%s razorpay_order_id=%s error=%s",
+            order.get("id"),
+            order.get("razorpay_order_id"),
+            safe_detail,
+        )
+        return JSONResponse(
+            status_code=502,
+            content={"success": False, "message": "Razorpay sync failed", "details": safe_detail},
+        )
+
+    synced_order = sync_result.get("order") or {}
+    logger.info(
+        "Razorpay sync complete local_order_id=%s razorpay_order_id=%s razorpay_payment_status=%s final_local_status=%s reason=%s",
+        synced_order.get("id") or order.get("id"),
+        synced_order.get("razorpay_order_id") or order.get("razorpay_order_id"),
+        sync_result.get("razorpay_payment_status"),
+        sync_result.get("local_status") or synced_order.get("payment_status"),
+        sync_result.get("reason"),
+    )
     return {
         "success": True,
         "verified_paid": sync_result.get("verified_paid"),
         "reason": sync_result.get("reason"),
-        "order": _public_order_payload(sync_result.get("order") or {}),
+        "message": "Razorpay status synced",
+        "order": _public_order_payload(synced_order),
     }
 
 
@@ -1892,6 +1953,38 @@ def _expected_order_amount(order: dict) -> int:
     return int(order.get("amount") or 0)
 
 
+def _order_age_seconds(order: dict) -> Optional[float]:
+    created_at = order.get("created_at")
+    if not created_at:
+        return None
+    try:
+        created = datetime.fromisoformat(str(created_at).replace("Z", "+00:00"))
+        if created.tzinfo is None:
+            created = created.replace(tzinfo=timezone.utc)
+        return (datetime.now(timezone.utc) - created).total_seconds()
+    except (TypeError, ValueError):
+        return None
+
+
+def _status_for_uncaptured_sync(order: dict, razorpay_order: Optional[dict], payments: list) -> tuple[str, str]:
+    if (order.get("payment_status") or order.get("status")) == "cancelled":
+        return "cancelled", "Checkout was cancelled"
+
+    for payment in payments:
+        if payment.get("status") == "authorized":
+            return "pending", "Razorpay payment is authorized but not captured"
+
+    razorpay_status = (razorpay_order or {}).get("status")
+    age_seconds = _order_age_seconds(order)
+    if age_seconds is not None and age_seconds >= 30 * 60:
+        return "cancelled", f"No captured Razorpay payment found; Razorpay order is {razorpay_status or 'not paid'}"
+
+    if razorpay_status in {"created", "attempted"}:
+        return "pending", f"Razorpay order is {razorpay_status}"
+
+    return "pending", f"Razorpay order is {razorpay_status or 'not paid'}"
+
+
 def _is_captured_payment_for_order(payment: dict, order: dict) -> tuple[bool, str]:
     stored_order_id = order.get("razorpay_order_id")
     expected_amount = _expected_order_amount(order)
@@ -1978,7 +2071,7 @@ async def _mark_order_not_paid(order: dict, payment_status: str, reason: str, pa
     return corrected_order
 
 
-async def _sync_order_with_razorpay(order: dict, send_email: bool = True) -> dict:
+async def _sync_order_with_razorpay(order: dict, send_email: bool = False) -> dict:
     if not order.get("razorpay_order_id"):
         raise HTTPException(status_code=400, detail="Order is not a Razorpay checkout order")
 
@@ -1998,26 +2091,21 @@ async def _sync_order_with_razorpay(order: dict, send_email: bool = True) -> dic
         order_ok, order_error = _is_paid_razorpay_order(razorpay_order, order)
         if not order_ok:
             corrected = await _mark_order_not_paid(order, "failed", order_error, captured_payment.get("id"))
-            return {"verified_paid": False, "order": corrected, "reason": order_error}
+            return {"verified_paid": False, "order": corrected, "reason": order_error, "razorpay_payment_status": captured_payment.get("status"), "local_status": corrected.get("payment_status")}
         product = await _find_checkout_product(order.get("product_id"), order.get("product_slug"))
         fulfillment = await _fulfill_paid_order(order, product, captured_payment.get("id"), send_email=send_email)
-        return {"verified_paid": True, "order": fulfillment["order"], "reason": None}
+        return {"verified_paid": True, "order": fulfillment["order"], "reason": None, "razorpay_payment_status": captured_payment.get("status"), "local_status": "paid"}
 
     razorpay_status = razorpay_order.get("status") if razorpay_order else None
     if failed_payment:
         reason = failed_payment.get("error_description") or failed_payment.get("error_reason") or "Razorpay payment failed"
         corrected = await _mark_order_not_paid(order, "failed", reason, failed_payment.get("id"))
-        return {"verified_paid": False, "order": corrected, "reason": reason}
+        return {"verified_paid": False, "order": corrected, "reason": reason, "razorpay_payment_status": failed_payment.get("status"), "local_status": corrected.get("payment_status")}
 
-    if order.get("payment_status") == "paid" or order.get("status") == "paid":
-        reason = "No captured Razorpay payment found"
-        corrected = await _mark_order_not_paid(order, "failed", reason, order.get("razorpay_payment_id"))
-        return {"verified_paid": False, "order": corrected, "reason": reason}
-
-    next_status = "pending"
-    reason = f"Razorpay order is {razorpay_status or 'not paid'}"
+    next_status, reason = _status_for_uncaptured_sync(order, razorpay_order, payments)
     corrected = await _mark_order_not_paid(order, next_status, reason, order.get("razorpay_payment_id"))
-    return {"verified_paid": False, "order": corrected, "reason": reason}
+    payment_statuses = ",".join(str(payment.get("status") or "unknown") for payment in payments) or "none"
+    return {"verified_paid": False, "order": corrected, "reason": reason, "razorpay_payment_status": payment_statuses, "local_status": corrected.get("payment_status")}
 
 
 async def _fulfill_paid_order(order: dict, product: dict, payment_id: str, send_email: bool = True) -> dict:

@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Mail, Phone, RefreshCw, Search, User } from 'lucide-react';
 import { toast } from 'sonner';
-import { fetchAdminOrders, resendDownloadEmail, syncRazorpayStatus } from '../../lib/api';
+import { fetchAdminOrders, formatApiErrorDetail, resendDownloadEmail, syncRazorpayStatus } from '../../lib/api';
 
 const statusOptions = ['all', 'pending', 'paid', 'failed', 'cancelled'];
 
@@ -25,6 +25,11 @@ const emailDeliveryStatus = (order) => {
   return String(order?.email_delivery_status || (order?.email_sent ? 'sent' : (order?.email_delivery_error || order?.email_error ? 'failed' : 'pending'))).toLowerCase();
 };
 const emailDeliveryError = (order) => order?.email_delivery_error || order?.email_error || '';
+const syncErrorMessage = (error) => {
+  const data = error?.response?.data;
+  if (data?.message && data?.details) return `${data.message}: ${data.details}`;
+  return data?.message || formatApiErrorDetail(data?.detail) || error?.message || 'Could not sync Razorpay status.';
+};
 
 const Orders = () => {
   const [orders, setOrders] = useState([]);
@@ -77,11 +82,15 @@ const Orders = () => {
     setSyncingOrderId(orderId);
     try {
       const result = await syncRazorpayStatus(orderId);
+      if (result?.success === false) {
+        toast.error(result?.details ? `${result.message}: ${result.details}` : (result?.message || 'Could not sync Razorpay status.'));
+        await loadOrders();
+        return;
+      }
       toast.success(result?.verified_paid ? 'Razorpay status synced: paid.' : 'Razorpay status synced.');
       await loadOrders();
     } catch (err) {
-      const message = err?.response?.data?.detail || err?.message || 'Could not sync Razorpay status.';
-      toast.error(message);
+      toast.error(syncErrorMessage(err));
       await loadOrders();
     } finally {
       setSyncingOrderId('');
