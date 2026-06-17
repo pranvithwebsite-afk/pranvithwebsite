@@ -1,11 +1,13 @@
 import React, { useEffect, useState } from 'react';
-import { ChevronDown, ChevronUp, Plus, Save, X, Edit2, Trash2 } from 'lucide-react';
+import { ChevronDown, ChevronUp, Plus, Save, X, Edit2, Trash2, Copy, Link, RefreshCw } from 'lucide-react';
 import {
   fetchAdminProducts,
   fetchAdminProduct,
   createAdminProduct,
   updateAdminProduct,
   deleteAdminProduct,
+  createProductPaymentLink,
+  refreshProductPaymentLink,
 } from '../../lib/api';
 import { toast } from 'sonner';
 
@@ -24,6 +26,10 @@ const defaultProductForm = {
   images: [],
   videos: [],
   download_file: '',
+  create_razorpay_payment_link: false,
+  razorpay_payment_link_id: '',
+  razorpay_payment_link_url: '',
+  razorpay_payment_link_status: '',
   seo_title: '',
   seo_description: '',
   published: true,
@@ -102,11 +108,11 @@ const Products = () => {
     try {
       setSaving(true);
       if (editingId) {
-        await updateAdminProduct(editingId, payload);
-        toast.success('Product updated successfully');
+        const result = await updateAdminProduct(editingId, payload);
+        toast[result?.warning ? 'warning' : 'success'](result?.warning || 'Product updated successfully');
       } else {
-        await createAdminProduct(payload);
-        toast.success('Product created successfully');
+        const result = await createAdminProduct(payload);
+        toast[result?.warning ? 'warning' : 'success'](result?.warning || 'Product created successfully');
       }
       closeForm();
       loadProducts();
@@ -141,6 +147,36 @@ const Products = () => {
       }
       return next;
     });
+  };
+
+  const handleCopyPaymentLink = async (url) => {
+    if (!url) return;
+    try {
+      await navigator.clipboard.writeText(url);
+      toast.success('Payment Link copied');
+    } catch (_) {
+      toast.error('Could not copy Payment Link');
+    }
+  };
+
+  const handleCreatePaymentLink = async (id) => {
+    try {
+      const result = await createProductPaymentLink(id);
+      toast.success(result?.created ? 'Payment Link created' : 'Payment Link already exists');
+      loadProducts();
+    } catch (error) {
+      toast.error(error?.response?.data?.detail || 'Could not create Payment Link');
+    }
+  };
+
+  const handleRefreshPaymentLink = async (id) => {
+    try {
+      await refreshProductPaymentLink(id);
+      toast.success('Payment Link status refreshed');
+      loadProducts();
+    } catch (error) {
+      toast.error(error?.response?.data?.detail || 'Could not refresh Payment Link');
+    }
   };
 
   const handleArrayAdd = (field, item) => {
@@ -180,6 +216,7 @@ const Products = () => {
           <h1 className="text-3xl font-semibold text-white">Products</h1>
           <p className="mt-3 text-slate-400">Manage your product catalog.</p>
           <p className="mt-2 text-sm text-slate-500">Products are stored in website CMS. Razorpay Orders are created automatically during checkout.</p>
+          <p className="mt-1 text-sm text-slate-500">Website checkout uses Razorpay Orders automatically. Payment Links are optional for manual sharing.</p>
         </div>
         <button
           onClick={openNewForm}
@@ -208,6 +245,17 @@ const Products = () => {
               <p className="mt-2 text-xs text-slate-500">
                 {product.published ? '✓ Published' : 'Draft'}
               </p>
+              {product.razorpay_payment_link_url ? (
+                <div className="mt-3 rounded-lg border border-slate-800 bg-slate-900 p-3">
+                  <p className="text-xs font-semibold text-slate-300">Razorpay Payment Link</p>
+                  <a href={product.razorpay_payment_link_url} target="_blank" rel="noreferrer" className="mt-1 block truncate text-xs text-violet-300">
+                    {product.razorpay_payment_link_url}
+                  </a>
+                  <p className="mt-1 text-xs text-slate-500">Status: {product.razorpay_payment_link_status || 'unknown'}</p>
+                </div>
+              ) : (
+                <p className="mt-3 text-xs text-slate-600">No optional Payment Link</p>
+              )}
               <div className="mt-4 flex gap-2">
                 <button
                   onClick={() => openEditForm(product)}
@@ -223,6 +271,33 @@ const Products = () => {
                   <Trash2 size={14} />
                   Delete
                 </button>
+              </div>
+              <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                {product.razorpay_payment_link_url && (
+                  <button
+                    onClick={() => handleCopyPaymentLink(product.razorpay_payment_link_url)}
+                    className="flex items-center justify-center gap-1 rounded bg-slate-800 px-3 py-2 text-xs font-semibold text-white transition hover:bg-slate-700"
+                  >
+                    <Copy size={13} />
+                    Copy Payment Link
+                  </button>
+                )}
+                <button
+                  onClick={() => handleCreatePaymentLink(product.id)}
+                  className="flex items-center justify-center gap-1 rounded bg-violet-700 px-3 py-2 text-xs font-semibold text-white transition hover:bg-violet-600"
+                >
+                  <Link size={13} />
+                  Create Payment Link
+                </button>
+                {product.razorpay_payment_link_id && (
+                  <button
+                    onClick={() => handleRefreshPaymentLink(product.id)}
+                    className="flex items-center justify-center gap-1 rounded bg-slate-800 px-3 py-2 text-xs font-semibold text-white transition hover:bg-slate-700"
+                  >
+                    <RefreshCw size={13} />
+                    Refresh Status
+                  </button>
+                )}
               </div>
             </div>
           ))}
@@ -360,6 +435,20 @@ const ProductForm = ({
             className="w-full px-4 py-2 rounded-lg bg-slate-900 border border-slate-700 text-white placeholder:text-slate-600 focus:outline-none focus:border-violet-500"
           />
         </div>
+
+        <label className="flex items-start gap-3 rounded-lg border border-slate-800 bg-slate-900 p-4 text-sm text-slate-200">
+          <input
+            type="checkbox"
+            name="create_razorpay_payment_link"
+            checked={!!formData.create_razorpay_payment_link}
+            onChange={onInputChange}
+            className="mt-1 h-4 w-4 rounded"
+          />
+          <span>
+            <span className="block font-semibold text-white">Create Razorpay Payment Link</span>
+            <span className="mt-1 block text-slate-500">Website checkout uses Razorpay Orders automatically. Payment Links are optional for manual sharing.</span>
+          </span>
+        </label>
 
         {/* Arrays Editor */}
         <ArrayEditor

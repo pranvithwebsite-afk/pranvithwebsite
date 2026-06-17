@@ -192,3 +192,65 @@ def test_order_paid_webhook_does_not_send_duplicate_email_after_payment_captured
     assert second["email_sent"] is True
     assert len(email_calls) == 1
     assert fake_db.products.documents[0]["sold_count"] == 1
+
+
+def test_payment_link_webhook_creates_local_order_and_sends_email(monkeypatch):
+    product = {
+        "id": "asset-1",
+        "slug": "creative-luts",
+        "name": "Creative LUTs",
+        "price": 499,
+        "published": True,
+        "download_file": "https://files.example.com/creative-luts.zip",
+        "razorpay_payment_link_id": "plink_123",
+        "sold_count": 0,
+    }
+    fake_db = FakeDatabase(product)
+    fake_db.webhook_events = FakeCollection()
+    monkeypatch.setattr(server, "db", fake_db)
+    monkeypatch.setenv("RAZORPAY_WEBHOOK_SECRET", "webhook_test_secret")
+    email_calls = []
+    monkeypatch.setattr(server, "_send_download_email", lambda *args: email_calls.append(args) or {"sent": True, "error": None})
+
+    payload = {
+        "event": "payment.captured",
+        "payload": {
+            "payment": {
+                "entity": {
+                    "id": "pay_payment_link",
+                    "order_id": "order_payment_link",
+                    "payment_link_id": "plink_123",
+                    "amount": 49900,
+                    "currency": "INR",
+                    "status": "captured",
+                    "captured": True,
+                    "email": "buyer@example.com",
+                    "contact": "+919876543210",
+                    "notes": {
+                        "product_id": product["id"],
+                        "product_slug": product["slug"],
+                        "product_name": product["name"],
+                    },
+                }
+            },
+            "payment_link": {
+                "entity": {
+                    "id": "plink_123",
+                    "reference_id": "cms-product-creative-luts",
+                }
+            },
+        },
+    }
+    body = json.dumps(payload, separators=(",", ":")).encode()
+    signature = hmac.new(b"webhook_test_secret", body, hashlib.sha256).hexdigest()
+
+    result = asyncio.run(server.razorpay_webhook(_request(body, signature, event_id="evt_payment_link")))
+
+    assert result["success"] is True
+    assert result["verified_paid"] is True
+    assert result["email_sent"] is True
+    assert len(fake_db.orders.documents) == 1
+    assert fake_db.orders.documents[0]["source"] == "razorpay_payment_link"
+    assert fake_db.orders.documents[0]["payment_status"] == "paid"
+    assert fake_db.orders.documents[0]["razorpay_payment_link_id"] == "plink_123"
+    assert len(email_calls) == 1

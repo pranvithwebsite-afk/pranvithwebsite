@@ -286,6 +286,16 @@ export const updateAdminProduct = async (productId, payload) => {
   return data;
 };
 
+export const createProductPaymentLink = async (productId) => {
+  const { data } = await adminApi.post(`/admin/products/${productId}/create-payment-link`);
+  return data;
+};
+
+export const refreshProductPaymentLink = async (productId) => {
+  const { data } = await adminApi.post(`/admin/products/${productId}/refresh-payment-link`);
+  return data;
+};
+
 export const deleteAdminProduct = async (productId) => {
   const { data } = await adminApi.delete(`/admin/products/${productId}`);
   return data;

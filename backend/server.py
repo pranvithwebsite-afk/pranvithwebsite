@@ -209,6 +209,9 @@ class Product(BaseModel):
     videos: List[str] = []
     download_file: Optional[str] = None
     payment_link: Optional[str] = None
+    razorpay_payment_link_id: Optional[str] = None
+    razorpay_payment_link_url: Optional[str] = None
+    razorpay_payment_link_status: Optional[str] = None
     thank_you_content: Optional[Dict[str, Any]] = None
     landing_content: Optional[Dict[str, Any]] = None
     hero_image: Optional[str] = None
@@ -238,6 +241,10 @@ class ProductIn(BaseModel):
     videos: List[str] = []
     download_file: Optional[str] = None
     payment_link: Optional[str] = None
+    create_razorpay_payment_link: Optional[bool] = False
+    razorpay_payment_link_id: Optional[str] = None
+    razorpay_payment_link_url: Optional[str] = None
+    razorpay_payment_link_status: Optional[str] = None
     thank_you_content: Optional[Dict[str, Any]] = None
     landing_content: Optional[Dict[str, Any]] = None
     hero_image: Optional[str] = None
@@ -584,6 +591,9 @@ def _public_product(product: dict) -> dict:
     safe = dict(product)
     safe.pop("download_file", None)
     safe.pop("payment_link", None)
+    safe.pop("razorpay_payment_link_id", None)
+    safe.pop("razorpay_payment_link_url", None)
+    safe.pop("razorpay_payment_link_status", None)
     return safe
 
 
@@ -594,7 +604,7 @@ async def public_products():
         logger.info("Product fetch source=fallback scope=public count=%d", len(products))
         return products
     try:
-        rows = await db.products.find({"published": True}, {"_id": 0, "download_file": 0, "payment_link": 0}).to_list(100)
+        rows = await db.products.find({"published": True}, {"_id": 0, "download_file": 0, "payment_link": 0, "razorpay_payment_link_id": 0, "razorpay_payment_link_url": 0, "razorpay_payment_link_status": 0}).to_list(100)
         logger.info(
             "Product fetch source=mongodb database=%s collection=products scope=public count=%d",
             db_name,
@@ -619,7 +629,7 @@ async def public_product_by_slug(slug: str):
             raise HTTPException(status_code=404, detail="Product not found")
         return _public_product(product)
     try:
-        product = await db.products.find_one({"slug": slug, "published": True}, {"_id": 0, "download_file": 0, "payment_link": 0})
+        product = await db.products.find_one({"slug": slug, "published": True}, {"_id": 0, "download_file": 0, "payment_link": 0, "razorpay_payment_link_id": 0, "razorpay_payment_link_url": 0, "razorpay_payment_link_status": 0})
         if not product:
             raise HTTPException(status_code=404, detail="Product not found")
         return product
@@ -939,6 +949,35 @@ async def admin_get_product(product_id: str, current_admin: AdminBase = Depends(
     return product
 
 
+@admin_router.post("/products/{product_id}/create-payment-link")
+async def admin_create_product_payment_link(product_id: str, current_admin: AdminBase = Depends(get_current_active_admin)):
+    product = await db.products.find_one({"id": product_id}, {"_id": 0})
+    if not product:
+        raise HTTPException(status_code=404, detail="Product not found")
+    link_result = await _create_razorpay_payment_link_for_product(product)
+    await db.products.update_one({"id": product_id}, {"$set": link_result["fields"]})
+    return {
+        "success": True,
+        "created": link_result["created"],
+        "product_id": product_id,
+        **link_result["fields"],
+    }
+
+
+@admin_router.post("/products/{product_id}/refresh-payment-link")
+async def admin_refresh_product_payment_link(product_id: str, current_admin: AdminBase = Depends(get_current_active_admin)):
+    product = await db.products.find_one({"id": product_id}, {"_id": 0})
+    if not product:
+        raise HTTPException(status_code=404, detail="Product not found")
+    link_result = await _refresh_razorpay_payment_link_for_product(product)
+    await db.products.update_one({"id": product_id}, {"$set": link_result["fields"]})
+    return {
+        "success": True,
+        "product_id": product_id,
+        **link_result["fields"],
+    }
+
+
 @admin_router.get("/orders")
 async def admin_orders(current_admin: AdminBase = Depends(get_current_active_admin)):
     try:
@@ -1253,6 +1292,7 @@ async def admin_delete_page(page_id: str, current_admin: AdminBase = Depends(get
 @admin_router.post("/products")
 async def admin_create_product(payload: ProductIn, current_admin: AdminBase = Depends(get_current_active_admin)):
     doc = payload.model_dump()
+    create_payment_link = bool(doc.pop("create_razorpay_payment_link", False))
     doc["slug"] = normalize_slug(doc.get("slug") or doc.get("name"))
     if not doc["slug"]:
         raise HTTPException(status_code=422, detail="Product slug is required")
@@ -1286,12 +1326,25 @@ async def admin_create_product(payload: ProductIn, current_admin: AdminBase = De
         doc["id"],
         doc["slug"],
     )
-    return {"success": True, "product": doc}
+    warning = None
+    if create_payment_link:
+        try:
+            link_result = await _create_razorpay_payment_link_for_product(doc)
+            doc.update(link_result["fields"])
+            await db.products.update_one({"id": doc["id"]}, {"$set": link_result["fields"]})
+        except Exception as exc:
+            warning = "Product saved, but Razorpay Payment Link creation failed."
+            logger.warning("Product saved without Razorpay Payment Link id=%s slug=%s error=%s", doc["id"], doc["slug"], exc)
+    response = {"success": True, "product": doc}
+    if warning:
+        response["warning"] = warning
+    return response
 
 
 @admin_router.put("/products/{product_id}")
 async def admin_update_product(product_id: str, payload: ProductIn, current_admin: AdminBase = Depends(get_current_active_admin)):
     update_doc = payload.model_dump(exclude_none=True)
+    create_payment_link = bool(update_doc.pop("create_razorpay_payment_link", False))
     update_doc["slug"] = normalize_slug(update_doc.get("slug") or update_doc.get("name"))
     if not update_doc["slug"]:
         raise HTTPException(status_code=422, detail="Product slug is required")
@@ -1302,7 +1355,20 @@ async def admin_update_product(product_id: str, payload: ProductIn, current_admi
     result = await db.products.update_one({"id": product_id}, {"$set": update_doc})
     if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="Product not found")
-    return {"success": True}
+    warning = None
+    if create_payment_link:
+        product = await db.products.find_one({"id": product_id}, {"_id": 0})
+        try:
+            link_result = await _create_razorpay_payment_link_for_product(product)
+            await db.products.update_one({"id": product_id}, {"$set": link_result["fields"]})
+            product.update(link_result["fields"])
+        except Exception as exc:
+            warning = "Product saved, but Razorpay Payment Link creation failed."
+            logger.warning("Product updated without Razorpay Payment Link id=%s slug=%s error=%s", product_id, update_doc["slug"], exc)
+    response = {"success": True}
+    if warning:
+        response["warning"] = warning
+    return response
 
 
 @admin_router.delete("/products/{product_id}")
@@ -1757,6 +1823,85 @@ def _product_price_paise(product: dict) -> int:
     return amount
 
 
+def _payment_link_amount_paise(product: dict) -> int:
+    price_rupees = product.get("sale_price")
+    if price_rupees is None:
+        price_rupees = product.get("price", 0)
+    amount = int(round(float(price_rupees or 0) * 100))
+    if amount <= 0:
+        raise HTTPException(status_code=400, detail="Payment Link requires a paid product")
+    if amount < 100:
+        raise HTTPException(status_code=400, detail="Amount must be at least 100 paise")
+    return amount
+
+
+def _payment_link_fields(payment_link: dict) -> dict:
+    return {
+        "razorpay_payment_link_id": payment_link.get("id"),
+        "razorpay_payment_link_url": payment_link.get("short_url") or payment_link.get("url"),
+        "razorpay_payment_link_status": payment_link.get("status"),
+    }
+
+
+def _payment_link_reference(product: dict) -> str:
+    return f"cms-product-{product.get('slug') or product.get('id')}"
+
+
+async def _create_razorpay_payment_link_for_product(product: dict, force: bool = False) -> dict:
+    if razorpay_client is None:
+        raise HTTPException(status_code=500, detail="Payment gateway not configured")
+    if product.get("razorpay_payment_link_id") and not force:
+        return {
+            "created": False,
+            "payment_link": {
+                "id": product.get("razorpay_payment_link_id"),
+                "short_url": product.get("razorpay_payment_link_url"),
+                "status": product.get("razorpay_payment_link_status"),
+            },
+            "fields": {
+                "razorpay_payment_link_id": product.get("razorpay_payment_link_id"),
+                "razorpay_payment_link_url": product.get("razorpay_payment_link_url"),
+                "razorpay_payment_link_status": product.get("razorpay_payment_link_status"),
+            },
+        }
+    amount = _payment_link_amount_paise(product)
+    payload = {
+        "amount": amount,
+        "currency": "INR",
+        "description": f"PranvithDOP product: {product.get('name', 'Product')}",
+        "reference_id": _payment_link_reference(product),
+        "notes": {
+            "product_id": product.get("id", ""),
+            "product_slug": product.get("slug", ""),
+            "product_name": product.get("name", ""),
+        },
+    }
+    try:
+        payment_link = razorpay_client.payment_link.create(payload)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception("Razorpay Payment Link creation failed product_id=%s slug=%s", product.get("id"), product.get("slug"))
+        raise HTTPException(status_code=502, detail=_razorpay_public_error(exc))
+    fields = _payment_link_fields(payment_link)
+    return {"created": True, "payment_link": payment_link, "fields": fields}
+
+
+async def _refresh_razorpay_payment_link_for_product(product: dict) -> dict:
+    payment_link_id = product.get("razorpay_payment_link_id")
+    if not payment_link_id:
+        raise HTTPException(status_code=404, detail="Razorpay Payment Link is not configured for this product")
+    if razorpay_client is None:
+        raise HTTPException(status_code=500, detail="Payment gateway not configured")
+    try:
+        payment_link = razorpay_client.payment_link.fetch(payment_link_id)
+    except Exception as exc:
+        logger.exception("Razorpay Payment Link refresh failed product_id=%s payment_link_id=%s", product.get("id"), payment_link_id)
+        raise HTTPException(status_code=502, detail=_razorpay_public_error(exc))
+    fields = _payment_link_fields(payment_link)
+    return {"payment_link": payment_link, "fields": fields}
+
+
 def _customer_order_summary(order: dict, product: dict) -> dict:
     email_delivery_status = order.get("email_delivery_status")
     if not email_delivery_status:
@@ -2114,8 +2259,10 @@ def _is_paid_razorpay_order(razorpay_order: Optional[dict], order: dict) -> tupl
 def _is_captured_webhook_payment(payment: dict, order: dict) -> tuple[bool, str]:
     if not payment:
         return False, "Webhook payment payload missing"
-    if payment.get("order_id") != order.get("razorpay_order_id"):
+    if payment.get("order_id") and payment.get("order_id") != order.get("razorpay_order_id"):
         return False, "Webhook payment order mismatch"
+    if not payment.get("order_id") and not (payment.get("payment_link_id") or payment.get("payment_link") or order.get("razorpay_payment_link_id")):
+        return False, "Webhook payment order missing"
     if payment.get("status") != "captured":
         return False, f"Webhook payment is {payment.get('status') or 'not captured'}"
     if payment.get("captured") is not True:
@@ -2141,6 +2288,119 @@ def _is_paid_webhook_order(razorpay_order: dict, order: dict) -> tuple[bool, str
     if webhook_currency != (order.get("currency") or "INR").upper():
         return False, "Webhook order currency mismatch"
     return True, ""
+
+
+def _webhook_notes(*entities: dict) -> dict:
+    for entity in entities:
+        notes = (entity or {}).get("notes")
+        if isinstance(notes, dict):
+            return notes
+    return {}
+
+
+async def _find_payment_link_product(payment_entity: dict, payment_link_entity: dict, order_entity: dict) -> Optional[dict]:
+    notes = _webhook_notes(payment_entity, payment_link_entity, order_entity)
+    product_id = notes.get("product_id")
+    product_slug = notes.get("product_slug")
+    payment_link_id = (
+        payment_entity.get("payment_link_id")
+        or payment_entity.get("payment_link")
+        or payment_link_entity.get("id")
+    )
+    reference_id = payment_link_entity.get("reference_id") or order_entity.get("reference_id")
+
+    query_options = []
+    if product_id:
+        query_options.append({"id": product_id})
+    if product_slug:
+        query_options.append({"slug": product_slug})
+    if payment_link_id:
+        query_options.append({"razorpay_payment_link_id": payment_link_id})
+    if reference_id and str(reference_id).startswith("cms-product-"):
+        slug_or_id = str(reference_id).replace("cms-product-", "", 1)
+        query_options.extend([{"slug": slug_or_id}, {"id": slug_or_id}])
+
+    for query in query_options:
+        product = await db.products.find_one(query, {"_id": 0})
+        if product:
+            return product
+    return None
+
+
+async def _get_or_create_payment_link_order(
+    razorpay_order_id: Optional[str],
+    razorpay_payment_id: Optional[str],
+    payment_entity: dict,
+    payment_link_entity: dict,
+    order_entity: dict,
+) -> Optional[dict]:
+    if razorpay_order_id:
+        order = await db.orders.find_one({"razorpay_order_id": razorpay_order_id}, {"_id": 0})
+        if order:
+            return order
+    if razorpay_payment_id:
+        order = await db.orders.find_one({"razorpay_payment_id": razorpay_payment_id}, {"_id": 0})
+        if order:
+            return order
+
+    product = await _find_payment_link_product(payment_entity, payment_link_entity, order_entity)
+    if not product:
+        return None
+
+    notes = _webhook_notes(payment_entity, payment_link_entity, order_entity)
+    payment_link_id = payment_entity.get("payment_link_id") or payment_entity.get("payment_link") or payment_link_entity.get("id")
+    payment_link_customer = payment_link_entity.get("customer") if isinstance(payment_link_entity.get("customer"), dict) else {}
+    buyer_email = (
+        payment_entity.get("email")
+        or payment_link_customer.get("email")
+        or notes.get("customer_email")
+        or ""
+    )
+    buyer_name = (
+        payment_entity.get("name")
+        or payment_link_customer.get("name")
+        or notes.get("customer_name")
+        or "Customer"
+    )
+    buyer_phone = (
+        payment_entity.get("contact")
+        or payment_link_customer.get("contact")
+        or notes.get("customer_phone")
+        or ""
+    )
+    amount = int(payment_entity.get("amount") or order_entity.get("amount_paid") or order_entity.get("amount") or 0)
+    currency = (payment_entity.get("currency") or order_entity.get("currency") or "INR").upper()
+    now = datetime.now(timezone.utc).isoformat()
+    order_doc = {
+        "id": str(uuid.uuid4()),
+        "razorpay_order_id": razorpay_order_id or f"payment_link_{razorpay_payment_id}",
+        "razorpay_payment_id": razorpay_payment_id,
+        "razorpay_payment_link_id": payment_link_id,
+        "amount": amount,
+        "currency": currency,
+        "receipt": payment_link_entity.get("reference_id") or _payment_link_reference(product),
+        "product_id": product.get("id"),
+        "product_slug": product.get("slug"),
+        "product_name": product.get("name"),
+        "product_title": product.get("name"),
+        "status": "pending",
+        "payment_status": "pending",
+        "customer_name": str(buyer_name).strip(),
+        "customer_email": str(buyer_email).lower().strip() if buyer_email else "",
+        "customer_phone": str(buyer_phone).strip(),
+        "buyer_name": str(buyer_name).strip(),
+        "buyer_email": str(buyer_email).lower().strip() if buyer_email else "",
+        "buyer_phone": str(buyer_phone).strip(),
+        "created_at": now,
+        "source": "razorpay_payment_link",
+        "email_delivery_status": "pending",
+        "email_delivery_error": None,
+        "email_sent": False,
+        "email_error": None,
+    }
+    await db.orders.insert_one(order_doc)
+    await _upsert_checkout_customer(order_doc, product)
+    return order_doc
 
 
 async def _verify_razorpay_paid_order(order: dict, razorpay_payment_id: str) -> dict:
@@ -2596,9 +2856,11 @@ async def razorpay_webhook(request: Request):
 
     payment_entity = (((payload.get("payload") or {}).get("payment") or {}).get("entity") or {})
     order_entity = (((payload.get("payload") or {}).get("order") or {}).get("entity") or {})
+    payment_link_entity = (((payload.get("payload") or {}).get("payment_link") or {}).get("entity") or {})
     razorpay_order_id = payment_entity.get("order_id") or order_entity.get("id")
     razorpay_payment_id = payment_entity.get("id")
-    if not razorpay_order_id:
+    payment_link_id = payment_entity.get("payment_link_id") or payment_entity.get("payment_link") or payment_link_entity.get("id")
+    if not razorpay_order_id and not payment_link_id:
         logger.warning("Razorpay webhook missing order id event=%s event_id=%s", event, event_id)
         await db.webhook_events.update_one(
             {"id": event_id},
@@ -2606,15 +2868,22 @@ async def razorpay_webhook(request: Request):
         )
         return {"success": True, "ignored": True}
 
-    order = await db.orders.find_one({"razorpay_order_id": razorpay_order_id}, {"_id": 0})
+    order = await _get_or_create_payment_link_order(
+        razorpay_order_id,
+        razorpay_payment_id,
+        payment_entity,
+        payment_link_entity,
+        order_entity,
+    )
     if not order:
-        logger.warning("Razorpay webhook order not found razorpay_order_id=%s event_id=%s", razorpay_order_id, event_id)
+        logger.warning("Razorpay webhook order not found razorpay_order_id=%s payment_link_id=%s event_id=%s", razorpay_order_id, payment_link_id, event_id)
         await db.webhook_events.update_one(
             {"id": event_id},
             {
                 "$set": {
                     "status": "ignored",
                     "razorpay_order_id": razorpay_order_id,
+                    "razorpay_payment_link_id": payment_link_id,
                     "razorpay_payment_id": razorpay_payment_id,
                     "reason": "order_not_found",
                     "processed_at": datetime.now(timezone.utc).isoformat(),
@@ -2622,6 +2891,7 @@ async def razorpay_webhook(request: Request):
             },
         )
         return {"success": True, "ignored": True}
+    razorpay_order_id = order.get("razorpay_order_id") or razorpay_order_id
 
     if event in {"payment.failed", "order.cancelled"}:
         reason = payment_entity.get("error_description") or payment_entity.get("error_reason") or "Razorpay payment failed"
