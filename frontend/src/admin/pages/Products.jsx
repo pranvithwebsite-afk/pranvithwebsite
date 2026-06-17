@@ -30,6 +30,13 @@ const defaultProductForm = {
   product_url: '',
 };
 
+const normalizeSlug = (value) =>
+  String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+
 const Products = () => {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -83,7 +90,11 @@ const Products = () => {
   };
 
   const handleSave = async () => {
-    if (!formData.slug || !formData.name) {
+    const payload = {
+      ...formData,
+      slug: normalizeSlug(formData.slug || formData.name),
+    };
+    if (!payload.slug || !payload.name) {
       toast.error('Please fill in required fields');
       return;
     }
@@ -91,10 +102,10 @@ const Products = () => {
     try {
       setSaving(true);
       if (editingId) {
-        await updateAdminProduct(editingId, formData);
+        await updateAdminProduct(editingId, payload);
         toast.success('Product updated successfully');
       } else {
-        await createAdminProduct(formData);
+        await createAdminProduct(payload);
         toast.success('Product created successfully');
       }
       closeForm();
@@ -119,10 +130,17 @@ const Products = () => {
 
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: type === 'checkbox' ? checked : type === 'number' ? Number(value) : value,
-    }));
+    setFormData((prev) => {
+      const nextValue = type === 'checkbox' ? checked : type === 'number' ? Number(value) : value;
+      const next = {
+        ...prev,
+        [name]: name === 'slug' ? normalizeSlug(nextValue) : nextValue,
+      };
+      if (name === 'name' && !prev.slug) {
+        next.slug = normalizeSlug(nextValue);
+      }
+      return next;
+    });
   };
 
   const handleArrayAdd = (field, item) => {

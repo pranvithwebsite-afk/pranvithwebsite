@@ -13,6 +13,7 @@ import json
 import asyncio
 import hmac
 import hashlib
+import html
 import logging
 import re
 import secrets
@@ -552,6 +553,11 @@ def _safe_settings(settings: Optional[dict]) -> dict:
         for key, value in (settings or {}).items()
         if key in PUBLIC_SETTINGS_FIELDS
     }
+
+
+def normalize_slug(value: str) -> str:
+    slug = re.sub(r"[^a-z0-9]+", "-", str(value or "").strip().lower())
+    return slug.strip("-")
 
 
 @api_router.get("/pages")
@@ -1247,6 +1253,9 @@ async def admin_delete_page(page_id: str, current_admin: AdminBase = Depends(get
 @admin_router.post("/products")
 async def admin_create_product(payload: ProductIn, current_admin: AdminBase = Depends(get_current_active_admin)):
     doc = payload.model_dump()
+    doc["slug"] = normalize_slug(doc.get("slug") or doc.get("name"))
+    if not doc["slug"]:
+        raise HTTPException(status_code=422, detail="Product slug is required")
     doc.update({
         "id": str(uuid.uuid4()),
         "created_at": datetime.now(timezone.utc).isoformat(),
@@ -1283,6 +1292,12 @@ async def admin_create_product(payload: ProductIn, current_admin: AdminBase = De
 @admin_router.put("/products/{product_id}")
 async def admin_update_product(product_id: str, payload: ProductIn, current_admin: AdminBase = Depends(get_current_active_admin)):
     update_doc = payload.model_dump(exclude_none=True)
+    update_doc["slug"] = normalize_slug(update_doc.get("slug") or update_doc.get("name"))
+    if not update_doc["slug"]:
+        raise HTTPException(status_code=422, detail="Product slug is required")
+    existing = await db.products.find_one({"slug": update_doc["slug"], "id": {"$ne": product_id}})
+    if existing:
+        raise HTTPException(status_code=409, detail="Product slug already exists")
     update_doc["updated_at"] = datetime.now(timezone.utc).isoformat()
     result = await db.products.update_one({"id": product_id}, {"$set": update_doc})
     if result.matched_count == 0:
@@ -1653,6 +1668,9 @@ api_router.include_router(admin_router)
 
 
 # ---------- Razorpay ----------
+DEFAULT_PUBLIC_SITE_URL = "https://pranvithdop.com"
+
+
 def _normalize_phone(phone: str) -> str:
     cleaned = re.sub(r"[\s().-]+", "", phone or "")
     if not re.fullmatch(r"\+?\d{7,15}", cleaned):
@@ -1664,18 +1682,22 @@ def _hash_download_token(token: str) -> str:
     return hashlib.sha256(token.encode("utf-8")).hexdigest()
 
 
+def _public_site_base() -> str:
+    return (
+        os.environ.get("PUBLIC_SITE_URL")
+        or os.environ.get("FRONTEND_URL")
+        or os.environ.get("PUBLIC_BASE_URL")
+        or DEFAULT_PUBLIC_SITE_URL
+    ).rstrip("/")
+
+
 def _paid_download_url(order_id: str, token: str) -> str:
-    return f"/api/orders/{order_id}/download?token={token}"
+    return f"{_public_site_base()}/api/orders/{order_id}/download?token={token}"
 
 
 def _public_download_url(download_url: str) -> str:
-    public_base = (
-        os.environ.get("FRONTEND_URL")
-        or os.environ.get("PUBLIC_BASE_URL")
-        or ""
-    ).rstrip("/")
-    if public_base and download_url.startswith("/"):
-        return f"{public_base}{download_url}"
+    if download_url.startswith("/"):
+        return f"{_public_site_base()}{download_url}"
     return download_url
 
 
@@ -1913,6 +1935,9 @@ def _send_download_email(to_email: str, buyer_name: str, product_name: str, paym
     msg["Subject"] = "Your download is ready - PranvithDOP"
     msg["From"] = smtp_from
     msg["To"] = to_email
+    safe_buyer_name = html.escape(buyer_name)
+    safe_product_name = html.escape(product_name)
+    safe_download_url = html.escape(download_url, quote=True)
     msg.set_content(
         "\n".join([
             f"Hi {buyer_name},",
@@ -1928,6 +1953,21 @@ def _send_download_email(to_email: str, buyer_name: str, product_name: str, paym
             "Regards,",
             "PranvithDOP",
         ])
+    )
+    msg.add_alternative(
+        "\n".join([
+            "<!doctype html>",
+            "<html>",
+            "  <body>",
+            f"    <p>Hi {safe_buyer_name},</p>",
+            "    <p>Thank you for your purchase.</p>",
+            f"    <p>Your download is ready: <a href=\"{safe_download_url}\">{safe_download_url}</a></p>",
+            f"    <p><strong>Product:</strong> {safe_product_name}</p>",
+            "    <p>Regards,<br>PranvithDOP</p>",
+            "  </body>",
+            "</html>",
+        ]),
+        subtype="html",
     )
 
     try:

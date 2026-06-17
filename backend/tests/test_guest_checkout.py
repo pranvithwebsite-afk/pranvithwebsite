@@ -49,9 +49,29 @@ class FakeRazorpayOrders:
             "currency": payload["currency"],
         }
 
+    def fetch(self, order_id):
+        return {
+            "id": order_id,
+            "status": "paid",
+            "amount_paid": 49900,
+        }
+
+
+class FakeRazorpayPayments:
+    def fetch(self, payment_id):
+        return {
+            "id": payment_id,
+            "order_id": "order_guest_checkout",
+            "status": "captured",
+            "captured": True,
+            "amount": 49900,
+            "currency": "INR",
+        }
+
 
 class FakeRazorpayClient:
     order = FakeRazorpayOrders()
+    payment = FakeRazorpayPayments()
 
 
 def test_guest_checkout_verification_and_download(monkeypatch):
@@ -68,6 +88,7 @@ def test_guest_checkout_verification_and_download(monkeypatch):
     monkeypatch.setattr(server, "razorpay_client", FakeRazorpayClient())
     monkeypatch.setattr(server, "RAZORPAY_KEY_ID", "rzp_test_key")
     monkeypatch.setattr(server, "RAZORPAY_KEY_SECRET", "test_secret")
+    monkeypatch.setenv("PUBLIC_SITE_URL", "https://pranvithdop.com")
     email_calls = []
     monkeypatch.setattr(server, "_send_download_email", lambda *args: email_calls.append(args) or True)
 
@@ -98,6 +119,8 @@ def test_guest_checkout_verification_and_download(monkeypatch):
     assert verified["download_token"]
     assert verified["email_sent"] is True
     assert email_calls[0][0] == "buyer@example.com"
+    assert email_calls[0][4].startswith(f"https://pranvithdop.com/api/orders/{created['order_id']}/download?token=")
+    assert not email_calls[0][4].startswith("/api/")
 
     access = asyncio.run(server.order_access(created["order_id"], verified["download_token"]))
     assert access["verified"] is True
@@ -107,6 +130,16 @@ def test_guest_checkout_verification_and_download(monkeypatch):
     response = asyncio.run(server.order_download(created["order_id"], verified["download_token"]))
     assert response.status_code == 302
     assert response.headers["location"] == product["download_file"]
+
+
+def test_paid_download_url_falls_back_to_public_domain(monkeypatch):
+    monkeypatch.delenv("PUBLIC_SITE_URL", raising=False)
+    monkeypatch.delenv("FRONTEND_URL", raising=False)
+    monkeypatch.delenv("PUBLIC_BASE_URL", raising=False)
+
+    assert server._paid_download_url("order_123", "token_456") == (
+        "https://pranvithdop.com/api/orders/order_123/download?token=token_456"
+    )
 
 
 def test_guest_checkout_rejects_mismatched_asset_after_signature(monkeypatch):

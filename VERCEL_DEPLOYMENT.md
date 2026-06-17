@@ -21,6 +21,7 @@ DEFAULT_ADMIN_NAME=Pranvith
 RAZORPAY_KEY_ID=your_razorpay_key_id
 RAZORPAY_KEY_SECRET=your_razorpay_key_secret
 VITE_RAZORPAY_KEY_ID=your_razorpay_key_id
+PUBLIC_SITE_URL=https://pranvithdop.com
 FRONTEND_URL=https://pranvithdop.com
 SMTP_HOST=smtp.example.com
 SMTP_PORT=587
@@ -33,7 +34,7 @@ JWT_EXPIRATION_MINUTES=180
 
 `VITE_BACKEND_URL` is optional. Leave it unset on Vercel so the frontend uses the same deployment origin and calls `/api`. Set it only if the frontend must call a separate backend host. The existing `REACT_APP_BACKEND_URL` and `REACT_APP_RAZORPAY_KEY_ID` names remain supported as local compatibility aliases.
 
-`RAZORPAY_KEY_SECRET` must only be set for the backend environment. The frontend receives only `VITE_RAZORPAY_KEY_ID`. `FRONTEND_URL` is used to create absolute protected download links in confirmation emails.
+`RAZORPAY_KEY_SECRET` must only be set for the backend environment. The frontend receives only `VITE_RAZORPAY_KEY_ID`. `PUBLIC_SITE_URL` is preferred for absolute protected download links in confirmation emails; `FRONTEND_URL` is kept as the compatibility fallback.
 
 SMTP is optional. If `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, and `FROM_EMAIL` are all configured, a successful payment sends the protected download link to the checkout email address. If they are omitted, checkout and download access continue to work and the backend logs that email delivery was skipped.
 
