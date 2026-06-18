@@ -17,7 +17,7 @@ const Home = () => {
   const summary = page?.sections?.summary || {};
 
   return (
-    <main className="relative bg-[#070314] text-white overflow-hidden">
+    <main className="page relative bg-[#070314] text-white overflow-hidden">
       <Header />
       <Hero pageData={page?.sections?.hero} />
 

@@ -104,10 +104,10 @@ const Assets = () => {
   }, [products, query, sort, priceFilter]);
 
   return (
-    <main className="bg-[#070314] text-white min-h-screen">
+    <main className="page bg-[#070314] text-white min-h-screen">
       <Header />
 
-      <section className="pt-32 pb-10">
+      <section className="pt-8 pb-10">
         <div className="max-w-7xl mx-auto px-6">
           <div className="rounded-2xl bg-gradient-to-r from-violet-900/40 via-indigo-900/30 to-violet-900/40 border border-violet-500/20 px-8 py-7">
             <h1 className="text-2xl md:text-4xl font-bold tracking-tight" data-testid="assets-page-title">Creative Assets Store</h1>

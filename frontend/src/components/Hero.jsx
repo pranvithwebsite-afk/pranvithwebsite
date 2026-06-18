@@ -12,7 +12,7 @@ const Hero = ({ pageData }) => {
   } = pageData || {};
 
   return (
-    <section className="relative pt-32 pb-12 overflow-hidden">
+    <section className="relative pt-8 pb-12 overflow-hidden">
       <div className="absolute inset-0 radial-purple pointer-events-none" />
 
       <div className="relative max-w-7xl mx-auto px-6 text-center">

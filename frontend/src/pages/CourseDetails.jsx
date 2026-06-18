@@ -22,9 +22,9 @@ const CourseDetails = () => {
   }
 
   return (
-    <main className="min-h-screen bg-[#070314] text-white">
+    <main className="page min-h-screen bg-[#070314] text-white">
       <Header />
-      <section className="mx-auto grid max-w-7xl gap-10 px-6 pb-24 pt-32 lg:grid-cols-2 lg:items-center">
+      <section className="mx-auto grid max-w-7xl gap-10 px-6 pb-24 pt-8 lg:grid-cols-2 lg:items-center">
         <div className="overflow-hidden rounded-3xl border border-violet-500/20">
           <img src={safeImageSrc(course.image)} alt={course.title} className="aspect-[16/10] h-full w-full object-cover" onError={handleImageError} />
         </div>

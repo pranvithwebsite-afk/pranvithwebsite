@@ -1,6 +1,7 @@
 import React from 'react';
 import './App.css';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import ScrollToTop from './components/ScrollToTop';
 import Home from './pages/Home';
 import Courses from './pages/Courses';
 import About from './pages/About';
@@ -28,6 +29,7 @@ function App() {
     <div className="App bg-[#070314] min-h-screen text-white">
       <BrowserRouter>
         <AdminAuthProvider>
+          <ScrollToTop />
           <Routes>
             <Route path="/admin/login" element={<AdminLogin />} />
             <Route element={<AdminRoute />}>

@@ -10,9 +10,9 @@ const Works = () => {
   const intro = page?.sections?.intro || {};
 
   return (
-    <main className="bg-[#070314] text-white">
+    <main className="page bg-[#070314] text-white">
       <Header />
-      <section className="pt-36 pb-6 text-center px-6">
+      <section className="pt-12 pb-6 text-center px-6">
         <h1 className="text-5xl md:text-7xl font-bold tracking-tight">
           {intro.headline || (
             <>

@@ -40,9 +40,9 @@ const AssetLanding = () => {
 
   if (loading) {
     return (
-      <main className="bg-[#070314] text-white min-h-screen">
+      <main className="page bg-[#070314] text-white min-h-screen">
         <Header />
-        <div className="pt-40 pb-24 flex justify-center text-white/60 text-sm">
+        <div className="pt-16 pb-24 flex justify-center text-white/60 text-sm">
           <Loader2 size={16} className="animate-spin mr-2" /> Loading asset...
         </div>
         <Footer />
@@ -52,9 +52,9 @@ const AssetLanding = () => {
 
   if (notFound || !product) {
     return (
-      <main className="bg-[#070314] text-white min-h-screen">
+      <main className="page bg-[#070314] text-white min-h-screen">
         <Header />
-        <div className="pt-40 pb-24 max-w-3xl mx-auto px-6 text-center">
+        <div className="pt-16 pb-24 max-w-3xl mx-auto px-6 text-center">
           <h1 className="text-3xl font-bold">Asset not found</h1>
           <p className="mt-3 text-white/60">The asset you're looking for is no longer available.</p>
           <Link to="/assets" className="inline-flex mt-6 bg-violet-600 hover:bg-violet-500 px-5 py-2.5 rounded-full text-sm font-semibold">
@@ -82,11 +82,11 @@ const AssetLanding = () => {
   const marketTable = landing.market_table || [];
 
   return (
-    <main className="bg-[#070314] text-white min-h-screen">
+    <main className="page bg-[#070314] text-white min-h-screen">
       <Header />
 
       {/* Hero */}
-      <section className="pt-32 pb-16">
+      <section className="pt-8 pb-16">
         <div className="max-w-7xl mx-auto px-6">
           <nav className="flex flex-wrap items-center gap-2 text-sm text-white/55 mb-8" data-testid="asset-breadcrumb">
             <Link to="/" className="hover:text-white">Home</Link>

@@ -18,9 +18,9 @@ const About = () => {
   const stats = page?.sections?.stats || defaultStats;
 
   return (
-    <main className="bg-[#070314] text-white">
+    <main className="page bg-[#070314] text-white">
       <Header />
-      <section className="pt-36 pb-24 px-6">
+      <section className="pt-12 pb-24 px-6">
         <div className="max-w-5xl mx-auto text-center">
           <h1 className="text-5xl md:text-7xl font-bold tracking-tight">
             {page?.title || 'About'}{' '}

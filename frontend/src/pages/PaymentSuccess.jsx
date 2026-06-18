@@ -58,9 +58,9 @@ const PaymentSuccess = () => {
   const verified = order?.verified_paid === true && order?.payment_status === 'paid';
 
   return (
-    <main className="min-h-screen bg-[#070314] text-white">
+    <main className="page min-h-screen bg-[#070314] text-white">
       <Header />
-      <section className="pt-32 pb-24">
+      <section className="pt-8 pb-24">
         <div className="mx-auto max-w-4xl px-6">
           <div className="rounded-[2rem] border border-emerald-500/20 bg-[#0d0820] p-8 text-center md:p-12">
             <div className={`mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-2xl ${
