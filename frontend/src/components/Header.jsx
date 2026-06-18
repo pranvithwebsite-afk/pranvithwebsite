@@ -15,6 +15,13 @@ const Header = () => {
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
+  const refreshHomeIfActive = (event) => {
+    if (location.pathname === '/') {
+      event.preventDefault();
+      window.location.reload();
+    }
+  };
+
   return (
     <header className="fixed top-0 left-0 right-0 z-50 flex justify-center pt-5 px-4">
       <nav
@@ -22,7 +29,7 @@ const Header = () => {
           scrolled ? 'bg-[#0a0518]/95 shadow-[0_8px_40px_rgba(139,92,246,0.15)]' : 'bg-[#0a0518]/70'
         }`}
       >
-        <Link to="/" className="flex items-center gap-2 shrink-0" data-testid="header-brand">
+        <Link to="/" onClick={refreshHomeIfActive} className="flex items-center gap-2 shrink-0" data-testid="header-brand">
           <div className="w-9 h-9 rounded-full overflow-hidden ring-2 ring-violet-500/40 bg-gradient-to-br from-rose-500 to-orange-500">
             <img
               src={FALLBACK_IMAGE}
@@ -41,6 +48,7 @@ const Header = () => {
               <li key={l.name}>
                 <Link
                   to={l.path}
+                  onClick={l.path === '/' ? refreshHomeIfActive : undefined}
                   data-testid={`nav-${l.name.toLowerCase().replace(/\s+/g, '-')}`}
                   className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
                     active ? 'text-violet-400' : 'text-white/85 hover:text-white'
@@ -65,7 +73,10 @@ const Header = () => {
               <li key={l.name}>
                 <Link
                   to={l.path}
-                  onClick={() => setOpen(false)}
+                  onClick={(event) => {
+                    setOpen(false);
+                    if (l.path === '/') refreshHomeIfActive(event);
+                  }}
                   data-testid={`mobile-nav-${l.name.toLowerCase().replace(/\s+/g, '-')}`}
                   className="block px-4 py-3 rounded-xl text-white/90 hover:bg-white/5"
                 >
