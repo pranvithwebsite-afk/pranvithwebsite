@@ -240,6 +240,7 @@ def test_product_save_supports_new_media_fields(monkeypatch):
 
     assert product["product_images"] == ["https://assets.pranvithdop.com/products/creative-lut/images/a.webp"]
     assert product["images"] == product["product_images"]
+    assert product["product_url"] == "/assets/creative-lut"
     assert product["video_type"] == "youtube"
     assert product["youtube_url"].endswith("abc123")
     assert product["before_image_url"].endswith("before-a.webp")

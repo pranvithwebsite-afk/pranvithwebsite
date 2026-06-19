@@ -664,6 +664,10 @@ def normalize_slug(value: str) -> str:
     return slug.strip("-")
 
 
+def product_url_for_slug(slug: str) -> str:
+    return f"/assets/{slug}"
+
+
 MEDIA_URL_FIELDS = {
     "download_file",
     "download_file_url",
@@ -1457,6 +1461,8 @@ async def admin_create_product(payload: ProductIn, current_admin: AdminBase = De
     doc["slug"] = normalize_slug(doc.get("slug") or doc.get("name"))
     if not doc["slug"]:
         raise HTTPException(status_code=422, detail="Product slug is required")
+    if not doc.get("product_url"):
+        doc["product_url"] = product_url_for_slug(doc["slug"])
     doc.update({
         "id": str(uuid.uuid4()),
         "created_at": datetime.now(timezone.utc).isoformat(),
@@ -1509,6 +1515,8 @@ async def admin_update_product(product_id: str, payload: ProductIn, current_admi
     update_doc["slug"] = normalize_slug(update_doc.get("slug") or update_doc.get("name"))
     if not update_doc["slug"]:
         raise HTTPException(status_code=422, detail="Product slug is required")
+    if not update_doc.get("product_url"):
+        update_doc["product_url"] = product_url_for_slug(update_doc["slug"])
     existing = await db.products.find_one({"slug": update_doc["slug"], "id": {"$ne": product_id}})
     if existing:
         raise HTTPException(status_code=409, detail="Product slug already exists")

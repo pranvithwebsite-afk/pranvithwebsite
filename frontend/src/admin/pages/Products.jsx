@@ -55,6 +55,8 @@ const normalizeSlug = (value) =>
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '');
 
+const productUrlForSlug = (slug) => `/assets/${slug}`;
+
 const rejectUnsafeMediaUrl = (value) => {
   const trimmed = String(value || '').trim();
   if (/^(javascript|data|vbscript):/i.test(trimmed)) {
@@ -141,9 +143,11 @@ const Products = () => {
   };
 
   const handleSave = async () => {
+    const slug = normalizeSlug(formData.slug || formData.name);
     const payload = {
       ...formData,
-      slug: normalizeSlug(formData.slug || formData.name),
+      slug,
+      product_url: productUrlForSlug(slug),
       images: formData.product_images || formData.images || [],
       product_images: formData.product_images || formData.images || [],
       youtube_url: rejectUnsafeMediaUrl(formData.youtube_url),
@@ -153,7 +157,7 @@ const Products = () => {
       download_file: rejectUnsafeMediaUrl(formData.download_file),
       download_file_url: rejectUnsafeMediaUrl(formData.download_file_url || formData.download_file),
     };
-    if (!payload.slug || !payload.name) {
+    if (!payload.slug || !payload.name || payload.price === '' || Number.isNaN(Number(payload.price))) {
       toast.error('Please fill in required fields');
       return;
     }
@@ -506,29 +510,16 @@ const ProductForm = ({
           </div>
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div>
-            <label className="block text-sm font-semibold text-white mb-2">Category</label>
-            <input
-              type="text"
-              name="category"
-              value={formData.category}
-              onChange={onInputChange}
-              placeholder="e.g., LUT Pack"
-              className="w-full px-4 py-2 rounded-lg bg-slate-900 border border-slate-700 text-white placeholder:text-slate-600 focus:outline-none focus:border-violet-500"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-semibold text-white mb-2">Product URL</label>
-            <input
-              type="text"
-              name="product_url"
-              value={formData.product_url}
-              onChange={onInputChange}
-              placeholder="/products/item"
-              className="w-full px-4 py-2 rounded-lg bg-slate-900 border border-slate-700 text-white placeholder:text-slate-600 focus:outline-none focus:border-violet-500"
-            />
-          </div>
+        <div>
+          <label className="block text-sm font-semibold text-white mb-2">Category</label>
+          <input
+            type="text"
+            name="category"
+            value={formData.category}
+            onChange={onInputChange}
+            placeholder="e.g., LUT Pack"
+            className="w-full px-4 py-2 rounded-lg bg-slate-900 border border-slate-700 text-white placeholder:text-slate-600 focus:outline-none focus:border-violet-500"
+          />
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2">
