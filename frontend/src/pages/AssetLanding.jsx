@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
@@ -69,7 +69,8 @@ const AssetLanding = () => {
   const isFree = product.is_free || (product.sale_price ?? product.price ?? 0) === 0;
   const price = product.sale_price ?? product.price ?? 0;
   const landing = product.landing_content || {};
-  const heroImage = safeImageSrc(product.hero_image || (product.images && product.images[0]));
+  const galleryImages = product.product_images || product.images || [];
+  const heroImage = safeImageSrc(product.hero_image || galleryImages[0]);
 
   const onPrimaryCta = () => {
     setCheckoutOpen(true);
@@ -144,6 +145,8 @@ const AssetLanding = () => {
         </div>
       </section>
 
+      <ProductMediaSection product={product} galleryImages={galleryImages} />
+
       {/* What you get */}
       {features.length > 0 && (
         <section className="pb-16">
@@ -164,7 +167,14 @@ const AssetLanding = () => {
       )}
 
       {/* Before & After */}
-      {landing.before_after && (
+      {product.before_image_url && product.after_image_url ? (
+        <section className="pb-16">
+          <div className="max-w-7xl mx-auto px-6">
+            <h2 className="text-3xl font-bold tracking-tight mb-8">LUT Before / After</h2>
+            <BeforeAfterSlider beforeImage={product.before_image_url} afterImage={product.after_image_url} />
+          </div>
+        </section>
+      ) : landing.before_after && (
         <section className="pb-16">
           <div className="max-w-7xl mx-auto px-6">
             <h2 className="text-3xl font-bold tracking-tight mb-8">Before & After</h2>
@@ -316,6 +326,124 @@ const AssetLanding = () => {
         }}
       />
     </main>
+  );
+};
+
+const ProductMediaSection = ({ product, galleryImages }) => {
+  const hasGallery = Array.isArray(galleryImages) && galleryImages.length > 0;
+  const hasVideo = product.video_type === 'youtube'
+    ? !!getYouTubeEmbedUrl(product.youtube_url)
+    : product.video_type === 'direct' && !!product.video_url;
+  if (!hasGallery && !hasVideo) return null;
+
+  return (
+    <section className="pb-16">
+      <div className="max-w-7xl mx-auto px-6 space-y-10">
+        {hasGallery && (
+          <div>
+            <h2 className="text-3xl font-bold tracking-tight mb-8">Product Gallery</h2>
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {galleryImages.map((image, index) => (
+                <img
+                  key={`${image}-${index}`}
+                  src={safeImageSrc(image)}
+                  alt={`${product.name} preview ${index + 1}`}
+                  className="aspect-video w-full rounded-3xl border border-white/10 bg-[#090712] object-cover"
+                  onError={handleImageError}
+                />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {hasVideo && (
+          <div>
+            <h2 className="text-3xl font-bold tracking-tight mb-8">Product Video</h2>
+            <div className="overflow-hidden rounded-[2rem] border border-white/10 bg-black shadow-[0_30px_80px_rgba(0,0,0,0.35)]">
+              {product.video_type === 'youtube' ? (
+                <iframe
+                  title={`${product.name} video`}
+                  src={getYouTubeEmbedUrl(product.youtube_url)}
+                  className="aspect-video w-full"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowFullScreen
+                />
+              ) : (
+                <video src={product.video_url} controls className="aspect-video w-full bg-black object-contain" />
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    </section>
+  );
+};
+
+const getYouTubeEmbedUrl = (url) => {
+  try {
+    const parsed = new URL(url);
+    const host = parsed.hostname.replace(/^www\./, '');
+    let id = '';
+    if (host === 'youtu.be') id = parsed.pathname.slice(1);
+    if (host.endsWith('youtube.com')) id = parsed.searchParams.get('v') || parsed.pathname.split('/').pop();
+    return id ? `https://www.youtube.com/embed/${id}` : '';
+  } catch (_) {
+    return '';
+  }
+};
+
+const BeforeAfterSlider = ({ beforeImage, afterImage }) => {
+  const [position, setPosition] = useState(50);
+  const frameRef = useRef(null);
+
+  const updatePosition = (clientX) => {
+    const rect = frameRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const next = ((clientX - rect.left) / rect.width) * 100;
+    setPosition(Math.min(98, Math.max(2, next)));
+  };
+
+  const startDrag = (event) => {
+    event.preventDefault();
+    const move = (moveEvent) => updatePosition(moveEvent.touches?.[0]?.clientX ?? moveEvent.clientX);
+    const stop = () => {
+      window.removeEventListener('mousemove', move);
+      window.removeEventListener('mouseup', stop);
+      window.removeEventListener('touchmove', move);
+      window.removeEventListener('touchend', stop);
+    };
+    window.addEventListener('mousemove', move);
+    window.addEventListener('mouseup', stop);
+    window.addEventListener('touchmove', move, { passive: false });
+    window.addEventListener('touchend', stop);
+    move(event);
+  };
+
+  return (
+    <div
+      ref={frameRef}
+      className="relative mx-auto aspect-video max-w-5xl overflow-hidden rounded-[2rem] border border-white/10 bg-black shadow-[0_30px_90px_rgba(0,0,0,0.45)]"
+      onMouseDown={startDrag}
+      onTouchStart={startDrag}
+    >
+      <img src={afterImage} alt="After LUT" className="absolute inset-0 h-full w-full object-cover" draggable={false} />
+      <div className="absolute inset-0" style={{ clipPath: `inset(0 ${100 - position}% 0 0)` }}>
+        <img src={beforeImage} alt="Before LUT" className="h-full w-full object-cover" draggable={false} />
+      </div>
+      <div className="absolute left-4 top-4 rounded-full bg-black/70 px-3 py-1 text-xs font-bold tracking-[0.22em] text-white">BEFORE</div>
+      <div className="absolute right-4 top-4 rounded-full bg-black/70 px-3 py-1 text-xs font-bold tracking-[0.22em] text-white">AFTER</div>
+      <div className="absolute inset-y-0 -ml-px w-0.5 bg-white shadow-[0_0_24px_rgba(255,255,255,0.65)]" style={{ left: `${position}%` }} />
+      <button
+        type="button"
+        aria-label="Drag before after comparison"
+        className="absolute top-1/2 h-12 w-12 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/70 bg-black/70 text-white shadow-[0_10px_30px_rgba(0,0,0,0.45)]"
+        style={{ left: `${position}%` }}
+        onMouseDown={startDrag}
+        onTouchStart={startDrag}
+      >
+        <span className="block text-lg leading-none">||</span>
+      </button>
+    </div>
   );
 };
 

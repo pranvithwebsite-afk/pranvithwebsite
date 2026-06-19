@@ -291,6 +291,32 @@ export const updateAdminProduct = async (productId, payload) => {
   return data;
 };
 
+export const uploadAdminProductMedia = async ({ file, type, productSlug, purpose, onUploadProgress }) => {
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('product_slug', productSlug);
+  formData.append('purpose', purpose);
+  const { data } = await adminApi.post('/admin/uploads/public', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+    timeout: 120000,
+    onUploadProgress,
+  });
+  return data;
+};
+
+export const uploadAdminPrivateDownload = async ({ file, productSlug, purpose, onUploadProgress }) => {
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('product_slug', productSlug);
+  formData.append('purpose', purpose);
+  const { data } = await adminApi.post('/admin/uploads/private', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+    timeout: 600000,
+    onUploadProgress,
+  });
+  return data;
+};
+
 export const createProductPaymentLink = async (productId) => {
   const { data } = await adminApi.post(`/admin/products/${productId}/create-payment-link`);
   return data;

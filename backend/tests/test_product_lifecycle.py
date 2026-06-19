@@ -1,9 +1,11 @@
 import asyncio
+from io import BytesIO
 from types import SimpleNamespace
 
 import pytest
 from fastapi import HTTPException
 from pymongo.errors import DuplicateKeyError
+from starlette.datastructures import UploadFile
 
 import server
 
@@ -95,6 +97,10 @@ def product_payload(slug="transitions"):
         name="Transitions",
         price=100,
     )
+
+
+def upload_file(name, content_type, content=b"test-bytes"):
+    return UploadFile(filename=name, file=BytesIO(content), headers={"content-type": content_type})
 
 
 def test_product_create_rejects_existing_slug_before_insert(monkeypatch):
@@ -209,3 +215,166 @@ def test_empty_new_catalog_is_seeded_once(monkeypatch):
     assert result["action"] == "seeded"
     assert result["seeded_count"] == len(server.ASSET_PRODUCTS)
     assert len(fake_db.products.documents) == len(server.ASSET_PRODUCTS)
+
+
+def test_product_save_supports_new_media_fields(monkeypatch):
+    fake_db = FakeDatabase()
+    monkeypatch.setattr(server, "db", fake_db)
+
+    payload = server.ProductIn(
+        slug="creative-lut",
+        name="Creative LUT",
+        price=499,
+        product_images=["https://assets.pranvithdop.com/products/creative-lut/images/a.webp"],
+        video_type="youtube",
+        youtube_url="https://www.youtube.com/watch?v=abc123",
+        before_image_url="https://assets.pranvithdop.com/products/creative-lut/before-after/before-a.webp",
+        after_image_url="https://assets.pranvithdop.com/products/creative-lut/before-after/after-a.webp",
+        download_file_key="downloads/creative-lut/paid-download/file.zip",
+        download_file_name="file.zip",
+        download_file_bucket="pranvith-paid-downloads",
+    )
+
+    response = asyncio.run(server.admin_create_product(payload, None))
+    product = response["product"]
+
+    assert product["product_images"] == ["https://assets.pranvithdop.com/products/creative-lut/images/a.webp"]
+    assert product["images"] == product["product_images"]
+    assert product["video_type"] == "youtube"
+    assert product["youtube_url"].endswith("abc123")
+    assert product["before_image_url"].endswith("before-a.webp")
+    assert product["after_image_url"].endswith("after-a.webp")
+    assert product["download_file_key"] == "downloads/creative-lut/paid-download/file.zip"
+
+
+def test_upload_accepts_valid_image(monkeypatch):
+    calls = []
+
+    class FakeR2:
+        def put_object(self, **kwargs):
+            calls.append(kwargs)
+
+    monkeypatch.setattr(server, "_r2_client", lambda: FakeR2())
+    monkeypatch.setenv("CLOUDFLARE_R2_BUCKET", "pranvith-assets-public")
+    monkeypatch.setenv("CLOUDFLARE_R2_PUBLIC_BASE_URL", "https://assets.pranvithdop.com")
+
+    response = asyncio.run(server.admin_upload_public_media(
+        file=upload_file("preview.webp", "image/webp"),
+        product_slug="Creative LUT",
+        purpose="product-image",
+        current_admin=None,
+    ))
+
+    assert response["url"].startswith("https://assets.pranvithdop.com/products/creative-lut/images/")
+    assert response["key"].startswith("products/creative-lut/images/")
+    assert calls[0]["ContentType"] == "image/webp"
+
+
+def test_upload_accepts_valid_video(monkeypatch):
+    calls = []
+
+    class FakeR2:
+        def put_object(self, **kwargs):
+            calls.append(kwargs)
+
+    monkeypatch.setattr(server, "_r2_client", lambda: FakeR2())
+    monkeypatch.setenv("CLOUDFLARE_R2_BUCKET", "pranvith-assets-public")
+    monkeypatch.setenv("CLOUDFLARE_R2_PUBLIC_BASE_URL", "https://assets.pranvithdop.com")
+
+    response = asyncio.run(server.admin_upload_public_media(
+        file=upload_file("trailer.mp4", "video/mp4"),
+        product_slug="Creative LUT",
+        purpose="product-video",
+        current_admin=None,
+    ))
+
+    assert response["key"].startswith("products/creative-lut/videos/")
+    assert response["url"].endswith(".mp4")
+    assert calls[0]["ContentType"] == "video/mp4"
+
+
+def test_upload_rejects_invalid_file_type(monkeypatch):
+    with pytest.raises(HTTPException) as raised:
+        asyncio.run(server.admin_upload_product_media(
+            file=upload_file("script.svg", "image/svg+xml"),
+            type="image",
+            product_slug="creative-lut",
+            purpose="product-image",
+            current_admin=None,
+        ))
+
+    assert raised.value.status_code == 415
+
+
+def test_upload_rejects_invalid_video_type(monkeypatch):
+    with pytest.raises(HTTPException) as raised:
+        asyncio.run(server.admin_upload_public_media(
+            file=upload_file("trailer.mov", "application/octet-stream"),
+            product_slug="creative-lut",
+            purpose="product-video",
+            current_admin=None,
+        ))
+
+    assert raised.value.status_code == 415
+
+
+def test_private_zip_upload_stores_key_without_public_url(monkeypatch):
+    calls = []
+
+    class FakeR2:
+        def put_object(self, **kwargs):
+            calls.append(kwargs)
+
+    monkeypatch.setattr(server, "_r2_client", lambda: FakeR2())
+    monkeypatch.setenv("CLOUDFLARE_R2_PRIVATE_BUCKET", "pranvith-paid-downloads")
+
+    response = asyncio.run(server.admin_upload_private_download(
+        file=upload_file("Paid Pack.zip", "application/zip"),
+        product_slug="Creative LUT",
+        purpose="paid-download",
+        current_admin=None,
+    ))
+
+    assert response["bucket"] == "pranvith-paid-downloads"
+    assert response["filename"] == "Paid-Pack.zip"
+    assert response["key"].startswith("downloads/creative-lut/paid-download/")
+    assert "url" not in response
+    assert calls[0]["Bucket"] == "pranvith-paid-downloads"
+
+
+def test_upload_requires_authentication():
+    route = next(route for route in server.admin_router.routes if getattr(route, "path", "") == "/uploads/private")
+    dependant_names = [dependency.call.__name__ for dependency in route.dependant.dependencies]
+
+    assert "get_current_active_admin" in dependant_names
+
+
+def test_old_product_data_gets_product_images_alias():
+    product = server._public_product({
+        "id": "old-product",
+        "slug": "old-product",
+        "name": "Old Product",
+        "images": ["https://example.com/old.jpg"],
+        "download_file": "https://example.com/private.zip",
+    })
+
+    assert product["product_images"] == ["https://example.com/old.jpg"]
+    assert "download_file" not in product
+
+
+def test_protected_download_rejects_unpaid_access(monkeypatch):
+    class FakeOrders:
+        async def find_one(self, query, projection=None):
+            return {
+                "id": "local-order",
+                "product_id": "product-1",
+                "product_slug": "creative-lut",
+                "payment_status": "pending",
+            }
+
+    monkeypatch.setattr(server, "db", SimpleNamespace(orders=FakeOrders()))
+
+    with pytest.raises(HTTPException) as raised:
+        asyncio.run(server.protected_product_download("local-order", "product-1"))
+
+    assert raised.value.status_code == 403

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ChevronDown, ChevronUp, Plus, Save, X, Edit2, Trash2, Copy, Link, RefreshCw } from 'lucide-react';
+import { ChevronDown, ChevronUp, Plus, Save, X, Edit2, Trash2, Copy, Link, RefreshCw, Upload, PlayCircle } from 'lucide-react';
 import {
   fetchAdminProducts,
   fetchAdminProduct,
@@ -8,6 +8,8 @@ import {
   deleteAdminProduct,
   createProductPaymentLink,
   refreshProductPaymentLink,
+  uploadAdminProductMedia,
+  uploadAdminPrivateDownload,
 } from '../../lib/api';
 import { toast } from 'sonner';
 
@@ -24,8 +26,18 @@ const defaultProductForm = {
   before_images: [],
   after_images: [],
   images: [],
+  product_images: [],
   videos: [],
+  video_type: '',
+  youtube_url: '',
+  video_url: '',
+  before_image_url: '',
+  after_image_url: '',
   download_file: '',
+  download_file_url: '',
+  download_file_key: '',
+  download_file_name: '',
+  download_file_bucket: '',
   create_razorpay_payment_link: false,
   razorpay_payment_link_id: '',
   razorpay_payment_link_url: '',
@@ -42,6 +54,39 @@ const normalizeSlug = (value) =>
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '');
+
+const rejectUnsafeMediaUrl = (value) => {
+  const trimmed = String(value || '').trim();
+  if (/^(javascript|data|vbscript):/i.test(trimmed)) {
+    toast.error('javascript:, data:, and vbscript: URLs are not allowed');
+    return '';
+  }
+  if (/^[a-z][a-z0-9+.-]*:/i.test(trimmed) && !/^https:\/\//i.test(trimmed)) {
+    toast.error('Use HTTPS URLs for media fields');
+    return '';
+  }
+  return trimmed;
+};
+
+const normalizeProductForForm = (product = {}) => {
+  const productImages = product.product_images || product.images || [];
+  return {
+    ...defaultProductForm,
+    ...product,
+    product_images: productImages,
+    images: productImages,
+    video_type: product.video_type || '',
+    youtube_url: product.youtube_url || '',
+    video_url: product.video_url || '',
+    before_image_url: product.before_image_url || '',
+    after_image_url: product.after_image_url || '',
+    download_file: product.download_file || product.download_file_url || '',
+    download_file_url: product.download_file_url || product.download_file || '',
+    download_file_key: product.download_file_key || '',
+    download_file_name: product.download_file_name || '',
+    download_file_bucket: product.download_file_bucket || '',
+  };
+};
 
 const Products = () => {
   const [products, setProducts] = useState([]);
@@ -73,7 +118,7 @@ const Products = () => {
   };
 
   const openNewForm = () => {
-    setFormData(defaultProductForm);
+    setFormData({ ...defaultProductForm });
     setEditingId(null);
     setShowForm(true);
   };
@@ -81,7 +126,7 @@ const Products = () => {
   const openEditForm = async (product) => {
     try {
       const fullProduct = await fetchAdminProduct(product.id);
-      setFormData(fullProduct);
+      setFormData(normalizeProductForForm(fullProduct));
       setEditingId(product.id);
       setShowForm(true);
     } catch (error) {
@@ -91,7 +136,7 @@ const Products = () => {
 
   const closeForm = () => {
     setShowForm(false);
-    setFormData(defaultProductForm);
+    setFormData({ ...defaultProductForm });
     setEditingId(null);
   };
 
@@ -99,6 +144,14 @@ const Products = () => {
     const payload = {
       ...formData,
       slug: normalizeSlug(formData.slug || formData.name),
+      images: formData.product_images || formData.images || [],
+      product_images: formData.product_images || formData.images || [],
+      youtube_url: rejectUnsafeMediaUrl(formData.youtube_url),
+      video_url: rejectUnsafeMediaUrl(formData.video_url),
+      before_image_url: rejectUnsafeMediaUrl(formData.before_image_url),
+      after_image_url: rejectUnsafeMediaUrl(formData.after_image_url),
+      download_file: rejectUnsafeMediaUrl(formData.download_file),
+      download_file_url: rejectUnsafeMediaUrl(formData.download_file_url || formData.download_file),
     };
     if (!payload.slug || !payload.name) {
       toast.error('Please fill in required fields');
@@ -109,13 +162,13 @@ const Products = () => {
       setSaving(true);
       if (editingId) {
         const result = await updateAdminProduct(editingId, payload);
-        toast[result?.warning ? 'warning' : 'success'](result?.warning || 'Product updated successfully');
+        toast[result?.warning ? 'warning' : 'success'](result?.warning || 'Product saved successfully');
       } else {
         const result = await createAdminProduct(payload);
-        toast[result?.warning ? 'warning' : 'success'](result?.warning || 'Product created successfully');
+        toast[result?.warning ? 'warning' : 'success'](result?.warning || 'Product saved successfully');
       }
       closeForm();
-      loadProducts();
+      await loadProducts();
     } catch (error) {
       toast.error(error?.response?.data?.detail || 'Failed to save product');
     } finally {
@@ -147,6 +200,14 @@ const Products = () => {
       }
       return next;
     });
+  };
+
+  const handleFieldChange = (name, value) => {
+    setFormData((prev) => ({
+      ...prev,
+      [name]: value,
+      ...(name === 'product_images' ? { images: value } : {}),
+    }));
   };
 
   const handleCopyPaymentLink = async (url) => {
@@ -181,9 +242,12 @@ const Products = () => {
 
   const handleArrayAdd = (field, item) => {
     if (!item.trim()) return;
+    const cleanItem = rejectUnsafeMediaUrl(item);
+    if (!cleanItem) return;
     setFormData((prev) => ({
       ...prev,
-      [field]: [...(prev[field] || []), item],
+      [field]: [...(prev[field] || []), cleanItem],
+      ...(field === 'product_images' ? { images: [...(prev[field] || []), cleanItem] } : {}),
     }));
   };
 
@@ -191,6 +255,7 @@ const Products = () => {
     setFormData((prev) => ({
       ...prev,
       [field]: prev[field]?.filter((_, i) => i !== index) || [],
+      ...(field === 'product_images' ? { images: prev[field]?.filter((_, i) => i !== index) || [] } : {}),
     }));
   };
 
@@ -199,6 +264,7 @@ const Products = () => {
       <ProductForm
         formData={formData}
         onInputChange={handleInputChange}
+        onFieldChange={handleFieldChange}
         onArrayAdd={handleArrayAdd}
         onArrayRemove={handleArrayRemove}
         onSave={handleSave}
@@ -310,6 +376,7 @@ const Products = () => {
 const ProductForm = ({
   formData,
   onInputChange,
+  onFieldChange,
   onArrayAdd,
   onArrayRemove,
   onSave,
@@ -323,8 +390,82 @@ const ProductForm = ({
     before_images: '',
     after_images: '',
     images: '',
+    product_images: '',
     videos: '',
   });
+  const [uploading, setUploading] = useState({});
+  const [uploadProgress, setUploadProgress] = useState({});
+
+  const currentSlug = normalizeSlug(formData.slug || formData.name);
+
+  const uploadMedia = async ({ file, type, purpose, targetField, append = false }) => {
+    if (!file) return;
+    if (!currentSlug) {
+      toast.error('Add a product name or slug before uploading');
+      return;
+    }
+    const uploadKey = `${purpose}-${targetField}`;
+    try {
+      setUploading((prev) => ({ ...prev, [uploadKey]: true }));
+      setUploadProgress((prev) => ({ ...prev, [uploadKey]: 0 }));
+      const result = await uploadAdminProductMedia({
+        file,
+        type,
+        purpose,
+        productSlug: currentSlug,
+        onUploadProgress: (event) => {
+          if (!event.total) return;
+          setUploadProgress((prev) => ({
+            ...prev,
+            [uploadKey]: Math.round((event.loaded * 100) / event.total),
+          }));
+        },
+      });
+      if (append) {
+        onFieldChange(targetField, [...(formData[targetField] || []), result.url]);
+      } else {
+        onFieldChange(targetField, result.url);
+      }
+      toast.success('Upload complete');
+    } catch (error) {
+      toast.error(error?.response?.data?.detail || 'Upload failed');
+    } finally {
+      setUploading((prev) => ({ ...prev, [uploadKey]: false }));
+    }
+  };
+
+  const uploadPrivateDownload = async (file) => {
+    if (!file) return;
+    if (!currentSlug) {
+      toast.error('Add a product name or slug before uploading');
+      return;
+    }
+    const uploadKey = 'private-download';
+    try {
+      setUploading((prev) => ({ ...prev, [uploadKey]: true }));
+      setUploadProgress((prev) => ({ ...prev, [uploadKey]: 0 }));
+      const result = await uploadAdminPrivateDownload({
+        file,
+        productSlug: currentSlug,
+        purpose: 'paid-download',
+        onUploadProgress: (event) => {
+          if (!event.total) return;
+          setUploadProgress((prev) => ({
+            ...prev,
+            [uploadKey]: Math.round((event.loaded * 100) / event.total),
+          }));
+        },
+      });
+      onFieldChange('download_file_key', result.key);
+      onFieldChange('download_file_name', result.filename);
+      onFieldChange('download_file_bucket', result.bucket);
+      toast.success('Private download uploaded');
+    } catch (error) {
+      toast.error(error?.response?.data?.detail || 'Private upload failed');
+    } finally {
+      setUploading((prev) => ({ ...prev, [uploadKey]: false }));
+    }
+  };
 
   return (
     <section className="space-y-6">
@@ -424,17 +565,14 @@ const ProductForm = ({
           />
         </div>
 
-        <div>
-          <label className="block text-sm font-semibold text-white mb-2">Download File URL</label>
-          <input
-            type="url"
-            name="download_file"
-            value={formData.download_file}
-            onChange={onInputChange}
-            placeholder="https://example.com/file.zip"
-            className="w-full px-4 py-2 rounded-lg bg-slate-900 border border-slate-700 text-white placeholder:text-slate-600 focus:outline-none focus:border-violet-500"
-          />
-        </div>
+        <PrivateDownloadSection
+          formData={formData}
+          onInputChange={onInputChange}
+          onFieldChange={onFieldChange}
+          uploading={!!uploading['private-download']}
+          progress={uploadProgress['private-download']}
+          onUpload={uploadPrivateDownload}
+        />
 
         <label className="flex items-start gap-3 rounded-lg border border-slate-800 bg-slate-900 p-4 text-sm text-slate-200">
           <input
@@ -477,15 +615,66 @@ const ProductForm = ({
 
         <ArrayEditor
           label="Product Images"
-          items={formData.images}
-          newItem={newArrayItems.images}
-          onNewItemChange={(val) => setNewArrayItems((p) => ({ ...p, images: val }))}
+          helpText="Use this for thumbnails, banners, preview images, preview videos, and before/after LUT images."
+          items={formData.product_images || formData.images || []}
+          newItem={newArrayItems.product_images}
+          onNewItemChange={(val) => setNewArrayItems((p) => ({ ...p, product_images: val }))}
           onAdd={() => {
-            onArrayAdd('images', newArrayItems.images);
-            setNewArrayItems((p) => ({ ...p, images: '' }));
+            onArrayAdd('product_images', newArrayItems.product_images);
+            setNewArrayItems((p) => ({ ...p, product_images: '' }));
           }}
-          onRemove={(idx) => onArrayRemove('images', idx)}
+          onRemove={(idx) => onArrayRemove('product_images', idx)}
           isUrl
+          previewType="image"
+          uploadControl={
+            <UploadButton
+              label="Upload Image"
+              accept=".jpg,.jpeg,.png,.webp,.gif,image/jpeg,image/png,image/webp,image/gif"
+              disabled={!!uploading['product-image-product_images']}
+              progress={uploadProgress['product-image-product_images']}
+              onFile={(file) => uploadMedia({
+                file,
+                type: 'image',
+                purpose: 'product-image',
+                targetField: 'product_images',
+                append: true,
+              })}
+            />
+          }
+        />
+
+        <ProductVideoSection
+          formData={formData}
+          onInputChange={onInputChange}
+          onFieldChange={onFieldChange}
+          uploading={!!uploading['product-video-video_url']}
+          progress={uploadProgress['product-video-video_url']}
+          onUpload={(file) => uploadMedia({
+            file,
+            type: 'video',
+            purpose: 'product-video',
+            targetField: 'video_url',
+          })}
+        />
+
+        <BeforeAfterUploadSection
+          formData={formData}
+          onInputChange={onInputChange}
+          onFieldChange={onFieldChange}
+          uploading={uploading}
+          uploadProgress={uploadProgress}
+          onUploadBefore={(file) => uploadMedia({
+            file,
+            type: 'image',
+            purpose: 'before-image',
+            targetField: 'before_image_url',
+          })}
+          onUploadAfter={(file) => uploadMedia({
+            file,
+            type: 'image',
+            purpose: 'after-image',
+            targetField: 'after_image_url',
+          })}
         />
 
         {/* SEO Fields */}
@@ -546,18 +735,275 @@ const ProductForm = ({
   );
 };
 
+const UploadButton = ({ label, accept, disabled, progress, onFile }) => (
+  <label className={`inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-slate-700 px-4 py-2 text-sm font-semibold text-white transition hover:border-slate-500 ${disabled ? 'pointer-events-none opacity-60' : ''}`}>
+    <Upload size={16} />
+    {disabled ? `Uploading${progress ? ` ${progress}%` : '...'}` : label}
+    <input
+      type="file"
+      accept={accept}
+      disabled={disabled}
+      onChange={(event) => {
+        const file = event.target.files?.[0];
+        event.target.value = '';
+        if (file) onFile(file);
+      }}
+      className="hidden"
+    />
+  </label>
+);
+
+const PrivateDownloadSection = ({
+  formData,
+  onInputChange,
+  onFieldChange,
+  uploading,
+  progress,
+  onUpload,
+}) => (
+  <div className="space-y-4 rounded-2xl border border-slate-800 bg-slate-900/70 p-4">
+    <div>
+      <h2 className="text-sm font-semibold text-white">Private Paid Download</h2>
+      <p className="mt-2 text-xs leading-relaxed text-slate-500">
+        Use this for ZIP files, project files, LUT packs, templates, and paid course materials. Customers can access this only after successful payment.
+      </p>
+    </div>
+    <div>
+      <label className="mb-2 block text-sm font-semibold text-white">Legacy Download File URL</label>
+      <input
+        type="url"
+        name="download_file"
+        value={formData.download_file}
+        onChange={(event) => {
+          onInputChange(event);
+          onFieldChange('download_file_url', event.target.value);
+        }}
+        placeholder="https://example.com/file.zip"
+        className="w-full rounded-lg border border-slate-700 bg-slate-950 px-4 py-2 text-white placeholder:text-slate-600 focus:border-violet-500 focus:outline-none"
+      />
+      <p className="mt-2 text-xs text-slate-500">Manual URL is for old products only. New paid files should use the protected upload below.</p>
+    </div>
+    <UploadButton
+      label="Upload Private File"
+      accept=".zip,.rar,.7z,.prproj,.drp,.cube,.xmp,.pdf,.mp4,application/zip,application/pdf,video/mp4"
+      disabled={uploading}
+      progress={progress}
+      onFile={onUpload}
+    />
+    {formData.download_file_key && (
+      <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 p-4">
+        <div className="mb-2 inline-flex rounded-full border border-emerald-400/30 bg-emerald-400/10 px-3 py-1 text-xs font-semibold text-emerald-200">
+          Private protected file
+        </div>
+        <p className="text-sm font-semibold text-white">{formData.download_file_name || 'Protected download'}</p>
+        <p className="mt-1 break-all text-xs text-emerald-100/70">{formData.download_file_key}</p>
+        <button
+          type="button"
+          onClick={() => {
+            onFieldChange('download_file_key', '');
+            onFieldChange('download_file_name', '');
+            onFieldChange('download_file_bucket', '');
+          }}
+          className="mt-3 rounded-lg border border-emerald-400/30 px-3 py-2 text-xs font-semibold text-emerald-100 transition hover:border-emerald-300"
+        >
+          Remove private file
+        </button>
+      </div>
+    )}
+  </div>
+);
+
+const ProductVideoSection = ({
+  formData,
+  onInputChange,
+  onFieldChange,
+  uploading,
+  progress,
+  onUpload,
+}) => (
+  <div className="space-y-4 rounded-2xl border border-slate-800 bg-slate-900/70 p-4">
+    <div className="flex items-center gap-2 text-sm font-semibold text-white">
+      <PlayCircle size={18} />
+      Product Video
+    </div>
+    <div className="grid gap-3 sm:grid-cols-3">
+      {[
+        { value: '', label: 'None' },
+        { value: 'youtube', label: 'YouTube Link' },
+        { value: 'direct', label: 'Direct Video' },
+      ].map((option) => (
+        <label key={option.value} className="flex items-center gap-2 rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-slate-200">
+          <input
+            type="radio"
+            name="video_type"
+            value={option.value}
+            checked={(formData.video_type || '') === option.value}
+            onChange={(event) => {
+              onInputChange(event);
+              if (event.target.value === 'youtube') onFieldChange('video_url', '');
+              if (event.target.value === 'direct') onFieldChange('youtube_url', '');
+            }}
+          />
+          {option.label}
+        </label>
+      ))}
+    </div>
+
+    {formData.video_type === 'youtube' && (
+      <div>
+        <label className="mb-2 block text-sm font-semibold text-white">YouTube URL</label>
+        <input
+          type="url"
+          name="youtube_url"
+          value={formData.youtube_url}
+          onChange={onInputChange}
+          placeholder="https://www.youtube.com/watch?v=..."
+          className="w-full rounded-lg border border-slate-700 bg-slate-950 px-4 py-2 text-white placeholder:text-slate-600 focus:border-violet-500 focus:outline-none"
+        />
+        <YouTubePreview url={formData.youtube_url} />
+      </div>
+    )}
+
+    {formData.video_type === 'direct' && (
+      <div className="space-y-3">
+        <div>
+          <label className="mb-2 block text-sm font-semibold text-white">Direct Video URL</label>
+          <input
+            type="url"
+            name="video_url"
+            value={formData.video_url}
+            onChange={onInputChange}
+            placeholder="https://assets.pranvithdop.com/products/..."
+            className="w-full rounded-lg border border-slate-700 bg-slate-950 px-4 py-2 text-white placeholder:text-slate-600 focus:border-violet-500 focus:outline-none"
+          />
+        </div>
+        <UploadButton
+          label="Upload Video"
+          accept=".mp4,.webm,.mov,video/mp4,video/webm,video/quicktime"
+          disabled={uploading}
+          progress={progress}
+          onFile={onUpload}
+        />
+        {formData.video_url && (
+          <video src={formData.video_url} controls className="mt-3 aspect-video w-full rounded-xl border border-slate-800 bg-black object-contain" />
+        )}
+      </div>
+    )}
+  </div>
+);
+
+const getYouTubeEmbedUrl = (url) => {
+  try {
+    const parsed = new URL(url);
+    const host = parsed.hostname.replace(/^www\./, '');
+    let id = '';
+    if (host === 'youtu.be') id = parsed.pathname.slice(1);
+    if (host.endsWith('youtube.com')) id = parsed.searchParams.get('v') || parsed.pathname.split('/').pop();
+    return id ? `https://www.youtube.com/embed/${id}` : '';
+  } catch (_) {
+    return '';
+  }
+};
+
+const YouTubePreview = ({ url }) => {
+  const embedUrl = getYouTubeEmbedUrl(url);
+  if (!embedUrl) return null;
+  return (
+    <iframe
+      title="YouTube preview"
+      src={embedUrl}
+      className="mt-3 aspect-video w-full rounded-xl border border-slate-800 bg-black"
+      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+      allowFullScreen
+    />
+  );
+};
+
+const BeforeAfterUploadSection = ({
+  formData,
+  onInputChange,
+  onFieldChange,
+  uploading,
+  uploadProgress,
+  onUploadBefore,
+  onUploadAfter,
+}) => (
+  <div className="space-y-4 rounded-2xl border border-slate-800 bg-slate-900/70 p-4">
+    <h2 className="text-sm font-semibold text-white">LUT Before / After Images</h2>
+    <div className="grid gap-4 sm:grid-cols-2">
+      <SingleImageField
+        label="Before Image"
+        name="before_image_url"
+        value={formData.before_image_url}
+        onInputChange={onInputChange}
+        onFieldChange={onFieldChange}
+        uploading={!!uploading['before-image-before_image_url']}
+        progress={uploadProgress['before-image-before_image_url']}
+        onUpload={onUploadBefore}
+      />
+      <SingleImageField
+        label="After Image"
+        name="after_image_url"
+        value={formData.after_image_url}
+        onInputChange={onInputChange}
+        onFieldChange={onFieldChange}
+        uploading={!!uploading['after-image-after_image_url']}
+        progress={uploadProgress['after-image-after_image_url']}
+        onUpload={onUploadAfter}
+      />
+    </div>
+  </div>
+);
+
+const SingleImageField = ({ label, name, value, onInputChange, onFieldChange, uploading, progress, onUpload }) => (
+  <div>
+    <label className="mb-2 block text-sm font-semibold text-white">{label}</label>
+    <input
+      type="url"
+      name={name}
+      value={value}
+      onChange={onInputChange}
+      placeholder="https://assets.pranvithdop.com/products/..."
+      className="w-full rounded-lg border border-slate-700 bg-slate-950 px-4 py-2 text-white placeholder:text-slate-600 focus:border-violet-500 focus:outline-none"
+    />
+    <div className="mt-3">
+      <UploadButton
+        label="Upload Image"
+        accept=".jpg,.jpeg,.png,.webp,.gif,image/jpeg,image/png,image/webp,image/gif"
+        disabled={uploading}
+        progress={progress}
+        onFile={onUpload}
+      />
+    </div>
+    {value && <img src={value} alt={label} className="mt-3 aspect-video w-full rounded-xl border border-slate-800 bg-slate-950 object-cover" />}
+    {value && (
+      <button
+        type="button"
+        onClick={() => onFieldChange(name, '')}
+        className="mt-2 rounded-lg border border-slate-700 px-3 py-2 text-xs font-semibold text-slate-200 transition hover:border-slate-500"
+      >
+        Clear image
+      </button>
+    )}
+  </div>
+);
+
 const ArrayEditor = ({
   label,
+  helpText = '',
   items = [],
   newItem,
   onNewItemChange,
   onAdd,
   onRemove,
   isUrl = false,
+  uploadControl = null,
+  previewType = null,
 }) => {
   return (
     <div>
       <label className="block text-sm font-semibold text-white mb-2">{label}</label>
+      {helpText && <p className="mb-3 text-xs leading-relaxed text-slate-500">{helpText}</p>}
       <div className="mb-3 flex flex-col gap-2 sm:flex-row">
         <input
           type={isUrl ? 'url' : 'text'}
@@ -573,7 +1019,23 @@ const ArrayEditor = ({
         >
           Add
         </button>
+        {uploadControl}
       </div>
+      {previewType === 'image' && items.length > 0 ? (
+        <div className="mb-3 grid gap-3 sm:grid-cols-2">
+          {items.map((item, idx) => (
+            <div key={`${item}-${idx}`} className="overflow-hidden rounded-xl border border-slate-800 bg-slate-900">
+              <img src={item} alt={`${label} ${idx + 1}`} className="aspect-video w-full object-cover" />
+              <div className="flex items-center justify-between gap-3 px-3 py-2 text-xs text-slate-300">
+                <span className="truncate">{item}</span>
+                <button onClick={() => onRemove(idx)} className="text-slate-400 transition hover:text-red-400">
+                  Remove
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : null}
       <div className="flex flex-wrap gap-2">
         {items.map((item, idx) => (
           <div

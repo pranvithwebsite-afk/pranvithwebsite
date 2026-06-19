@@ -1,4 +1,4 @@
-from fastapi import FastAPI, APIRouter, HTTPException, Depends, status, UploadFile, File, Request
+from fastapi import FastAPI, APIRouter, HTTPException, Depends, status, UploadFile, File, Form, Request
 from fastapi.security import OAuth2PasswordBearer
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
@@ -20,7 +20,7 @@ import secrets
 import smtplib
 import ssl
 from pathlib import Path
-from pydantic import BaseModel, Field, ConfigDict, EmailStr
+from pydantic import BaseModel, Field, ConfigDict, EmailStr, field_validator
 from typing import Any, Dict, List, Optional
 from urllib.parse import urlparse
 import uuid
@@ -28,6 +28,10 @@ from datetime import datetime, timedelta, timezone
 import razorpay
 import shutil
 import mimetypes
+try:
+    import boto3
+except ImportError:  # pragma: no cover - optional unless R2 uploads are used
+    boto3 = None
 
 from seed_data import (
     COURSES,
@@ -251,8 +255,18 @@ class Product(BaseModel):
     before_images: List[str] = []
     after_images: List[str] = []
     images: List[str] = []
+    product_images: List[str] = []
     videos: List[str] = []
+    video_type: Optional[str] = None
+    youtube_url: Optional[str] = None
+    video_url: Optional[str] = None
+    before_image_url: Optional[str] = None
+    after_image_url: Optional[str] = None
     download_file: Optional[str] = None
+    download_file_url: Optional[str] = None
+    download_file_key: Optional[str] = None
+    download_file_name: Optional[str] = None
+    download_file_bucket: Optional[str] = None
     payment_link: Optional[str] = None
     razorpay_payment_link_id: Optional[str] = None
     razorpay_payment_link_url: Optional[str] = None
@@ -283,8 +297,18 @@ class ProductIn(BaseModel):
     before_images: List[str] = []
     after_images: List[str] = []
     images: List[str] = []
+    product_images: List[str] = []
     videos: List[str] = []
+    video_type: Optional[str] = None
+    youtube_url: Optional[str] = None
+    video_url: Optional[str] = None
+    before_image_url: Optional[str] = None
+    after_image_url: Optional[str] = None
     download_file: Optional[str] = None
+    download_file_url: Optional[str] = None
+    download_file_key: Optional[str] = None
+    download_file_name: Optional[str] = None
+    download_file_bucket: Optional[str] = None
     payment_link: Optional[str] = None
     create_razorpay_payment_link: Optional[bool] = False
     razorpay_payment_link_id: Optional[str] = None
@@ -298,6 +322,34 @@ class ProductIn(BaseModel):
     seo_description: Optional[str] = None
     published: bool = True
     product_url: Optional[str] = None
+
+    @field_validator(
+        "download_file",
+        "download_file_url",
+        "payment_link",
+        "razorpay_payment_link_url",
+        "hero_image",
+        "product_url",
+        "youtube_url",
+        "video_url",
+        "before_image_url",
+        "after_image_url",
+    )
+    @classmethod
+    def validate_media_url(cls, value):
+        return _reject_unsafe_url(value)
+
+    @field_validator("images", "product_images", "videos", "before_images", "after_images")
+    @classmethod
+    def validate_media_url_list(cls, value):
+        return [_reject_unsafe_url(item) for item in (value or []) if item]
+
+    @field_validator("video_type")
+    @classmethod
+    def validate_video_type(cls, value):
+        if value in {None, "", "youtube", "direct"}:
+            return value
+        raise ValueError("video_type must be youtube, direct, or empty")
 
 
 class MediaItem(BaseModel):
@@ -612,6 +664,57 @@ def normalize_slug(value: str) -> str:
     return slug.strip("-")
 
 
+MEDIA_URL_FIELDS = {
+    "download_file",
+    "download_file_url",
+    "hero_image",
+    "product_url",
+    "youtube_url",
+    "video_url",
+    "before_image_url",
+    "after_image_url",
+}
+
+
+def _reject_unsafe_url(value: Optional[str]) -> Optional[str]:
+    if value is None:
+        return value
+    cleaned = value.strip()
+    if not cleaned:
+        return cleaned
+    parsed = urlparse(cleaned)
+    if parsed.scheme.lower() in {"javascript", "data", "vbscript"}:
+        raise ValueError("javascript/data/vbscript URLs are not allowed")
+    if parsed.scheme:
+        allowed_schemes = {"https"}
+        if IS_DEVELOPMENT:
+            allowed_schemes.add("http")
+        if parsed.scheme.lower() not in allowed_schemes:
+            raise ValueError("Only safe HTTPS URLs are allowed")
+    return cleaned
+
+
+def _normalize_product_media_fields(doc: dict) -> dict:
+    if not doc.get("product_images") and doc.get("images"):
+        doc["product_images"] = list(doc.get("images") or [])
+    if not doc.get("images") and doc.get("product_images"):
+        doc["images"] = list(doc.get("product_images") or [])
+    doc.setdefault("product_images", [])
+    doc.setdefault("images", [])
+    doc["product_images"] = [_reject_unsafe_url(item) for item in (doc.get("product_images") or []) if item]
+    doc["images"] = [_reject_unsafe_url(item) for item in (doc.get("images") or doc["product_images"] or []) if item]
+    for field_name in MEDIA_URL_FIELDS:
+        if field_name in doc:
+            doc[field_name] = _reject_unsafe_url(doc.get(field_name))
+    if not doc.get("download_file_url") and doc.get("download_file"):
+        doc["download_file_url"] = doc.get("download_file")
+    if not doc.get("download_file") and doc.get("download_file_url"):
+        doc["download_file"] = doc.get("download_file_url")
+    if doc.get("video_type") not in {None, "", "youtube", "direct"}:
+        raise HTTPException(status_code=422, detail="video_type must be youtube, direct, or empty")
+    return doc
+
+
 @api_router.get("/pages")
 async def public_pages():
     if db is None:
@@ -633,8 +736,12 @@ async def public_page_by_slug(slug: str):
 
 
 def _public_product(product: dict) -> dict:
-    safe = dict(product)
+    safe = _normalize_product_media_fields(dict(product))
     safe.pop("download_file", None)
+    safe.pop("download_file_url", None)
+    safe.pop("download_file_key", None)
+    safe.pop("download_file_name", None)
+    safe.pop("download_file_bucket", None)
     safe.pop("payment_link", None)
     safe.pop("razorpay_payment_link_id", None)
     safe.pop("razorpay_payment_link_url", None)
@@ -649,13 +756,13 @@ async def public_products():
         logger.info("Product fetch source=fallback scope=public count=%d", len(products))
         return products
     try:
-        rows = await db.products.find({"published": True}, {"_id": 0, "download_file": 0, "payment_link": 0, "razorpay_payment_link_id": 0, "razorpay_payment_link_url": 0, "razorpay_payment_link_status": 0}).to_list(100)
+        rows = await db.products.find({"published": True}, {"_id": 0, "download_file": 0, "download_file_url": 0, "download_file_key": 0, "download_file_name": 0, "download_file_bucket": 0, "payment_link": 0, "razorpay_payment_link_id": 0, "razorpay_payment_link_url": 0, "razorpay_payment_link_status": 0}).to_list(100)
         logger.info(
             "Product fetch source=mongodb database=%s collection=products scope=public count=%d",
             db_name,
             len(rows),
         )
-        return rows
+        return [_public_product(row) for row in rows]
     except Exception as exc:
         logger.exception(
             "Public products endpoint failed; falling back to seeded catalog. database=%s collection=products error_type=%s",
@@ -674,10 +781,10 @@ async def public_product_by_slug(slug: str):
             raise HTTPException(status_code=404, detail="Product not found")
         return _public_product(product)
     try:
-        product = await db.products.find_one({"slug": slug, "published": True}, {"_id": 0, "download_file": 0, "payment_link": 0, "razorpay_payment_link_id": 0, "razorpay_payment_link_url": 0, "razorpay_payment_link_status": 0})
+        product = await db.products.find_one({"slug": slug, "published": True}, {"_id": 0, "download_file": 0, "download_file_url": 0, "download_file_key": 0, "download_file_name": 0, "download_file_bucket": 0, "payment_link": 0, "razorpay_payment_link_id": 0, "razorpay_payment_link_url": 0, "razorpay_payment_link_status": 0})
         if not product:
             raise HTTPException(status_code=404, detail="Product not found")
-        return product
+        return _public_product(product)
     except HTTPException:
         raise
     except Exception as exc:
@@ -991,7 +1098,7 @@ async def admin_products(current_admin: AdminBase = Depends(get_current_active_a
         db_name,
         len(rows),
     )
-    return rows
+    return [_normalize_product_media_fields(row) for row in rows]
 
 
 @admin_router.get("/products/{product_id}")
@@ -999,7 +1106,7 @@ async def admin_get_product(product_id: str, current_admin: AdminBase = Depends(
     product = await db.products.find_one({"id": product_id}, {"_id": 0})
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
-    return product
+    return _normalize_product_media_fields(product)
 
 
 @admin_router.post("/products/{product_id}/create-payment-link")
@@ -1080,8 +1187,8 @@ async def admin_resend_download_email(order_id: str, current_admin: AdminBase = 
         raise HTTPException(status_code=400, detail=error)
 
     product = await _find_checkout_product(order.get("product_id"), order.get("product_slug"))
-    download_file = order.get("download_file") or product.get("download_file")
-    if not download_file:
+    download_fields = _product_download_fields(product, order)
+    if not download_fields.get("download_file_key") and not download_fields.get("download_file"):
         error = "Download file not configured"
         now = datetime.now(timezone.utc).isoformat()
         update_fields = _email_delivery_update(False, error, now)
@@ -1094,8 +1201,8 @@ async def admin_resend_download_email(order_id: str, current_admin: AdminBase = 
     download_url = _paid_download_url(public_order_id, download_token)
     base_fields = {
         "download_token_hash": _hash_download_token(download_token),
-        "download_file": download_file,
         "download_url": download_url,
+        **download_fields,
     }
 
     result = _send_download_email(
@@ -1345,7 +1452,7 @@ async def admin_delete_page(page_id: str, current_admin: AdminBase = Depends(get
 
 @admin_router.post("/products")
 async def admin_create_product(payload: ProductIn, current_admin: AdminBase = Depends(get_current_active_admin)):
-    doc = payload.model_dump()
+    doc = _normalize_product_media_fields(payload.model_dump())
     create_payment_link = bool(doc.pop("create_razorpay_payment_link", False))
     doc["slug"] = normalize_slug(doc.get("slug") or doc.get("name"))
     if not doc["slug"]:
@@ -1397,7 +1504,7 @@ async def admin_create_product(payload: ProductIn, current_admin: AdminBase = De
 
 @admin_router.put("/products/{product_id}")
 async def admin_update_product(product_id: str, payload: ProductIn, current_admin: AdminBase = Depends(get_current_active_admin)):
-    update_doc = payload.model_dump(exclude_none=True)
+    update_doc = _normalize_product_media_fields(payload.model_dump(exclude_none=True))
     create_payment_link = bool(update_doc.pop("create_razorpay_payment_link", False))
     update_doc["slug"] = normalize_slug(update_doc.get("slug") or update_doc.get("name"))
     if not update_doc["slug"]:
@@ -1545,6 +1652,201 @@ ALLOWED_UPLOAD_TYPES = {
     ".webp": {"image/webp"},
     ".zip": {"application/zip", "application/x-zip-compressed"},
 }
+
+R2_IMAGE_TYPES = {
+    ".gif": {"image/gif"},
+    ".jpeg": {"image/jpeg"},
+    ".jpg": {"image/jpeg"},
+    ".png": {"image/png"},
+    ".webp": {"image/webp"},
+}
+R2_VIDEO_TYPES = {
+    ".mov": {"video/quicktime", "video/mov"},
+    ".mp4": {"video/mp4"},
+    ".webm": {"video/webm"},
+}
+R2_PRIVATE_TYPES = {
+    ".7z": {"application/x-7z-compressed", "application/octet-stream"},
+    ".cube": {"application/octet-stream", "text/plain", "application/x-cube"},
+    ".drp": {"application/octet-stream", "application/x-davinci-resolve-project"},
+    ".mp4": {"video/mp4"},
+    ".pdf": {"application/pdf"},
+    ".prproj": {"application/octet-stream", "application/x-premiere-project"},
+    ".rar": {"application/vnd.rar", "application/x-rar-compressed", "application/octet-stream"},
+    ".xmp": {"application/octet-stream", "application/xml", "text/xml", "text/plain"},
+    ".zip": {"application/zip", "application/x-zip-compressed", "application/octet-stream"},
+}
+R2_PUBLIC_PURPOSES = {"product-image", "product-video", "before-image", "after-image", "banner", "thumbnail"}
+R2_PRIVATE_PURPOSES = {"paid-download", "zip-file", "project-file", "lut-pack", "template-pack", "course-material"}
+R2_MAX_IMAGE_BYTES = 10 * 1024 * 1024
+R2_MAX_VIDEO_BYTES = 100 * 1024 * 1024
+R2_MAX_PRIVATE_BYTES = 500 * 1024 * 1024
+
+
+def _r2_client():
+    if boto3 is None:
+        raise HTTPException(status_code=500, detail="R2 upload dependency is not installed")
+    account_id = os.environ.get("CLOUDFLARE_R2_ACCOUNT_ID", "").strip()
+    endpoint = os.environ.get("CLOUDFLARE_R2_ENDPOINT", "").strip()
+    if account_id and "ACCOUNT_ID" in endpoint:
+        endpoint = endpoint.replace("ACCOUNT_ID", account_id)
+    required = {
+        "CLOUDFLARE_R2_ACCESS_KEY_ID": os.environ.get("CLOUDFLARE_R2_ACCESS_KEY_ID"),
+        "CLOUDFLARE_R2_SECRET_ACCESS_KEY": os.environ.get("CLOUDFLARE_R2_SECRET_ACCESS_KEY"),
+        "CLOUDFLARE_R2_ENDPOINT": endpoint,
+    }
+    if not all(required.values()):
+        raise HTTPException(status_code=500, detail="Cloudflare R2 is not configured")
+    return boto3.client(
+        "s3",
+        endpoint_url=endpoint,
+        aws_access_key_id=required["CLOUDFLARE_R2_ACCESS_KEY_ID"],
+        aws_secret_access_key=required["CLOUDFLARE_R2_SECRET_ACCESS_KEY"],
+        region_name="auto",
+    )
+
+
+def _safe_filename(filename: str) -> str:
+    name = Path(filename or "download").name.strip()
+    safe = re.sub(r"[^A-Za-z0-9._-]+", "-", name).strip(".-")
+    return safe or "download"
+
+
+def _r2_public_object_key(product_slug: str, purpose: str, file_ext: str) -> str:
+    slug = normalize_slug(product_slug)
+    if not slug:
+        raise HTTPException(status_code=422, detail="product_slug is required")
+    if purpose not in R2_PUBLIC_PURPOSES:
+        raise HTTPException(status_code=422, detail="Unsupported upload purpose")
+    file_id = str(uuid.uuid4())
+    if purpose == "product-image":
+        return f"products/{slug}/images/{file_id}{file_ext}"
+    if purpose == "product-video":
+        return f"products/{slug}/videos/{file_id}{file_ext}"
+    if purpose == "before-image":
+        return f"products/{slug}/before-after/before-{file_id}{file_ext}"
+    if purpose == "after-image":
+        return f"products/{slug}/before-after/after-{file_id}{file_ext}"
+    return f"products/{slug}/media/{purpose}-{file_id}{file_ext}"
+
+
+def _r2_private_object_key(product_slug: str, purpose: str, safe_filename: str) -> str:
+    slug = normalize_slug(product_slug)
+    if not slug:
+        raise HTTPException(status_code=422, detail="product_slug is required")
+    if purpose not in R2_PRIVATE_PURPOSES:
+        raise HTTPException(status_code=422, detail="Unsupported upload purpose")
+    return f"downloads/{slug}/{purpose}/{uuid.uuid4()}-{safe_filename}"
+
+
+def _validate_r2_public_upload(file: UploadFile, purpose: str) -> tuple[str, int]:
+    original_name = Path(file.filename or "").name
+    file_ext = Path(original_name).suffix.lower()
+    if purpose in {"product-image", "before-image", "after-image", "banner", "thumbnail"}:
+        allowed_types = R2_IMAGE_TYPES.get(file_ext)
+        max_bytes = R2_MAX_IMAGE_BYTES
+    elif purpose == "product-video":
+        allowed_types = R2_VIDEO_TYPES.get(file_ext)
+        max_bytes = R2_MAX_VIDEO_BYTES
+    else:
+        raise HTTPException(status_code=422, detail="Unsupported upload purpose")
+    if not allowed_types or file.content_type not in allowed_types:
+        raise HTTPException(status_code=415, detail="Unsupported file type")
+    return file_ext, max_bytes
+
+
+def _validate_r2_private_upload(file: UploadFile, purpose: str) -> tuple[str, str, int]:
+    if purpose not in R2_PRIVATE_PURPOSES:
+        raise HTTPException(status_code=422, detail="Unsupported upload purpose")
+    safe_filename = _safe_filename(file.filename or "download")
+    file_ext = Path(safe_filename).suffix.lower()
+    allowed_types = R2_PRIVATE_TYPES.get(file_ext)
+    if not allowed_types or file.content_type not in allowed_types:
+        raise HTTPException(status_code=415, detail="Unsupported file type")
+    return file_ext, safe_filename, R2_MAX_PRIVATE_BYTES
+
+
+@admin_router.post("/uploads/public")
+async def admin_upload_public_media(
+    file: UploadFile = File(...),
+    product_slug: str = Form(...),
+    purpose: str = Form(...),
+    current_admin: AdminBase = Depends(get_current_active_admin),
+):
+    file_ext, max_bytes = _validate_r2_public_upload(file, purpose)
+    content = await file.read(max_bytes + 1)
+    if len(content) > max_bytes:
+        limit_mb = max_bytes // (1024 * 1024)
+        raise HTTPException(status_code=413, detail=f"File exceeds the {limit_mb} MB upload limit")
+
+    key = _r2_public_object_key(product_slug, purpose, file_ext)
+    bucket = os.environ.get("CLOUDFLARE_R2_BUCKET", "pranvith-assets-public").strip()
+    public_base = os.environ.get("CLOUDFLARE_R2_PUBLIC_BASE_URL", "").strip().rstrip("/")
+    if not bucket or not public_base:
+        raise HTTPException(status_code=500, detail="Cloudflare public R2 bucket is not configured")
+    try:
+        _r2_client().put_object(
+            Bucket=bucket,
+            Key=key,
+            Body=content,
+            ContentType=file.content_type,
+        )
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("R2 upload failed key=%s content_type=%s size=%d", key, file.content_type, len(content))
+        raise HTTPException(status_code=502, detail="Cloudflare R2 upload failed")
+    return {
+        "url": f"{public_base}/{key}",
+        "key": key,
+    }
+
+
+@admin_router.post("/uploads/private")
+async def admin_upload_private_download(
+    file: UploadFile = File(...),
+    product_slug: str = Form(...),
+    purpose: str = Form(...),
+    current_admin: AdminBase = Depends(get_current_active_admin),
+):
+    _file_ext, safe_filename, max_bytes = _validate_r2_private_upload(file, purpose)
+    content = await file.read(max_bytes + 1)
+    if len(content) > max_bytes:
+        limit_mb = max_bytes // (1024 * 1024)
+        raise HTTPException(status_code=413, detail=f"File exceeds the {limit_mb} MB upload limit")
+
+    bucket = os.environ.get("CLOUDFLARE_R2_PRIVATE_BUCKET", "pranvith-paid-downloads").strip()
+    if not bucket:
+        raise HTTPException(status_code=500, detail="Cloudflare private R2 bucket is not configured")
+    key = _r2_private_object_key(product_slug, purpose, safe_filename)
+    try:
+        _r2_client().put_object(
+            Bucket=bucket,
+            Key=key,
+            Body=content,
+            ContentType=file.content_type,
+        )
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Private R2 upload failed key=%s content_type=%s size=%d", key, file.content_type, len(content))
+        raise HTTPException(status_code=502, detail="Cloudflare R2 upload failed")
+    return {
+        "key": key,
+        "bucket": bucket,
+        "filename": safe_filename,
+    }
+
+
+@admin_router.post("/uploads")
+async def admin_upload_product_media(
+    file: UploadFile = File(...),
+    type: str = Form(...),
+    product_slug: str = Form(...),
+    purpose: str = Form(...),
+    current_admin: AdminBase = Depends(get_current_active_admin),
+):
+    return await admin_upload_public_media(file, product_slug, purpose, current_admin)
 
 
 @admin_router.post("/upload")
@@ -1841,6 +2143,42 @@ def _validated_download_url(download_url: str) -> str:
     ):
         raise HTTPException(status_code=500, detail="Download URL is not allowed")
     return download_url
+
+
+def _product_download_fields(product: dict, order: Optional[dict] = None) -> dict:
+    source = {**(product or {}), **(order or {})}
+    download_key = source.get("download_file_key")
+    if download_key:
+        return {
+            "download_file_key": download_key,
+            "download_file_name": source.get("download_file_name") or Path(download_key).name,
+            "download_file_bucket": source.get("download_file_bucket") or os.environ.get("CLOUDFLARE_R2_PRIVATE_BUCKET", "pranvith-paid-downloads"),
+            "download_file": source.get("download_file") or source.get("download_file_url"),
+        }
+    download_file = source.get("download_file") or source.get("download_file_url")
+    if download_file:
+        return {
+            "download_file": download_file,
+            "download_file_url": download_file,
+        }
+    return {}
+
+
+def _private_download_presigned_url(key: str, bucket: Optional[str] = None, expires_in: int = 300) -> str:
+    resolved_bucket = bucket or os.environ.get("CLOUDFLARE_R2_PRIVATE_BUCKET", "pranvith-paid-downloads")
+    if not key or not resolved_bucket:
+        raise HTTPException(status_code=404, detail="Download file not configured")
+    try:
+        return _r2_client().generate_presigned_url(
+            "get_object",
+            Params={"Bucket": resolved_bucket, "Key": key},
+            ExpiresIn=expires_in,
+        )
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Private R2 presigned URL generation failed bucket=%s key=%s", resolved_bucket, key)
+        raise HTTPException(status_code=502, detail="Download is temporarily unavailable")
 
 
 async def _find_checkout_product(product_id: Optional[str], product_slug: Optional[str]) -> dict:
@@ -2567,8 +2905,8 @@ async def _fulfill_paid_order(order: dict, product: dict, payment_id: str, send_
         download_url = _paid_download_url(order.get("razorpay_order_id") or order.get("id"), download_token)
         download_token_hash = _hash_download_token(download_token)
 
-    download_file = order.get("download_file") or product.get("download_file")
-    if not download_file:
+    download_fields = _product_download_fields(product, order)
+    if not download_fields.get("download_file_key") and not download_fields.get("download_file"):
         raise HTTPException(status_code=404, detail="Download file not configured")
 
     paid_fields = {
@@ -2578,8 +2916,8 @@ async def _fulfill_paid_order(order: dict, product: dict, payment_id: str, send_
         "verified_at": order.get("verified_at") or now,
         "paid_at": order.get("paid_at") or now,
         "download_token_hash": download_token_hash,
-        "download_file": download_file,
         "download_url": download_url,
+        **download_fields,
     }
 
     await db.orders.update_one(
@@ -3100,19 +3438,60 @@ async def order_download(order_id: str, token: str):
     order = _validate_download_access(order, token)
     order = await _ensure_verified_paid_download_order(order)
 
-    download_file = order.get("download_file")
-    if not download_file:
-        product = await _find_checkout_product(order.get("product_id"), order.get("product_slug"))
-        download_file = product.get("download_file")
-    if not download_file:
+    product = await _find_checkout_product(order.get("product_id"), order.get("product_slug"))
+    download_fields = _product_download_fields(product, order)
+    if not download_fields.get("download_file_key") and not download_fields.get("download_file"):
         raise HTTPException(status_code=404, detail="Download file not configured")
 
     await db.orders.update_one(
         {"$or": [{"razorpay_order_id": order_id}, {"id": order_id}]},
         {"$inc": {"download_count": 1}, "$set": {"last_downloaded_at": datetime.now(timezone.utc).isoformat()}},
     )
+    if download_fields.get("download_file_key"):
+        download_url = _private_download_presigned_url(
+            download_fields["download_file_key"],
+            download_fields.get("download_file_bucket"),
+        )
+    else:
+        download_url = _validated_download_url(download_fields["download_file"])
     return RedirectResponse(
-        _validated_download_url(download_file),
+        download_url,
+        status_code=302,
+        headers={"Cache-Control": "no-store", "Referrer-Policy": "no-referrer"},
+    )
+
+
+@api_router.get("/downloads/{order_id}/{product_id}")
+async def protected_product_download(order_id: str, product_id: str, token: Optional[str] = None):
+    if db is None:
+        raise HTTPException(status_code=500, detail="Database not configured")
+    order = await db.orders.find_one(
+        {"$or": [{"razorpay_order_id": order_id}, {"id": order_id}]}, {"_id": 0}
+    )
+    if not order or order.get("payment_status") != "paid":
+        raise HTTPException(status_code=403, detail="Download is available only after successful payment")
+    if token:
+        order = _validate_download_access(order, token)
+    order = await _ensure_verified_paid_download_order(order)
+    if product_id not in {order.get("product_id"), order.get("product_slug")}:
+        raise HTTPException(status_code=403, detail="Download does not belong to this order")
+    product = await _find_checkout_product(order.get("product_id"), order.get("product_slug"))
+    download_fields = _product_download_fields(product, order)
+    if download_fields.get("download_file_key"):
+        download_url = _private_download_presigned_url(
+            download_fields["download_file_key"],
+            download_fields.get("download_file_bucket"),
+        )
+    elif download_fields.get("download_file"):
+        download_url = _validated_download_url(download_fields["download_file"])
+    else:
+        raise HTTPException(status_code=404, detail="Download file not configured")
+    await db.orders.update_one(
+        {"$or": [{"razorpay_order_id": order_id}, {"id": order_id}]},
+        {"$inc": {"download_count": 1}, "$set": {"last_downloaded_at": datetime.now(timezone.utc).isoformat()}},
+    )
+    return RedirectResponse(
+        download_url,
         status_code=302,
         headers={"Cache-Control": "no-store", "Referrer-Policy": "no-referrer"},
     )
@@ -3127,8 +3506,8 @@ async def payment_free_order(payload: PaymentFreeOrderIn):
     if not product.get("is_free") and int(round(float(product.get("sale_price") or product.get("price") or 0) * 100)) > 0:
         raise HTTPException(status_code=400, detail="This product is not free")
 
-    download_file = product.get("download_file")
-    if not download_file:
+    download_fields = _product_download_fields(product)
+    if not download_fields.get("download_file_key") and not download_fields.get("download_file"):
         raise HTTPException(status_code=404, detail="Download file not configured")
 
     download_token = secrets.token_urlsafe(32)
@@ -3154,8 +3533,8 @@ async def payment_free_order(payload: PaymentFreeOrderIn):
         "paid_at": datetime.now(timezone.utc).isoformat(),
         "source": "free_download",
         "download_token_hash": _hash_download_token(download_token),
-        "download_file": download_file,
         "download_url": download_url,
+        **download_fields,
         "email_delivery_status": "pending",
         "email_delivery_error": None,
         "email_sent": False,
