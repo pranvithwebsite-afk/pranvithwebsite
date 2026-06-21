@@ -1,9 +1,15 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { ArrowLeft, BookOpen } from 'lucide-react';
 import { Link, Navigate, useParams } from 'react-router-dom';
 import Footer from '../components/Footer';
 import Header from '../components/Header';
+import {
+  CourseComingSoon,
+  defaultCourseVisibility,
+  shouldShowCourseComingSoon,
+} from '../components/CoursePageContent';
 import { courses } from '../data/mock';
+import { fetchPublicSettings } from '../lib/api';
 import { handleImageError, safeImageSrc } from '../lib/utils';
 
 const formatPrice = (price) =>
@@ -15,10 +21,40 @@ const formatPrice = (price) =>
 
 const CourseDetails = () => {
   const { slug } = useParams();
+  const [visibility, setVisibility] = useState(defaultCourseVisibility);
   const course = courses.find((item) => item.slug === slug);
+
+  useEffect(() => {
+    let mounted = true;
+    fetchPublicSettings()
+      .then((settings) => {
+        if (mounted) {
+          setVisibility({
+            ...defaultCourseVisibility,
+            ...(settings?.course_visibility || {}),
+          });
+        }
+      })
+      .catch(() => {
+        if (mounted) setVisibility(defaultCourseVisibility);
+      });
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   if (!course) {
     return <Navigate to="/courses" replace />;
+  }
+
+  if (shouldShowCourseComingSoon(visibility)) {
+    return (
+      <main className="page min-h-screen bg-[#070314] text-white">
+        <Header />
+        <CourseComingSoon visibility={visibility} />
+        <Footer />
+      </main>
+    );
   }
 
   return (

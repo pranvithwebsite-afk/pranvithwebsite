@@ -31,6 +31,25 @@ const defaultSettings = {
     hero_media_muted: true,
     hero_media_loop: true,
   },
+  home_visibility: {
+    showHero: true,
+    showInstagramProfile: true,
+    showServices: true,
+    showShowreel: true,
+    showFeaturedAssets: true,
+    showCoursesPreview: false,
+    showStudentTestimonials: false,
+    showCta: true,
+    showFooterCta: true,
+  },
+  course_visibility: {
+    courses_enabled: false,
+    show_coming_soon: true,
+    coming_soon_title: 'Courses Coming Soon',
+    coming_soon_subtitle: 'We are preparing premium video editing courses. Stay tuned.',
+    coming_soon_button_text: 'Explore Assets',
+    coming_soon_button_link: '/assets',
+  },
   instagram_profile: {
     username: 'pranvith_dop',
     display_name: 'Pranvith Dop',
@@ -88,6 +107,14 @@ const Settings = () => {
           home_hero: {
             ...defaultSettings.home_hero,
             ...(data?.home_hero || {}),
+          },
+          home_visibility: {
+            ...defaultSettings.home_visibility,
+            ...(data?.home_visibility || {}),
+          },
+          course_visibility: {
+            ...defaultSettings.course_visibility,
+            ...(data?.course_visibility || {}),
           },
           instagram_profile: {
             ...defaultSettings.instagram_profile,
@@ -154,6 +181,26 @@ const Settings = () => {
       ...current,
       home_hero: {
         ...(current.home_hero || defaultSettings.home_hero),
+        [field]: value,
+      },
+    }));
+  };
+
+  const updateHomeVisibility = (field, value) => {
+    setSettings((current) => ({
+      ...current,
+      home_visibility: {
+        ...(current.home_visibility || defaultSettings.home_visibility),
+        [field]: value,
+      },
+    }));
+  };
+
+  const updateCourseVisibility = (field, value) => {
+    setSettings((current) => ({
+      ...current,
+      course_visibility: {
+        ...(current.course_visibility || defaultSettings.course_visibility),
         [field]: value,
       },
     }));
@@ -297,6 +344,14 @@ const Settings = () => {
         home_hero: {
           ...(settings.home_hero || defaultSettings.home_hero),
         },
+        home_visibility: {
+          ...defaultSettings.home_visibility,
+          ...(settings.home_visibility || {}),
+        },
+        course_visibility: {
+          ...defaultSettings.course_visibility,
+          ...(settings.course_visibility || {}),
+        },
         instagram_profile: {
           ...(settings.instagram_profile || defaultSettings.instagram_profile),
           cards: (settings.instagram_profile?.cards || []).map((card, index) => ({
@@ -324,6 +379,14 @@ const Settings = () => {
         home_hero: {
           ...defaultSettings.home_hero,
           ...((result.settings || payload).home_hero || {}),
+        },
+        home_visibility: {
+          ...defaultSettings.home_visibility,
+          ...((result.settings || payload).home_visibility || {}),
+        },
+        course_visibility: {
+          ...defaultSettings.course_visibility,
+          ...((result.settings || payload).course_visibility || {}),
         },
         instagram_profile: {
           ...defaultSettings.instagram_profile,
@@ -434,6 +497,16 @@ const Settings = () => {
             <input type="checkbox" checked={settings.notifications_enabled} onChange={(event) => update('notifications_enabled', event.target.checked)} className="h-5 w-5 rounded border-slate-700 bg-slate-900 text-violet-500" />
             Enable site notifications for CMS events
           </label>
+
+          <HomeVisibilityEditor
+            visibility={settings.home_visibility || defaultSettings.home_visibility}
+            onChange={updateHomeVisibility}
+          />
+
+          <CourseVisibilityEditor
+            visibility={settings.course_visibility || defaultSettings.course_visibility}
+            onChange={updateCourseVisibility}
+          />
 
           <div className="rounded-3xl border border-slate-800 bg-slate-900/60 p-5">
             <div className="mb-5">
@@ -679,6 +752,76 @@ const HealthItem = ({ label, value, ok }) => (
   <div className="rounded-2xl border border-slate-800 bg-slate-900 px-4 py-3">
     <p className="text-xs text-slate-500">{label}</p>
     <p className={`mt-1 font-semibold ${ok ? 'text-emerald-300' : 'text-amber-300'}`}>{value}</p>
+  </div>
+);
+
+const homeVisibilityOptions = [
+  ['showHero', 'Show Hero Section'],
+  ['showInstagramProfile', 'Show Instagram/Profile Section'],
+  ['showServices', 'Show Services Section'],
+  ['showShowreel', 'Show Showreel Section'],
+  ['showFeaturedAssets', 'Show Featured Assets Section'],
+  ['showCoursesPreview', 'Show Courses Preview Section'],
+  ['showStudentTestimonials', 'Show Student Testimonials Section'],
+  ['showCta', 'Show CTA Section'],
+  ['showFooterCta', 'Show Footer CTA Section'],
+];
+
+const ToggleRow = ({ label, checked, onChange }) => (
+  <label className="flex items-center justify-between gap-4 rounded-2xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm text-slate-100">
+    <span>{label}</span>
+    <input
+      type="checkbox"
+      checked={!!checked}
+      onChange={(event) => onChange(event.target.checked)}
+      className="h-5 w-5 rounded border-slate-700 bg-slate-900 text-violet-500 accent-violet-600"
+    />
+  </label>
+);
+
+const HomeVisibilityEditor = ({ visibility, onChange }) => (
+  <div className="rounded-3xl border border-slate-800 bg-slate-900/60 p-5">
+    <div className="mb-5">
+      <h2 className="text-xl font-semibold text-white">Home Page Visibility</h2>
+      <p className="mt-2 text-sm text-slate-400">Choose which sections are visible on the Home page.</p>
+    </div>
+    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+      {homeVisibilityOptions.map(([key, label]) => (
+        <ToggleRow
+          key={key}
+          label={label}
+          checked={visibility?.[key]}
+          onChange={(value) => onChange(key, value)}
+        />
+      ))}
+    </div>
+  </div>
+);
+
+const CourseVisibilityEditor = ({ visibility, onChange }) => (
+  <div className="rounded-3xl border border-slate-800 bg-slate-900/60 p-5">
+    <div className="mb-5">
+      <h2 className="text-xl font-semibold text-white">Course Visibility</h2>
+      <p className="mt-2 text-sm text-slate-400">Control whether /courses shows Coming Soon or the live course content.</p>
+    </div>
+    <div className="grid gap-3 md:grid-cols-2">
+      <ToggleRow label="Courses Enabled" checked={visibility?.courses_enabled} onChange={(value) => onChange('courses_enabled', value)} />
+      <ToggleRow label="Show Coming Soon" checked={visibility?.show_coming_soon} onChange={(value) => onChange('show_coming_soon', value)} />
+    </div>
+    <div className="mt-5 grid gap-4 lg:grid-cols-2">
+      <Field label="Coming Soon title">
+        <input value={visibility?.coming_soon_title || ''} onChange={(event) => onChange('coming_soon_title', event.target.value)} className={fieldClass} />
+      </Field>
+      <Field label="Button text optional">
+        <input value={visibility?.coming_soon_button_text || ''} onChange={(event) => onChange('coming_soon_button_text', event.target.value)} className={fieldClass} />
+      </Field>
+      <Field label="Button link optional">
+        <input value={visibility?.coming_soon_button_link || ''} onChange={(event) => onChange('coming_soon_button_link', event.target.value)} className={fieldClass} />
+      </Field>
+      <Field label="Coming Soon subtitle">
+        <textarea value={visibility?.coming_soon_subtitle || ''} onChange={(event) => onChange('coming_soon_subtitle', event.target.value)} rows={3} className={`${fieldClass} resize-none`} />
+      </Field>
+    </div>
   </div>
 );
 

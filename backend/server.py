@@ -504,6 +504,7 @@ class SettingsPayload(BaseModel):
     gtm_id: Optional[str] = None
     instagram_profile: Optional[Dict[str, Any]] = None
     home_hero: Optional[Dict[str, Any]] = None
+    home_visibility: Optional[Dict[str, Any]] = None
     course_page: Optional[Dict[str, Any]] = None
     course_visibility: Optional[Dict[str, Any]] = None
 
@@ -521,6 +522,11 @@ class SettingsPayload(BaseModel):
     @classmethod
     def validate_home_hero(cls, value):
         return _safe_home_hero(value)
+
+    @field_validator("home_visibility")
+    @classmethod
+    def validate_home_visibility(cls, value):
+        return _safe_home_visibility(value)
 
     @field_validator("course_page")
     @classmethod
@@ -689,6 +695,7 @@ async def public_settings():
             "contact_address": "Hyderabad, India",
             "instagram_profile": DEFAULT_INSTAGRAM_PROFILE,
             "home_hero": DEFAULT_HOME_HERO,
+            "home_visibility": DEFAULT_HOME_VISIBILITY,
             "course_page": DEFAULT_COURSE_PAGE,
             "course_visibility": DEFAULT_COURSE_VISIBILITY,
         }
@@ -709,6 +716,7 @@ PUBLIC_SETTINGS_FIELDS = {
     "gtm_id",
     "instagram_profile",
     "home_hero",
+    "home_visibility",
     "course_page",
     "course_visibility",
 }
@@ -724,6 +732,8 @@ def _safe_settings(settings: Optional[dict]) -> dict:
         safe["instagram_profile"] = _safe_instagram_profile(safe.get("instagram_profile"))
     if "home_hero" in safe:
         safe["home_hero"] = _safe_home_hero(safe.get("home_hero"))
+    if "home_visibility" in safe:
+        safe["home_visibility"] = _safe_home_visibility(safe.get("home_visibility"))
     if "course_page" in safe:
         safe["course_page"] = _safe_course_page(safe.get("course_page"))
     if "course_visibility" in safe:
@@ -746,6 +756,27 @@ DEFAULT_HOME_HERO = {
     "hero_media_muted": True,
     "hero_media_loop": True,
 }
+
+
+DEFAULT_HOME_VISIBILITY = {
+    "showHero": True,
+    "showInstagramProfile": True,
+    "showServices": True,
+    "showShowreel": True,
+    "showFeaturedAssets": True,
+    "showCoursesPreview": False,
+    "showStudentTestimonials": False,
+    "showCta": True,
+    "showFooterCta": True,
+}
+
+
+def _safe_home_visibility(visibility: Optional[dict]) -> dict:
+    source = {**DEFAULT_HOME_VISIBILITY, **(visibility or {})}
+    return {
+        key: bool(source.get(key, default_value))
+        for key, default_value in DEFAULT_HOME_VISIBILITY.items()
+    }
 
 
 DEFAULT_INSTAGRAM_PROFILE = {
