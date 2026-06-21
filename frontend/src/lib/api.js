@@ -107,6 +107,11 @@ export const fetchFAQs = async () => {
   return data;
 };
 
+export const fetchPublicSettings = async () => {
+  const { data } = await api.get('/settings');
+  return data;
+};
+
 const fetchDevelopmentCatalog = async (path) => {
   const { data } = await axios.get(`${DEVELOPMENT_CATALOG_API}${path}`, {
     timeout: 15000,

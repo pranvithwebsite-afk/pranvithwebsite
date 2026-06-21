@@ -502,6 +502,17 @@ class SettingsPayload(BaseModel):
     meta_pixel_id: Optional[str] = None
     ga4_id: Optional[str] = None
     gtm_id: Optional[str] = None
+    instagram_profile: Optional[Dict[str, Any]] = None
+
+    @field_validator("logo_url")
+    @classmethod
+    def validate_logo_url(cls, value):
+        return _reject_unsafe_url(value)
+
+    @field_validator("instagram_profile")
+    @classmethod
+    def validate_instagram_profile(cls, value):
+        return _safe_instagram_profile(value)
 
 
 class HireRequestIn(BaseModel):
@@ -632,6 +643,7 @@ async def public_settings():
             "contact_email": "info@pranvithdop.com",
             "contact_phone": "+91 9059867883",
             "contact_address": "Hyderabad, India",
+            "instagram_profile": DEFAULT_INSTAGRAM_PROFILE,
         }
     return _safe_settings(settings_doc)
 
@@ -648,14 +660,79 @@ PUBLIC_SETTINGS_FIELDS = {
     "meta_pixel_id",
     "ga4_id",
     "gtm_id",
+    "instagram_profile",
 }
 
 
 def _safe_settings(settings: Optional[dict]) -> dict:
-    return {
+    safe = {
         key: value
         for key, value in (settings or {}).items()
         if key in PUBLIC_SETTINGS_FIELDS
+    }
+    if "instagram_profile" in safe:
+        safe["instagram_profile"] = _safe_instagram_profile(safe.get("instagram_profile"))
+    return safe
+
+
+DEFAULT_INSTAGRAM_PROFILE = {
+    "username": "pranvith_dop",
+    "display_name": "Pranvith Dop",
+    "profile_image_url": "/assets/brand-profile.png",
+    "followers_count": "5,131",
+    "following_count": "10",
+    "posts_count": "",
+    "bio_line_1": "🎥 DOP | Filmmaker | Video Editor",
+    "bio_line_2": "🚁 Drone Pilot | DI",
+    "bio_line_3": "📸 Product & Commercial Photography",
+    "bio_line_4": "🎨 Graphic Design",
+    "link_text": "youtube.com/@pranvithdop",
+    "link_url": "https://www.youtube.com/@pranvithdop",
+    "follow_button_url": "https://www.instagram.com/pranvith_dop?utm_source=ig_web_button_share_sheet&igsh=ZDNlZDc0MzIxNw==",
+    "cards": [
+        {"title": "Cinematic editing reel", "type": "Reel", "thumbnail_image_url": "", "link_url": "https://www.instagram.com/pranvith_dop?utm_source=ig_web_button_share_sheet&igsh=ZDNlZDc0MzIxNw==", "enabled": True, "sort_order": 0},
+        {"title": "Behind the scenes", "type": "Post", "thumbnail_image_url": "", "link_url": "https://www.instagram.com/pranvith_dop?utm_source=ig_web_button_share_sheet&igsh=ZDNlZDc0MzIxNw==", "enabled": True, "sort_order": 1},
+        {"title": "Drone shot preview", "type": "Video", "thumbnail_image_url": "", "link_url": "https://www.instagram.com/pranvith_dop?utm_source=ig_web_button_share_sheet&igsh=ZDNlZDc0MzIxNw==", "enabled": True, "sort_order": 2},
+        {"title": "Commercial frame", "type": "Reel", "thumbnail_image_url": "", "link_url": "https://www.instagram.com/pranvith_dop?utm_source=ig_web_button_share_sheet&igsh=ZDNlZDc0MzIxNw==", "enabled": True, "sort_order": 3},
+        {"title": "DI color grade", "type": "Post", "thumbnail_image_url": "", "link_url": "https://www.instagram.com/pranvith_dop?utm_source=ig_web_button_share_sheet&igsh=ZDNlZDc0MzIxNw==", "enabled": True, "sort_order": 4},
+        {"title": "Graphic design post", "type": "Video", "thumbnail_image_url": "", "link_url": "https://www.instagram.com/pranvith_dop?utm_source=ig_web_button_share_sheet&igsh=ZDNlZDc0MzIxNw==", "enabled": True, "sort_order": 5},
+    ],
+}
+
+
+def _safe_instagram_profile(profile: Optional[dict]) -> dict:
+    source = {**DEFAULT_INSTAGRAM_PROFILE, **(profile or {})}
+    safe_cards = []
+    for index, card in enumerate(source.get("cards") or []):
+        if not isinstance(card, dict):
+            continue
+        card_type = str(card.get("type") or "Post").strip().title()
+        if card_type not in {"Reel", "Post", "Video"}:
+            card_type = "Post"
+        safe_cards.append({
+            "title": str(card.get("title") or "").strip()[:120],
+            "type": card_type,
+            "thumbnail_image_url": _reject_unsafe_url(card.get("thumbnail_image_url") or "") or "",
+            "link_url": _reject_unsafe_url(card.get("link_url") or source.get("follow_button_url") or "") or "",
+            "enabled": bool(card.get("enabled", True)),
+            "sort_order": int(card.get("sort_order", index) or 0),
+        })
+    safe_cards.sort(key=lambda item: item.get("sort_order", 0))
+    return {
+        "username": str(source.get("username") or "").strip()[:80],
+        "display_name": str(source.get("display_name") or "").strip()[:120],
+        "profile_image_url": _reject_unsafe_url(source.get("profile_image_url") or "") or "",
+        "followers_count": str(source.get("followers_count") or "").strip()[:40],
+        "following_count": str(source.get("following_count") or "").strip()[:40],
+        "posts_count": str(source.get("posts_count") or "").strip()[:40],
+        "bio_line_1": str(source.get("bio_line_1") or "").strip()[:200],
+        "bio_line_2": str(source.get("bio_line_2") or "").strip()[:200],
+        "bio_line_3": str(source.get("bio_line_3") or "").strip()[:200],
+        "bio_line_4": str(source.get("bio_line_4") or "").strip()[:200],
+        "link_text": str(source.get("link_text") or "").strip()[:160],
+        "link_url": _reject_unsafe_url(source.get("link_url") or "") or "",
+        "follow_button_url": _reject_unsafe_url(source.get("follow_button_url") or "") or "",
+        "cards": safe_cards,
     }
 
 
