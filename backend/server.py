@@ -222,71 +222,22 @@ class Page(BaseModel):
     model_config = ConfigDict(extra="ignore")
     id: str
     slug: str
-    path: Optional[str] = None
     title: str
-    status: str = "draft"
+    sections: Dict[str, Any]
     seo_title: Optional[str] = None
     seo_description: Optional[str] = None
-    hero_title: Optional[str] = None
-    hero_subtitle: Optional[str] = None
-    hero_button_text: Optional[str] = None
-    hero_button_link: Optional[str] = None
-    hero_background_image: Optional[str] = None
-    sections: List[Dict[str, Any]] = []
+    published: bool = True
     created_at: str
     updated_at: Optional[str] = None
 
 
 class PageIn(BaseModel):
     slug: str
-    path: Optional[str] = None
     title: str
-    status: str = "draft"
+    sections: Dict[str, Any] = {}
     seo_title: Optional[str] = None
     seo_description: Optional[str] = None
-    hero_title: Optional[str] = None
-    hero_subtitle: Optional[str] = None
-    hero_button_text: Optional[str] = None
-    hero_button_link: Optional[str] = None
-    hero_background_image: Optional[str] = None
-    sections: List[Dict[str, Any]] = []
-    published: Optional[bool] = None
-
-    @field_validator("slug")
-    @classmethod
-    def validate_page_slug(cls, value):
-        slug = _normalize_page_slug(value)
-        if not slug:
-            raise ValueError("Page slug is required")
-        return slug
-
-    @field_validator("path")
-    @classmethod
-    def validate_page_path(cls, value):
-        return _normalize_page_path(value)
-
-    @field_validator("status")
-    @classmethod
-    def validate_page_status(cls, value):
-        if value not in PAGE_STATUSES:
-            raise ValueError("status must be draft, published, or not_created")
-        return value
-
-    @field_validator("hero_button_link", "hero_background_image")
-    @classmethod
-    def validate_page_url(cls, value):
-        return _reject_unsafe_url(value)
-
-
-class PageStatusIn(BaseModel):
-    status: str
-
-    @field_validator("status")
-    @classmethod
-    def validate_status(cls, value):
-        if value not in PAGE_STATUSES:
-            raise ValueError("status must be draft, published, or not_created")
-        return value
+    published: bool = True
 
 
 class Product(BaseModel):
@@ -747,116 +698,6 @@ def _reject_unsafe_url(value: Optional[str]) -> Optional[str]:
     return cleaned
 
 
-PAGE_STATUSES = {"draft", "published", "not_created"}
-PAGE_URL_FIELDS = {
-    "image",
-    "video_url",
-    "button_link",
-    "hero_button_link",
-    "hero_background_image",
-    "before_image",
-    "after_image",
-    "url",
-    "link",
-}
-RESERVED_PAGE_SLUGS = {"home", "courses", "about", "assets", "works", "hire"}
-
-
-def _normalize_page_slug(value: Optional[str]) -> str:
-    raw = str(value or "").strip()
-    if raw == "/":
-        return "home"
-    raw = raw.strip("/")
-    return normalize_slug(raw)
-
-
-def _normalize_page_path(value: Optional[str], slug: Optional[str] = None) -> str:
-    if value is None or str(value).strip() == "":
-        normalized_slug = _normalize_page_slug(slug)
-        return "/" if normalized_slug == "home" else f"/{normalized_slug}"
-    raw = str(value).strip()
-    if raw == "/":
-        return "/"
-    raw = "/" + raw.strip("/")
-    if not re.fullmatch(r"/[a-z0-9][a-z0-9\-\/]*", raw):
-        raise ValueError("Page path must contain only lowercase letters, numbers, hyphens and slashes")
-    return raw
-
-
-def _sanitize_custom_html(value: Optional[str]) -> str:
-    cleaned = str(value or "")
-    cleaned = re.sub(r"(?is)<\s*(script|iframe|object|embed|link|meta|style)[^>]*>.*?<\s*/\s*\1\s*>", "", cleaned)
-    cleaned = re.sub(r"(?is)<\s*(script|iframe|object|embed|link|meta|style)[^>]*/?\s*>", "", cleaned)
-    cleaned = re.sub(r"(?i)\s+on[a-z]+\s*=\s*(\"[^\"]*\"|'[^']*'|[^\s>]+)", "", cleaned)
-    cleaned = re.sub(r"(?i)(href|src)\s*=\s*([\"'])\s*(javascript|data|vbscript):.*?\2", r'\1="#"', cleaned)
-    return cleaned
-
-
-def _sanitize_page_value(value: Any, key: Optional[str] = None) -> Any:
-    if isinstance(value, str):
-        key_name = (key or "").lower()
-        if key_name in PAGE_URL_FIELDS or key_name.endswith("_url") or key_name.endswith("_link"):
-            return _reject_unsafe_url(value)
-        if key_name in {"html", "custom_html", "content_html"}:
-            return _sanitize_custom_html(value)
-        return value.strip()
-    if isinstance(value, list):
-        return [_sanitize_page_value(item, key) for item in value]
-    if isinstance(value, dict):
-        return {str(k): _sanitize_page_value(v, str(k)) for k, v in value.items()}
-    return value
-
-
-def _legacy_sections_to_builder(sections: Any) -> List[Dict[str, Any]]:
-    if isinstance(sections, list):
-        return sections
-    if not isinstance(sections, dict):
-        return []
-    builder_sections = []
-    for index, (key, value) in enumerate(sections.items()):
-        section = dict(value) if isinstance(value, dict) else {"description": value}
-        section_type = "hero" if key == "hero" else "text"
-        section.setdefault("id", key or str(uuid.uuid4()))
-        section.setdefault("type", section_type)
-        section.setdefault("title", section.get("headline") or section.get("title") or "")
-        section.setdefault("subtitle", section.get("subheadline") or section.get("description") or "")
-        section.setdefault("button_text", section.get("buttonText") or "")
-        section.setdefault("button_link", section.get("buttonUrl") or "")
-        section.setdefault("enabled", True)
-        section.setdefault("sort_order", index)
-        builder_sections.append(section)
-    return builder_sections
-
-
-def _normalize_page_doc(doc: dict) -> dict:
-    page = dict(doc or {})
-    page.pop("_id", None)
-    page["slug"] = _normalize_page_slug(page.get("slug") or page.get("path") or page.get("title"))
-    page["path"] = _normalize_page_path(page.get("path"), page["slug"])
-    if page.get("status") not in PAGE_STATUSES:
-        page["status"] = "published" if page.get("published", False) else "draft"
-    page["published"] = page["status"] == "published"
-    sections = _legacy_sections_to_builder(page.get("sections"))
-    sanitized_sections = []
-    for index, section in enumerate(sections):
-        cleaned = _sanitize_page_value(dict(section))
-        cleaned["id"] = str(cleaned.get("id") or uuid.uuid4())
-        cleaned["type"] = str(cleaned.get("type") or "text")
-        cleaned["enabled"] = bool(cleaned.get("enabled", True))
-        cleaned["sort_order"] = int(cleaned.get("sort_order", index) or 0)
-        sanitized_sections.append(cleaned)
-    page["sections"] = sorted(sanitized_sections, key=lambda item: item.get("sort_order", 0))
-    hero_section = next((item for item in page["sections"] if item.get("type") == "hero"), {})
-    page.setdefault("hero_title", hero_section.get("title") or hero_section.get("headline") or "")
-    page.setdefault("hero_subtitle", hero_section.get("subtitle") or hero_section.get("subheadline") or "")
-    page.setdefault("hero_button_text", hero_section.get("button_text") or hero_section.get("buttonText") or "")
-    page.setdefault("hero_button_link", hero_section.get("button_link") or hero_section.get("buttonUrl") or "")
-    page.setdefault("hero_background_image", hero_section.get("image") or "")
-    for field_name in ["hero_button_link", "hero_background_image"]:
-        page[field_name] = _reject_unsafe_url(page.get(field_name))
-    return page
-
-
 def _normalize_product_media_fields(doc: dict) -> dict:
     if not doc.get("product_images") and doc.get("images"):
         doc["product_images"] = list(doc.get("images") or [])
@@ -881,32 +722,21 @@ def _normalize_product_media_fields(doc: dict) -> dict:
 @api_router.get("/pages")
 async def public_pages():
     if db is None:
-        return [
-            _normalize_page_doc(page)
-            for page in PAGES
-            if _normalize_page_doc(page).get("status") == "published"
-        ]
-    rows = await db.pages.find(
-        {"$or": [{"status": "published"}, {"status": {"$exists": False}, "published": True}]},
-        {"_id": 0},
-    ).to_list(100)
-    return [_normalize_page_doc(row) for row in rows if _normalize_page_doc(row).get("status") == "published"]
+        return [page for page in PAGES if page.get("published", True)]
+    return await db.pages.find({"published": True}, {"_id": 0}).to_list(100)
 
 
 @api_router.get("/pages/{slug}")
 async def public_page_by_slug(slug: str):
-    normalized_slug = _normalize_page_slug(slug)
     if db is None:
-        page = next((page for page in PAGES if _normalize_page_slug(page.get("slug")) == normalized_slug), None)
-        normalized = _normalize_page_doc(page) if page else None
-        if not normalized or normalized.get("status") != "published":
+        page = next((page for page in PAGES if page.get("slug") == slug and page.get("published", True)), None)
+        if not page:
             raise HTTPException(status_code=404, detail="Page not found")
-        return normalized
-    page = await db.pages.find_one({"slug": normalized_slug}, {"_id": 0})
-    normalized = _normalize_page_doc(page) if page else None
-    if not normalized or normalized.get("status") != "published":
+        return page
+    page = await db.pages.find_one({"slug": slug, "published": True}, {"_id": 0})
+    if not page:
         raise HTTPException(status_code=404, detail="Page not found")
-    return normalized
+    return page
 
 
 def _public_product(product: dict) -> dict:
@@ -1250,27 +1080,18 @@ async def admin_razorpay_health(current_admin: AdminBase = Depends(get_current_a
 @admin_router.get("/pages")
 async def admin_pages(current_admin: AdminBase = Depends(get_current_active_admin)):
     try:
-        rows = await db.pages.find({}, {"_id": 0}).to_list(100)
-        return [_normalize_page_doc(row) for row in rows]
+        return await db.pages.find({}, {"_id": 0}).to_list(100)
     except Exception:
         logger.exception("Admin pages fetch failed")
         raise HTTPException(status_code=500, detail="Could not load pages")
 
 
-async def _find_admin_page(identifier: str) -> Optional[dict]:
-    normalized_slug = _normalize_page_slug(identifier)
-    return await db.pages.find_one(
-        {"$or": [{"id": identifier}, {"slug": normalized_slug}]},
-        {"_id": 0},
-    )
-
-
-@admin_router.get("/pages/{identifier}")
-async def admin_get_page(identifier: str, current_admin: AdminBase = Depends(get_current_active_admin)):
-    page = await _find_admin_page(identifier)
+@admin_router.get("/pages/{page_id}")
+async def admin_get_page(page_id: str, current_admin: AdminBase = Depends(get_current_active_admin)):
+    page = await db.pages.find_one({"id": page_id}, {"_id": 0})
     if not page:
         raise HTTPException(status_code=404, detail="Page not found")
-    return _normalize_page_doc(page)
+    return page
 
 
 @admin_router.get("/products")
@@ -1605,59 +1426,32 @@ async def admin_save_settings(payload: SettingsPayload, current_admin: AdminBase
 
 @admin_router.post("/pages")
 async def admin_create_page(payload: PageIn, current_admin: AdminBase = Depends(get_current_active_admin)):
-    doc = _normalize_page_doc(payload.model_dump(exclude_none=True))
-    existing = await db.pages.find_one({"slug": doc["slug"]}, {"_id": 0, "id": 1})
-    if existing:
-        raise HTTPException(status_code=409, detail="Page slug already exists")
+    doc = payload.model_dump()
     doc.update({
         "id": str(uuid.uuid4()),
         "created_at": datetime.now(timezone.utc).isoformat(),
-        "updated_at": datetime.now(timezone.utc).isoformat(),
+        "updated_at": None,
     })
     await db.pages.insert_one(doc)
     return {"success": True, "page": doc}
 
 
-@admin_router.put("/pages/{identifier}")
-async def admin_update_page(identifier: str, payload: PageIn, current_admin: AdminBase = Depends(get_current_active_admin)):
-    existing = await _find_admin_page(identifier)
-    if not existing:
-        raise HTTPException(status_code=404, detail="Page not found")
-    update_doc = _normalize_page_doc({**existing, **payload.model_dump(exclude_none=True)})
-    duplicate = await db.pages.find_one({"slug": update_doc["slug"], "id": {"$ne": existing["id"]}}, {"_id": 0, "id": 1})
-    if duplicate:
-        raise HTTPException(status_code=409, detail="Page slug already exists")
+@admin_router.put("/pages/{page_id}")
+async def admin_update_page(page_id: str, payload: PageIn, current_admin: AdminBase = Depends(get_current_active_admin)):
+    update_doc = payload.model_dump(exclude_none=True)
     update_doc["updated_at"] = datetime.now(timezone.utc).isoformat()
-    result = await db.pages.update_one({"id": existing["id"]}, {"$set": update_doc})
+    result = await db.pages.update_one({"id": page_id}, {"$set": update_doc})
     if result.matched_count == 0:
-        raise HTTPException(status_code=404, detail="Page not found")
-    return {"success": True, "page": update_doc}
-
-
-@admin_router.delete("/pages/{identifier}")
-async def admin_delete_page(identifier: str, current_admin: AdminBase = Depends(get_current_active_admin)):
-    page = await _find_admin_page(identifier)
-    if not page:
-        raise HTTPException(status_code=404, detail="Page not found")
-    if _normalize_page_slug(page.get("slug")) in RESERVED_PAGE_SLUGS:
-        raise HTTPException(status_code=400, detail="Required website pages cannot be deleted; set status to draft instead")
-    result = await db.pages.delete_one({"id": page["id"]})
-    if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Page not found")
     return {"success": True}
 
 
-@admin_router.patch("/pages/{identifier}/status")
-async def admin_update_page_status(identifier: str, payload: PageStatusIn, current_admin: AdminBase = Depends(get_current_active_admin)):
-    page = await _find_admin_page(identifier)
-    if not page:
+@admin_router.delete("/pages/{page_id}")
+async def admin_delete_page(page_id: str, current_admin: AdminBase = Depends(get_current_active_admin)):
+    result = await db.pages.delete_one({"id": page_id})
+    if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Page not found")
-    now = datetime.now(timezone.utc).isoformat()
-    await db.pages.update_one(
-        {"id": page["id"]},
-        {"$set": {"status": payload.status, "published": payload.status == "published", "updated_at": now}},
-    )
-    return {"success": True, "status": payload.status}
+    return {"success": True}
 
 
 @admin_router.post("/products")
@@ -2173,10 +1967,6 @@ async def prepare_cms_collections():
         pass
     try:
         await db.blog_posts.create_index("slug", unique=True)
-    except Exception:
-        pass
-    try:
-        await db.pages.create_index("slug", unique=True)
     except Exception:
         pass
     try:
@@ -3852,12 +3642,11 @@ async def _seed_db():
                 await db.faqs.insert_one({**f, "order": i})
             logger.info("Seeded %d faqs", len(FAQS))
 
-        # Seed CMS pages only when missing so admin edits are never overwritten.
+        # Seed CMS pages (upsert by slug so rebrand updates apply)
         for page in PAGES:
-            doc = _normalize_page_doc(page)
             await db.pages.update_one(
-                {"slug": doc["slug"]},
-                {"$setOnInsert": doc},
+                {"slug": page["slug"]},
+                {"$set": dict(page)},
                 upsert=True,
             )
         logger.info("Upserted %d pages", len(PAGES))
