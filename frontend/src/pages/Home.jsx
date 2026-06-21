@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
+import { ArrowRight } from 'lucide-react';
 import Header from '../components/Header';
 import Hero from '../components/Hero';
-import RightForYou from '../components/RightForYou';
 import CoursesSection from '../components/Courses';
 import ShowreelSection from '../components/ShowreelSection';
 import ServicesSection from '../components/ServicesSection';
@@ -16,34 +16,67 @@ import { usePageData } from '../hooks/usePageData';
 import { fetchPublicSettings } from '../lib/api';
 
 const defaultHomeVisibility = {
-  showHero: true,
-  showInstagramProfile: true,
-  showServices: true,
-  showShowreel: true,
-  showFeaturedAssets: true,
-  showCoursesPreview: false,
-  showStudentTestimonials: false,
-  showCta: true,
-  showFooterCta: true,
+  hero: true,
+  featuredAssets: true,
+  instagramProfile: true,
+  services: true,
+  showreel: true,
+  coursesPreview: false,
+  studentTestimonials: false,
+  cta: true,
+  footerCta: true,
   section_order: [
-    'showHero',
-    'showInstagramProfile',
-    'showServices',
-    'showShowreel',
-    'showFeaturedAssets',
-    'showCoursesPreview',
-    'showStudentTestimonials',
-    'showCta',
-    'showFooterCta',
+    'hero',
+    'featuredAssets',
+    'instagramProfile',
+    'services',
+    'showreel',
+    'coursesPreview',
+    'studentTestimonials',
+    'cta',
+    'footerCta',
   ],
 };
 
 const homeSectionKeys = defaultHomeVisibility.section_order;
+const legacyHomeSectionKeys = {
+  showHero: 'hero',
+  showFeaturedAssets: 'featuredAssets',
+  showInstagramProfile: 'instagramProfile',
+  showServices: 'services',
+  showShowreel: 'showreel',
+  showCoursesPreview: 'coursesPreview',
+  showStudentTestimonials: 'studentTestimonials',
+  showCta: 'cta',
+  showFooterCta: 'footerCta',
+  transformVision: 'instagramProfile',
+  profile: 'instagramProfile',
+  worksPreview: 'showreel',
+  testimonials: 'studentTestimonials',
+};
 
 const normalizeHomeVisibility = (visibility) => {
-  const merged = { ...defaultHomeVisibility, ...(visibility || {}) };
-  const order = Array.isArray(merged.section_order) ? merged.section_order : defaultHomeVisibility.section_order;
-  const safeOrder = order.filter((key, index) => homeSectionKeys.includes(key) && order.indexOf(key) === index);
+  const source = visibility || {};
+  const merged = { ...defaultHomeVisibility };
+  homeSectionKeys.forEach((key) => {
+    if (Object.prototype.hasOwnProperty.call(source, key)) merged[key] = source[key];
+  });
+  Object.entries(legacyHomeSectionKeys).forEach(([oldKey, newKey]) => {
+    if (
+      Object.prototype.hasOwnProperty.call(source, oldKey)
+      && !Object.prototype.hasOwnProperty.call(source, newKey)
+    ) {
+      merged[newKey] = source[oldKey];
+    }
+  });
+  const rawOrder = Array.isArray(source.section_order) ? source.section_order : defaultHomeVisibility.section_order;
+  const safeOrder = [];
+  rawOrder.forEach((key) => {
+    const canonicalKey = legacyHomeSectionKeys[key] || key;
+    if (homeSectionKeys.includes(canonicalKey) && !safeOrder.includes(canonicalKey)) {
+      safeOrder.push(canonicalKey);
+    }
+  });
   homeSectionKeys.forEach((key) => {
     if (!safeOrder.includes(key)) safeOrder.push(key);
   });
@@ -76,12 +109,12 @@ const Home = () => {
       <Header />
       {visibility.section_order.map((sectionKey) => {
         if (visibility[sectionKey] === false) return null;
-        if (sectionKey === 'showCoursesPreview' && visibility[sectionKey] !== true) return null;
-        if (sectionKey === 'showStudentTestimonials' && visibility[sectionKey] !== true) return null;
+        if (sectionKey === 'coursesPreview' && visibility[sectionKey] !== true) return null;
+        if (sectionKey === 'studentTestimonials' && visibility[sectionKey] !== true) return null;
 
         const sections = {
-          showHero: (
-            <React.Fragment key="showHero">
+          hero: (
+            <React.Fragment key="hero">
               <Hero pageData={page?.sections?.hero} />
               {summary.title && (
                 <section className="px-6 py-16">
@@ -95,20 +128,20 @@ const Home = () => {
               )}
             </React.Fragment>
           ),
-          showInstagramProfile: <TransformVision key="showInstagramProfile" />,
-          showServices: <ServicesSection key="showServices" />,
-          showShowreel: <ShowreelSection key="showShowreel" />,
-          showFeaturedAssets: <OurWorks key="showFeaturedAssets" />,
-          showCoursesPreview: <CoursesSection key="showCoursesPreview" />,
-          showStudentTestimonials: (
-            <React.Fragment key="showStudentTestimonials">
+          featuredAssets: <OurWorks key="featuredAssets" />,
+          instagramProfile: <TransformVision key="instagramProfile" />,
+          services: <ServicesSection key="services" />,
+          showreel: <ShowreelSection key="showreel" />,
+          coursesPreview: <CoursesSection key="coursesPreview" />,
+          studentTestimonials: (
+            <React.Fragment key="studentTestimonials">
               <ClientTestimonialsSection />
               <StudentVideos />
               <Testimonials />
             </React.Fragment>
           ),
-          showCta: <RightForYou key="showCta" />,
-          showFooterCta: <FAQ key="showFooterCta" />,
+          cta: <HomeCta key="cta" />,
+          footerCta: <FAQ key="footerCta" />,
         };
 
         return sections[sectionKey] || null;
@@ -117,5 +150,25 @@ const Home = () => {
     </main>
   );
 };
+
+const HomeCta = () => (
+  <section className="relative overflow-hidden px-6 py-20">
+    <div className="mx-auto max-w-6xl rounded-3xl border border-violet-500/20 bg-gradient-to-r from-[#1a124a]/70 to-[#0f0830]/60 px-6 py-8 shadow-2xl shadow-violet-950/20 md:px-10">
+      <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.3em] text-violet-300">PranvithDOP</p>
+          <h2 className="mt-3 text-2xl font-bold text-white md:text-4xl">Ready to create cinematic visuals?</h2>
+          <p className="mt-2 max-w-2xl text-sm text-white/65">Explore assets, courses, showreels, and production services built for serious creators.</p>
+        </div>
+        <a href="/hire" className="group inline-flex shrink-0 items-center gap-3 rounded-full bg-violet-600 px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-violet-500">
+          Book a Project
+          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-white/20 transition-transform group-hover:translate-x-0.5">
+            <ArrowRight size={11} />
+          </span>
+        </a>
+      </div>
+    </div>
+  </section>
+);
 
 export default Home;

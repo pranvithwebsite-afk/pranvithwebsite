@@ -14,27 +14,43 @@ const requiredPages = [
 ];
 
 const homeSections = [
-  ['showHero', 'Hero Section'],
-  ['showInstagramProfile', 'Instagram/Profile Section'],
-  ['showServices', 'Services Section'],
-  ['showShowreel', 'Showreel Section'],
-  ['showFeaturedAssets', 'Featured Assets Section'],
-  ['showCoursesPreview', 'Courses Preview Section'],
-  ['showStudentTestimonials', 'Student Testimonials Section'],
-  ['showCta', 'CTA Section'],
-  ['showFooterCta', 'Footer CTA Section'],
+  ['hero', 'Hero Section'],
+  ['featuredAssets', 'Featured Assets Section'],
+  ['instagramProfile', 'Instagram/Profile Section'],
+  ['services', 'Services Section'],
+  ['showreel', 'Showreel Section'],
+  ['coursesPreview', 'Courses Preview Section'],
+  ['studentTestimonials', 'Student Testimonials Section'],
+  ['cta', 'CTA Course Section'],
+  ['footerCta', 'Footer CTA Section'],
 ];
 
+const legacyHomeSectionKeys = {
+  showHero: 'hero',
+  showFeaturedAssets: 'featuredAssets',
+  showInstagramProfile: 'instagramProfile',
+  showServices: 'services',
+  showShowreel: 'showreel',
+  showCoursesPreview: 'coursesPreview',
+  showStudentTestimonials: 'studentTestimonials',
+  showCta: 'cta',
+  showFooterCta: 'footerCta',
+  transformVision: 'instagramProfile',
+  profile: 'instagramProfile',
+  worksPreview: 'showreel',
+  testimonials: 'studentTestimonials',
+};
+
 const defaultHomeVisibility = {
-  showHero: true,
-  showInstagramProfile: true,
-  showServices: true,
-  showShowreel: true,
-  showFeaturedAssets: true,
-  showCoursesPreview: false,
-  showStudentTestimonials: false,
-  showCta: true,
-  showFooterCta: true,
+  hero: true,
+  featuredAssets: true,
+  instagramProfile: true,
+  services: true,
+  showreel: true,
+  coursesPreview: false,
+  studentTestimonials: false,
+  cta: true,
+  footerCta: true,
   section_order: homeSections.map(([key]) => key),
 };
 
@@ -125,10 +141,27 @@ const mergeRequiredPages = (items) => requiredPages.map((required) => {
 });
 
 const normalizeHomeVisibility = (value = {}) => {
-  const merged = { ...defaultHomeVisibility, ...value };
+  const merged = { ...defaultHomeVisibility };
   const keys = homeSections.map(([key]) => key);
-  const incoming = Array.isArray(merged.section_order) ? merged.section_order : keys;
-  const order = incoming.filter((key, index) => keys.includes(key) && incoming.indexOf(key) === index);
+  keys.forEach((key) => {
+    if (Object.prototype.hasOwnProperty.call(value, key)) merged[key] = value[key];
+  });
+  Object.entries(legacyHomeSectionKeys).forEach(([oldKey, newKey]) => {
+    if (
+      Object.prototype.hasOwnProperty.call(value, oldKey)
+      && !Object.prototype.hasOwnProperty.call(value, newKey)
+    ) {
+      merged[newKey] = value[oldKey];
+    }
+  });
+  const incoming = Array.isArray(value.section_order) ? value.section_order : keys;
+  const order = [];
+  incoming.forEach((key) => {
+    const canonicalKey = legacyHomeSectionKeys[key] || key;
+    if (keys.includes(canonicalKey) && !order.includes(canonicalKey)) {
+      order.push(canonicalKey);
+    }
+  });
   keys.forEach((key) => {
     if (!order.includes(key)) order.push(key);
   });
@@ -544,6 +577,13 @@ const CoursesEditor = ({ draft, update, mediaItems }) => {
 
       <div className="rounded-3xl border border-slate-800 bg-slate-950 p-5">
         <h2 className="text-xl font-semibold text-white">Course Hero</h2>
+        <div className="mt-5">
+          <Toggle
+            label={'Show "Is This Course Right For You?" Section'}
+            checked={draft.course_page.show_right_for_you !== false}
+            onChange={(value) => updateCourse({ ...draft.course_page, show_right_for_you: value })}
+          />
+        </div>
         <div className="mt-5 grid gap-4 lg:grid-cols-2">
           <Field label="Heading"><input value={draft.course_page.hero?.heading || ''} onChange={(event) => updateHero('heading', event.target.value)} className={fieldClass} /></Field>
           <Field label="Subtitle"><textarea value={draft.course_page.hero?.subtitle || ''} onChange={(event) => updateHero('subtitle', event.target.value)} rows={3} className={`${fieldClass} resize-none`} /></Field>

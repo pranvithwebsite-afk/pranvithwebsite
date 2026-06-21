@@ -769,39 +769,63 @@ DEFAULT_HOME_HERO = {
 
 
 HOME_SECTION_KEYS = [
-    "showHero",
-    "showInstagramProfile",
-    "showServices",
-    "showShowreel",
-    "showFeaturedAssets",
-    "showCoursesPreview",
-    "showStudentTestimonials",
-    "showCta",
-    "showFooterCta",
+    "hero",
+    "featuredAssets",
+    "instagramProfile",
+    "services",
+    "showreel",
+    "coursesPreview",
+    "studentTestimonials",
+    "cta",
+    "footerCta",
 ]
+
+HOME_SECTION_ALIASES = {
+    "showHero": "hero",
+    "showFeaturedAssets": "featuredAssets",
+    "showInstagramProfile": "instagramProfile",
+    "showServices": "services",
+    "showShowreel": "showreel",
+    "showCoursesPreview": "coursesPreview",
+    "showStudentTestimonials": "studentTestimonials",
+    "showCta": "cta",
+    "showFooterCta": "footerCta",
+    "transformVision": "instagramProfile",
+    "profile": "instagramProfile",
+    "worksPreview": "showreel",
+    "testimonials": "studentTestimonials",
+}
 
 
 DEFAULT_HOME_VISIBILITY = {
-    "showHero": True,
-    "showInstagramProfile": True,
-    "showServices": True,
-    "showShowreel": True,
-    "showFeaturedAssets": True,
-    "showCoursesPreview": False,
-    "showStudentTestimonials": False,
-    "showCta": True,
-    "showFooterCta": True,
+    "hero": True,
+    "featuredAssets": True,
+    "instagramProfile": True,
+    "services": True,
+    "showreel": True,
+    "coursesPreview": False,
+    "studentTestimonials": False,
+    "cta": True,
+    "footerCta": True,
     "section_order": HOME_SECTION_KEYS,
 }
 
 
 def _safe_home_visibility(visibility: Optional[dict]) -> dict:
-    source = {**DEFAULT_HOME_VISIBILITY, **(visibility or {})}
+    raw = visibility or {}
+    source = {**DEFAULT_HOME_VISIBILITY}
+    for key in HOME_SECTION_KEYS:
+        if key in raw:
+            source[key] = raw.get(key)
+    for old_key, new_key in HOME_SECTION_ALIASES.items():
+        if old_key in raw and new_key not in raw:
+            source[new_key] = raw.get(old_key)
     incoming_order = source.get("section_order") or HOME_SECTION_KEYS
     safe_order = []
     for key in incoming_order:
-        if key in HOME_SECTION_KEYS and key not in safe_order:
-            safe_order.append(key)
+        canonical_key = HOME_SECTION_ALIASES.get(key, key)
+        if canonical_key in HOME_SECTION_KEYS and canonical_key not in safe_order:
+            safe_order.append(canonical_key)
     for key in HOME_SECTION_KEYS:
         if key not in safe_order:
             safe_order.append(key)
@@ -840,6 +864,7 @@ DEFAULT_INSTAGRAM_PROFILE = {
 
 
 DEFAULT_COURSE_PAGE = {
+    "show_right_for_you": True,
     "hero": {
         "heading": "Master Cinematic Video Editing",
         "subtitle": "Learn practical editing workflows, storytelling, color, sound, and delivery systems for real creator and client projects.",
@@ -1059,6 +1084,7 @@ def _safe_course_page(course_page: Optional[dict]) -> dict:
         }
 
     return {
+        "show_right_for_you": bool(source.get("show_right_for_you", True)),
         "hero": {
             "heading": str(hero_source.get("heading") or "").strip()[:180],
             "subtitle": str(hero_source.get("subtitle") or "").strip()[:600],

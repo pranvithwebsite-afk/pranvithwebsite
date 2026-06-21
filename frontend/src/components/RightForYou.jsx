@@ -2,7 +2,7 @@ import React from 'react';
 import { ArrowRight } from 'lucide-react';
 import { audienceCards } from '../data/mock';
 
-const RightForYou = () => {
+const RightForYou = ({ buttonLink = '/courses', buttonText = 'Start Now' }) => {
   return (
     <section className="relative py-24 overflow-hidden">
       <div className="absolute inset-0 grid-bg opacity-50" />
@@ -33,12 +33,12 @@ const RightForYou = () => {
         {/* Upgrade CTA bar */}
         <div className="mt-12 rounded-2xl bg-gradient-to-r from-[#1a124a]/60 to-[#0f0830]/40 border border-violet-500/20 px-6 md:px-8 py-5 flex items-center justify-between gap-4 flex-wrap">
           <p className="text-base md:text-lg font-medium text-white">UPGRADE YOUR EDITING SKILLS NOW</p>
-          <button className="group inline-flex items-center gap-3 bg-violet-600 hover:bg-violet-500 transition-colors text-white px-6 py-2.5 rounded-full text-sm font-semibold">
-            Start Now
+          <a href={buttonLink} className="group inline-flex items-center gap-3 bg-violet-600 hover:bg-violet-500 transition-colors text-white px-6 py-2.5 rounded-full text-sm font-semibold">
+            {buttonText}
             <span className="w-5 h-5 rounded-full bg-white/20 flex items-center justify-center group-hover:translate-x-0.5 transition-transform">
               <ArrowRight size={11} />
             </span>
-          </button>
+          </a>
         </div>
       </div>
     </section>

@@ -3,6 +3,7 @@ import { ArrowLeft, ArrowRight, Play, Star, X } from 'lucide-react';
 import { courses, faqs, studentVideos, testimonials, whatYoullLearn } from '../data/mock';
 import { fetchPublicSettings } from '../lib/api';
 import { handleImageError, safeImageSrc } from '../lib/utils';
+import RightForYou from './RightForYou';
 
 const fallbackThumbnail = courses[0]?.image || '';
 
@@ -16,6 +17,7 @@ export const defaultCourseVisibility = {
 };
 
 export const defaultCoursePageContent = {
+  show_right_for_you: true,
   hero: {
     heading: 'Master Cinematic Video Editing',
     subtitle: 'Learn practical editing workflows, storytelling, color, sound, and delivery systems for real creator and client projects.',
@@ -219,6 +221,8 @@ const CoursePageContent = ({ children }) => {
           </div>
         </div>
       </section>
+
+      {content.show_right_for_you !== false && <RightForYou />}
 
       {learnItems.length > 0 && (
         <section className="px-6 py-16">
