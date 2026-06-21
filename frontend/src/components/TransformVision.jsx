@@ -7,45 +7,44 @@ const instagramProfileUrl =
 
 const instagramCards = [
   {
-    title: 'Editing Reel',
+    title: 'Cinematic editing reel',
     type: 'REEL',
     coverText: 'EDIT REEL',
     background: 'linear-gradient(145deg, #7c3aed 0%, #312e81 50%, #090516 100%)',
     instagramUrl: instagramProfileUrl,
   },
   {
-    title: 'Video Editing Tips',
+    title: 'Behind the scenes',
     type: 'POST',
-    coverText: 'EDITING TIPS',
+    coverText: 'BTS',
     background: 'linear-gradient(145deg, #db2777 0%, #7e22ce 48%, #12051f 100%)',
     instagramUrl: instagramProfileUrl,
   },
   {
-    title: 'Before and After Edit',
+    title: 'Drone shot preview',
     type: 'VIDEO',
-    coverText: 'BEFORE / AFTER',
+    coverText: 'DRONE',
     background: 'linear-gradient(135deg, #111827 0%, #111827 49%, #7c3aed 50%, #c026d3 100%)',
     instagramUrl: instagramProfileUrl,
   },
   {
-    title: 'Motion Graphics',
+    title: 'Commercial frame',
     type: 'REEL',
-    coverText: 'MOTION',
+    coverText: 'COMMERCIAL',
     background: 'radial-gradient(circle at 30% 25%, #f472b6 0%, #7c3aed 35%, #111827 78%)',
     instagramUrl: instagramProfileUrl,
   },
   {
-    title: 'Client Work Preview',
+    title: 'DI color grade',
     type: 'POST',
-    coverText: 'CLIENT WORK',
+    coverText: 'DI',
     background: 'linear-gradient(160deg, #0f172a 0%, #581c87 55%, #be185d 100%)',
-    profileImage: true,
     instagramUrl: instagramProfileUrl,
   },
   {
-    title: 'Cinematic Edit',
+    title: 'Graphic design post',
     type: 'VIDEO',
-    coverText: 'CINEMATIC',
+    coverText: 'DESIGN',
     background: 'linear-gradient(145deg, #020617 0%, #312e81 48%, #9333ea 100%)',
     instagramUrl: instagramProfileUrl,
   },
@@ -101,33 +100,31 @@ const TransformVision = () => {
                     <div className="w-14 h-14 rounded-full overflow-hidden bg-gradient-to-br from-orange-500 to-rose-500">
                       <img
                         src={FALLBACK_IMAGE}
-                        alt="PranvithDOP"
+                        alt="Pranvith Dop"
                         className="w-full h-full object-cover"
                         onError={handleImageError}
                       />
                     </div>
                     <div className="flex-1">
-                      <div className="flex justify-between text-center">
+                      <div className="flex justify-around text-center">
                         <div>
-                          <div className="text-sm font-semibold">218</div>
-                          <div className="text-[10px] text-white/60">posts</div>
-                        </div>
-                        <div>
-                          <div className="text-sm font-semibold">109K</div>
+                          <div className="text-sm font-semibold">5,131</div>
                           <div className="text-[10px] text-white/60">followers</div>
                         </div>
                         <div>
-                          <div className="text-sm font-semibold">20</div>
+                          <div className="text-sm font-semibold">10</div>
                           <div className="text-[10px] text-white/60">following</div>
                         </div>
                       </div>
                     </div>
                   </div>
                   <div className="text-xs leading-tight">
-                    <div className="font-semibold">PRANAVITH</div>
-                    <div className="text-white/70">Video Editor &amp; Mentor</div>
-                    <div className="text-white/70">MASTERY VIDEO EDITING COURSE</div>
-                    <div className="text-violet-300 mt-1">t.me/pranvithdop</div>
+                    <div className="font-semibold">Pranvith Dop</div>
+                    <div className="text-white/70">🎥 DOP | Filmmaker | Video Editor</div>
+                    <div className="text-white/70">🚁 Drone Pilot | DI</div>
+                    <div className="text-white/70">📸 Product &amp; Commercial Photography</div>
+                    <div className="text-white/70">🎨 Graphic Design</div>
+                    <div className="text-violet-300 mt-1">youtube.com/@pranvithdop</div>
                   </div>
                   <a
                     href={instagramProfileUrl}
@@ -148,14 +145,6 @@ const TransformVision = () => {
                         className="group relative aspect-square overflow-hidden rounded border border-white/5 bg-violet-950"
                         style={{ background: card.background }}
                       >
-                        {card.profileImage && (
-                          <img
-                            src={FALLBACK_IMAGE}
-                            alt=""
-                            className="absolute inset-0 h-full w-full object-cover opacity-55 transition-transform duration-300 group-hover:scale-105"
-                            onError={handleImageError}
-                          />
-                        )}
                         <div className="absolute inset-0 opacity-30 [background-image:linear-gradient(rgba(255,255,255,.12)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,.12)_1px,transparent_1px)] [background-size:12px_12px]" />
                         <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/10 to-transparent" />
                         <span className="absolute inset-x-2 top-1/2 -translate-y-1/2 text-center text-[9px] font-black leading-tight tracking-wide text-white/90">

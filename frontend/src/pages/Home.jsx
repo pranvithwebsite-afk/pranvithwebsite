@@ -3,7 +3,6 @@ import Header from '../components/Header';
 import Hero from '../components/Hero';
 import RightForYou from '../components/RightForYou';
 import CoursesSection from '../components/Courses';
-import WhatYoullLearn from '../components/WhatYoullLearn';
 import TransformVision from '../components/TransformVision';
 import StudentVideos from '../components/StudentVideos';
 import OurWorks from '../components/OurWorks';
@@ -34,7 +33,6 @@ const Home = () => {
 
       <RightForYou />
       <CoursesSection />
-      <WhatYoullLearn />
       <TransformVision />
       <StudentVideos />
       <OurWorks />
