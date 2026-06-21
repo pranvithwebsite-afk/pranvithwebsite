@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Activity, ArrowDown, ArrowUp, Plus, Save, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { fetchAdminRazorpayHealth, fetchAdminSettings, saveAdminSettings } from '../../lib/api';
+import { fetchAdminMedia, fetchAdminRazorpayHealth, fetchAdminSettings, saveAdminSettings } from '../../lib/api';
 
 const defaultSettings = {
   site_name: '',
@@ -15,6 +15,21 @@ const defaultSettings = {
   meta_pixel_id: '',
   ga4_id: '',
   gtm_id: '',
+  home_hero: {
+    badge_text: 'Learn premium editing, LUTs, transitions, and storytelling workflows that get results.',
+    hero_title: 'Video Editing Mastery for Creators',
+    hero_subtitle: 'Master the art of video editing with our comprehensive courses. From beginner basics to advanced techniques, learn professional editing skills that transform your creative vision into stunning reality.',
+    primary_button_text: 'Explore Assets',
+    primary_button_link: '/assets',
+    secondary_button_text: 'Join Community',
+    secondary_button_link: '/courses',
+    hero_media_type: 'image',
+    hero_media_url: 'https://images.unsplash.com/photo-1574717024653-61fd2cf4d44d?w=1600&q=80',
+    hero_media_poster_url: '',
+    hero_media_autoplay: true,
+    hero_media_muted: true,
+    hero_media_loop: true,
+  },
   instagram_profile: {
     username: 'pranvith_dop',
     display_name: 'Pranvith Dop',
@@ -60,6 +75,7 @@ const Settings = () => {
   const [checkingRazorpay, setCheckingRazorpay] = useState(false);
   const [razorpayHealth, setRazorpayHealth] = useState(null);
   const [razorpayHealthError, setRazorpayHealthError] = useState('');
+  const [mediaItems, setMediaItems] = useState([]);
 
   useEffect(() => {
     fetchAdminSettings()
@@ -67,6 +83,10 @@ const Settings = () => {
         setSettings({
           ...defaultSettings,
           ...(data || {}),
+          home_hero: {
+            ...defaultSettings.home_hero,
+            ...(data?.home_hero || {}),
+          },
           instagram_profile: {
             ...defaultSettings.instagram_profile,
             ...(data?.instagram_profile || {}),
@@ -83,6 +103,10 @@ const Settings = () => {
         toast.error('Failed to load settings');
       })
       .finally(() => setLoading(false));
+
+    fetchAdminMedia()
+      .then((data) => setMediaItems(Array.isArray(data) ? data : []))
+      .catch(() => setMediaItems([]));
   }, []);
 
   const update = (field, value) => {
@@ -95,6 +119,16 @@ const Settings = () => {
       ...current,
       instagram_profile: {
         ...(current.instagram_profile || defaultSettings.instagram_profile),
+        [field]: value,
+      },
+    }));
+  };
+
+  const updateHomeHero = (field, value) => {
+    setSettings((current) => ({
+      ...current,
+      home_hero: {
+        ...(current.home_hero || defaultSettings.home_hero),
         [field]: value,
       },
     }));
@@ -171,6 +205,9 @@ const Settings = () => {
         site_name: settings.site_name.trim(),
         site_description: settings.site_description.trim(),
         theme: settings.theme.trim().toLowerCase(),
+        home_hero: {
+          ...(settings.home_hero || defaultSettings.home_hero),
+        },
         instagram_profile: {
           ...(settings.instagram_profile || defaultSettings.instagram_profile),
           cards: (settings.instagram_profile?.cards || []).map((card, index) => ({
@@ -183,6 +220,10 @@ const Settings = () => {
       setSettings({
         ...defaultSettings,
         ...(result.settings || payload),
+        home_hero: {
+          ...defaultSettings.home_hero,
+          ...((result.settings || payload).home_hero || {}),
+        },
         instagram_profile: {
           ...defaultSettings.instagram_profile,
           ...((result.settings || payload).instagram_profile || {}),
@@ -284,6 +325,91 @@ const Settings = () => {
             <input type="checkbox" checked={settings.notifications_enabled} onChange={(event) => update('notifications_enabled', event.target.checked)} className="h-5 w-5 rounded border-slate-700 bg-slate-900 text-violet-500" />
             Enable site notifications for CMS events
           </label>
+
+          <div className="rounded-3xl border border-slate-800 bg-slate-900/60 p-5">
+            <div className="mb-5">
+              <h2 className="text-xl font-semibold text-white">Home Hero Section</h2>
+              <p className="mt-2 text-sm text-slate-400">Controls the top hero copy, buttons, and media preview on the Home page.</p>
+            </div>
+
+            <div className="grid gap-6 lg:grid-cols-2">
+              <Field label="Badge text">
+                <input value={settings.home_hero.badge_text} onChange={(event) => updateHomeHero('badge_text', event.target.value)} className={fieldClass} />
+              </Field>
+              <Field label="Hero title">
+                <input value={settings.home_hero.hero_title} onChange={(event) => updateHomeHero('hero_title', event.target.value)} className={fieldClass} />
+              </Field>
+            </div>
+
+            <div className="mt-6">
+              <Field label="Hero subtitle">
+                <textarea value={settings.home_hero.hero_subtitle} onChange={(event) => updateHomeHero('hero_subtitle', event.target.value)} rows={4} className={`${fieldClass} min-h-[120px] resize-none`} />
+              </Field>
+            </div>
+
+            <div className="mt-6 grid gap-6 lg:grid-cols-2">
+              <Field label="Primary button text">
+                <input value={settings.home_hero.primary_button_text} onChange={(event) => updateHomeHero('primary_button_text', event.target.value)} className={fieldClass} />
+              </Field>
+              <Field label="Primary button link">
+                <input value={settings.home_hero.primary_button_link} onChange={(event) => updateHomeHero('primary_button_link', event.target.value)} className={fieldClass} />
+              </Field>
+              <Field label="Secondary button text">
+                <input value={settings.home_hero.secondary_button_text} onChange={(event) => updateHomeHero('secondary_button_text', event.target.value)} className={fieldClass} />
+              </Field>
+              <Field label="Secondary button link">
+                <input value={settings.home_hero.secondary_button_link} onChange={(event) => updateHomeHero('secondary_button_link', event.target.value)} className={fieldClass} />
+              </Field>
+            </div>
+
+            <div className="mt-6 grid gap-6 lg:grid-cols-3">
+              <Field label="Hero media type">
+                <select value={settings.home_hero.hero_media_type} onChange={(event) => updateHomeHero('hero_media_type', event.target.value)} className={fieldClass}>
+                  <option value="image">image</option>
+                  <option value="video_file">video_file</option>
+                  <option value="video_url">video_url</option>
+                </select>
+              </Field>
+              <Field label="Hero media URL">
+                <input value={settings.home_hero.hero_media_url} onChange={(event) => updateHomeHero('hero_media_url', event.target.value)} className={fieldClass} />
+              </Field>
+              <Field label="Poster/thumbnail URL optional">
+                <input value={settings.home_hero.hero_media_poster_url} onChange={(event) => updateHomeHero('hero_media_poster_url', event.target.value)} className={fieldClass} />
+              </Field>
+            </div>
+
+            {mediaItems.length > 0 && (
+              <div className="mt-4 grid gap-4 lg:grid-cols-2">
+                <select value="" onChange={(event) => event.target.value && updateHomeHero('hero_media_url', event.target.value)} className={fieldClass}>
+                  <option value="">Select uploaded hero image/video</option>
+                  {mediaItems.map((item) => (
+                    <option key={item.id} value={item.url}>{item.title || item.url}</option>
+                  ))}
+                </select>
+                <select value="" onChange={(event) => event.target.value && updateHomeHero('hero_media_poster_url', event.target.value)} className={fieldClass}>
+                  <option value="">Select uploaded poster/thumbnail</option>
+                  {mediaItems.filter((item) => String(item.type || '').startsWith('image/')).map((item) => (
+                    <option key={item.id} value={item.url}>{item.title || item.url}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            <div className="mt-6 grid gap-4 sm:grid-cols-3">
+              <label className="flex items-center gap-3 text-sm text-slate-200">
+                <input type="checkbox" checked={!!settings.home_hero.hero_media_autoplay} onChange={(event) => updateHomeHero('hero_media_autoplay', event.target.checked)} className="h-5 w-5 rounded border-slate-700 bg-slate-900 text-violet-500" />
+                Autoplay
+              </label>
+              <label className="flex items-center gap-3 text-sm text-slate-200">
+                <input type="checkbox" checked={!!settings.home_hero.hero_media_muted} onChange={(event) => updateHomeHero('hero_media_muted', event.target.checked)} className="h-5 w-5 rounded border-slate-700 bg-slate-900 text-violet-500" />
+                Muted
+              </label>
+              <label className="flex items-center gap-3 text-sm text-slate-200">
+                <input type="checkbox" checked={!!settings.home_hero.hero_media_loop} onChange={(event) => updateHomeHero('hero_media_loop', event.target.checked)} className="h-5 w-5 rounded border-slate-700 bg-slate-900 text-violet-500" />
+                Loop
+              </label>
+            </div>
+          </div>
 
           <div className="rounded-3xl border border-slate-800 bg-slate-900/60 p-5">
             <div className="mb-5">

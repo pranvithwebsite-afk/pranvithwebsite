@@ -503,6 +503,7 @@ class SettingsPayload(BaseModel):
     ga4_id: Optional[str] = None
     gtm_id: Optional[str] = None
     instagram_profile: Optional[Dict[str, Any]] = None
+    home_hero: Optional[Dict[str, Any]] = None
 
     @field_validator("logo_url")
     @classmethod
@@ -513,6 +514,11 @@ class SettingsPayload(BaseModel):
     @classmethod
     def validate_instagram_profile(cls, value):
         return _safe_instagram_profile(value)
+
+    @field_validator("home_hero")
+    @classmethod
+    def validate_home_hero(cls, value):
+        return _safe_home_hero(value)
 
 
 class HireRequestIn(BaseModel):
@@ -644,6 +650,7 @@ async def public_settings():
             "contact_phone": "+91 9059867883",
             "contact_address": "Hyderabad, India",
             "instagram_profile": DEFAULT_INSTAGRAM_PROFILE,
+            "home_hero": DEFAULT_HOME_HERO,
         }
     return _safe_settings(settings_doc)
 
@@ -661,6 +668,7 @@ PUBLIC_SETTINGS_FIELDS = {
     "ga4_id",
     "gtm_id",
     "instagram_profile",
+    "home_hero",
 }
 
 
@@ -672,7 +680,26 @@ def _safe_settings(settings: Optional[dict]) -> dict:
     }
     if "instagram_profile" in safe:
         safe["instagram_profile"] = _safe_instagram_profile(safe.get("instagram_profile"))
+    if "home_hero" in safe:
+        safe["home_hero"] = _safe_home_hero(safe.get("home_hero"))
     return safe
+
+
+DEFAULT_HOME_HERO = {
+    "badge_text": "Learn premium editing, LUTs, transitions, and storytelling workflows that get results.",
+    "hero_title": "Video Editing Mastery for Creators",
+    "hero_subtitle": "Master the art of video editing with our comprehensive courses. From beginner basics to advanced techniques, learn professional editing skills that transform your creative vision into stunning reality.",
+    "primary_button_text": "Explore Assets",
+    "primary_button_link": "/assets",
+    "secondary_button_text": "Join Community",
+    "secondary_button_link": "/courses",
+    "hero_media_type": "image",
+    "hero_media_url": "https://images.unsplash.com/photo-1574717024653-61fd2cf4d44d?w=1600&q=80",
+    "hero_media_poster_url": "",
+    "hero_media_autoplay": True,
+    "hero_media_muted": True,
+    "hero_media_loop": True,
+}
 
 
 DEFAULT_INSTAGRAM_PROFILE = {
@@ -698,6 +725,47 @@ DEFAULT_INSTAGRAM_PROFILE = {
         {"title": "Graphic design post", "type": "Video", "thumbnail_image_url": "", "link_url": "https://www.instagram.com/pranvith_dop?utm_source=ig_web_button_share_sheet&igsh=ZDNlZDc0MzIxNw==", "enabled": True, "sort_order": 5},
     ],
 }
+
+
+def _safe_home_hero(hero: Optional[dict]) -> dict:
+    source = {**DEFAULT_HOME_HERO, **(hero or {})}
+    media_type = str(source.get("hero_media_type") or "image").strip()
+    if media_type not in {"image", "video_file", "video_url"}:
+        raise ValueError("hero_media_type must be image, video_file, or video_url")
+    return {
+        "badge_text": str(source.get("badge_text") or "").strip()[:240],
+        "hero_title": str(source.get("hero_title") or "").strip()[:160],
+        "hero_subtitle": str(source.get("hero_subtitle") or "").strip()[:500],
+        "primary_button_text": str(source.get("primary_button_text") or "").strip()[:80],
+        "primary_button_link": _reject_unsafe_url(source.get("primary_button_link") or "") or "",
+        "secondary_button_text": str(source.get("secondary_button_text") or "").strip()[:80],
+        "secondary_button_link": _reject_unsafe_url(source.get("secondary_button_link") or "") or "",
+        "hero_media_type": media_type,
+        "hero_media_url": _safe_hero_media_url(media_type, source.get("hero_media_url") or ""),
+        "hero_media_poster_url": _reject_unsafe_url(source.get("hero_media_poster_url") or "") or "",
+        "hero_media_autoplay": bool(source.get("hero_media_autoplay", True)),
+        "hero_media_muted": bool(source.get("hero_media_muted", True)),
+        "hero_media_loop": bool(source.get("hero_media_loop", True)),
+    }
+
+
+def _safe_hero_media_url(media_type: str, value: Optional[str]) -> str:
+    cleaned = _reject_unsafe_url(value) or ""
+    if not cleaned:
+        return ""
+    if media_type != "video_url":
+        return cleaned
+    if cleaned.startswith("/") and not cleaned.startswith("//"):
+        return cleaned
+    parsed = urlparse(cleaned)
+    host = (parsed.netloc or "").lower()
+    path = (parsed.path or "").lower()
+    is_youtube = host in {"youtube.com", "www.youtube.com", "m.youtube.com", "youtu.be", "www.youtu.be"}
+    is_vimeo = host in {"vimeo.com", "www.vimeo.com", "player.vimeo.com"}
+    is_direct_video = path.endswith((".mp4", ".webm"))
+    if not (is_youtube or is_vimeo or is_direct_video):
+        raise ValueError("video_url must be YouTube, Vimeo, or a direct mp4/webm URL")
+    return cleaned
 
 
 def _safe_instagram_profile(profile: Optional[dict]) -> dict:
