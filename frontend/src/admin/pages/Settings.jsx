@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Activity, ArrowDown, ArrowUp, Plus, Save, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { fetchAdminMedia, fetchAdminRazorpayHealth, fetchAdminSettings, saveAdminSettings } from '../../lib/api';
+import { defaultCoursePageContent } from '../../components/CoursePageContent';
 
 const defaultSettings = {
   site_name: '',
@@ -50,6 +51,7 @@ const defaultSettings = {
       { title: 'Drone shot preview', type: 'Video', thumbnail_image_url: '', link_url: 'https://www.instagram.com/pranvith_dop?utm_source=ig_web_button_share_sheet&igsh=ZDNlZDc0MzIxNw==', enabled: true, sort_order: 2 },
     ],
   },
+  course_page: defaultCoursePageContent,
 };
 
 const fieldClass = 'w-full rounded-2xl border border-slate-800 bg-slate-900 px-4 py-3 text-white outline-none focus:border-violet-500';
@@ -93,6 +95,29 @@ const Settings = () => {
             cards: Array.isArray(data?.instagram_profile?.cards)
               ? data.instagram_profile.cards
               : defaultSettings.instagram_profile.cards,
+          },
+          course_page: {
+            ...defaultSettings.course_page,
+            ...(data?.course_page || {}),
+            hero: {
+              ...defaultSettings.course_page.hero,
+              ...(data?.course_page?.hero || {}),
+            },
+            learn_items: Array.isArray(data?.course_page?.learn_items)
+              ? data.course_page.learn_items
+              : defaultSettings.course_page.learn_items,
+            testimonial_videos: Array.isArray(data?.course_page?.testimonial_videos)
+              ? data.course_page.testimonial_videos
+              : defaultSettings.course_page.testimonial_videos,
+            text_reviews: Array.isArray(data?.course_page?.text_reviews)
+              ? data.course_page.text_reviews
+              : defaultSettings.course_page.text_reviews,
+            comments: Array.isArray(data?.course_page?.comments)
+              ? data.course_page.comments
+              : defaultSettings.course_page.comments,
+            faqs: Array.isArray(data?.course_page?.faqs)
+              ? data.course_page.faqs
+              : defaultSettings.course_page.faqs,
           },
         });
         setLoadError('');
@@ -192,6 +217,70 @@ const Settings = () => {
     });
   };
 
+  const updateCourseHero = (field, value) => {
+    setSettings((current) => ({
+      ...current,
+      course_page: {
+        ...(current.course_page || defaultSettings.course_page),
+        hero: {
+          ...defaultSettings.course_page.hero,
+          ...(current.course_page?.hero || {}),
+          [field]: value,
+        },
+      },
+    }));
+  };
+
+  const updateCourseItem = (section, index, field, value) => {
+    setSettings((current) => {
+      const coursePage = current.course_page || defaultSettings.course_page;
+      const items = [...(coursePage[section] || [])];
+      items[index] = { ...(items[index] || {}), [field]: value };
+      return {
+        ...current,
+        course_page: {
+          ...coursePage,
+          [section]: items.map((item, sortOrder) => ({ ...item, sort_order: sortOrder })),
+        },
+      };
+    });
+  };
+
+  const addCourseItem = (section, item) => {
+    setSettings((current) => {
+      const coursePage = current.course_page || defaultSettings.course_page;
+      const items = [...(coursePage[section] || []), { ...item, sort_order: (coursePage[section] || []).length }];
+      return { ...current, course_page: { ...coursePage, [section]: items } };
+    });
+  };
+
+  const removeCourseItem = (section, index) => {
+    setSettings((current) => {
+      const coursePage = current.course_page || defaultSettings.course_page;
+      const items = (coursePage[section] || [])
+        .filter((_, currentIndex) => currentIndex !== index)
+        .map((item, sortOrder) => ({ ...item, sort_order: sortOrder }));
+      return { ...current, course_page: { ...coursePage, [section]: items } };
+    });
+  };
+
+  const moveCourseItem = (section, index, direction) => {
+    setSettings((current) => {
+      const coursePage = current.course_page || defaultSettings.course_page;
+      const items = [...(coursePage[section] || [])];
+      const nextIndex = index + direction;
+      if (nextIndex < 0 || nextIndex >= items.length) return current;
+      [items[index], items[nextIndex]] = [items[nextIndex], items[index]];
+      return {
+        ...current,
+        course_page: {
+          ...coursePage,
+          [section]: items.map((item, sortOrder) => ({ ...item, sort_order: sortOrder })),
+        },
+      };
+    });
+  };
+
   const handleSave = async (event) => {
     event.preventDefault();
     const nextErrors = validateSettings(settings);
@@ -215,6 +304,18 @@ const Settings = () => {
             sort_order: index,
           })),
         },
+        course_page: {
+          ...(settings.course_page || defaultSettings.course_page),
+          hero: {
+            ...defaultSettings.course_page.hero,
+            ...(settings.course_page?.hero || {}),
+          },
+          learn_items: (settings.course_page?.learn_items || []).map((item, index) => ({ ...item, sort_order: index })),
+          testimonial_videos: (settings.course_page?.testimonial_videos || []).map((item, index) => ({ ...item, sort_order: index })),
+          text_reviews: (settings.course_page?.text_reviews || []).map((item, index) => ({ ...item, sort_order: index })),
+          comments: (settings.course_page?.comments || []).map((item, index) => ({ ...item, sort_order: index })),
+          faqs: (settings.course_page?.faqs || []).map((item, index) => ({ ...item, sort_order: index })),
+        },
       };
       const result = await saveAdminSettings(payload);
       setSettings({
@@ -227,6 +328,14 @@ const Settings = () => {
         instagram_profile: {
           ...defaultSettings.instagram_profile,
           ...((result.settings || payload).instagram_profile || {}),
+        },
+        course_page: {
+          ...defaultSettings.course_page,
+          ...((result.settings || payload).course_page || {}),
+          hero: {
+            ...defaultSettings.course_page.hero,
+            ...((result.settings || payload).course_page?.hero || {}),
+          },
         },
       });
       toast.success('Settings saved successfully');
@@ -507,6 +616,16 @@ const Settings = () => {
             </div>
           </div>
 
+          <CoursePageEditor
+            coursePage={settings.course_page || defaultSettings.course_page}
+            mediaItems={mediaItems}
+            onHeroChange={updateCourseHero}
+            onItemChange={updateCourseItem}
+            onAddItem={addCourseItem}
+            onRemoveItem={removeCourseItem}
+            onMoveItem={moveCourseItem}
+          />
+
           <div className="flex justify-end">
             <button type="submit" disabled={saving} className="inline-flex items-center gap-2 rounded-2xl bg-violet-600 px-5 py-3 text-sm font-semibold text-white hover:bg-violet-500 disabled:opacity-50">
               <Save size={16} />
@@ -560,6 +679,260 @@ const HealthItem = ({ label, value, ok }) => (
   <div className="rounded-2xl border border-slate-800 bg-slate-900 px-4 py-3">
     <p className="text-xs text-slate-500">{label}</p>
     <p className={`mt-1 font-semibold ${ok ? 'text-emerald-300' : 'text-amber-300'}`}>{value}</p>
+  </div>
+);
+
+const courseAddTemplates = {
+  learn_items: { title: 'New lesson outcome', description: '', icon: '', enabled: true },
+  testimonial_videos: { student_name: 'New student', course_name: '', thumbnail_image_url: '', video_type: 'video_url', video_url: '', review_text: '', rating: 5, enabled: true },
+  text_reviews: { student_name: 'New student', student_image_url: '', course_name: '', rating: 5, review_text: '', enabled: true },
+  comments: { student_name: 'New student', comment_text: '', date: '', enabled: true },
+  faqs: { question: 'New question', answer: '', enabled: true },
+};
+
+const CoursePageEditor = ({
+  coursePage,
+  mediaItems,
+  onHeroChange,
+  onItemChange,
+  onAddItem,
+  onRemoveItem,
+  onMoveItem,
+}) => {
+  const imageItems = mediaItems.filter((item) => String(item.type || '').startsWith('image/'));
+  const videoItems = mediaItems.filter((item) => String(item.type || '').startsWith('video/'));
+
+  return (
+    <div className="rounded-3xl border border-slate-800 bg-slate-900/60 p-5">
+      <div className="mb-6">
+        <h2 className="text-xl font-semibold text-white">Course Page Content</h2>
+        <p className="mt-2 text-sm text-slate-400">Simple editable content for /courses. Course cards and checkout stay unchanged.</p>
+      </div>
+
+      <div className="rounded-2xl border border-slate-800 bg-slate-950 p-4">
+        <h3 className="mb-4 text-lg font-semibold text-white">Course Hero / Intro</h3>
+        <div className="grid gap-4 lg:grid-cols-2">
+          <Field label="Heading">
+            <input value={coursePage.hero?.heading || ''} onChange={(event) => onHeroChange('heading', event.target.value)} className={fieldClass} />
+          </Field>
+          <Field label="Button text">
+            <input value={coursePage.hero?.button_text || ''} onChange={(event) => onHeroChange('button_text', event.target.value)} className={fieldClass} />
+          </Field>
+          <Field label="Button link">
+            <input value={coursePage.hero?.button_link || ''} onChange={(event) => onHeroChange('button_link', event.target.value)} className={fieldClass} />
+          </Field>
+          <Field label="Image/video URL optional">
+            <input value={coursePage.hero?.media_url || ''} onChange={(event) => onHeroChange('media_url', event.target.value)} className={fieldClass} />
+          </Field>
+        </div>
+        <div className="mt-4">
+          <Field label="Subtitle">
+            <textarea value={coursePage.hero?.subtitle || ''} onChange={(event) => onHeroChange('subtitle', event.target.value)} rows={4} className={`${fieldClass} resize-none`} />
+          </Field>
+        </div>
+        {mediaItems.length > 0 && (
+          <div className="mt-4">
+            <select value="" onChange={(event) => event.target.value && onHeroChange('media_url', event.target.value)} className={fieldClass}>
+              <option value="">Select hero media from Media Library</option>
+              {mediaItems.map((item) => (
+                <option key={item.id} value={item.url}>{item.title || item.url}</option>
+              ))}
+            </select>
+          </div>
+        )}
+      </div>
+
+      <CourseRepeater
+        title="What You'll Learn"
+        section="learn_items"
+        items={coursePage.learn_items || []}
+        addLabel="Add learning item"
+        onAddItem={onAddItem}
+        onItemChange={onItemChange}
+        onRemoveItem={onRemoveItem}
+        onMoveItem={onMoveItem}
+        renderFields={(item, index) => (
+          <div className="grid gap-4 lg:grid-cols-2">
+            <Field label="Title">
+              <input value={item.title || ''} onChange={(event) => onItemChange('learn_items', index, 'title', event.target.value)} className={fieldClass} />
+            </Field>
+            <Field label="Icon optional">
+              <input value={item.icon || ''} onChange={(event) => onItemChange('learn_items', index, 'icon', event.target.value)} className={fieldClass} />
+            </Field>
+            <Field label="Description">
+              <textarea value={item.description || ''} onChange={(event) => onItemChange('learn_items', index, 'description', event.target.value)} rows={3} className={`${fieldClass} resize-none lg:col-span-2`} />
+            </Field>
+          </div>
+        )}
+      />
+
+      <CourseRepeater
+        title="Student Testimonial Videos"
+        section="testimonial_videos"
+        items={coursePage.testimonial_videos || []}
+        addLabel="Add video testimonial"
+        onAddItem={onAddItem}
+        onItemChange={onItemChange}
+        onRemoveItem={onRemoveItem}
+        onMoveItem={onMoveItem}
+        renderFields={(item, index) => (
+          <div className="grid gap-4 lg:grid-cols-2">
+            <Field label="Student name">
+              <input value={item.student_name || ''} onChange={(event) => onItemChange('testimonial_videos', index, 'student_name', event.target.value)} className={fieldClass} />
+            </Field>
+            <Field label="Course name optional">
+              <input value={item.course_name || ''} onChange={(event) => onItemChange('testimonial_videos', index, 'course_name', event.target.value)} className={fieldClass} />
+            </Field>
+            <Field label="Thumbnail image URL">
+              <input value={item.thumbnail_image_url || ''} onChange={(event) => onItemChange('testimonial_videos', index, 'thumbnail_image_url', event.target.value)} className={fieldClass} />
+            </Field>
+            <Field label="Video type">
+              <select value={item.video_type || 'video_url'} onChange={(event) => onItemChange('testimonial_videos', index, 'video_type', event.target.value)} className={fieldClass}>
+                <option value="video_file">video_file</option>
+                <option value="video_url">video_url</option>
+                <option value="youtube">youtube</option>
+                <option value="vimeo">vimeo</option>
+              </select>
+            </Field>
+            <Field label="Video URL">
+              <input value={item.video_url || ''} onChange={(event) => onItemChange('testimonial_videos', index, 'video_url', event.target.value)} className={fieldClass} />
+            </Field>
+            <Field label="Rating optional">
+              <input type="number" min="1" max="5" value={item.rating || ''} onChange={(event) => onItemChange('testimonial_videos', index, 'rating', event.target.value)} className={fieldClass} />
+            </Field>
+            {imageItems.length > 0 && (
+              <select value="" onChange={(event) => event.target.value && onItemChange('testimonial_videos', index, 'thumbnail_image_url', event.target.value)} className={fieldClass}>
+                <option value="">Select thumbnail from Media Library</option>
+                {imageItems.map((media) => <option key={media.id} value={media.url}>{media.title || media.url}</option>)}
+              </select>
+            )}
+            {videoItems.length > 0 && (
+              <select value="" onChange={(event) => event.target.value && onItemChange('testimonial_videos', index, 'video_url', event.target.value)} className={fieldClass}>
+                <option value="">Select video from Media Library</option>
+                {videoItems.map((media) => <option key={media.id} value={media.url}>{media.title || media.url}</option>)}
+              </select>
+            )}
+            <Field label="Review text optional">
+              <textarea value={item.review_text || ''} onChange={(event) => onItemChange('testimonial_videos', index, 'review_text', event.target.value)} rows={3} className={`${fieldClass} resize-none`} />
+            </Field>
+          </div>
+        )}
+      />
+
+      <CourseRepeater
+        title="Student Text Reviews"
+        section="text_reviews"
+        items={coursePage.text_reviews || []}
+        addLabel="Add text review"
+        onAddItem={onAddItem}
+        onItemChange={onItemChange}
+        onRemoveItem={onRemoveItem}
+        onMoveItem={onMoveItem}
+        renderFields={(item, index) => (
+          <div className="grid gap-4 lg:grid-cols-2">
+            <Field label="Student name">
+              <input value={item.student_name || ''} onChange={(event) => onItemChange('text_reviews', index, 'student_name', event.target.value)} className={fieldClass} />
+            </Field>
+            <Field label="Student image URL optional">
+              <input value={item.student_image_url || ''} onChange={(event) => onItemChange('text_reviews', index, 'student_image_url', event.target.value)} className={fieldClass} />
+            </Field>
+            <Field label="Course name optional">
+              <input value={item.course_name || ''} onChange={(event) => onItemChange('text_reviews', index, 'course_name', event.target.value)} className={fieldClass} />
+            </Field>
+            <Field label="Rating optional">
+              <input type="number" min="1" max="5" value={item.rating || ''} onChange={(event) => onItemChange('text_reviews', index, 'rating', event.target.value)} className={fieldClass} />
+            </Field>
+            <Field label="Review text">
+              <textarea value={item.review_text || ''} onChange={(event) => onItemChange('text_reviews', index, 'review_text', event.target.value)} rows={3} className={`${fieldClass} resize-none`} />
+            </Field>
+          </div>
+        )}
+      />
+
+      <CourseRepeater
+        title="Student Comments"
+        section="comments"
+        items={coursePage.comments || []}
+        addLabel="Add comment"
+        onAddItem={onAddItem}
+        onItemChange={onItemChange}
+        onRemoveItem={onRemoveItem}
+        onMoveItem={onMoveItem}
+        renderFields={(item, index) => (
+          <div className="grid gap-4 lg:grid-cols-2">
+            <Field label="Student name">
+              <input value={item.student_name || ''} onChange={(event) => onItemChange('comments', index, 'student_name', event.target.value)} className={fieldClass} />
+            </Field>
+            <Field label="Date optional">
+              <input value={item.date || ''} onChange={(event) => onItemChange('comments', index, 'date', event.target.value)} className={fieldClass} />
+            </Field>
+            <Field label="Comment text">
+              <textarea value={item.comment_text || ''} onChange={(event) => onItemChange('comments', index, 'comment_text', event.target.value)} rows={3} className={`${fieldClass} resize-none`} />
+            </Field>
+          </div>
+        )}
+      />
+
+      <CourseRepeater
+        title="Course FAQ"
+        section="faqs"
+        items={coursePage.faqs || []}
+        addLabel="Add FAQ"
+        onAddItem={onAddItem}
+        onItemChange={onItemChange}
+        onRemoveItem={onRemoveItem}
+        onMoveItem={onMoveItem}
+        renderFields={(item, index) => (
+          <div className="grid gap-4">
+            <Field label="Question">
+              <input value={item.question || ''} onChange={(event) => onItemChange('faqs', index, 'question', event.target.value)} className={fieldClass} />
+            </Field>
+            <Field label="Answer">
+              <textarea value={item.answer || ''} onChange={(event) => onItemChange('faqs', index, 'answer', event.target.value)} rows={3} className={`${fieldClass} resize-none`} />
+            </Field>
+          </div>
+        )}
+      />
+    </div>
+  );
+};
+
+const CourseRepeater = ({
+  title,
+  section,
+  items,
+  addLabel,
+  renderFields,
+  onAddItem,
+  onItemChange,
+  onRemoveItem,
+  onMoveItem,
+}) => (
+  <div className="mt-6 rounded-2xl border border-slate-800 bg-slate-950 p-4">
+    <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+      <h3 className="text-lg font-semibold text-white">{title}</h3>
+      <button type="button" onClick={() => onAddItem(section, courseAddTemplates[section])} className="inline-flex items-center gap-2 rounded-2xl border border-slate-700 px-4 py-2 text-sm font-semibold text-white hover:border-violet-500">
+        <Plus size={15} /> {addLabel}
+      </button>
+    </div>
+    <div className="space-y-4">
+      {items.map((item, index) => (
+        <div key={`${section}-${index}`} className="rounded-2xl border border-slate-800 bg-slate-900/80 p-4">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <label className="flex items-center gap-3 text-sm text-slate-200">
+              <input type="checkbox" checked={item.enabled !== false} onChange={(event) => onItemChange(section, index, 'enabled', event.target.checked)} className="h-5 w-5 rounded border-slate-700 bg-slate-900 text-violet-500" />
+              Enabled
+            </label>
+            <div className="flex gap-2">
+              <button type="button" onClick={() => onMoveItem(section, index, -1)} disabled={index === 0} className="rounded-lg border border-slate-700 p-2 text-slate-200 disabled:opacity-30"><ArrowUp size={14} /></button>
+              <button type="button" onClick={() => onMoveItem(section, index, 1)} disabled={index === items.length - 1} className="rounded-lg border border-slate-700 p-2 text-slate-200 disabled:opacity-30"><ArrowDown size={14} /></button>
+              <button type="button" onClick={() => onRemoveItem(section, index)} className="rounded-lg border border-rose-500/30 p-2 text-rose-300 hover:bg-rose-500/10"><Trash2 size={14} /></button>
+            </div>
+          </div>
+          {renderFields(item, index)}
+        </div>
+      ))}
+    </div>
   </div>
 );
 

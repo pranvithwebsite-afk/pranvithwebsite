@@ -1,17 +1,46 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
 import CoursesSection from '../components/Courses';
+import CoursePageContent, {
+  CourseComingSoon,
+  defaultCourseVisibility,
+  shouldShowCourseComingSoon,
+} from '../components/CoursePageContent';
+import { fetchPublicSettings } from '../lib/api';
 
 const Courses = () => {
+  const [visibility, setVisibility] = useState(defaultCourseVisibility);
+
+  useEffect(() => {
+    let mounted = true;
+    fetchPublicSettings()
+      .then((settings) => {
+        if (mounted) {
+          setVisibility({
+            ...defaultCourseVisibility,
+            ...(settings?.course_visibility || {}),
+          });
+        }
+      })
+      .catch(() => {
+        if (mounted) setVisibility(defaultCourseVisibility);
+      });
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
   return (
     <main className="page bg-[#070314] text-white">
       <Header />
-      <div className="pt-8 pb-10 text-center">
-        <h1 className="text-5xl md:text-6xl font-bold tracking-tight">All Courses</h1>
-        <p className="mt-4 text-white/65 max-w-xl mx-auto px-6">Explore our complete catalog of professional video editing courses.</p>
-      </div>
-      <CoursesSection />
+      {shouldShowCourseComingSoon(visibility) ? (
+        <CourseComingSoon visibility={visibility} />
+      ) : (
+        <CoursePageContent>
+          <CoursesSection />
+        </CoursePageContent>
+      )}
       <Footer />
     </main>
   );

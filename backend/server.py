@@ -504,6 +504,8 @@ class SettingsPayload(BaseModel):
     gtm_id: Optional[str] = None
     instagram_profile: Optional[Dict[str, Any]] = None
     home_hero: Optional[Dict[str, Any]] = None
+    course_page: Optional[Dict[str, Any]] = None
+    course_visibility: Optional[Dict[str, Any]] = None
 
     @field_validator("logo_url")
     @classmethod
@@ -519,6 +521,16 @@ class SettingsPayload(BaseModel):
     @classmethod
     def validate_home_hero(cls, value):
         return _safe_home_hero(value)
+
+    @field_validator("course_page")
+    @classmethod
+    def validate_course_page(cls, value):
+        return _safe_course_page(value)
+
+    @field_validator("course_visibility")
+    @classmethod
+    def validate_course_visibility(cls, value):
+        return _safe_course_visibility(value)
 
 
 class HireRequestIn(BaseModel):
@@ -677,6 +689,8 @@ async def public_settings():
             "contact_address": "Hyderabad, India",
             "instagram_profile": DEFAULT_INSTAGRAM_PROFILE,
             "home_hero": DEFAULT_HOME_HERO,
+            "course_page": DEFAULT_COURSE_PAGE,
+            "course_visibility": DEFAULT_COURSE_VISIBILITY,
         }
     return _safe_settings(settings_doc)
 
@@ -695,6 +709,8 @@ PUBLIC_SETTINGS_FIELDS = {
     "gtm_id",
     "instagram_profile",
     "home_hero",
+    "course_page",
+    "course_visibility",
 }
 
 
@@ -708,6 +724,10 @@ def _safe_settings(settings: Optional[dict]) -> dict:
         safe["instagram_profile"] = _safe_instagram_profile(safe.get("instagram_profile"))
     if "home_hero" in safe:
         safe["home_hero"] = _safe_home_hero(safe.get("home_hero"))
+    if "course_page" in safe:
+        safe["course_page"] = _safe_course_page(safe.get("course_page"))
+    if "course_visibility" in safe:
+        safe["course_visibility"] = _safe_course_visibility(safe.get("course_visibility"))
     return safe
 
 
@@ -751,6 +771,179 @@ DEFAULT_INSTAGRAM_PROFILE = {
         {"title": "Graphic design post", "type": "Video", "thumbnail_image_url": "", "link_url": "https://www.instagram.com/pranvith_dop?utm_source=ig_web_button_share_sheet&igsh=ZDNlZDc0MzIxNw==", "enabled": True, "sort_order": 5},
     ],
 }
+
+
+DEFAULT_COURSE_PAGE = {
+    "hero": {
+        "heading": "Master Cinematic Video Editing",
+        "subtitle": "Learn practical editing workflows, storytelling, color, sound, and delivery systems for real creator and client projects.",
+        "button_text": "Explore Courses",
+        "button_link": "/courses",
+        "media_url": "",
+    },
+    "learn_items": [
+        {"title": "Premiere Pro Workflow", "description": "Build clean timelines, organize footage, cut faster, and export professionally.", "icon": "Pr", "enabled": True, "sort_order": 0},
+        {"title": "After Effects Motion", "description": "Create titles, motion graphics, transitions, and polished visual effects.", "icon": "Ae", "enabled": True, "sort_order": 1},
+        {"title": "AI Editing Tools", "description": "Use modern AI tools to speed up captions, cleanup, reframing, and creative workflows.", "icon": "AI", "enabled": True, "sort_order": 2},
+    ],
+    "testimonial_videos": [
+        {"student_name": "Student 1", "course_name": "", "thumbnail_image_url": "", "video_type": "video_url", "video_url": "", "review_text": "", "rating": 5, "enabled": True, "sort_order": 0},
+        {"student_name": "Student 2", "course_name": "", "thumbnail_image_url": "", "video_type": "video_url", "video_url": "", "review_text": "", "rating": 5, "enabled": True, "sort_order": 1},
+        {"student_name": "Student 3", "course_name": "", "thumbnail_image_url": "", "video_type": "video_url", "video_url": "", "review_text": "", "rating": 5, "enabled": True, "sort_order": 2},
+    ],
+    "text_reviews": [
+        {"student_name": "Student", "student_image_url": "", "course_name": "Premiere Pro", "rating": 5, "review_text": "This course helped me understand editing workflow clearly and improved my confidence.", "enabled": True, "sort_order": 0},
+        {"student_name": "Creator", "student_image_url": "", "course_name": "Video Editing", "rating": 5, "review_text": "The lessons are simple, practical, and useful for real editing projects.", "enabled": True, "sort_order": 1},
+    ],
+    "comments": [
+        {"student_name": "Student", "comment_text": "Clear lessons and practical editing steps.", "date": "", "enabled": True, "sort_order": 0},
+    ],
+    "faqs": [
+        {"question": "Do I need prior editing experience?", "answer": "No. The course content is beginner-friendly and moves into practical professional workflows.", "enabled": True, "sort_order": 0},
+    ],
+}
+
+
+DEFAULT_COURSE_VISIBILITY = {
+    "courses_enabled": False,
+    "show_coming_soon": True,
+    "coming_soon_title": "Courses Coming Soon",
+    "coming_soon_subtitle": "We are preparing premium video editing courses. Stay tuned.",
+    "coming_soon_button_text": "Explore Assets",
+    "coming_soon_button_link": "/assets",
+}
+
+
+def _safe_course_visibility(visibility: Optional[dict]) -> dict:
+    source = {**DEFAULT_COURSE_VISIBILITY, **(visibility or {})}
+    return {
+        "courses_enabled": bool(source.get("courses_enabled", False)),
+        "show_coming_soon": bool(source.get("show_coming_soon", True)),
+        "coming_soon_title": str(source.get("coming_soon_title") or "").strip()[:160],
+        "coming_soon_subtitle": str(source.get("coming_soon_subtitle") or "").strip()[:500],
+        "coming_soon_button_text": str(source.get("coming_soon_button_text") or "").strip()[:80],
+        "coming_soon_button_link": _reject_unsafe_url(source.get("coming_soon_button_link") or "") or "",
+    }
+
+
+def _safe_rating(value: Any) -> Optional[int]:
+    if value in {None, ""}:
+        return None
+    rating = int(value)
+    if rating < 1 or rating > 5:
+        raise ValueError("rating must be between 1 and 5")
+    return rating
+
+
+def _safe_course_video_url(video_type: str, value: Optional[str]) -> str:
+    cleaned = _reject_unsafe_url(value) or ""
+    if not cleaned:
+        return ""
+    if cleaned.startswith("/") and not cleaned.startswith("//"):
+        return cleaned
+    parsed = urlparse(cleaned)
+    host = (parsed.netloc or "").lower()
+    path = (parsed.path or "").lower()
+    if video_type == "video_file":
+        if not path.endswith((".mp4", ".webm")):
+            raise ValueError("video_file must be a direct mp4/webm URL")
+    elif video_type == "youtube":
+        if host not in {"youtube.com", "www.youtube.com", "m.youtube.com", "youtu.be", "www.youtu.be"}:
+            raise ValueError("youtube video URL must be a YouTube URL")
+    elif video_type == "vimeo":
+        if host not in {"vimeo.com", "www.vimeo.com", "player.vimeo.com"}:
+            raise ValueError("vimeo video URL must be a Vimeo URL")
+    elif video_type == "video_url":
+        allowed = path.endswith((".mp4", ".webm")) or host in {
+            "youtube.com", "www.youtube.com", "m.youtube.com", "youtu.be", "www.youtu.be",
+            "vimeo.com", "www.vimeo.com", "player.vimeo.com",
+        }
+        if not allowed:
+            raise ValueError("video_url must be YouTube, Vimeo, or a direct mp4/webm URL")
+    return cleaned
+
+
+def _safe_sorted_items(items: Any, mapper, limit: int = 50) -> list:
+    safe_items = []
+    for index, item in enumerate(items or []):
+        if not isinstance(item, dict):
+            continue
+        safe_items.append(mapper(item, index))
+    safe_items.sort(key=lambda item: item.get("sort_order", 0))
+    return safe_items[:limit]
+
+
+def _safe_course_page(course_page: Optional[dict]) -> dict:
+    source = {**DEFAULT_COURSE_PAGE, **(course_page or {})}
+    hero_source = {**DEFAULT_COURSE_PAGE["hero"], **(source.get("hero") or {})}
+
+    def learn_item(item, index):
+        return {
+            "title": str(item.get("title") or "").strip()[:120],
+            "description": str(item.get("description") or "").strip()[:500],
+            "icon": str(item.get("icon") or "").strip()[:20],
+            "enabled": bool(item.get("enabled", True)),
+            "sort_order": int(item.get("sort_order", index) or 0),
+        }
+
+    def testimonial_video(item, index):
+        video_type = str(item.get("video_type") or "video_url").strip().lower()
+        if video_type not in {"video_file", "video_url", "youtube", "vimeo"}:
+            raise ValueError("video_type must be video_file, video_url, youtube, or vimeo")
+        return {
+            "student_name": str(item.get("student_name") or "").strip()[:120],
+            "course_name": str(item.get("course_name") or "").strip()[:120],
+            "thumbnail_image_url": _reject_unsafe_url(item.get("thumbnail_image_url") or "") or "",
+            "video_type": video_type,
+            "video_url": _safe_course_video_url(video_type, item.get("video_url") or ""),
+            "review_text": str(item.get("review_text") or "").strip()[:700],
+            "rating": _safe_rating(item.get("rating")),
+            "enabled": bool(item.get("enabled", True)),
+            "sort_order": int(item.get("sort_order", index) or 0),
+        }
+
+    def text_review(item, index):
+        return {
+            "student_name": str(item.get("student_name") or "").strip()[:120],
+            "student_image_url": _reject_unsafe_url(item.get("student_image_url") or "") or "",
+            "course_name": str(item.get("course_name") or "").strip()[:120],
+            "rating": _safe_rating(item.get("rating")),
+            "review_text": str(item.get("review_text") or "").strip()[:900],
+            "enabled": bool(item.get("enabled", True)),
+            "sort_order": int(item.get("sort_order", index) or 0),
+        }
+
+    def comment(item, index):
+        return {
+            "student_name": str(item.get("student_name") or "").strip()[:120],
+            "comment_text": str(item.get("comment_text") or "").strip()[:600],
+            "date": str(item.get("date") or "").strip()[:80],
+            "enabled": bool(item.get("enabled", True)),
+            "sort_order": int(item.get("sort_order", index) or 0),
+        }
+
+    def faq(item, index):
+        return {
+            "question": str(item.get("question") or "").strip()[:220],
+            "answer": str(item.get("answer") or "").strip()[:900],
+            "enabled": bool(item.get("enabled", True)),
+            "sort_order": int(item.get("sort_order", index) or 0),
+        }
+
+    return {
+        "hero": {
+            "heading": str(hero_source.get("heading") or "").strip()[:180],
+            "subtitle": str(hero_source.get("subtitle") or "").strip()[:600],
+            "button_text": str(hero_source.get("button_text") or "").strip()[:80],
+            "button_link": _reject_unsafe_url(hero_source.get("button_link") or "") or "",
+            "media_url": _reject_unsafe_url(hero_source.get("media_url") or "") or "",
+        },
+        "learn_items": _safe_sorted_items(source.get("learn_items"), learn_item),
+        "testimonial_videos": _safe_sorted_items(source.get("testimonial_videos"), testimonial_video),
+        "text_reviews": _safe_sorted_items(source.get("text_reviews"), text_review),
+        "comments": _safe_sorted_items(source.get("comments"), comment),
+        "faqs": _safe_sorted_items(source.get("faqs"), faq),
+    }
 
 
 def _safe_home_hero(hero: Optional[dict]) -> dict:
