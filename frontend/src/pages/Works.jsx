@@ -4,14 +4,14 @@ import Footer from '../components/Footer';
 import OurWorks from '../components/OurWorks';
 import StudentVideos from '../components/StudentVideos';
 import { usePageData } from '../hooks/usePageData';
+import CmsPageRenderer from '../components/cms/CmsPageRenderer';
 
 const Works = () => {
-  const { page } = usePageData('works');
-  const intro = page?.sections?.intro || {};
-
-  return (
-    <main className="page bg-[#070314] text-white">
-      <Header />
+  const { page, loading } = usePageData('works');
+  const legacySections = !Array.isArray(page?.sections) ? page?.sections : {};
+  const intro = legacySections?.intro || {};
+  const worksFallback = (
+    <>
       <section className="pt-12 pb-6 text-center px-6">
         <h1 className="text-5xl md:text-7xl font-bold tracking-tight">
           {intro.headline || (
@@ -29,6 +29,18 @@ const Works = () => {
       </section>
       <OurWorks />
       <StudentVideos />
+    </>
+  );
+
+  return (
+    <main className="page bg-[#070314] text-white">
+      <Header />
+      <CmsPageRenderer
+        page={page}
+        loading={loading}
+        slots={{ works: <OurWorks /> }}
+        fallback={worksFallback}
+      />
       <Footer />
     </main>
   );

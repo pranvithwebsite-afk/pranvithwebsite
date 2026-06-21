@@ -270,6 +270,11 @@ export const updateAdminPage = async (pageId, payload) => {
   return data;
 };
 
+export const updateAdminPageStatus = async (pageId, status) => {
+  const { data } = await adminApi.patch(`/admin/pages/${pageId}/status`, { status });
+  return data;
+};
+
 export const deleteAdminPage = async (pageId) => {
   const { data } = await adminApi.delete(`/admin/pages/${pageId}`);
   return data;

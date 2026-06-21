@@ -5,6 +5,7 @@ import { CheckCircle2, Send } from 'lucide-react';
 import { toast } from 'sonner';
 import { submitHireRequest } from '../lib/api';
 import { usePageData } from '../hooks/usePageData';
+import CmsPageRenderer from '../components/cms/CmsPageRenderer';
 
 const defaultBenefits = [
   'Vetted, course-trained video editors',
@@ -15,9 +16,10 @@ const defaultBenefits = [
 ];
 
 const Hire = () => {
-  const { page } = usePageData('hire');
-  const intro = page?.sections?.intro || {};
-  const benefits = page?.sections?.benefits || defaultBenefits;
+  const { page, loading } = usePageData('hire');
+  const legacySections = !Array.isArray(page?.sections) ? page?.sections : {};
+  const intro = legacySections?.intro || {};
+  const benefits = legacySections?.benefits || defaultBenefits;
 
   const [form, setForm] = useState({ name: '', email: '', requirement: '' });
   const [busy, setBusy] = useState(false);
@@ -41,9 +43,7 @@ const Hire = () => {
     }
   };
 
-  return (
-    <main className="page bg-[#070314] text-white">
-      <Header />
+  const fallback = (
       <section className="pt-12 pb-24 px-6">
         <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-12 items-start">
           <div>
@@ -107,14 +107,21 @@ const Hire = () => {
               </div>
               <button
                 type="submit"
+                disabled={busy}
                 className="w-full inline-flex items-center justify-center gap-2 bg-violet-600 hover:bg-violet-500 transition-colors text-white py-3 rounded-lg text-sm font-semibold"
               >
-                Send Request <Send size={14} />
+                {busy ? 'Sending...' : 'Send Request'} <Send size={14} />
               </button>
             </div>
           </form>
         </div>
       </section>
+  );
+
+  return (
+    <main className="page bg-[#070314] text-white">
+      <Header />
+      <CmsPageRenderer page={page} loading={loading} fallback={fallback} />
       <Footer />
     </main>
   );

@@ -6,6 +6,8 @@ import { Search, Loader2 } from 'lucide-react';
 import { fetchProducts } from '../lib/api';
 import { FALLBACK_IMAGE, dedupeCatalogItems, getCatalogItemKey, handleImageError, safeImageSrc } from '../lib/utils';
 import CheckoutModal from '../components/CheckoutModal';
+import { usePageData } from '../hooks/usePageData';
+import CmsPageRenderer from '../components/cms/CmsPageRenderer';
 
 const defaultBackgrounds = [
   'linear-gradient(135deg, #1e3a8a 0%, #0c1e4d 60%, #050b1f 100%)',
@@ -56,6 +58,7 @@ const normalize = (item = {}, index) => {
 
 const Assets = () => {
   const navigate = useNavigate();
+  const { page, loading: pageLoading } = usePageData('assets');
   const [query, setQuery] = useState('');
   const [sort, setSort] = useState('newest');
   const [priceFilter, setPriceFilter] = useState('all');
@@ -103,10 +106,70 @@ const Assets = () => {
     return list;
   }, [products, query, sort, priceFilter]);
 
-  return (
-    <main className="page bg-[#070314] text-white min-h-screen">
-      <Header />
+  const productsShowcase = (
+    <section className="pb-24">
+      <div className="max-w-7xl mx-auto px-6 grid grid-cols-1 lg:grid-cols-[260px_1fr] gap-8">
+        <aside className="lg:sticky lg:top-28 h-fit rounded-2xl bg-[#0d0820]/60 border border-violet-500/15 p-6">
+          <h3 className="text-violet-400 text-xs font-bold tracking-[0.3em] mb-5">FILTERS</h3>
 
+          <div className="relative mb-7">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40" />
+            <input
+              type="text"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search assets..."
+              data-testid="assets-search-input"
+              className="w-full pl-9 pr-3 py-2.5 rounded-lg bg-white/5 border border-white/10 text-sm text-white placeholder:text-white/35 focus:outline-none focus:border-violet-500/60"
+            />
+          </div>
+
+          <div className="mb-7">
+            <p className="text-sm font-semibold text-white mb-3">Sort By</p>
+            <RadioRow name="sort" value="newest" checked={sort === 'newest'} onChange={() => setSort('newest')} label="Newest First" />
+            <RadioRow name="sort" value="oldest" checked={sort === 'oldest'} onChange={() => setSort('oldest')} label="Oldest First" />
+          </div>
+
+          <div>
+            <p className="text-sm font-semibold text-white mb-3">Price</p>
+            <RadioRow name="price" value="all" checked={priceFilter === 'all'} onChange={() => setPriceFilter('all')} label="All" />
+            <RadioRow name="price" value="free" checked={priceFilter === 'free'} onChange={() => setPriceFilter('free')} label="Free" />
+            <RadioRow name="price" value="paid" checked={priceFilter === 'paid'} onChange={() => setPriceFilter('paid')} label="Paid" />
+          </div>
+        </aside>
+
+        <div>
+          {loading ? (
+            <div className="flex items-center gap-2 text-white/60 text-sm" data-testid="assets-loading">
+              <Loader2 size={14} className="animate-spin" /> Loading assets...
+            </div>
+          ) : loadError ? (
+            <div className="rounded-2xl border border-rose-500/20 bg-rose-500/5 p-12 text-center text-white/70" data-testid="assets-error">
+              Assets could not be loaded. Please refresh and try again.
+            </div>
+          ) : filtered.length === 0 ? (
+            <div className="rounded-2xl border border-white/10 bg-white/5 p-12 text-center text-white/60" data-testid="assets-empty">
+              No assets match your filters.
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6" data-testid="assets-grid">
+              {filtered.map((p, index) => (
+                <ProductCard
+                  key={getCatalogItemKey(p, index)}
+                  p={p}
+                  onView={() => navigate(`/assets/${p.slug}`)}
+                  onBuy={() => setCheckoutProduct(p)}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </section>
+  );
+
+  const fallback = (
+    <>
       <section className="pt-8 pb-10">
         <div className="max-w-7xl mx-auto px-6">
           <div className="rounded-2xl bg-gradient-to-r from-violet-900/40 via-indigo-900/30 to-violet-900/40 border border-violet-500/20 px-8 py-7">
@@ -117,66 +180,14 @@ const Assets = () => {
           </div>
         </div>
       </section>
+      {productsShowcase}
+    </>
+  );
 
-      <section className="pb-24">
-        <div className="max-w-7xl mx-auto px-6 grid grid-cols-1 lg:grid-cols-[260px_1fr] gap-8">
-          <aside className="lg:sticky lg:top-28 h-fit rounded-2xl bg-[#0d0820]/60 border border-violet-500/15 p-6">
-            <h3 className="text-violet-400 text-xs font-bold tracking-[0.3em] mb-5">FILTERS</h3>
-
-            <div className="relative mb-7">
-              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40" />
-              <input
-                type="text"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search assets..."
-                data-testid="assets-search-input"
-                className="w-full pl-9 pr-3 py-2.5 rounded-lg bg-white/5 border border-white/10 text-sm text-white placeholder:text-white/35 focus:outline-none focus:border-violet-500/60"
-              />
-            </div>
-
-            <div className="mb-7">
-              <p className="text-sm font-semibold text-white mb-3">Sort By</p>
-              <RadioRow name="sort" value="newest" checked={sort === 'newest'} onChange={() => setSort('newest')} label="Newest First" />
-              <RadioRow name="sort" value="oldest" checked={sort === 'oldest'} onChange={() => setSort('oldest')} label="Oldest First" />
-            </div>
-
-            <div>
-              <p className="text-sm font-semibold text-white mb-3">Price</p>
-              <RadioRow name="price" value="all" checked={priceFilter === 'all'} onChange={() => setPriceFilter('all')} label="All" />
-              <RadioRow name="price" value="free" checked={priceFilter === 'free'} onChange={() => setPriceFilter('free')} label="Free" />
-              <RadioRow name="price" value="paid" checked={priceFilter === 'paid'} onChange={() => setPriceFilter('paid')} label="Paid" />
-            </div>
-          </aside>
-
-          <div>
-            {loading ? (
-              <div className="flex items-center gap-2 text-white/60 text-sm" data-testid="assets-loading">
-                <Loader2 size={14} className="animate-spin" /> Loading assets...
-              </div>
-            ) : loadError ? (
-              <div className="rounded-2xl border border-rose-500/20 bg-rose-500/5 p-12 text-center text-white/70" data-testid="assets-error">
-                Assets could not be loaded. Please refresh and try again.
-              </div>
-            ) : filtered.length === 0 ? (
-              <div className="rounded-2xl border border-white/10 bg-white/5 p-12 text-center text-white/60" data-testid="assets-empty">
-                No assets match your filters.
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6" data-testid="assets-grid">
-                {filtered.map((p, index) => (
-                  <ProductCard
-                    key={getCatalogItemKey(p, index)}
-                    p={p}
-                    onView={() => navigate(`/assets/${p.slug}`)}
-                    onBuy={() => setCheckoutProduct(p)}
-                  />
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-      </section>
+  return (
+    <main className="page bg-[#070314] text-white min-h-screen">
+      <Header />
+      <CmsPageRenderer page={page} loading={pageLoading} slots={{ products: productsShowcase }} fallback={fallback} />
 
       <Footer />
       <CheckoutModal
