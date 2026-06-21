@@ -25,6 +25,29 @@ const defaultHomeVisibility = {
   showStudentTestimonials: false,
   showCta: true,
   showFooterCta: true,
+  section_order: [
+    'showHero',
+    'showInstagramProfile',
+    'showServices',
+    'showShowreel',
+    'showFeaturedAssets',
+    'showCoursesPreview',
+    'showStudentTestimonials',
+    'showCta',
+    'showFooterCta',
+  ],
+};
+
+const homeSectionKeys = defaultHomeVisibility.section_order;
+
+const normalizeHomeVisibility = (visibility) => {
+  const merged = { ...defaultHomeVisibility, ...(visibility || {}) };
+  const order = Array.isArray(merged.section_order) ? merged.section_order : defaultHomeVisibility.section_order;
+  const safeOrder = order.filter((key, index) => homeSectionKeys.includes(key) && order.indexOf(key) === index);
+  homeSectionKeys.forEach((key) => {
+    if (!safeOrder.includes(key)) safeOrder.push(key);
+  });
+  return { ...merged, section_order: safeOrder };
 };
 
 const Home = () => {
@@ -37,10 +60,7 @@ const Home = () => {
     fetchPublicSettings()
       .then((settings) => {
         if (mounted) {
-          setVisibility({
-            ...defaultHomeVisibility,
-            ...(settings?.home_visibility || {}),
-          });
+          setVisibility(normalizeHomeVisibility(settings?.home_visibility));
         }
       })
       .catch(() => {
@@ -54,29 +74,45 @@ const Home = () => {
   return (
     <main className="page relative bg-[#070314] text-white overflow-hidden">
       <Header />
-      {visibility.showHero !== false && <Hero pageData={page?.sections?.hero} />}
+      {visibility.section_order.map((sectionKey) => {
+        if (visibility[sectionKey] === false) return null;
+        if (sectionKey === 'showCoursesPreview' && visibility[sectionKey] !== true) return null;
+        if (sectionKey === 'showStudentTestimonials' && visibility[sectionKey] !== true) return null;
 
-      {visibility.showHero !== false && summary.title && (
-        <section className="px-6 py-16">
-          <div className="max-w-5xl mx-auto text-center">
-            <p className="text-sm uppercase text-violet-300 tracking-[0.4em] mb-3">{summary.title}</p>
-            <p className="text-xl md:text-2xl text-slate-300 leading-relaxed max-w-3xl mx-auto">
-              {summary.description}
-            </p>
-          </div>
-        </section>
-      )}
+        const sections = {
+          showHero: (
+            <React.Fragment key="showHero">
+              <Hero pageData={page?.sections?.hero} />
+              {summary.title && (
+                <section className="px-6 py-16">
+                  <div className="max-w-5xl mx-auto text-center">
+                    <p className="text-sm uppercase text-violet-300 tracking-[0.4em] mb-3">{summary.title}</p>
+                    <p className="text-xl md:text-2xl text-slate-300 leading-relaxed max-w-3xl mx-auto">
+                      {summary.description}
+                    </p>
+                  </div>
+                </section>
+              )}
+            </React.Fragment>
+          ),
+          showInstagramProfile: <TransformVision key="showInstagramProfile" />,
+          showServices: <ServicesSection key="showServices" />,
+          showShowreel: <ShowreelSection key="showShowreel" />,
+          showFeaturedAssets: <OurWorks key="showFeaturedAssets" />,
+          showCoursesPreview: <CoursesSection key="showCoursesPreview" />,
+          showStudentTestimonials: (
+            <React.Fragment key="showStudentTestimonials">
+              <ClientTestimonialsSection />
+              <StudentVideos />
+              <Testimonials />
+            </React.Fragment>
+          ),
+          showCta: <RightForYou key="showCta" />,
+          showFooterCta: <FAQ key="showFooterCta" />,
+        };
 
-      {visibility.showCta !== false && <RightForYou />}
-      {visibility.showShowreel !== false && <ShowreelSection />}
-      {visibility.showServices !== false && <ServicesSection />}
-      {visibility.showStudentTestimonials === true && <ClientTestimonialsSection />}
-      {visibility.showCoursesPreview === true && <CoursesSection />}
-      {visibility.showInstagramProfile !== false && <TransformVision />}
-      {visibility.showStudentTestimonials === true && <StudentVideos />}
-      {visibility.showFeaturedAssets !== false && <OurWorks />}
-      {visibility.showStudentTestimonials === true && <Testimonials />}
-      {visibility.showFooterCta !== false && <FAQ />}
+        return sections[sectionKey] || null;
+      })}
       <Footer />
     </main>
   );

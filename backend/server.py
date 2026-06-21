@@ -507,6 +507,7 @@ class SettingsPayload(BaseModel):
     home_visibility: Optional[Dict[str, Any]] = None
     course_page: Optional[Dict[str, Any]] = None
     course_visibility: Optional[Dict[str, Any]] = None
+    page_settings: Optional[Dict[str, Any]] = None
 
     @field_validator("logo_url")
     @classmethod
@@ -537,6 +538,11 @@ class SettingsPayload(BaseModel):
     @classmethod
     def validate_course_visibility(cls, value):
         return _safe_course_visibility(value)
+
+    @field_validator("page_settings")
+    @classmethod
+    def validate_page_settings(cls, value):
+        return _safe_page_settings(value)
 
 
 class HireRequestIn(BaseModel):
@@ -698,6 +704,7 @@ async def public_settings():
             "home_visibility": DEFAULT_HOME_VISIBILITY,
             "course_page": DEFAULT_COURSE_PAGE,
             "course_visibility": DEFAULT_COURSE_VISIBILITY,
+            "page_settings": DEFAULT_PAGE_SETTINGS,
         }
     return _safe_settings(settings_doc)
 
@@ -719,6 +726,7 @@ PUBLIC_SETTINGS_FIELDS = {
     "home_visibility",
     "course_page",
     "course_visibility",
+    "page_settings",
 }
 
 
@@ -738,6 +746,8 @@ def _safe_settings(settings: Optional[dict]) -> dict:
         safe["course_page"] = _safe_course_page(safe.get("course_page"))
     if "course_visibility" in safe:
         safe["course_visibility"] = _safe_course_visibility(safe.get("course_visibility"))
+    if "page_settings" in safe:
+        safe["page_settings"] = _safe_page_settings(safe.get("page_settings"))
     return safe
 
 
@@ -758,6 +768,19 @@ DEFAULT_HOME_HERO = {
 }
 
 
+HOME_SECTION_KEYS = [
+    "showHero",
+    "showInstagramProfile",
+    "showServices",
+    "showShowreel",
+    "showFeaturedAssets",
+    "showCoursesPreview",
+    "showStudentTestimonials",
+    "showCta",
+    "showFooterCta",
+]
+
+
 DEFAULT_HOME_VISIBILITY = {
     "showHero": True,
     "showInstagramProfile": True,
@@ -768,15 +791,27 @@ DEFAULT_HOME_VISIBILITY = {
     "showStudentTestimonials": False,
     "showCta": True,
     "showFooterCta": True,
+    "section_order": HOME_SECTION_KEYS,
 }
 
 
 def _safe_home_visibility(visibility: Optional[dict]) -> dict:
     source = {**DEFAULT_HOME_VISIBILITY, **(visibility or {})}
-    return {
+    incoming_order = source.get("section_order") or HOME_SECTION_KEYS
+    safe_order = []
+    for key in incoming_order:
+        if key in HOME_SECTION_KEYS and key not in safe_order:
+            safe_order.append(key)
+    for key in HOME_SECTION_KEYS:
+        if key not in safe_order:
+            safe_order.append(key)
+    safe = {
         key: bool(source.get(key, default_value))
         for key, default_value in DEFAULT_HOME_VISIBILITY.items()
+        if key in HOME_SECTION_KEYS
     }
+    safe["section_order"] = safe_order
+    return safe
 
 
 DEFAULT_INSTAGRAM_PROFILE = {
@@ -843,6 +878,68 @@ DEFAULT_COURSE_VISIBILITY = {
     "coming_soon_button_text": "Explore Assets",
     "coming_soon_button_link": "/assets",
 }
+
+
+DEFAULT_PAGE_SETTINGS = {
+    "about": {
+        "heading": "DOP, filmmaker, editor, drone pilot, and visual storyteller.",
+        "subtitle": "About Pranvith Dop",
+        "profile_image_url": "",
+        "description": "PranvithDOP creates cinematic visuals for brands, creators, weddings, products, and digital campaigns.",
+        "experience_highlights": "Film, ad & edit projects\nProduct and commercial shoots\nAerial/drone sequences\nPost-production workflow",
+        "cta_text": "Book a project",
+        "cta_link": "/hire",
+        "show_hero": True,
+        "show_stats": True,
+        "show_gear": True,
+    },
+    "assets": {
+        "heading": "Creative Assets Store",
+        "subtitle": "Premium LUTs, sound packs, motion templates and more — built for editors.",
+        "show_hero": True,
+        "show_product_listing": True,
+        "show_featured_products": True,
+        "cta_text": "Explore Assets",
+        "cta_link": "/assets",
+    },
+    "works": {
+        "heading": "Portfolio Built With Light, Motion & Emotion",
+        "subtitle": "A curated collection of cinematic commercial, wedding, drone, editing, product, and film work.",
+        "show_portfolio_grid": True,
+        "show_showreel": True,
+        "show_testimonials": True,
+        "cta_text": "Book a project",
+        "cta_link": "/hire",
+    },
+    "hire": {
+        "heading": "Build a film, campaign, or visual story with cinematic intent.",
+        "subtitle": "Tell us about your shoot, brand film, wedding, reel, product campaign, or edit.",
+        "show_enquiry_form": True,
+        "show_services": True,
+        "show_contact_info": True,
+        "cta_text": "Send Project Enquiry",
+        "cta_link": "/hire",
+    },
+}
+
+
+def _safe_page_settings(settings: Optional[dict]) -> dict:
+    source = {**DEFAULT_PAGE_SETTINGS, **(settings or {})}
+    safe = {}
+    for slug, defaults in DEFAULT_PAGE_SETTINGS.items():
+        page = {**defaults, **(source.get(slug) or {})}
+        safe_page = {}
+        for key, default_value in defaults.items():
+            if isinstance(default_value, bool):
+                safe_page[key] = bool(page.get(key, default_value))
+            elif key.endswith("_link") or key.endswith("_url"):
+                safe_page[key] = _reject_unsafe_url(page.get(key) or "") or ""
+            elif key == "experience_highlights":
+                safe_page[key] = str(page.get(key) or "").strip()[:1000]
+            else:
+                safe_page[key] = str(page.get(key) or "").strip()[:700]
+        safe[slug] = safe_page
+    return safe
 
 
 def _safe_course_visibility(visibility: Optional[dict]) -> dict:
