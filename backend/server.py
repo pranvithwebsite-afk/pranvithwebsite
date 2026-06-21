@@ -508,6 +508,7 @@ class SettingsPayload(BaseModel):
     course_page: Optional[Dict[str, Any]] = None
     course_visibility: Optional[Dict[str, Any]] = None
     page_settings: Optional[Dict[str, Any]] = None
+    works_page: Optional[Dict[str, Any]] = None
 
     @field_validator("logo_url")
     @classmethod
@@ -543,6 +544,11 @@ class SettingsPayload(BaseModel):
     @classmethod
     def validate_page_settings(cls, value):
         return _safe_page_settings(value)
+
+    @field_validator("works_page")
+    @classmethod
+    def validate_works_page(cls, value):
+        return _safe_works_page(value)
 
 
 class HireRequestIn(BaseModel):
@@ -705,6 +711,7 @@ async def public_settings():
             "course_page": DEFAULT_COURSE_PAGE,
             "course_visibility": DEFAULT_COURSE_VISIBILITY,
             "page_settings": DEFAULT_PAGE_SETTINGS,
+            "works_page": DEFAULT_WORKS_PAGE,
         }
     return _safe_settings(settings_doc)
 
@@ -727,6 +734,7 @@ PUBLIC_SETTINGS_FIELDS = {
     "course_page",
     "course_visibility",
     "page_settings",
+    "works_page",
 }
 
 
@@ -748,6 +756,8 @@ def _safe_settings(settings: Optional[dict]) -> dict:
         safe["course_visibility"] = _safe_course_visibility(safe.get("course_visibility"))
     if "page_settings" in safe:
         safe["page_settings"] = _safe_page_settings(safe.get("page_settings"))
+    if "works_page" in safe:
+        safe["works_page"] = _safe_works_page(safe.get("works_page"))
     return safe
 
 
@@ -909,11 +919,12 @@ DEFAULT_PAGE_SETTINGS = {
     "about": {
         "heading": "DOP, filmmaker, editor, drone pilot, and visual storyteller.",
         "subtitle": "About Pranvith Dop",
-        "profile_image_url": "",
+        "profile_image_url": "/assets/brand-profile.png",
         "description": "PranvithDOP creates cinematic visuals for brands, creators, weddings, products, and digital campaigns.",
         "experience_highlights": "Film, ad & edit projects\nProduct and commercial shoots\nAerial/drone sequences\nPost-production workflow",
         "cta_text": "Book a project",
         "cta_link": "/hire",
+        "show_about_image": True,
         "show_hero": True,
         "show_stats": True,
         "show_gear": True,
@@ -946,6 +957,105 @@ DEFAULT_PAGE_SETTINGS = {
         "cta_link": "/hire",
     },
 }
+
+
+WORKS_CATEGORIES = {"Commercial", "Wedding", "Drone", "Editing", "Product", "Film"}
+WORKS_VIDEO_TYPES = {"video_file", "video_url", "youtube", "vimeo"}
+
+DEFAULT_WORKS_PAGE = {
+    "hero": {
+        "label": "PORTFOLIO",
+        "heading": "Films, commercials, aerials, and edits crafted for impact.",
+        "subtitle": "A curated portfolio of PranvithDOP cinematography, drone work, product visuals, and post-production projects.",
+        "hero_media_type": "image",
+        "hero_media_url": "",
+        "poster_image_url": "",
+        "show_hero": True,
+    },
+    "showreel": {
+        "show_featured_showreel": True,
+        "label": "FEATURED SHOWREEL",
+        "heading": "A cinematic portfolio of light, movement, and emotion.",
+        "description": "Commercials, wedding stories, drone sequences, product frames, and post-production work shaped for premium digital delivery.",
+        "video_type": "video_url",
+        "video_url": "",
+        "thumbnail_image_url": "",
+        "button_text": "View all works",
+        "button_link": "/works",
+    },
+    "projects": [
+        {"title": "Commercial Brand Film", "category": "Commercial", "thumbnail_image_url": "", "description": "A polished commercial film with controlled lighting, cinematic movement, and premium product framing.", "video_url": "", "video_type": "video_url", "equipment": "Cinema camera, gimbal, LED lighting", "client": "Brand project", "date": "2026", "enabled": True, "sort_order": 0},
+        {"title": "Cinematic Wedding Story", "category": "Wedding", "thumbnail_image_url": "", "description": "Emotion-led wedding cinematography built around light, movement, vows, and family moments.", "video_url": "", "video_type": "video_url", "equipment": "Cinema camera, drone, wireless audio", "client": "Private client", "date": "2026", "enabled": True, "sort_order": 1},
+        {"title": "Aerial Drone Sequence", "category": "Drone", "thumbnail_image_url": "", "description": "Aerial visuals for locations, events, establishing shots, and cinematic production sequences.", "video_url": "", "video_type": "video_url", "equipment": "4K drone, ND filters", "client": "Production partner", "date": "2026", "enabled": True, "sort_order": 2},
+    ],
+}
+
+
+def _safe_works_video_url(video_type: str, value: Optional[str]) -> str:
+    return _safe_course_video_url(video_type, value)
+
+
+def _safe_works_page(works_page: Optional[dict]) -> dict:
+    source = {**DEFAULT_WORKS_PAGE, **(works_page or {})}
+    hero_source = {**DEFAULT_WORKS_PAGE["hero"], **(source.get("hero") or {})}
+    showreel_source = {**DEFAULT_WORKS_PAGE["showreel"], **(source.get("showreel") or {})}
+
+    hero_media_type = str(hero_source.get("hero_media_type") or "image").strip().lower()
+    if hero_media_type not in {"image", "video_file", "video_url"}:
+        raise ValueError("hero_media_type must be image, video_file, or video_url")
+
+    showreel_video_type = str(showreel_source.get("video_type") or "video_url").strip().lower()
+    if showreel_video_type not in WORKS_VIDEO_TYPES:
+        raise ValueError("video_type must be video_file, video_url, youtube, or vimeo")
+
+    projects = []
+    for index, project in enumerate(source.get("projects") or []):
+        if not isinstance(project, dict):
+            continue
+        category = str(project.get("category") or "Commercial").strip().title()
+        if category not in WORKS_CATEGORIES:
+            category = "Commercial"
+        video_type = str(project.get("video_type") or "video_url").strip().lower()
+        if video_type not in WORKS_VIDEO_TYPES:
+            raise ValueError("project video_type must be video_file, video_url, youtube, or vimeo")
+        projects.append({
+            "title": str(project.get("title") or "").strip()[:160],
+            "category": category,
+            "thumbnail_image_url": _reject_unsafe_url(project.get("thumbnail_image_url") or "") or "",
+            "description": str(project.get("description") or "").strip()[:700],
+            "video_url": _safe_works_video_url(video_type, project.get("video_url") or ""),
+            "video_type": video_type,
+            "equipment": str(project.get("equipment") or "").strip()[:220],
+            "client": str(project.get("client") or "").strip()[:160],
+            "date": str(project.get("date") or "").strip()[:80],
+            "enabled": bool(project.get("enabled", True)),
+            "sort_order": int(project.get("sort_order", index) or 0),
+        })
+    projects.sort(key=lambda item: item.get("sort_order", 0))
+
+    return {
+        "hero": {
+            "label": str(hero_source.get("label") or "").strip()[:80],
+            "heading": str(hero_source.get("heading") or "").strip()[:220],
+            "subtitle": str(hero_source.get("subtitle") or "").strip()[:700],
+            "hero_media_type": hero_media_type,
+            "hero_media_url": _safe_hero_media_url(hero_media_type, hero_source.get("hero_media_url") or ""),
+            "poster_image_url": _reject_unsafe_url(hero_source.get("poster_image_url") or "") or "",
+            "show_hero": bool(hero_source.get("show_hero", True)),
+        },
+        "showreel": {
+            "show_featured_showreel": bool(showreel_source.get("show_featured_showreel", True)),
+            "label": str(showreel_source.get("label") or "").strip()[:80],
+            "heading": str(showreel_source.get("heading") or "").strip()[:220],
+            "description": str(showreel_source.get("description") or "").strip()[:700],
+            "video_type": showreel_video_type,
+            "video_url": _safe_works_video_url(showreel_video_type, showreel_source.get("video_url") or ""),
+            "thumbnail_image_url": _reject_unsafe_url(showreel_source.get("thumbnail_image_url") or "") or "",
+            "button_text": str(showreel_source.get("button_text") or "").strip()[:80],
+            "button_link": _reject_unsafe_url(showreel_source.get("button_link") or "") or "",
+        },
+        "projects": projects[:80],
+    }
 
 
 def _safe_page_settings(settings: Optional[dict]) -> dict:

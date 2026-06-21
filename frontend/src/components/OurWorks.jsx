@@ -1,49 +1,87 @@
-import React from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Play } from 'lucide-react';
-import { ourWorks } from '../data/mock';
+import { portfolioProjects } from '../data/portfolio';
+import { fetchPublicSettings } from '../lib/api';
 import { handleImageError, safeImageSrc } from '../lib/utils';
 
+const fallbackProjects = portfolioProjects.slice(0, 5).map((project, index) => ({
+  title: project.title,
+  category: project.category,
+  thumbnail_image_url: project.thumbnail,
+  description: project.description,
+  video_url: project.videoLink,
+  enabled: true,
+  sort_order: index,
+}));
+
 const OurWorks = () => {
-  const items = [...ourWorks, ...ourWorks];
+  const [projects, setProjects] = useState(fallbackProjects);
+
+  useEffect(() => {
+    let mounted = true;
+    fetchPublicSettings()
+      .then((settings) => {
+        const configured = Array.isArray(settings?.works_page?.projects)
+          ? settings.works_page.projects
+          : [];
+        const enabled = configured
+          .filter((project) => project.enabled !== false)
+          .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+        if (mounted && enabled.length > 0) setProjects(enabled.slice(0, 5));
+      })
+      .catch(() => {
+        if (mounted) setProjects(fallbackProjects);
+      });
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const visibleProjects = useMemo(() => projects.slice(0, 5), [projects]);
+
   return (
-    <section className="relative py-24 overflow-hidden bg-gradient-to-b from-[#070314] via-[#0a0420] to-[#070314]">
-      {/* mountain background suggestion */}
-      <div className="absolute inset-x-0 bottom-0 h-1/2 opacity-30" style={{ background: 'linear-gradient(to top, rgba(139,92,246,0.15), transparent)' }} />
+    <section className="relative overflow-hidden bg-gradient-to-b from-[#070314] via-[#0a0420] to-[#070314] px-6 py-24">
+      <div className="relative mx-auto max-w-7xl">
+        <div className="mb-12 text-center">
+          <p className="text-xs font-semibold uppercase tracking-[0.35em] text-violet-300">Our Works</p>
+          <h2 className="mt-4 text-4xl font-bold tracking-tight md:text-6xl">Cinematic work, cleanly presented.</h2>
+          <p className="mx-auto mt-5 max-w-xl leading-relaxed text-white/70">
+            Selected films, commercial visuals, drone sequences, and edits from the PranvithDOP portfolio.
+          </p>
+        </div>
 
-      <div className="relative max-w-7xl mx-auto px-6 text-center mb-12">
-        <h2 className="text-4xl md:text-6xl font-bold tracking-tight">OUR WORKS</h2>
-        <p className="mt-5 text-white/70 max-w-xl mx-auto leading-relaxed">
-          Real projects edited with creativity and precision.
-          From wedding films to reels and client work.
-        </p>
-      </div>
-
-      <div className="relative">
-        <div className="absolute left-0 top-0 bottom-0 w-32 z-10 bg-gradient-to-r from-[#070314] to-transparent pointer-events-none" />
-        <div className="absolute right-0 top-0 bottom-0 w-32 z-10 bg-gradient-to-l from-[#070314] to-transparent pointer-events-none" />
-
-        <div className="flex gap-5 animate-marquee-slow w-max">
-          {items.map((w, idx) => (
-            <div
-              key={`${w.id}-${idx}`}
-              className="relative w-[300px] h-[170px] rounded-xl overflow-hidden bg-[#0f0830] border border-white/10 shrink-0 group cursor-pointer"
+        <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+          {visibleProjects.map((project, index) => (
+            <a
+              key={`${project.title}-${index}`}
+              href={project.video_url || '/works'}
+              className="group overflow-hidden rounded-3xl border border-white/10 bg-white/[0.04] transition hover:-translate-y-1 hover:border-violet-400/50"
             >
-              <img src={safeImageSrc(w.thumb)} alt="work" className="absolute inset-0 w-full h-full object-cover opacity-50 group-hover:opacity-90 transition" onError={handleImageError} />
-              <div className="absolute inset-0 bg-gradient-to-t from-[#070314] to-transparent" />
-              <button className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition">
-                <div className="w-12 h-12 rounded-full bg-violet-600/95 flex items-center justify-center">
-                  <Play size={18} className="text-white ml-0.5" fill="white" />
-                </div>
-              </button>
-            </div>
+              <div className="relative aspect-[16/11] overflow-hidden bg-gradient-to-br from-violet-950 via-slate-950 to-black">
+                {project.thumbnail_image_url ? (
+                  <img src={safeImageSrc(project.thumbnail_image_url)} alt={project.title} className="h-full w-full object-cover opacity-75 transition duration-500 group-hover:scale-105 group-hover:opacity-95" onError={handleImageError} />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center px-6 text-center text-sm font-semibold uppercase tracking-[0.24em] text-violet-200/70">PranvithDOP</div>
+                )}
+                <div className="absolute inset-0 bg-gradient-to-t from-[#070314] via-transparent to-transparent" />
+                <span className="absolute left-4 top-4 rounded-full bg-black/60 px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-violet-200">{project.category}</span>
+                <span className="absolute right-4 top-4 flex h-10 w-10 items-center justify-center rounded-full bg-violet-600/90 text-white opacity-0 transition group-hover:opacity-100">
+                  <Play size={15} fill="currentColor" />
+                </span>
+              </div>
+              <div className="p-5">
+                <h3 className="text-lg font-semibold text-white">{project.title}</h3>
+                <p className="mt-2 line-clamp-2 text-sm leading-relaxed text-white/60">{project.description}</p>
+              </div>
+            </a>
           ))}
         </div>
-      </div>
 
-      <div className="text-center mt-14">
-        <button className="inline-flex items-center gap-2 bg-violet-600 hover:bg-violet-500 transition-colors text-white px-7 py-3 rounded-full text-sm font-semibold tracking-wider">
-          WATCH OUR WORK
-        </button>
+        <div className="mt-12 text-center">
+          <a href="/works" className="inline-flex rounded-full bg-violet-600 px-7 py-3 text-sm font-semibold tracking-wider text-white transition-colors hover:bg-violet-500">
+            VIEW ALL WORKS
+          </a>
+        </div>
       </div>
     </section>
   );

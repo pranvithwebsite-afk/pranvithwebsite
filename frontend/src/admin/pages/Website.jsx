@@ -3,6 +3,7 @@ import { ArrowDown, ArrowLeft, ArrowUp, Plus, Save, Trash2, X } from 'lucide-rea
 import { toast } from 'sonner';
 import { fetchAdminMedia, fetchAdminPages, fetchAdminSettings, saveAdminSettings } from '../../lib/api';
 import { defaultCoursePageContent, defaultCourseVisibility } from '../../components/CoursePageContent';
+import { portfolioProjects } from '../../data/portfolio';
 
 const requiredPages = [
   { title: 'Home', slug: 'home', path: '/' },
@@ -95,11 +96,12 @@ const defaultPageSettings = {
   about: {
     heading: 'DOP, filmmaker, editor, drone pilot, and visual storyteller.',
     subtitle: 'About Pranvith Dop',
-    profile_image_url: '',
+    profile_image_url: '/assets/brand-profile.png',
     description: 'PranvithDOP creates cinematic visuals for brands, creators, weddings, products, and digital campaigns.',
     experience_highlights: 'Film, ad & edit projects\nProduct and commercial shoots\nAerial/drone sequences\nPost-production workflow',
     cta_text: 'Book a project',
     cta_link: '/hire',
+    show_about_image: true,
     show_hero: true,
     show_stats: true,
     show_gear: true,
@@ -131,6 +133,45 @@ const defaultPageSettings = {
     cta_text: 'Send Project Enquiry',
     cta_link: '/hire',
   },
+};
+
+const worksCategories = ['Commercial', 'Wedding', 'Drone', 'Editing', 'Product', 'Film'];
+const worksVideoTypes = ['video_file', 'video_url', 'youtube', 'vimeo'];
+
+const defaultWorksPage = {
+  hero: {
+    label: 'PORTFOLIO',
+    heading: 'Films, commercials, aerials, and edits crafted for impact.',
+    subtitle: 'A curated portfolio of PranvithDOP cinematography, drone work, product visuals, and post-production projects.',
+    hero_media_type: 'image',
+    hero_media_url: '',
+    poster_image_url: '',
+    show_hero: true,
+  },
+  showreel: {
+    show_featured_showreel: true,
+    label: 'FEATURED SHOWREEL',
+    heading: 'A cinematic portfolio of light, movement, and emotion.',
+    description: 'Commercials, wedding stories, drone sequences, product frames, and post-production work shaped for premium digital delivery.',
+    video_type: 'video_url',
+    video_url: '',
+    thumbnail_image_url: '',
+    button_text: 'View all works',
+    button_link: '/works',
+  },
+  projects: portfolioProjects.map((project, index) => ({
+    title: project.title,
+    category: project.category,
+    thumbnail_image_url: project.thumbnail,
+    description: project.description,
+    video_url: project.videoLink,
+    video_type: 'video_url',
+    equipment: project.equipment,
+    client: project.client,
+    date: project.date,
+    enabled: true,
+    sort_order: index,
+  })),
 };
 
 const fieldClass = 'w-full rounded-2xl border border-slate-800 bg-slate-900 px-4 py-3 text-white outline-none focus:border-violet-500';
@@ -275,6 +316,13 @@ const PageEditor = ({ page, settings, mediaItems, onBack, onSave, saving }) => {
       ...(settings.course_page || {}),
       hero: { ...defaultCoursePageContent.hero, ...(settings.course_page?.hero || {}) },
     },
+    works_page: {
+      ...defaultWorksPage,
+      ...(settings.works_page || {}),
+      hero: { ...defaultWorksPage.hero, ...(settings.works_page?.hero || {}) },
+      showreel: { ...defaultWorksPage.showreel, ...(settings.works_page?.showreel || {}) },
+      projects: Array.isArray(settings.works_page?.projects) ? settings.works_page.projects : defaultWorksPage.projects,
+    },
     page_settings: {
       ...defaultPageSettings,
       ...(settings.page_settings || {}),
@@ -317,9 +365,15 @@ const PageEditor = ({ page, settings, mediaItems, onBack, onSave, saving }) => {
           faqs: (draft.course_page.faqs || []).map((item, index) => ({ ...item, sort_order: index })),
         },
       },
+      works: {
+        works_page: {
+          ...draft.works_page,
+          projects: (draft.works_page.projects || []).map((project, index) => ({ ...project, sort_order: index })),
+        },
+      },
     };
 
-    if (page.slug === 'home' || page.slug === 'courses') {
+    if (page.slug === 'home' || page.slug === 'courses' || page.slug === 'works') {
       onSave(pagePayloads[page.slug]);
       return;
     }
@@ -362,7 +416,14 @@ const PageEditor = ({ page, settings, mediaItems, onBack, onSave, saving }) => {
           mediaItems={mediaItems}
         />
       )}
-      {['about', 'assets', 'works', 'hire'].includes(page.slug) && (
+      {page.slug === 'works' && (
+        <WorksEditor
+          draft={draft}
+          update={update}
+          mediaItems={mediaItems}
+        />
+      )}
+      {['about', 'assets', 'hire'].includes(page.slug) && (
         <SimplePageEditor
           slug={page.slug}
           pageSettings={{ ...defaultPageSettings[page.slug], ...(draft.page_settings?.[page.slug] || {}) }}
@@ -666,15 +727,161 @@ const CourseListEditor = ({ title, section, items, coursePage, updateCourse, tem
   );
 };
 
+const WorksEditor = ({ draft, update, mediaItems }) => {
+  const worksPage = draft.works_page || defaultWorksPage;
+  const imageItems = mediaItems.filter((item) => String(item.type || '').startsWith('image/'));
+  const videoItems = mediaItems.filter((item) => String(item.type || '').startsWith('video/'));
+  const updateWorks = (next) => update('works_page', next);
+  const updateHero = (field, value) => updateWorks({ ...worksPage, hero: { ...worksPage.hero, [field]: value } });
+  const updateShowreel = (field, value) => updateWorks({ ...worksPage, showreel: { ...worksPage.showreel, [field]: value } });
+  const projects = worksPage.projects || [];
+
+  const updateProject = (index, field, value) => {
+    const next = [...projects];
+    next[index] = { ...(next[index] || {}), [field]: value };
+    updateWorks({ ...worksPage, projects: next.map((project, sort_order) => ({ ...project, sort_order })) });
+  };
+  const moveProject = (index, direction) => {
+    const next = [...projects];
+    const nextIndex = index + direction;
+    if (nextIndex < 0 || nextIndex >= next.length) return;
+    [next[index], next[nextIndex]] = [next[nextIndex], next[index]];
+    updateWorks({ ...worksPage, projects: next.map((project, sort_order) => ({ ...project, sort_order })) });
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="rounded-3xl border border-slate-800 bg-slate-950 p-5">
+        <h2 className="text-xl font-semibold text-white">Page Hero</h2>
+        <div className="mt-5 grid gap-4 lg:grid-cols-2">
+          <Toggle label="Show hero" checked={worksPage.hero?.show_hero !== false} onChange={(value) => updateHero('show_hero', value)} />
+          <Field label="Small label text"><input value={worksPage.hero?.label || ''} onChange={(event) => updateHero('label', event.target.value)} className={fieldClass} /></Field>
+          <Field label="Main heading"><input value={worksPage.hero?.heading || ''} onChange={(event) => updateHero('heading', event.target.value)} className={fieldClass} /></Field>
+          <Field label="Subtitle"><textarea value={worksPage.hero?.subtitle || ''} onChange={(event) => updateHero('subtitle', event.target.value)} rows={3} className={`${fieldClass} resize-none`} /></Field>
+          <Field label="Hero media type">
+            <select value={worksPage.hero?.hero_media_type || 'image'} onChange={(event) => updateHero('hero_media_type', event.target.value)} className={fieldClass}>
+              <option value="image">image</option>
+              <option value="video_file">video_file</option>
+              <option value="video_url">video_url</option>
+            </select>
+          </Field>
+          <Field label="Hero media URL"><input value={worksPage.hero?.hero_media_url || ''} onChange={(event) => updateHero('hero_media_url', event.target.value)} className={fieldClass} /></Field>
+          <Field label="Poster image URL optional"><input value={worksPage.hero?.poster_image_url || ''} onChange={(event) => updateHero('poster_image_url', event.target.value)} className={fieldClass} /></Field>
+        </div>
+        {mediaItems.length > 0 && (
+          <select value="" onChange={(event) => event.target.value && updateHero('hero_media_url', event.target.value)} className={`${fieldClass} mt-4`}>
+            <option value="">Select hero media from Media Library</option>
+            {mediaItems.map((item) => <option key={item.id} value={item.url}>{item.title || item.url}</option>)}
+          </select>
+        )}
+      </div>
+
+      <div className="rounded-3xl border border-slate-800 bg-slate-950 p-5">
+        <h2 className="text-xl font-semibold text-white">Featured Showreel</h2>
+        <div className="mt-5 grid gap-4 lg:grid-cols-2">
+          <Toggle label="Show featured showreel" checked={worksPage.showreel?.show_featured_showreel !== false} onChange={(value) => updateShowreel('show_featured_showreel', value)} />
+          <Field label="Section label"><input value={worksPage.showreel?.label || ''} onChange={(event) => updateShowreel('label', event.target.value)} className={fieldClass} /></Field>
+          <Field label="Section heading"><input value={worksPage.showreel?.heading || ''} onChange={(event) => updateShowreel('heading', event.target.value)} className={fieldClass} /></Field>
+          <Field label="Description"><textarea value={worksPage.showreel?.description || ''} onChange={(event) => updateShowreel('description', event.target.value)} rows={3} className={`${fieldClass} resize-none`} /></Field>
+          <Field label="Video type">
+            <select value={worksPage.showreel?.video_type || 'video_url'} onChange={(event) => updateShowreel('video_type', event.target.value)} className={fieldClass}>
+              {worksVideoTypes.map((type) => <option key={type} value={type}>{type}</option>)}
+            </select>
+          </Field>
+          <Field label="Video URL"><input value={worksPage.showreel?.video_url || ''} onChange={(event) => updateShowreel('video_url', event.target.value)} className={fieldClass} /></Field>
+          <Field label="Thumbnail/poster URL"><input value={worksPage.showreel?.thumbnail_image_url || ''} onChange={(event) => updateShowreel('thumbnail_image_url', event.target.value)} className={fieldClass} /></Field>
+          <Field label="Button text optional"><input value={worksPage.showreel?.button_text || ''} onChange={(event) => updateShowreel('button_text', event.target.value)} className={fieldClass} /></Field>
+          <Field label="Button link optional"><input value={worksPage.showreel?.button_link || ''} onChange={(event) => updateShowreel('button_link', event.target.value)} className={fieldClass} /></Field>
+        </div>
+        <div className="mt-4 grid gap-4 lg:grid-cols-2">
+          {imageItems.length > 0 && (
+            <select value="" onChange={(event) => event.target.value && updateShowreel('thumbnail_image_url', event.target.value)} className={fieldClass}>
+              <option value="">Select thumbnail from Media Library</option>
+              {imageItems.map((item) => <option key={item.id} value={item.url}>{item.title || item.url}</option>)}
+            </select>
+          )}
+          {videoItems.length > 0 && (
+            <select value="" onChange={(event) => event.target.value && updateShowreel('video_url', event.target.value)} className={fieldClass}>
+              <option value="">Select video from Media Library</option>
+              {videoItems.map((item) => <option key={item.id} value={item.url}>{item.title || item.url}</option>)}
+            </select>
+          )}
+        </div>
+      </div>
+
+      <div className="rounded-3xl border border-slate-800 bg-slate-950 p-5">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-xl font-semibold text-white">Portfolio Projects</h2>
+          <button type="button" onClick={() => updateWorks({ ...worksPage, projects: [...projects, { title: 'New Project', category: 'Commercial', thumbnail_image_url: '', description: '', video_url: '', video_type: 'video_url', equipment: '', client: '', date: '', enabled: true, sort_order: projects.length }] })} className="inline-flex items-center gap-2 rounded-lg border border-slate-700 px-3 py-2 text-sm text-white hover:border-violet-500">
+            <Plus size={14} /> Add Project
+          </button>
+        </div>
+        <div className="mt-5 space-y-4">
+          {projects.map((project, index) => (
+            <div key={`${project.title}-${index}`} className="rounded-2xl border border-slate-800 bg-slate-900 p-4">
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+                <Toggle label="Enabled" checked={project.enabled !== false} onChange={(value) => updateProject(index, 'enabled', value)} />
+                <div className="flex gap-2">
+                  <IconButton disabled={index === 0} onClick={() => moveProject(index, -1)}><ArrowUp size={14} /></IconButton>
+                  <IconButton disabled={index === projects.length - 1} onClick={() => moveProject(index, 1)}><ArrowDown size={14} /></IconButton>
+                  <IconButton onClick={() => updateWorks({ ...worksPage, projects: projects.filter((_, current) => current !== index) })}><Trash2 size={14} /></IconButton>
+                </div>
+              </div>
+              <div className="grid gap-4 lg:grid-cols-2">
+                <Field label="Title"><input value={project.title || ''} onChange={(event) => updateProject(index, 'title', event.target.value)} className={fieldClass} /></Field>
+                <Field label="Category">
+                  <select value={project.category || 'Commercial'} onChange={(event) => updateProject(index, 'category', event.target.value)} className={fieldClass}>
+                    {worksCategories.map((category) => <option key={category} value={category}>{category}</option>)}
+                  </select>
+                </Field>
+                <Field label="Thumbnail image URL"><input value={project.thumbnail_image_url || ''} onChange={(event) => updateProject(index, 'thumbnail_image_url', event.target.value)} className={fieldClass} /></Field>
+                <Field label="Video type">
+                  <select value={project.video_type || 'video_url'} onChange={(event) => updateProject(index, 'video_type', event.target.value)} className={fieldClass}>
+                    {worksVideoTypes.map((type) => <option key={type} value={type}>{type}</option>)}
+                  </select>
+                </Field>
+                <Field label="Video URL optional"><input value={project.video_url || ''} onChange={(event) => updateProject(index, 'video_url', event.target.value)} className={fieldClass} /></Field>
+                <Field label="Equipment used optional"><input value={project.equipment || ''} onChange={(event) => updateProject(index, 'equipment', event.target.value)} className={fieldClass} /></Field>
+                <Field label="Client optional"><input value={project.client || ''} onChange={(event) => updateProject(index, 'client', event.target.value)} className={fieldClass} /></Field>
+                <Field label="Date/year optional"><input value={project.date || ''} onChange={(event) => updateProject(index, 'date', event.target.value)} className={fieldClass} /></Field>
+                <Field label="Description"><textarea value={project.description || ''} onChange={(event) => updateProject(index, 'description', event.target.value)} rows={3} className={`${fieldClass} resize-none`} /></Field>
+              </div>
+              <div className="mt-4 grid gap-4 lg:grid-cols-2">
+                {imageItems.length > 0 && (
+                  <select value="" onChange={(event) => event.target.value && updateProject(index, 'thumbnail_image_url', event.target.value)} className={fieldClass}>
+                    <option value="">Select thumbnail from Media Library</option>
+                    {imageItems.map((item) => <option key={item.id} value={item.url}>{item.title || item.url}</option>)}
+                  </select>
+                )}
+                {videoItems.length > 0 && (
+                  <select value="" onChange={(event) => event.target.value && updateProject(index, 'video_url', event.target.value)} className={fieldClass}>
+                    <option value="">Select video from Media Library</option>
+                    {videoItems.map((item) => <option key={item.id} value={item.url}>{item.title || item.url}</option>)}
+                  </select>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const SimplePageEditor = ({ slug, pageSettings, update }) => {
   const textFields = Object.entries(pageSettings).filter(([, value]) => typeof value !== 'boolean');
   const toggles = Object.entries(pageSettings).filter(([, value]) => typeof value === 'boolean');
+  const labelFor = (field) => {
+    if (slug === 'about' && field === 'profile_image_url') return 'About image URL';
+    if (slug === 'about' && field === 'show_about_image') return 'Show About image';
+    return field.replaceAll('_', ' ');
+  };
   return (
     <div className="rounded-3xl border border-slate-800 bg-slate-950 p-5">
       <h2 className="text-xl font-semibold capitalize text-white">{slug} Page Settings</h2>
       <div className="mt-5 grid gap-4 lg:grid-cols-2">
         {textFields.map(([field, value]) => (
-          <Field key={field} label={field.replaceAll('_', ' ')}>
+          <Field key={field} label={labelFor(field)}>
             {field.includes('description') || field.includes('subtitle') || field.includes('highlights') ? (
               <textarea value={value || ''} onChange={(event) => update(field, event.target.value)} rows={4} className={`${fieldClass} resize-none`} />
             ) : (
@@ -685,7 +892,7 @@ const SimplePageEditor = ({ slug, pageSettings, update }) => {
       </div>
       <div className="mt-5 grid gap-3 md:grid-cols-2">
         {toggles.map(([field, value]) => (
-          <Toggle key={field} label={field.replaceAll('_', ' ')} checked={value} onChange={(next) => update(field, next)} />
+          <Toggle key={field} label={labelFor(field)} checked={value} onChange={(next) => update(field, next)} />
         ))}
       </div>
     </div>
