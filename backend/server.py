@@ -524,7 +524,13 @@ class SettingsPayload(BaseModel):
 class HireRequestIn(BaseModel):
     name: str = Field(min_length=1, max_length=120)
     email: EmailStr
-    requirement: str = Field(min_length=3, max_length=2000)
+    phone: Optional[str] = Field(default=None, max_length=30)
+    project_type: Optional[str] = Field(default=None, max_length=120)
+    budget: Optional[str] = Field(default=None, max_length=120)
+    project_date: Optional[str] = Field(default=None, max_length=120)
+    location: Optional[str] = Field(default=None, max_length=180)
+    message: Optional[str] = Field(default=None, max_length=3000)
+    requirement: Optional[str] = Field(default=None, max_length=3000)
 
 
 class HireRequest(BaseModel):
@@ -532,8 +538,28 @@ class HireRequest(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     name: str
     email: str
+    phone: Optional[str] = None
+    project_type: Optional[str] = None
+    budget: Optional[str] = None
+    project_date: Optional[str] = None
+    location: Optional[str] = None
+    message: str
     requirement: str
+    status: str = "new"
     created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    updated_at: Optional[str] = None
+
+
+class EnquiryStatusIn(BaseModel):
+    status: str
+
+    @field_validator("status")
+    @classmethod
+    def validate_status(cls, value):
+        status = (value or "").strip().lower()
+        if status not in {"new", "contacted", "completed"}:
+            raise ValueError("Status must be new, contacted, or completed")
+        return status
 
 
 class SubscribeIn(BaseModel):
@@ -978,7 +1004,20 @@ async def public_blog_categories():
 
 @api_router.post("/hire")
 async def create_hire_request(payload: HireRequestIn):
-    obj = HireRequest(name=payload.name, email=str(payload.email), requirement=payload.requirement)
+    message = (payload.message or payload.requirement or "").strip()
+    if not message:
+        raise HTTPException(status_code=422, detail="Project message is required")
+    obj = HireRequest(
+        name=payload.name.strip(),
+        email=str(payload.email).lower().strip(),
+        phone=(payload.phone or "").strip() or None,
+        project_type=(payload.project_type or "").strip() or None,
+        budget=(payload.budget or "").strip() or None,
+        project_date=(payload.project_date or "").strip() or None,
+        location=(payload.location or "").strip() or None,
+        message=message,
+        requirement=message,
+    )
     try:
         await db.hire_requests.insert_one(obj.model_dump())
     except Exception as e:
@@ -1530,6 +1569,40 @@ async def admin_customers(current_admin: AdminBase = Depends(get_current_active_
 
     customers.sort(key=lambda item: item.get("latest_purchase_at") or "", reverse=True)
     return customers
+
+
+@admin_router.get("/enquiries")
+async def admin_enquiries(current_admin: AdminBase = Depends(get_current_active_admin)):
+    try:
+        return await db.hire_requests.find({}, {"_id": 0}).sort("created_at", -1).to_list(500)
+    except Exception:
+        logger.exception("Admin enquiries fetch failed")
+        raise HTTPException(status_code=500, detail="Could not load enquiries")
+
+
+@admin_router.patch("/enquiries/{enquiry_id}/status")
+async def admin_update_enquiry_status(
+    enquiry_id: str,
+    payload: EnquiryStatusIn,
+    current_admin: AdminBase = Depends(get_current_active_admin),
+):
+    now = datetime.now(timezone.utc).isoformat()
+    result = await db.hire_requests.update_one(
+        {"id": enquiry_id},
+        {"$set": {"status": payload.status, "updated_at": now}},
+    )
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Enquiry not found")
+    enquiry = await db.hire_requests.find_one({"id": enquiry_id}, {"_id": 0})
+    return {"success": True, "enquiry": enquiry}
+
+
+@admin_router.delete("/enquiries/{enquiry_id}")
+async def admin_delete_enquiry(enquiry_id: str, current_admin: AdminBase = Depends(get_current_active_admin)):
+    result = await db.hire_requests.delete_one({"id": enquiry_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Enquiry not found")
+    return {"success": True}
 
 
 @admin_router.get("/media")
@@ -2088,6 +2161,7 @@ async def prepare_cms_collections():
         "seed_state",
         "downloads",
         "coupons",
+        "hire_requests",
         "testimonials",
         "blog_posts",
         "blog_categories",

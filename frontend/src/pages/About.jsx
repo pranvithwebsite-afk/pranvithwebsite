@@ -1,69 +1,79 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
-import { Award, Users, Clock, Globe } from 'lucide-react';
-import { usePageData } from '../hooks/usePageData';
+import { Award, Camera, Clock, Film, Plane, Sparkles } from 'lucide-react';
+import { gearList } from '../data/portfolio';
 
-const About = () => {
-  const { page } = usePageData('about');
+const stats = [
+  { icon: Film, label: 'Film, ad & edit projects', value: '250+' },
+  { icon: Camera, label: 'Product and commercial shoots', value: '80+' },
+  { icon: Plane, label: 'Aerial/drone sequences', value: '120+' },
+  { icon: Clock, label: 'Post-production hours', value: '3,000+' },
+];
 
-  const defaultStats = [
-    { icon: Users, label: 'Students Trained', value: '5,000+' },
-    { icon: Award, label: 'Courses Created', value: '12+' },
-    { icon: Clock, label: 'Hours of Content', value: '300+' },
-    { icon: Globe, label: 'Countries Reached', value: '20+' },
-  ];
-
-  const intro = page?.sections?.intro || {};
-  const stats = page?.sections?.stats || defaultStats;
-
-  return (
-    <main className="page bg-[#070314] text-white">
-      <Header />
-      <section className="pt-12 pb-24 px-6">
-        <div className="max-w-5xl mx-auto text-center">
-          <h1 className="text-5xl md:text-7xl font-bold tracking-tight">
-            {page?.title || 'About'}{' '}
-            <span className="bg-clip-text text-transparent bg-gradient-to-r from-violet-400 to-fuchsia-300">PranvithDOP</span>
+const About = () => (
+  <main className="page bg-[#070314] text-white">
+    <Header />
+    <section className="relative overflow-hidden px-6 py-24">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_40%_0%,rgba(124,58,237,0.22),transparent_45%)]" />
+      <div className="relative mx-auto grid max-w-7xl gap-12 lg:grid-cols-[0.9fr_1.1fr] lg:items-center">
+        <div className="overflow-hidden rounded-3xl border border-violet-500/20 bg-white/[0.04] p-3 shadow-[0_30px_120px_rgba(124,58,237,0.18)]">
+          <div className="aspect-[4/5] rounded-2xl bg-[radial-gradient(circle_at_30%_20%,rgba(236,72,153,0.35),transparent_35%),linear-gradient(145deg,#1e0a45,#070314)]" />
+        </div>
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.4em] text-violet-300">About Pranvith Dop</p>
+          <h1 className="mt-5 text-5xl font-bold tracking-tight md:text-7xl">
+            DOP, filmmaker, editor, drone pilot, and visual storyteller.
           </h1>
-          <p className="mt-7 text-white/70 text-lg leading-relaxed max-w-3xl mx-auto">
-            {intro.headline ? `${intro.headline} ${intro.description || ''}` :
-              `PranvithDOP is the home for aspiring video editors, content creators, and freelancers who want to learn
-            professional editing techniques from real-world projects. We combine industry-standard tools with
-            AI-powered workflows to help you create stunning videos faster than ever.`}
+          <p className="mt-7 text-lg leading-relaxed text-white/70">
+            PranvithDOP creates cinematic visuals for brands, creators, weddings, products, and digital campaigns. The work combines cinematography, lighting, drone movement, DI, editing, commercial photography, and graphic design into one production-ready pipeline.
+          </p>
+          <div className="mt-8 flex flex-wrap gap-4">
+            <Link to="/hire" className="rounded-full bg-violet-600 px-7 py-3 text-sm font-semibold text-white hover:bg-violet-500">Book a project</Link>
+            <Link to="/works" className="rounded-full border border-white/15 px-7 py-3 text-sm font-semibold text-white hover:bg-white/10">View portfolio</Link>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section className="px-6 pb-20">
+      <div className="mx-auto grid max-w-7xl gap-5 sm:grid-cols-2 lg:grid-cols-4">
+        {stats.map((stat) => {
+          const Icon = stat.icon;
+          return (
+            <div key={stat.label} className="rounded-3xl border border-violet-500/15 bg-[#100830]/60 p-6 text-center">
+              <Icon size={28} className="mx-auto mb-4 text-violet-300" />
+              <p className="text-3xl font-bold text-white">{stat.value}</p>
+              <p className="mt-2 text-xs uppercase tracking-wider text-white/50">{stat.label}</p>
+            </div>
+          );
+        })}
+      </div>
+    </section>
+
+    <section className="px-6 pb-24">
+      <div className="mx-auto grid max-w-7xl gap-8 lg:grid-cols-2">
+        <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-8">
+          <Sparkles className="mb-5 text-violet-300" />
+          <h2 className="text-3xl font-bold text-white">Creative positioning</h2>
+          <p className="mt-4 leading-relaxed text-white/70">
+            Built for clients who need more than footage: visual direction, cinematic lighting, clean edit structure, tasteful color, and final assets ready for web, social, campaigns, and events.
           </p>
         </div>
-
-        <div className="max-w-6xl mx-auto mt-16 grid grid-cols-2 md:grid-cols-4 gap-5">
-          {stats.map((s) => (
-            <div key={s.label} className="p-6 rounded-2xl border border-violet-500/15 bg-[#100830]/60 text-center">
-              {s.icon ? (
-                <s.icon size={28} className="mx-auto text-violet-400 mb-3" />
-              ) : (
-                <div className="w-7 h-7 mx-auto mb-3 bg-violet-500/30 rounded" />
-              )}
-              <p className="text-3xl font-bold">{s.value}</p>
-              <p className="mt-1 text-xs text-white/60 tracking-wide">{s.label}</p>
-            </div>
-          ))}
+        <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-8">
+          <Award className="mb-5 text-violet-300" />
+          <h2 className="text-3xl font-bold text-white">Gear & workflow</h2>
+          <div className="mt-5 grid gap-3 sm:grid-cols-2">
+            {gearList.map((item) => (
+              <div key={item} className="rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white/75">{item}</div>
+            ))}
+          </div>
         </div>
-
-        <div className="max-w-3xl mx-auto mt-20 text-white/75 leading-relaxed space-y-5 text-base">
-          {(page?.sections?.content || [
-            `Founded by Pranavith from Hyderabad, India, PranvithDOP started as a YouTube channel sharing free video editing
-            tutorials. Today it has grown into a full-fledged education platform with structured courses,
-            real-world projects, mentorship, and a thriving community of creators.`,
-            `Our mission is simple: make professional video editing accessible to everyone — whether you
-            are a beginner taking your first steps, a YouTuber leveling up your content, or a freelancer
-            building a career out of your craft.`,
-          ]).map((text, idx) => (
-            <p key={idx}>{text}</p>
-          ))}
-        </div>
-      </section>
-      <Footer />
-    </main>
-  );
-};
+      </div>
+    </section>
+    <Footer />
+  </main>
+);
 
 export default About;

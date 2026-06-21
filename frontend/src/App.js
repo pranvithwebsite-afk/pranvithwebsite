@@ -8,6 +8,7 @@ import About from './pages/About';
 import Assets from './pages/Assets';
 import Hire from './pages/Hire';
 import Works from './pages/Works';
+import ServicePage from './pages/ServicePage';
 import AssetLanding from './pages/AssetLanding';
 import PaymentSuccess from './pages/PaymentSuccess';
 import PaymentFailed from './pages/PaymentFailed';
@@ -21,6 +22,7 @@ import Website from './admin/pages/Website';
 import Products from './admin/pages/Products';
 import Orders from './admin/pages/Orders';
 import Customers from './admin/pages/Customers';
+import Enquiries from './admin/pages/Enquiries';
 import Media from './admin/pages/Media';
 import Settings from './admin/pages/Settings';
 
@@ -40,6 +42,7 @@ function App() {
                 <Route path="products" element={<Products />} />
                 <Route path="orders" element={<Orders />} />
                 <Route path="customers" element={<Customers />} />
+                <Route path="enquiries" element={<Enquiries />} />
                 <Route path="media" element={<Media />} />
                 <Route path="settings" element={<Settings />} />
               </Route>
@@ -55,6 +58,9 @@ function App() {
             <Route path="/payment-failed" element={<PaymentFailed />} />
             <Route path="/works" element={<Works />} />
             <Route path="/hire" element={<Hire />} />
+            <Route path="/commercial-video-production" element={<ServicePage type="commercial" />} />
+            <Route path="/wedding-cinematography" element={<ServicePage type="wedding" />} />
+            <Route path="/drone-cinematography" element={<ServicePage type="drone" />} />
           </Routes>
         </AdminAuthProvider>
       </BrowserRouter>

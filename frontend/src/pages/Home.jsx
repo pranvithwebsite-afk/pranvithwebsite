@@ -3,6 +3,9 @@ import Header from '../components/Header';
 import Hero from '../components/Hero';
 import RightForYou from '../components/RightForYou';
 import CoursesSection from '../components/Courses';
+import ShowreelSection from '../components/ShowreelSection';
+import ServicesSection from '../components/ServicesSection';
+import ClientTestimonialsSection from '../components/ClientTestimonialsSection';
 import TransformVision from '../components/TransformVision';
 import StudentVideos from '../components/StudentVideos';
 import OurWorks from '../components/OurWorks';
@@ -32,6 +35,9 @@ const Home = () => {
       )}
 
       <RightForYou />
+      <ShowreelSection />
+      <ServicesSection />
+      <ClientTestimonialsSection />
       <CoursesSection />
       <TransformVision />
       <StudentVideos />

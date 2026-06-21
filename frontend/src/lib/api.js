@@ -211,6 +211,21 @@ export const fetchAdminCustomers = async () => {
   return data;
 };
 
+export const fetchAdminEnquiries = async () => {
+  const { data } = await adminApi.get('/admin/enquiries');
+  return data;
+};
+
+export const updateAdminEnquiryStatus = async (enquiryId, status) => {
+  const { data } = await adminApi.patch(`/admin/enquiries/${encodeURIComponent(enquiryId)}/status`, { status });
+  return data;
+};
+
+export const deleteAdminEnquiry = async (enquiryId) => {
+  const { data } = await adminApi.delete(`/admin/enquiries/${encodeURIComponent(enquiryId)}`);
+  return data;
+};
+
 export const resendDownloadEmail = async (orderId) => {
   const { data } = await adminApi.post(`/admin/orders/${encodeURIComponent(orderId)}/resend-download-email`);
   return data;
