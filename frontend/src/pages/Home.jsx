@@ -14,28 +14,27 @@ import { safePublicHref } from '../lib/utils';
 const sectionToHomeKey = {
   hero: 'hero',
   services: 'services',
+  services_cards: 'services',
   showreel: 'showreel',
   cta: 'cta',
   'featured-assets': 'featuredAssets',
+  featured_assets_preview: 'featuredAssets',
+  portfolio_grid: 'featuredAssets',
   instagram: 'instagramProfile',
+  'instagram-profile': 'instagramProfile',
+  instagram_profile: 'instagramProfile',
+  gallery: 'instagramProfile',
   faq: 'footerCta',
 };
 
-const defaultOrder = ['hero', 'featuredAssets', 'instagramProfile', 'services', 'showreel', 'cta', 'footerCta'];
-
-const sectionByKey = (sections = {}) => (key) =>
-  Object.values(sections).find((section) => section.section_id === key || section.type === key);
+const sectionByKey = (sections = []) => (key) =>
+  sections.find((section) => section.section_id === key || section.type === key);
 
 const homeOrderFromCms = (sections = []) => {
   const order = sections
-    .filter((section) => section.enabled !== false)
-    .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0))
     .map((section) => sectionToHomeKey[section.section_id] || sectionToHomeKey[section.type])
     .filter(Boolean);
-  defaultOrder.forEach((key) => {
-    if (!order.includes(key)) order.push(key);
-  });
-  return order;
+  return order.length ? order : [];
 };
 
 const Home = () => {
@@ -44,6 +43,11 @@ const Home = () => {
   const findSection = sectionByKey(cmsSections);
   const heroSection = findSection('hero');
   const ctaSection = findSection('cta');
+  const worksSection = findSection('featured-assets') || findSection('portfolio_grid');
+  const instagramSection = findSection('instagram-profile') || findSection('instagram') || findSection('gallery');
+  const servicesSection = findSection('services') || findSection('services_cards');
+  const showreelSection = findSection('showreel');
+  const faqSection = findSection('faq');
   const order = homeOrderFromCms(cmsSections);
 
   const heroData = heroSection ? {
@@ -59,16 +63,14 @@ const Home = () => {
       <Header />
       {order.map((sectionKey) => {
         const sections = {
-          hero: <Hero key="hero" pageData={heroData} />,
-          featuredAssets: <OurWorks key="featuredAssets" />,
-          instagramProfile: <TransformVision key="instagramProfile" />,
-          services: <ServicesSection key="services" />,
-          showreel: <ShowreelSection key="showreel" />,
+          hero: heroSection ? <Hero key="hero" pageData={heroData} /> : null,
+          featuredAssets: <OurWorks key="featuredAssets" section={worksSection} />,
+          instagramProfile: instagramSection ? <TransformVision key="instagramProfile" section={instagramSection} /> : null,
+          services: servicesSection ? <ServicesSection key="services" section={servicesSection} /> : null,
+          showreel: showreelSection ? <ShowreelSection key="showreel" section={showreelSection} /> : null,
           cta: <HomeCta key="cta" section={ctaSection} />,
-          footerCta: <FAQ key="footerCta" />,
+          footerCta: faqSection ? <FAQ key="footerCta" section={faqSection} /> : null,
         };
-        const cmsSection = cmsSections.find((section) => (sectionToHomeKey[section.section_id] || sectionToHomeKey[section.type]) === sectionKey);
-        if (cmsSection && cmsSection.enabled === false) return null;
         return sections[sectionKey] || null;
       })}
       <Footer />

@@ -1586,6 +1586,34 @@ async def _cms_page_response(page_key: str, public: bool = False) -> dict:
         section_query["enabled"] = {"$ne": False}
     sections = await db.cms_sections.find(section_query, {"_id": 0}).sort("sort_order", 1).to_list(200)
     safe_page = {k: v for k, v in page.items() if k not in {"_id"}}
+    if public:
+        safe_page = {
+            "page_key": page_key,
+            "title": safe_page.get("title", ""),
+            "subtitle": safe_page.get("subtitle", ""),
+            "path": safe_page.get("path", CMS_PAGE_PATHS.get(page_key, f"/{page_key}")),
+            "status": "published",
+            "seo_title": safe_page.get("seo_title", ""),
+            "seo_description": safe_page.get("seo_description", ""),
+            "settings": safe_page.get("settings") or {},
+        }
+        public_sections = []
+        for section in sections:
+            public_sections.append({
+                "section_id": section.get("section_id", ""),
+                "type": section.get("type", "text"),
+                "title": section.get("title", ""),
+                "subtitle": section.get("subtitle", ""),
+                "description": section.get("description", ""),
+                "button_text": section.get("button_text", ""),
+                "button_link": section.get("button_link", ""),
+                "media_type": section.get("media_type", "auto"),
+                "media_url": section.get("media_url", ""),
+                "poster_url": section.get("poster_url", ""),
+                "data": section.get("data") or {},
+            })
+        safe_page["sections"] = public_sections
+        return safe_page
     safe_page["sections"] = sections
     return safe_page
 

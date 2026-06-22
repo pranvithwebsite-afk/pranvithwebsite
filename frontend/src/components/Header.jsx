@@ -27,8 +27,8 @@ const Header = () => {
       <nav
         className={`flex w-full max-w-[1160px] items-center justify-between gap-3 rounded-full border border-white/10 px-3 py-2 ring-1 ring-violet-500/10 backdrop-blur-xl transition-all duration-300 md:gap-8 md:px-5 ${
           scrolled
-            ? 'bg-[#090612]/85 shadow-[0_18px_70px_rgba(124,58,237,0.28)]'
-            : 'bg-[#090612]/65 shadow-[0_18px_60px_rgba(124,58,237,0.20)]'
+            ? 'bg-[#080511]/82 shadow-[0_24px_90px_-34px_rgba(124,58,237,0.45)]'
+            : 'bg-[#080511]/68 shadow-[0_22px_80px_-36px_rgba(124,58,237,0.38)]'
         }`}
       >
         <Link to="/" onClick={refreshHomeIfActive} className="flex items-center gap-2 shrink-0" data-testid="header-brand">

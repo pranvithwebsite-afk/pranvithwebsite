@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Instagram, ArrowRight } from 'lucide-react';
-import { FALLBACK_IMAGE, handleImageError } from '../lib/utils';
+import { FALLBACK_IMAGE, handleImageError, safePublicHref } from '../lib/utils';
 import { fetchPublicSettings } from '../lib/api';
 
 const instagramProfileUrl =
@@ -79,10 +79,21 @@ const defaultInstagramCards = [
   },
 ];
 
-const TransformVision = () => {
+const TransformVision = ({ section }) => {
   const [instagramProfile, setInstagramProfile] = useState(defaultInstagramProfile);
 
   useEffect(() => {
+    if (section) {
+      setInstagramProfile({
+        ...defaultInstagramProfile,
+        ...(section.data || {}),
+        profile_image_url: section.media_url || section.data?.profile_image_url || defaultInstagramProfile.profile_image_url,
+        cards: section.data?.items || section.data?.cards || [],
+        button_text: section.button_text,
+        button_link: section.button_link,
+      });
+      return undefined;
+    }
     let mounted = true;
     fetchPublicSettings()
       .then((settings) => {
@@ -98,10 +109,10 @@ const TransformVision = () => {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [section]);
 
   const cards = useMemo(() => {
-    const configuredCards = Array.isArray(instagramProfile.cards) && instagramProfile.cards.length > 0
+    const configuredCards = Array.isArray(instagramProfile.cards) && (instagramProfile.cards.length > 0 || section)
       ? instagramProfile.cards
       : defaultInstagramCards;
     return configuredCards
@@ -114,7 +125,7 @@ const TransformVision = () => {
         type: card.type || defaultInstagramCards[index % defaultInstagramCards.length].type,
         link_url: card.link_url || instagramProfile.follow_button_url || instagramProfileUrl,
       }));
-  }, [instagramProfile]);
+  }, [instagramProfile, section]);
 
   const followUrl = instagramProfile.follow_button_url || instagramProfileUrl;
   const bioLines = [
@@ -130,23 +141,26 @@ const TransformVision = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
           <div>
             <h2 className="text-4xl md:text-6xl font-bold tracking-tight leading-[1.1]">
-              Transform your{' '}
-              <span className="bg-clip-text text-transparent bg-gradient-to-r from-violet-400 to-fuchsia-300">
-                creative vision
-              </span>{' '}
-              into reality.
+              {section?.title || (
+                <>
+                  Transform your{' '}
+                  <span className="bg-clip-text text-transparent bg-gradient-to-r from-violet-400 to-fuchsia-300">
+                    creative vision
+                  </span>{' '}
+                  into reality.
+                </>
+              )}
             </h2>
             <p className="mt-7 text-white/65 leading-relaxed max-w-lg">
-              Master professional video editing skills with our comprehensive courses.
-              Learn industry-standard techniques, creative storytelling, and advanced workflows that bring your ideas to life.
+              {section?.description || 'Master professional video editing skills with our comprehensive courses. Learn industry-standard techniques, creative storytelling, and advanced workflows that bring your ideas to life.'}
             </p>
             <div className="mt-9 flex items-center gap-4">
-              <button className="group inline-flex items-center gap-3 bg-violet-600 hover:bg-violet-500 transition-colors text-white px-6 py-3 rounded-full text-sm font-semibold">
-                Get started
+              <a href={safePublicHref(instagramProfile.button_link, '/courses')} className="group inline-flex items-center gap-3 bg-violet-600 hover:bg-violet-500 transition-colors text-white px-6 py-3 rounded-full text-sm font-semibold">
+                {instagramProfile.button_text || 'Get started'}
                 <span className="w-5 h-5 rounded-full bg-white/20 flex items-center justify-center group-hover:translate-x-0.5 transition-transform">
                   <ArrowRight size={11} />
                 </span>
-              </button>
+              </a>
               <a
                 href={followUrl}
                 target="_blank"

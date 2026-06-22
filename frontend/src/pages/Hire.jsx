@@ -17,14 +17,6 @@ const initialForm = {
   message: '',
 };
 
-const defaultBenefits = [
-  'Cinematic wedding, commercial, drone, and brand storytelling',
-  'DOP-led planning for light, movement, locations, and edit mood',
-  'Editing, DI, product photography, and creative design support',
-  'Clear project scope, timeline, and delivery expectations',
-  'Flexible packages for shoots, campaigns, reels, and full films',
-];
-
 const projectTypes = ['Commercial Ad', 'Wedding Cinematography', 'Drone Shoot', 'Product Shoot', 'Film / Music Video', 'Editing / DI', 'Other'];
 
 const section = (sections, idOrType) =>
@@ -35,11 +27,19 @@ const Hire = () => {
   const sections = page?.sections || [];
   const hero = section(sections, 'hero') || {};
   const services = section(sections, 'services') || {};
+  const infoCardsSection = section(sections, 'info-cards') || section(sections, 'contact_info') || {};
   const formSection = section(sections, 'enquiry-form') || section(sections, 'contact_form') || {};
   const benefits = Array.isArray(services.data?.items) && services.data.items.length
     ? services.data.items.filter((item) => item.enabled !== false).map((item) => item.description || item.title).filter(Boolean)
-    : defaultBenefits;
-  const showForm = page?.settings?.show_enquiry_form !== false && formSection.enabled !== false;
+    : [];
+  const infoCards = Array.isArray(infoCardsSection.data?.items)
+    ? infoCardsSection.data.items.filter((item) => item.enabled !== false).sort((a, b) => Number(a.sort_order || 0) - Number(b.sort_order || 0))
+    : [];
+  const visibleProjectTypes = Array.isArray(formSection.data?.project_types) && formSection.data.project_types.length
+    ? formSection.data.project_types
+    : projectTypes;
+  const showForm = page?.settings?.show_enquiry_form !== false && !!formSection.section_id;
+  const showMainSection = hero.section_id || services.section_id || infoCardsSection.section_id || showForm;
 
   const [form, setForm] = useState(initialForm);
   const [busy, setBusy] = useState(false);
@@ -67,7 +67,7 @@ const Hire = () => {
   return (
     <main className="page bg-[#070314] text-white">
       <Header />
-      <section className="relative overflow-hidden px-6 pb-24 pt-12">
+      {showMainSection && <section className="relative overflow-hidden px-6 pb-24 pt-12">
         <div className="absolute left-1/2 top-0 h-96 w-96 -translate-x-1/2 rounded-full bg-violet-600/20 blur-3xl" />
         <div className="absolute bottom-16 right-0 h-72 w-72 rounded-full bg-blue-500/10 blur-3xl" />
 
@@ -92,18 +92,20 @@ const Hire = () => {
               ))}
             </div>
 
-            <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div className="rounded-2xl border border-white/10 bg-black/20 p-5">
-                <CalendarDays className="text-violet-300" size={22} />
-                <p className="mt-3 text-sm font-semibold text-white">Plan the shoot</p>
-                <p className="mt-1 text-xs leading-5 text-white/55">Share your date, location, budget, and visual references.</p>
+            {infoCards.length > 0 && (
+              <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2">
+                {infoCards.map((card, index) => {
+                  const Icon = index % 2 === 0 ? CalendarDays : MapPin;
+                  return (
+                    <div key={`${card.title}-${index}`} className="rounded-2xl border border-white/10 bg-black/20 p-5">
+                      <Icon className={index % 2 === 0 ? 'text-violet-300' : 'text-sky-300'} size={22} />
+                      <p className="mt-3 text-sm font-semibold text-white">{card.title}</p>
+                      <p className="mt-1 text-xs leading-5 text-white/55">{card.description}</p>
+                    </div>
+                  );
+                })}
               </div>
-              <div className="rounded-2xl border border-white/10 bg-black/20 p-5">
-                <MapPin className="text-sky-300" size={22} />
-                <p className="mt-3 text-sm font-semibold text-white">Shoot anywhere</p>
-                <p className="mt-1 text-xs leading-5 text-white/55">Available for local, destination, commercial, and drone projects.</p>
-              </div>
-            </div>
+            )}
           </div>
 
           {showForm && (
@@ -122,7 +124,7 @@ const Hire = () => {
                   <span className="mb-1.5 block text-xs text-white/65">Project type</span>
                   <select value={form.project_type} onChange={(event) => updateField('project_type', event.target.value)} className="w-full rounded-xl border border-white/10 bg-[#120824] px-4 py-3 text-sm text-white outline-none transition focus:border-violet-400">
                     <option value="">Select type</option>
-                    {projectTypes.map((type) => <option key={type} value={type}>{type}</option>)}
+                    {visibleProjectTypes.map((type) => <option key={type} value={type}>{type}</option>)}
                   </select>
                 </label>
                 <FormInput label="Budget" value={form.budget} onChange={(value) => updateField('budget', value)} placeholder="Approx budget" />
@@ -140,7 +142,7 @@ const Hire = () => {
             </form>
           )}
         </div>
-      </section>
+      </section>}
       <Footer />
     </main>
   );

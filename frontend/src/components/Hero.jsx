@@ -82,7 +82,7 @@ const Hero = ({ pageData }) => {
   }, [directVideo, embedUrl, hasMedia, hero.hero_media_poster_url, mediaUrl]);
 
   return (
-    <section className="relative pt-8 pb-12 overflow-hidden">
+    <section className="relative -mt-[var(--navbar-height)] overflow-hidden pb-12 pt-[calc(var(--navbar-height)+2rem)]">
       <div className="absolute inset-0 radial-purple pointer-events-none" />
 
       <div className="relative max-w-7xl mx-auto px-6 text-center">

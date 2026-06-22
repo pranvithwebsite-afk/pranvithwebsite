@@ -2,13 +2,27 @@ import React, { useEffect, useState } from 'react';
 import { Plus, Minus } from 'lucide-react';
 import { faqs as mockFaqs } from '../data/mock';
 import { fetchFAQs } from '../lib/api';
-import { dedupeFaqs } from '../lib/utils';
+import { dedupeFaqs, safePublicHref } from '../lib/utils';
 
-const FAQ = () => {
-  const [faqs, setFaqs] = useState(() => dedupeFaqs(mockFaqs));
+const normalizeCmsFaqs = (items = []) => items
+  .filter((item) => item.enabled !== false)
+  .sort((a, b) => Number(a.sort_order || 0) - Number(b.sort_order || 0))
+  .map((item, index) => ({
+    id: item.id || `${item.question || item.title}-${index}`,
+    q: item.question || item.title,
+    a: item.answer || item.description,
+  }))
+  .filter((item) => item.q && item.a);
+
+const FAQ = ({ section }) => {
+  const [faqs, setFaqs] = useState(() => section ? normalizeCmsFaqs(section.data?.items) : dedupeFaqs(mockFaqs));
   const [open, setOpen] = useState(0);
 
   useEffect(() => {
+    if (section) {
+      setFaqs(normalizeCmsFaqs(section.data?.items));
+      return undefined;
+    }
     (async () => {
       try {
         const data = await fetchFAQs();
@@ -17,7 +31,9 @@ const FAQ = () => {
         // fallback
       }
     })();
-  }, []);
+  }, [section]);
+
+  if (section && faqs.length === 0) return null;
 
   return (
     <section className="relative py-24">
@@ -27,13 +43,13 @@ const FAQ = () => {
             F.A.Q.
           </span>
           <h2 className="mt-6 text-4xl md:text-6xl font-bold tracking-tight leading-[1.1]">
-            Have Questions?
+            {section?.title || 'Have Questions?'}
             <span className="block bg-clip-text text-transparent bg-gradient-to-r from-violet-400 to-fuchsia-300">
-              We&apos;ve Answered Them.
+              {section?.subtitle || "We've Answered Them."}
             </span>
           </h2>
           <p className="mt-5 text-white/65 max-w-md mx-auto">
-            From tools to timelines to placements, get full clarity before you take the next step.
+            {section?.description || 'From tools to timelines to placements, get full clarity before you take the next step.'}
           </p>
         </div>
 
@@ -68,9 +84,9 @@ const FAQ = () => {
 
         <div className="text-center mt-14">
           <p className="text-white/65 text-sm mb-4">Still have questions? We&apos;re here to help!</p>
-          <button className="inline-flex items-center gap-2 bg-violet-600 hover:bg-violet-500 transition-colors text-white px-8 py-3 rounded-full text-sm font-semibold">
-            Contact Us
-          </button>
+          <a href={safePublicHref(section?.button_link, '/hire')} className="inline-flex items-center gap-2 bg-violet-600 hover:bg-violet-500 transition-colors text-white px-8 py-3 rounded-full text-sm font-semibold">
+            {section?.button_text || 'Contact Us'}
+          </a>
         </div>
       </div>
     </section>

@@ -1,52 +1,22 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo } from 'react';
 import { Play } from 'lucide-react';
-import { portfolioProjects } from '../data/portfolio';
-import { fetchPublicSettings } from '../lib/api';
-import { handleImageError, safeImageSrc } from '../lib/utils';
+import { handleImageError, safeImageSrc, safePublicHref } from '../lib/utils';
 
-const fallbackProjects = portfolioProjects.slice(0, 5).map((project, index) => ({
-  title: project.title,
-  category: project.category,
-  thumbnail_image_url: project.thumbnail,
-  description: project.description,
-  video_url: project.videoLink,
-  enabled: true,
-  sort_order: index,
-}));
+const enabledSorted = (items = []) =>
+  [...items].filter((item) => item.enabled !== false).sort((a, b) => Number(a.sort_order || 0) - Number(b.sort_order || 0));
 
-const OurWorks = () => {
-  const [projects, setProjects] = useState(fallbackProjects);
-
-  useEffect(() => {
-    let mounted = true;
-    fetchPublicSettings()
-      .then((settings) => {
-        const configured = Array.isArray(settings?.works_page?.projects)
-          ? settings.works_page.projects
-          : [];
-        const enabled = configured
-          .filter((project) => project.enabled !== false)
-          .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
-        if (mounted && enabled.length > 0) setProjects(enabled.slice(0, 5));
-      })
-      .catch(() => {
-        if (mounted) setProjects(fallbackProjects);
-      });
-    return () => {
-      mounted = false;
-    };
-  }, []);
-
-  const visibleProjects = useMemo(() => projects.slice(0, 5), [projects]);
+const OurWorks = ({ section }) => {
+  const visibleProjects = useMemo(() => enabledSorted(section?.data?.items).slice(0, 5), [section]);
+  if (!section) return null;
 
   return (
     <section className="relative overflow-hidden bg-gradient-to-b from-[#070314] via-[#0a0420] to-[#070314] px-6 py-24">
       <div className="relative mx-auto max-w-7xl">
         <div className="mb-12 text-center">
           <p className="text-xs font-semibold uppercase tracking-[0.35em] text-violet-300">Our Works</p>
-          <h2 className="mt-4 text-4xl font-bold tracking-tight md:text-6xl">Cinematic work, cleanly presented.</h2>
+          <h2 className="mt-4 text-4xl font-bold tracking-tight md:text-6xl">{section.title || 'Cinematic work, cleanly presented.'}</h2>
           <p className="mx-auto mt-5 max-w-xl leading-relaxed text-white/70">
-            Selected films, commercial visuals, drone sequences, and edits from the PranvithDOP portfolio.
+            {section.description || section.subtitle || 'Selected films, commercial visuals, drone sequences, and edits from the PranvithDOP portfolio.'}
           </p>
         </div>
 
@@ -54,12 +24,12 @@ const OurWorks = () => {
           {visibleProjects.map((project, index) => (
             <a
               key={`${project.title}-${index}`}
-              href={project.video_url || '/works'}
+              href={safePublicHref(project.video_url || project.button_link, '/works')}
               className="group overflow-hidden rounded-3xl border border-white/10 bg-white/[0.04] transition hover:-translate-y-1 hover:border-violet-400/50"
             >
               <div className="relative aspect-[16/11] overflow-hidden bg-gradient-to-br from-violet-950 via-slate-950 to-black">
-                {project.thumbnail_image_url ? (
-                  <img src={safeImageSrc(project.thumbnail_image_url)} alt={project.title} className="h-full w-full object-cover opacity-75 transition duration-500 group-hover:scale-105 group-hover:opacity-95" onError={handleImageError} />
+                {project.thumbnail_image_url || project.thumbnail_url || project.image_url ? (
+                  <img src={safeImageSrc(project.thumbnail_image_url || project.thumbnail_url || project.image_url)} alt={project.title} className="h-full w-full object-cover opacity-75 transition duration-500 group-hover:scale-105 group-hover:opacity-95" onError={handleImageError} />
                 ) : (
                   <div className="flex h-full w-full items-center justify-center px-6 text-center text-sm font-semibold uppercase tracking-[0.24em] text-violet-200/70">PranvithDOP</div>
                 )}
@@ -77,11 +47,13 @@ const OurWorks = () => {
           ))}
         </div>
 
-        <div className="mt-12 text-center">
-          <a href="/works" className="inline-flex rounded-full bg-violet-600 px-7 py-3 text-sm font-semibold tracking-wider text-white transition-colors hover:bg-violet-500">
-            VIEW ALL WORKS
-          </a>
-        </div>
+        {(section.button_text || section.button_link) && (
+          <div className="mt-12 text-center">
+            <a href={safePublicHref(section.button_link, '/works')} className="inline-flex rounded-full bg-violet-600 px-7 py-3 text-sm font-semibold tracking-wider text-white transition-colors hover:bg-violet-500">
+              {section.button_text || 'VIEW ALL WORKS'}
+            </a>
+          </div>
+        )}
       </div>
     </section>
   );

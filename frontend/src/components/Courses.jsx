@@ -6,7 +6,7 @@ import { payWithRazorpay } from '../lib/razorpay';
 import { dedupeCatalogItems, getCatalogItemKey, handleImageError, safeImageSrc } from '../lib/utils';
 import { toast } from 'sonner';
 
-const Courses = () => {
+const Courses = ({ section }) => {
   const [courses, setCourses] = useState(() => dedupeCatalogItems(mockCourses));
   const [loading, setLoading] = useState(true);
   const [buyingId, setBuyingId] = useState(null);
@@ -51,11 +51,10 @@ const Courses = () => {
       <div className="absolute inset-0 radial-purple-bottom pointer-events-none" />
       <div className="relative max-w-7xl mx-auto px-6">
         <div className="text-center mb-4">
-          <h2 className="text-4xl md:text-6xl font-bold tracking-tight">MASTER VIDEO EDITING</h2>
-          <p className="mt-4 text-violet-400 text-base md:text-lg font-medium">Expand Your Career Opportunity</p>
+          <h2 className="text-4xl md:text-6xl font-bold tracking-tight">{section?.title || 'MASTER VIDEO EDITING'}</h2>
+          <p className="mt-4 text-violet-400 text-base md:text-lg font-medium">{section?.subtitle || 'Expand Your Career Opportunity'}</p>
           <p className="mt-3 text-white/65 max-w-2xl mx-auto">
-            Learn professional video editing techniques from industry experts.
-            From beginner to advanced level courses.
+            {section?.description || 'Learn professional video editing techniques from industry experts. From beginner to advanced level courses.'}
           </p>
         </div>
 

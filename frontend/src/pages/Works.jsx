@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
 import { Play } from 'lucide-react';
-import { handleImageError, safeImageSrc } from '../lib/utils';
+import { handleImageError, safeImageSrc, safePublicHref } from '../lib/utils';
 import SafeVideoEmbed from '../components/SafeVideoEmbed';
 import { useCmsPage } from '../hooks/useCmsPage';
 
@@ -21,6 +21,7 @@ const Works = () => {
   const hero = section(sections, 'hero') || {};
   const showreel = section(sections, 'showreel') || {};
   const projectsSection = section(sections, 'projects') || section(sections, 'portfolio_grid') || {};
+  const ctaSection = section(sections, 'cta') || {};
   const allProjects = useMemo(() => enabledSorted(projectsSection.data?.items || []), [projectsSection.data]);
   const projects = useMemo(() => (
     active === 'All' ? allProjects : allProjects.filter((project) => project.category === active)
@@ -34,7 +35,7 @@ const Works = () => {
   return (
     <main className="page bg-[#070314] text-white">
       <Header />
-      {hero.enabled !== false && (
+      {hero.section_id && (
         <section className="relative overflow-hidden px-6 pb-12 pt-16 text-center">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(124,58,237,0.22),transparent_45%)]" />
           <div className="relative mx-auto max-w-5xl">
@@ -45,7 +46,7 @@ const Works = () => {
         </section>
       )}
 
-      {showreel.enabled !== false && (
+      {showreel.section_id && (
         <section className="px-6 pb-16 pt-8">
           <div className="mx-auto grid max-w-7xl gap-8 rounded-3xl border border-white/10 bg-white/[0.04] p-6 md:p-8 lg:grid-cols-[1.05fr_0.95fr] lg:items-center">
             <div>
@@ -85,7 +86,7 @@ const Works = () => {
         </section>
       )}
 
-      <section id="works-grid" className="px-6 pb-24 pt-10">
+      {projectsSection.section_id && <section id="works-grid" className="px-6 pb-24 pt-10">
         <div className="mx-auto max-w-7xl">
           <div className="mb-8 flex flex-wrap justify-center gap-2">
             {visibleCategories.map((filter) => (
@@ -115,7 +116,20 @@ const Works = () => {
             </div>
           )}
         </div>
-      </section>
+      </section>}
+      {ctaSection.section_id && (
+        <section className="px-6 pb-24">
+          <div className="mx-auto max-w-5xl rounded-3xl border border-violet-500/20 bg-gradient-to-r from-[#1a124a]/70 to-[#0f0830]/60 px-6 py-8 text-center shadow-2xl shadow-violet-950/20 md:px-10">
+            <h2 className="text-3xl font-bold text-white md:text-5xl">{ctaSection.title}</h2>
+            {ctaSection.description && <p className="mx-auto mt-4 max-w-2xl text-sm leading-7 text-white/65">{ctaSection.description}</p>}
+            {(ctaSection.button_text || ctaSection.button_link) && (
+              <a href={safePublicHref(ctaSection.button_link, '/hire')} className="mt-7 inline-flex rounded-full bg-violet-600 px-7 py-3 text-sm font-semibold text-white hover:bg-violet-500">
+                {ctaSection.button_text || 'Hire PranvithDOP'}
+              </a>
+            )}
+          </div>
+        </section>
+      )}
       <Footer />
     </main>
   );

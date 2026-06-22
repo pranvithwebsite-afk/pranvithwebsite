@@ -13,11 +13,14 @@ const section = (sections, idOrType) =>
 
 const Courses = () => {
   const { page } = useCmsPage('courses');
+  const pageHidden = page?.status === 'hidden';
   const sections = page?.sections || [];
   const settings = { ...defaultCourseVisibility, ...(page?.settings || {}) };
   const comingSoon = section(sections, 'coming-soon') || {};
   const hero = section(sections, 'hero') || {};
+  const rightForYou = section(sections, 'right-for-you') || {};
   const learn = section(sections, 'what-youll-learn') || section(sections, 'course_showcase') || {};
+  const courseList = section(sections, 'course-list') || {};
   const videos = section(sections, 'testimonial_videos') || {};
   const reviews = section(sections, 'reviews') || {};
   const faq = section(sections, 'faq') || {};
@@ -31,6 +34,10 @@ const Courses = () => {
       button_link: hero.button_link,
       media_url: hero.media_url,
     },
+    show_right_for_you: !!rightForYou.section_id,
+    right_for_you_section: rightForYou.section_id ? rightForYou : null,
+    course_list_section: courseList.section_id ? courseList : null,
+    show_course_list: courseList.section_id ? courseList.data?.show_course_list !== false : false,
     learn_items: enabledSorted(learn.data?.items),
     testimonial_videos: enabledSorted(videos.data?.items),
     text_reviews: enabledSorted(reviews.data?.items),
@@ -46,7 +53,7 @@ const Courses = () => {
   return (
     <main className="page bg-[#070314] text-white">
       <Header />
-      {!coursesEnabled || settings.show_coming_soon !== false ? (
+      {pageHidden ? null : (!coursesEnabled || settings.show_coming_soon !== false ? (
         <CourseComingSoon
           visibility={{
             ...settings,
@@ -58,9 +65,9 @@ const Courses = () => {
         />
       ) : (
         <CoursePageContent contentOverride={courseContent}>
-          <CoursesSection />
+          {courseContent.show_course_list && <CoursesSection section={courseContent.course_list_section} />}
         </CoursePageContent>
-      )}
+      ))}
       <Footer />
     </main>
   );

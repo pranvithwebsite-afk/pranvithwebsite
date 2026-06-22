@@ -105,7 +105,8 @@ const Assets = () => {
     return list;
   }, [products, query, sort, priceFilter]);
   const settings = cmsPage?.settings || {};
-  const showProductListing = settings.show_product_listing !== false;
+  const pageHidden = cmsPage?.status === 'hidden';
+  const showProductListing = !pageHidden && settings.show_product_listing !== false;
   const showFilters = settings.show_filters !== false;
   const heroSection = (cmsPage?.sections || []).find((section) => section.section_id === 'hero' || section.type === 'hero');
 
@@ -113,7 +114,7 @@ const Assets = () => {
     <main className="page bg-[#070314] text-white min-h-screen">
       <Header />
 
-      {heroSection?.enabled !== false && (
+      {!pageHidden && heroSection?.section_id && (
         <section className="pt-8 pb-10">
           <div className="max-w-7xl mx-auto px-6">
             <div className="rounded-2xl bg-gradient-to-r from-violet-900/40 via-indigo-900/30 to-violet-900/40 border border-violet-500/20 px-8 py-7">

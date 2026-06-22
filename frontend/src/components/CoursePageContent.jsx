@@ -19,6 +19,9 @@ export const defaultCourseVisibility = {
 
 export const defaultCoursePageContent = {
   show_right_for_you: true,
+  right_for_you_section: null,
+  show_course_list: true,
+  course_list_section: null,
   hero: {
     heading: 'Master Cinematic Video Editing',
     subtitle: 'Learn practical editing workflows, storytelling, color, sound, and delivery systems for real creator and client projects.',
@@ -189,7 +192,7 @@ const CoursePageContent = ({ children, contentOverride }) => {
         </div>
       </section>
 
-      {content.show_right_for_you !== false && <RightForYou />}
+      {content.show_right_for_you !== false && content.right_for_you_section && <RightForYou section={content.right_for_you_section} />}
 
       {learnItems.length > 0 && (
         <section className="px-6 py-16">
