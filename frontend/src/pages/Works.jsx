@@ -3,7 +3,7 @@ import Header from '../components/Header';
 import Footer from '../components/Footer';
 import { Play } from 'lucide-react';
 import { handleImageError, safeImageSrc, safePublicHref } from '../lib/utils';
-import SafeVideoEmbed from '../components/SafeVideoEmbed';
+import SafeVideoEmbed, { getYouTubeThumbnail } from '../components/SafeVideoEmbed';
 import { useCmsPage } from '../hooks/useCmsPage';
 
 const filters = ['All', 'Commercial', 'Wedding', 'Drone', 'Editing', 'Product', 'Film'];
@@ -13,6 +13,12 @@ const enabledSorted = (items = []) =>
 
 const section = (sections, idOrType) =>
   (sections || []).find((item) => item.section_id === idOrType || item.type === idOrType);
+
+const getWorkThumbnail = (item = {}) => {
+  const customThumbnail = item.thumbnail_image_url || item.thumbnail_url || item.image_url;
+  if (customThumbnail) return customThumbnail;
+  return getYouTubeThumbnail(item.video_url, 'hqdefault') || null;
+};
 
 const Works = () => {
   const { page } = useCmsPage('works');
@@ -135,27 +141,43 @@ const Works = () => {
   );
 };
 
-const ProjectCard = ({ project }) => (
-  <div className="group h-full overflow-hidden rounded-3xl border border-white/10 bg-white/[0.04] transition duration-300 hover:-translate-y-1 hover:border-violet-400/50">
-    <div className="relative aspect-[16/11] overflow-hidden bg-gradient-to-br from-violet-950 via-slate-950 to-black">
-      {project.thumbnail_image_url || project.thumbnail_url || project.image_url ? (
-        <img src={safeImageSrc(project.thumbnail_image_url || project.thumbnail_url || project.image_url)} alt={project.title} className="h-full w-full object-cover opacity-75 transition duration-500 group-hover:scale-105 group-hover:opacity-95" onError={handleImageError} />
-      ) : (
-        <div className="flex h-full w-full items-center justify-center px-6 text-center text-sm font-semibold uppercase tracking-[0.24em] text-violet-200/70">PranvithDOP</div>
-      )}
-      <div className="absolute inset-0 bg-gradient-to-t from-[#070314] via-transparent to-transparent" />
-      <span className="absolute left-4 top-4 rounded-full bg-black/60 px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-violet-200">{project.category || 'Film'}</span>
-    </div>
-    <div className="p-6">
-      <h3 className="text-xl font-semibold text-white">{project.title}</h3>
-      <p className="mt-3 text-sm leading-relaxed text-white/65">{project.description}</p>
-      <div className="mt-5 space-y-1 text-xs text-white/45">
-        {project.equipment && <p>Equipment: {project.equipment}</p>}
-        {project.client && <p>Client: {project.client}</p>}
-        {project.date && <p>Date: {project.date}</p>}
+const ProjectCard = ({ project }) => {
+  const thumbnail = getWorkThumbnail(project);
+  const hasVideo = !!project.video_url;
+  const Wrapper = hasVideo ? 'a' : 'div';
+  const wrapperProps = hasVideo ? {
+    href: safePublicHref(project.video_url, '#'),
+    target: '_blank',
+    rel: 'noopener noreferrer',
+  } : {};
+
+  return (
+    <Wrapper {...wrapperProps} className="group block h-full overflow-hidden rounded-3xl border border-white/10 bg-white/[0.04] transition duration-300 hover:-translate-y-1 hover:border-violet-400/50">
+      <div className="relative aspect-[16/11] overflow-hidden bg-gradient-to-br from-violet-950 via-slate-950 to-black">
+        {thumbnail ? (
+          <img src={safeImageSrc(thumbnail)} alt={project.title} loading="lazy" className="h-full w-full object-cover opacity-75 transition duration-500 group-hover:scale-105 group-hover:opacity-95" onError={handleImageError} />
+        ) : (
+          <div className="flex h-full w-full items-center justify-center px-6 text-center text-sm font-semibold uppercase tracking-[0.24em] text-violet-200/70">PranvithDOP</div>
+        )}
+        <div className="absolute inset-0 bg-gradient-to-t from-[#070314] via-transparent to-transparent" />
+        <span className="absolute left-4 top-4 rounded-full bg-black/60 px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-violet-200">{project.category || 'Film'}</span>
+        {hasVideo && (
+          <span className="absolute left-1/2 top-1/2 flex h-14 w-14 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-violet-600/90 text-white shadow-[0_0_40px_rgba(139,92,246,0.65)] transition group-hover:scale-110 group-hover:bg-violet-500">
+            <Play size={20} fill="currentColor" className="ml-0.5" />
+          </span>
+        )}
       </div>
-    </div>
-  </div>
-);
+      <div className="p-6">
+        <h3 className="text-xl font-semibold text-white">{project.title}</h3>
+        <p className="mt-3 text-sm leading-relaxed text-white/65">{project.description}</p>
+        <div className="mt-5 space-y-1 text-xs text-white/45">
+          {project.equipment && <p>Equipment: {project.equipment}</p>}
+          {project.client && <p>Client: {project.client}</p>}
+          {project.date && <p>Date: {project.date}</p>}
+        </div>
+      </div>
+    </Wrapper>
+  );
+};
 
 export default Works;
