@@ -1,16 +1,23 @@
-import React, { useEffect, useState } from 'react';
-import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
-import { Menu, Bell, LogOut, User, X } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
+import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { Bell, KeyRound, LogOut, Menu, ShieldCheck, User, Users, X } from 'lucide-react';
+import { toast } from 'sonner';
 import navItems from './nav';
 import { useAdminAuth } from './AdminAuthContext';
+import { changeAdminPassword } from '../lib/api';
 
 const AdminLayout = () => {
   const [open, setOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [passwordOpen, setPasswordOpen] = useState(false);
   const { admin, logout } = useAdminAuth();
   const location = useLocation();
+  const navigate = useNavigate();
+  const profileRef = useRef(null);
 
   useEffect(() => {
     setOpen(false);
+    setProfileOpen(false);
   }, [location.pathname]);
 
   useEffect(() => {
@@ -29,6 +36,29 @@ const AdminLayout = () => {
       window.removeEventListener('keydown', handleEscape);
     };
   }, [open]);
+
+  useEffect(() => {
+    if (!profileOpen) return undefined;
+    const handlePointerDown = (event) => {
+      if (profileRef.current && !profileRef.current.contains(event.target)) {
+        setProfileOpen(false);
+      }
+    };
+    const handleEscape = (event) => {
+      if (event.key === 'Escape') setProfileOpen(false);
+    };
+    document.addEventListener('mousedown', handlePointerDown);
+    window.addEventListener('keydown', handleEscape);
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown);
+      window.removeEventListener('keydown', handleEscape);
+    };
+  }, [profileOpen]);
+
+  const openAdminUsers = () => {
+    setProfileOpen(false);
+    navigate('/admin/admin-users');
+  };
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100">
@@ -116,13 +146,29 @@ const AdminLayout = () => {
                 >
                   <Bell size={18} />
                 </button>
-                <button
-                  type="button"
-                  className="hidden h-10 w-10 items-center justify-center rounded-2xl border border-slate-800 bg-slate-900 text-slate-300 hover:bg-slate-800 sm:inline-flex"
-                  title="Profile"
-                >
-                  <User size={18} />
-                </button>
+                <div className="relative" ref={profileRef}>
+                  <button
+                    type="button"
+                    onClick={() => setProfileOpen((value) => !value)}
+                    className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-slate-800 bg-slate-900 text-slate-300 hover:border-violet-500 hover:bg-slate-800"
+                    title="Profile"
+                    aria-label="Open admin profile"
+                    aria-expanded={profileOpen}
+                  >
+                    <User size={18} />
+                  </button>
+                  {profileOpen && (
+                    <AdminProfileDropdown
+                      admin={admin}
+                      onChangePassword={() => {
+                        setProfileOpen(false);
+                        setPasswordOpen(true);
+                      }}
+                      onManageAdmins={openAdminUsers}
+                      onLogout={logout}
+                    />
+                  )}
+                </div>
                 <button
                   type="button"
                   onClick={logout}
@@ -141,8 +187,116 @@ const AdminLayout = () => {
           </main>
         </div>
       </div>
+      {passwordOpen && <ChangePasswordModal onClose={() => setPasswordOpen(false)} />}
     </div>
   );
 };
+
+const AdminProfileDropdown = ({ admin, onChangePassword, onManageAdmins, onLogout }) => (
+  <div className="absolute right-0 top-12 z-50 w-[min(22rem,calc(100vw-2rem))] overflow-hidden rounded-3xl border border-slate-800 bg-slate-950 shadow-2xl shadow-black/50">
+    <div className="border-b border-slate-800 bg-gradient-to-br from-violet-600/20 via-slate-900 to-slate-950 p-5">
+      <div className="inline-flex h-12 w-12 items-center justify-center rounded-2xl border border-violet-400/30 bg-violet-500/10 text-violet-100">
+        <ShieldCheck size={22} />
+      </div>
+      <p className="mt-4 text-lg font-semibold text-white">{admin?.name || 'Admin'}</p>
+      <p className="mt-1 break-all text-sm text-slate-400">{admin?.email || 'admin'}</p>
+    </div>
+    <div className="space-y-3 p-4 text-sm">
+      <InfoRow label="Role" value={admin?.role || 'admin'} />
+      <InfoRow label="Status" value={admin?.is_active === false ? 'Inactive' : 'Active'} accent={admin?.is_active === false ? 'rose' : 'emerald'} />
+      <button type="button" onClick={onChangePassword} className="flex w-full items-center gap-3 rounded-2xl border border-slate-800 px-4 py-3 text-left font-semibold text-white hover:border-violet-500 hover:bg-slate-900">
+        <KeyRound size={16} /> Change Password
+      </button>
+      <button type="button" onClick={onManageAdmins} className="flex w-full items-center gap-3 rounded-2xl border border-slate-800 px-4 py-3 text-left font-semibold text-white hover:border-violet-500 hover:bg-slate-900">
+        <Users size={16} /> Manage Admins
+      </button>
+      <button type="button" onClick={onLogout} className="flex w-full items-center gap-3 rounded-2xl border border-rose-500/30 px-4 py-3 text-left font-semibold text-rose-100 hover:border-rose-400 hover:bg-rose-500/10">
+        <LogOut size={16} /> Logout
+      </button>
+    </div>
+  </div>
+);
+
+const InfoRow = ({ label, value, accent }) => (
+  <div className="flex items-center justify-between gap-4 rounded-2xl border border-slate-800 bg-slate-900/70 px-4 py-3">
+    <span className="text-slate-500">{label}</span>
+    <span className={`font-semibold ${accent === 'emerald' ? 'text-emerald-300' : accent === 'rose' ? 'text-rose-300' : 'text-slate-200'}`}>{value}</span>
+  </div>
+);
+
+const ChangePasswordModal = ({ onClose }) => {
+  const [form, setForm] = useState({ current_password: '', new_password: '', confirm_password: '' });
+  const [saving, setSaving] = useState(false);
+
+  const update = (field, value) => setForm((current) => ({ ...current, [field]: value }));
+
+  const submit = async (event) => {
+    event.preventDefault();
+    if (!form.current_password) {
+      toast.error('Current password is required');
+      return;
+    }
+    if (form.new_password.length < 8) {
+      toast.error('New password must be at least 8 characters');
+      return;
+    }
+    if (form.new_password !== form.confirm_password) {
+      toast.error('Password confirmation does not match');
+      return;
+    }
+    setSaving(true);
+    try {
+      await changeAdminPassword(form);
+      toast.success('Password changed');
+      onClose();
+    } catch (error) {
+      toast.error(error?.response?.data?.detail || 'Unable to change password');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 px-4 py-8 backdrop-blur">
+      <form onSubmit={submit} className="w-full max-w-lg rounded-3xl border border-slate-800 bg-slate-950 p-6 shadow-2xl">
+        <div className="mb-5 flex items-center justify-between gap-3">
+          <div>
+            <h2 className="text-xl font-semibold text-white">Change Password</h2>
+            <p className="mt-1 text-sm text-slate-500">Your password is verified and stored only as a secure hash.</p>
+          </div>
+          <button type="button" onClick={onClose} className="rounded-full border border-slate-700 p-2 text-slate-300 hover:text-white" aria-label="Close change password">
+            <X size={16} />
+          </button>
+        </div>
+        <div className="space-y-4">
+          <PasswordField label="Current password" value={form.current_password} onChange={(value) => update('current_password', value)} />
+          <PasswordField label="New password" value={form.new_password} onChange={(value) => update('new_password', value)} />
+          <PasswordField label="Confirm new password" value={form.confirm_password} onChange={(value) => update('confirm_password', value)} />
+        </div>
+        <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+          <button type="button" onClick={onClose} className="rounded-2xl border border-slate-700 px-5 py-3 text-sm font-semibold text-slate-200 hover:border-slate-500">
+            Cancel
+          </button>
+          <button type="submit" disabled={saving} className="rounded-2xl bg-violet-600 px-5 py-3 text-sm font-semibold text-white hover:bg-violet-500 disabled:opacity-60">
+            {saving ? 'Saving...' : 'Save Password'}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+};
+
+const PasswordField = ({ label, value, onChange }) => (
+  <label className="block text-sm text-slate-300">
+    {label}
+    <input
+      type="password"
+      value={value}
+      onChange={(event) => onChange(event.target.value)}
+      autoComplete="new-password"
+      className="mt-2 w-full rounded-2xl border border-slate-800 bg-slate-900 px-4 py-3 text-white outline-none focus:border-violet-500"
+    />
+  </label>
+);
 
 export default AdminLayout;

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Activity, Save } from 'lucide-react';
 import { toast } from 'sonner';
 import { fetchAdminRazorpayHealth, fetchAdminSettings, saveAdminSettings } from '../../lib/api';
+import MediaUrlInput from '../components/MediaUrlInput';
 
 const defaultSettings = {
   site_name: '',
@@ -151,9 +152,13 @@ const Settings = () => {
           </Field>
 
           <div className="grid gap-6 lg:grid-cols-2">
-            <Field label="Logo URL">
-              <input value={settings.logo_url} onChange={(event) => update('logo_url', event.target.value)} className={fieldClass} placeholder="/assets/brand-profile.png" />
-            </Field>
+            <MediaUrlInput
+              label="Logo URL"
+              value={settings.logo_url}
+              onChange={(value) => update('logo_url', value)}
+              accept="image/*"
+              placeholder="/assets/brand-profile.png"
+            />
             <Field label="Contact email">
               <input type="email" value={settings.contact_email} onChange={(event) => update('contact_email', event.target.value)} className={fieldClass} placeholder="info@pranvithdop.com" />
             </Field>

@@ -62,7 +62,7 @@ const Hero = ({ pageData }) => {
           videoUrl={mediaUrl}
           title="Home hero video"
           poster={hero.hero_media_poster_url}
-          className="absolute inset-0 h-full w-full rounded-none opacity-40"
+          className="absolute inset-0 h-full w-full rounded-none"
         />
       );
     }

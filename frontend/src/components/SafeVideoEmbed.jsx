@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useState } from 'react';
+import { Play } from 'lucide-react';
 
 const YOUTUBE_HOSTS = new Set(['youtube.com', 'www.youtube.com', 'm.youtube.com', 'youtu.be', 'www.youtu.be', 'youtube-nocookie.com', 'www.youtube-nocookie.com']);
 const VIMEO_HOSTS = new Set(['vimeo.com', 'www.vimeo.com', 'player.vimeo.com']);
@@ -87,6 +88,17 @@ export const getSafeVideoEmbedUrl = (videoType, videoUrl) => {
   return '';
 };
 
+export const getYouTubeThumbnail = (url, quality = 'maxresdefault') => {
+  const id = getYouTubeId(url);
+  return id ? `https://img.youtube.com/vi/${id}/${quality}.jpg` : '';
+};
+
+const withAutoplay = (url) => {
+  if (!url) return '';
+  const separator = url.includes('?') ? '&' : '?';
+  return `${url}${separator}autoplay=1`;
+};
+
 const externalVideoLabel = (videoType, videoUrl) => {
   if (getYouTubeId(videoUrl) || String(videoType || '').toLowerCase() === 'youtube') return 'Watch on YouTube';
   return 'Open video';
@@ -112,34 +124,44 @@ const SafeVideoEmbed = ({
   title = 'Video',
   poster = '',
   className = '',
+  autoplayOnClick = true,
+  showPlayOverlay = true,
 }) => {
+  const [activated, setActivated] = useState(!showPlayOverlay);
+  const [posterFailed, setPosterFailed] = useState(false);
+  const [youtubeMaxFailed, setYoutubeMaxFailed] = useState(false);
+  const [thumbnailUnavailable, setThumbnailUnavailable] = useState(false);
   const type = String(videoType || '').trim().toLowerCase();
   const embedUrl = getSafeVideoEmbedUrl(type, videoUrl);
   const directVideo = type === 'direct' || type === 'video_file' || isDirectVideoUrl(videoUrl);
   const externalUrl = getSafeExternalUrl(videoUrl);
   const posterUrl = getSafePosterUrl(poster);
-  const wrapperClass = `relative aspect-video overflow-hidden rounded-[inherit] bg-black ${className}`.trim();
+  const youtubeThumbnail = !posterUrl || posterFailed ? getYouTubeThumbnail(videoUrl, youtubeMaxFailed ? 'hqdefault' : 'maxresdefault') : '';
+  const thumbnailUrl = thumbnailUnavailable ? '' : (posterUrl && !posterFailed ? posterUrl : youtubeThumbnail);
+  const wrapperClass = `group relative aspect-video overflow-hidden rounded-[inherit] border border-violet-500/15 bg-black ${className}`.trim();
 
-  if (directVideo && externalUrl) {
+  if (activated && directVideo && externalUrl) {
     return (
-      <video
-        src={externalUrl}
-        poster={posterUrl || undefined}
-        controls
-        playsInline
-        preload="metadata"
-        className={`${wrapperClass} h-full w-full object-contain`}
-      />
+      <div className={wrapperClass}>
+        <video
+          src={externalUrl}
+          poster={posterUrl || undefined}
+          controls
+          autoPlay={autoplayOnClick}
+          playsInline
+          preload="metadata"
+          className="absolute inset-0 h-full w-full object-contain"
+        />
+      </div>
     );
   }
 
-  if (embedUrl) {
+  if (activated && embedUrl) {
     return (
       <div className={wrapperClass}>
-        {posterUrl && <img src={posterUrl} alt="" className="absolute inset-0 h-full w-full object-cover opacity-30" loading="lazy" />}
         <iframe
           title={title}
-          src={embedUrl}
+          src={autoplayOnClick ? withAutoplay(embedUrl) : embedUrl}
           className="absolute inset-0 h-full w-full"
           loading="lazy"
           referrerPolicy="strict-origin-when-cross-origin"
@@ -157,6 +179,40 @@ const SafeVideoEmbed = ({
           </a>
         )}
       </div>
+    );
+  }
+
+  if ((embedUrl || (directVideo && externalUrl)) && showPlayOverlay) {
+    return (
+      <button
+        type="button"
+        onClick={() => setActivated(true)}
+        className={`${wrapperClass} block w-full text-left`}
+        aria-label={`Play ${title}`}
+      >
+        {thumbnailUrl ? (
+          <img
+            src={thumbnailUrl}
+            alt={title}
+            className="absolute inset-0 h-full w-full object-cover transition duration-500 group-hover:scale-105"
+            loading="lazy"
+            onError={() => {
+              if (posterUrl && !posterFailed) setPosterFailed(true);
+              else if (youtubeThumbnail && !youtubeMaxFailed) setYoutubeMaxFailed(true);
+              else setThumbnailUnavailable(true);
+            }}
+          />
+        ) : (
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_35%,rgba(124,58,237,0.35),transparent_38%),linear-gradient(135deg,#1a0a3a,#0f0625_52%,#070314)]" />
+        )}
+        <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/75 via-black/20 to-transparent" />
+        <span className="absolute left-1/2 top-1/2 flex h-16 w-16 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-white/20 bg-violet-600 text-white shadow-[0_0_35px_rgba(139,92,246,0.75)] transition group-hover:scale-110 group-hover:bg-violet-500 sm:h-20 sm:w-20">
+          <Play size={28} fill="currentColor" className="ml-1" />
+        </span>
+        <span className="absolute bottom-4 left-4 right-4 line-clamp-2 text-sm font-semibold text-white drop-shadow md:text-base">
+          {title}
+        </span>
+      </button>
     );
   }
 

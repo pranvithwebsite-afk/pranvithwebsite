@@ -38,6 +38,8 @@ from seed_data import (
     TESTIMONIALS,
     FAQS,
     PAGES,
+    CMS_PAGES,
+    CMS_SECTIONS,
     ASSET_PRODUCTS,
     BLOG_CATEGORIES,
     BLOG_POSTS,
@@ -248,6 +250,123 @@ class PageIn(BaseModel):
     seo_title: Optional[str] = None
     seo_description: Optional[str] = None
     published: bool = True
+
+
+CMS_PAGE_KEYS = {"home", "courses", "about", "assets", "works", "hire"}
+CMS_PAGE_PATHS = {
+    "home": "/",
+    "courses": "/courses",
+    "about": "/about",
+    "assets": "/assets",
+    "works": "/works",
+    "hire": "/hire",
+}
+CMS_STATUSES = {"published", "draft", "hidden"}
+CMS_SECTION_TYPES = {
+    "hero",
+    "text",
+    "image_text",
+    "video",
+    "showreel",
+    "services_cards",
+    "portfolio_grid",
+    "product_showcase",
+    "course_showcase",
+    "testimonial_videos",
+    "reviews",
+    "faq",
+    "cta",
+    "contact_form",
+    "gallery",
+    "before_after",
+}
+CMS_MEDIA_TYPES = {"auto", "image", "video_file", "youtube", "vimeo"}
+
+
+class CmsPageIn(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    title: Optional[str] = Field(default=None, max_length=200)
+    subtitle: Optional[str] = Field(default=None, max_length=700)
+    slug: Optional[str] = Field(default=None, max_length=80)
+    path: Optional[str] = Field(default=None, max_length=120)
+    status: Optional[str] = "draft"
+    seo_title: Optional[str] = Field(default=None, max_length=220)
+    seo_description: Optional[str] = Field(default=None, max_length=500)
+    settings: Dict[str, Any] = {}
+
+    @field_validator("status")
+    @classmethod
+    def validate_status(cls, value):
+        cleaned = str(value or "draft").strip().lower()
+        if cleaned not in CMS_STATUSES:
+            raise ValueError("status must be published, draft, or hidden")
+        return cleaned
+
+    @field_validator("path")
+    @classmethod
+    def validate_path(cls, value):
+        if value is None:
+            return value
+        cleaned = value.strip()
+        if not cleaned.startswith("/") or cleaned.startswith("//") or ".." in Path(cleaned).parts:
+            raise ValueError("path must be a safe relative path")
+        return cleaned
+
+
+class CmsSectionIn(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    section_id: Optional[str] = Field(default=None, max_length=80)
+    type: str = "text"
+    title: Optional[str] = Field(default="", max_length=220)
+    subtitle: Optional[str] = Field(default="", max_length=700)
+    description: Optional[str] = Field(default="", max_length=4000)
+    button_text: Optional[str] = Field(default="", max_length=120)
+    button_link: Optional[str] = None
+    media_type: str = "auto"
+    media_url: Optional[str] = None
+    poster_url: Optional[str] = None
+    data: Dict[str, Any] = {}
+    enabled: bool = True
+    sort_order: Optional[int] = None
+
+    @field_validator("section_id")
+    @classmethod
+    def validate_section_id(cls, value):
+        if value in {None, ""}:
+            return value
+        cleaned = normalize_slug(value)
+        if not cleaned:
+            raise ValueError("section id is invalid")
+        return cleaned
+
+    @field_validator("type")
+    @classmethod
+    def validate_type(cls, value):
+        cleaned = normalize_slug(value).replace("-", "_")
+        if cleaned not in CMS_SECTION_TYPES:
+            raise ValueError("Unsupported CMS section type")
+        return cleaned
+
+    @field_validator("media_type")
+    @classmethod
+    def validate_media_type(cls, value):
+        cleaned = str(value or "auto").strip().lower()
+        if cleaned not in CMS_MEDIA_TYPES:
+            raise ValueError("Unsupported media type")
+        return cleaned
+
+    @field_validator("button_link", "media_url", "poster_url")
+    @classmethod
+    def validate_urls(cls, value):
+        return _reject_unsafe_url(value)
+
+
+class CmsReorderIn(BaseModel):
+    section_ids: List[str]
+
+
+class CmsVisibilityIn(BaseModel):
+    enabled: bool
 
 
 class Product(BaseModel):
@@ -1342,6 +1461,135 @@ def _reject_unsafe_url(value: Optional[str]) -> Optional[str]:
     return cleaned
 
 
+def _sanitize_cms_value(value: Any) -> Any:
+    if isinstance(value, str):
+        cleaned = html.escape(value.strip(), quote=False)
+        lowered = cleaned.lower()
+        if lowered.startswith(("javascript:", "vbscript:", "data:")):
+            raise ValueError("Unsafe URL/content is not allowed")
+        return cleaned[:10000]
+    if isinstance(value, list):
+        return [_sanitize_cms_value(item) for item in value[:200]]
+    if isinstance(value, dict):
+        safe = {}
+        for key, item in value.items():
+            safe_key = re.sub(r"[^A-Za-z0-9_.-]+", "_", str(key))[:80]
+            if not safe_key:
+                continue
+            if safe_key.endswith("_url") or safe_key.endswith("_link") or safe_key in {"url", "href", "src", "thumbnail", "image", "video"}:
+                safe[safe_key] = _reject_unsafe_url(str(item).strip()) if item else ""
+            else:
+                safe[safe_key] = _sanitize_cms_value(item)
+        return safe
+    if isinstance(value, (bool, int, float)) or value is None:
+        return value
+    return str(value)[:1000]
+
+
+def _normalize_cms_page_key(page_key: str) -> str:
+    key = normalize_slug(page_key)
+    if key not in CMS_PAGE_KEYS:
+        raise HTTPException(status_code=404, detail="CMS page not found")
+    return key
+
+
+def _cms_page_doc(page_key: str, payload: Optional[CmsPageIn] = None, existing: Optional[dict] = None) -> dict:
+    now = datetime.now(timezone.utc).isoformat()
+    base = {
+        "id": existing.get("id") if existing else str(uuid.uuid4()),
+        "page_key": page_key,
+        "title": page_key.replace("-", " ").title(),
+        "subtitle": "",
+        "slug": page_key,
+        "path": CMS_PAGE_PATHS.get(page_key, f"/{page_key}"),
+        "status": "draft",
+        "seo_title": "",
+        "seo_description": "",
+        "settings": {},
+        "created_at": existing.get("created_at") if existing else now,
+        "updated_at": now,
+    }
+    if existing:
+        base.update({k: v for k, v in existing.items() if k != "_id"})
+    if payload:
+        incoming = payload.model_dump(exclude_unset=True)
+        if incoming.get("slug"):
+            incoming["slug"] = normalize_slug(incoming["slug"])
+        if "settings" in incoming:
+            incoming["settings"] = _sanitize_cms_value(incoming.get("settings") or {})
+        base.update({k: v for k, v in incoming.items() if v is not None})
+        base["updated_at"] = now
+    return base
+
+
+def _cms_section_doc(page_key: str, payload: CmsSectionIn, existing: Optional[dict] = None) -> dict:
+    now = datetime.now(timezone.utc).isoformat()
+    base = {
+        "id": existing.get("id") if existing else str(uuid.uuid4()),
+        "section_id": existing.get("section_id") if existing else (payload.section_id or str(uuid.uuid4())[:8]),
+        "page_key": page_key,
+        "type": "text",
+        "title": "",
+        "subtitle": "",
+        "description": "",
+        "button_text": "",
+        "button_link": "",
+        "media_type": "auto",
+        "media_url": "",
+        "poster_url": "",
+        "data": {},
+        "enabled": True,
+        "sort_order": 0,
+        "created_at": existing.get("created_at") if existing else now,
+        "updated_at": now,
+    }
+    if existing:
+        base.update({k: v for k, v in existing.items() if k != "_id"})
+    incoming = payload.model_dump(exclude_unset=True)
+    incoming["data"] = _sanitize_cms_value(incoming.get("data") or {})
+    if "section_id" in incoming and incoming["section_id"]:
+        incoming["section_id"] = normalize_slug(incoming["section_id"])
+    base.update({k: v for k, v in incoming.items() if v is not None})
+    base["page_key"] = page_key
+    base["updated_at"] = now
+    return base
+
+
+async def _cms_page_response(page_key: str, public: bool = False) -> dict:
+    page = await db.cms_pages.find_one({"page_key": page_key}, {"_id": 0})
+    if not page:
+        return {
+            "page_key": page_key,
+            "title": page_key.title(),
+            "subtitle": "",
+            "path": CMS_PAGE_PATHS.get(page_key, f"/{page_key}"),
+            "status": "hidden" if public else "draft",
+            "seo_title": "",
+            "seo_description": "",
+            "settings": {},
+            "sections": [],
+        }
+    if public and page.get("status") != "published":
+        return {
+            "page_key": page_key,
+            "title": page.get("title", ""),
+            "subtitle": page.get("subtitle", ""),
+            "path": page.get("path", CMS_PAGE_PATHS.get(page_key, f"/{page_key}")),
+            "status": "hidden",
+            "seo_title": "",
+            "seo_description": "",
+            "settings": {},
+            "sections": [],
+        }
+    section_query = {"page_key": page_key}
+    if public:
+        section_query["enabled"] = {"$ne": False}
+    sections = await db.cms_sections.find(section_query, {"_id": 0}).sort("sort_order", 1).to_list(200)
+    safe_page = {k: v for k, v in page.items() if k not in {"_id"}}
+    safe_page["sections"] = sections
+    return safe_page
+
+
 def _normalize_product_media_fields(doc: dict) -> dict:
     if not doc.get("product_images") and doc.get("images"):
         doc["product_images"] = list(doc.get("images") or [])
@@ -1381,6 +1629,21 @@ async def public_page_by_slug(slug: str):
     if not page:
         raise HTTPException(status_code=404, detail="Page not found")
     return page
+
+
+@api_router.get("/cms/pages/{page_key}")
+async def public_cms_page(page_key: str):
+    page_key = _normalize_cms_page_key(page_key)
+    if db is None:
+        return {
+            "page_key": page_key,
+            "title": page_key.title(),
+            "status": "hidden",
+            "seo_title": "",
+            "seo_description": "",
+            "sections": [],
+        }
+    return await _cms_page_response(page_key, public=True)
 
 
 def _public_product(product: dict) -> dict:
@@ -1522,6 +1785,10 @@ class AdminBase(BaseModel):
     email: EmailStr
     role: str
     permissions: List[str] = []
+    is_active: bool = True
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
+    last_login: Optional[str] = None
 
 
 class AdminInDB(AdminBase):
@@ -1538,6 +1805,33 @@ class AdminCreate(BaseModel):
 class AdminLoginIn(BaseModel):
     email: EmailStr
     password: str
+
+
+class AdminChangePasswordIn(BaseModel):
+    current_password: str = Field(min_length=1)
+    new_password: str = Field(min_length=8, max_length=128)
+    confirm_password: str = Field(min_length=8, max_length=128)
+
+
+class AdminUserCreateIn(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+    email: EmailStr
+    role: str = "admin"
+    password: str = Field(min_length=8, max_length=128)
+    confirm_password: str = Field(min_length=8, max_length=128)
+    is_active: bool = True
+
+
+class AdminUserUpdateIn(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+    email: EmailStr
+    role: str = "admin"
+    is_active: bool = True
+
+
+class AdminResetPasswordIn(BaseModel):
+    password: str = Field(min_length=8, max_length=128)
+    confirm_password: str = Field(min_length=8, max_length=128)
 
 
 class Token(BaseModel):
@@ -1613,6 +1907,9 @@ async def authenticate_admin(email: str, password: str):
     if not admin:
         logger.warning("Admin login failed: admin not found for email %s", normalized_email)
         return None
+    if admin.get("is_active", True) is False:
+        logger.warning("Admin login failed: inactive admin for email %s", normalized_email)
+        return None
     if not verify_password(password, admin.get("hashed_password", "")):
         logger.warning("Admin login failed: invalid password for email %s", normalized_email)
         return None
@@ -1626,7 +1923,23 @@ def admin_doc_to_public(doc: dict) -> AdminBase:
         email=doc.get("email"),
         role=doc.get("role", "admin"),
         permissions=doc.get("permissions", []),
+        is_active=doc.get("is_active", True) is not False,
+        created_at=doc.get("created_at"),
+        updated_at=doc.get("updated_at"),
+        last_login=doc.get("last_login"),
     )
+
+
+def validate_admin_role(role: str) -> str:
+    cleaned = (role or "admin").strip().lower()
+    if cleaned not in {"admin", "super_admin"}:
+        raise HTTPException(status_code=422, detail="Role must be admin or super_admin")
+    return cleaned
+
+
+def validate_password_confirmation(password: str, confirm_password: str):
+    if password != confirm_password:
+        raise HTTPException(status_code=422, detail="Password confirmation does not match")
 
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
@@ -1655,11 +1968,37 @@ async def get_current_admin(token: str = Depends(oauth2_scheme)) -> AdminBase:
     if admin is None:
         logger.warning("Admin token rejected: admin id %s not found", admin_id)
         raise credentials_exception
+    if admin.get("is_active", True) is False:
+        logger.warning("Admin token rejected: inactive admin id %s", admin_id)
+        raise credentials_exception
     return admin_doc_to_public(admin)
 
 
 async def get_current_active_admin(current_admin: AdminBase = Depends(get_current_admin)) -> AdminBase:
     return current_admin
+
+
+async def get_current_super_admin(current_admin: AdminBase = Depends(get_current_active_admin)) -> AdminBase:
+    if current_admin.role != "super_admin":
+        raise HTTPException(status_code=403, detail="Super admin access is required")
+    return current_admin
+
+
+async def assert_not_last_super_admin(admin_id: str, next_role: Optional[str] = None, next_active: Optional[bool] = None):
+    target = await db.admins.find_one({"id": admin_id})
+    if not target:
+        raise HTTPException(status_code=404, detail="Admin user not found")
+    is_super = target.get("role") == "super_admin"
+    will_be_super = (next_role or target.get("role")) == "super_admin"
+    will_be_active = (target.get("is_active", True) is not False) if next_active is None else bool(next_active)
+    if not is_super:
+        return target
+    if will_be_super and will_be_active:
+        return target
+    active_super_count = await db.admins.count_documents({"role": "super_admin", "is_active": {"$ne": False}})
+    if active_super_count <= 1:
+        raise HTTPException(status_code=409, detail="Cannot remove or disable the last active super admin")
+    return target
 
 
 @admin_router.post("/login", response_model=AdminLoginResponse)
@@ -1688,6 +2027,10 @@ async def admin_login(payload: AdminLoginIn):
     if not admin:
         raise HTTPException(status_code=401, detail="Incorrect email or password")
     logger.info("Admin login successful for email %s", payload.email.lower().strip())
+    now = datetime.now(timezone.utc).isoformat()
+    await db.admins.update_one({"id": admin["id"]}, {"$set": {"last_login": now, "updated_at": now}})
+    admin["last_login"] = now
+    admin["updated_at"] = now
     access_token = create_access_token({"id": admin["id"], "sub": admin["id"], "role": admin.get("role", "admin")})
     return {
         "access_token": access_token,
@@ -1704,6 +2047,101 @@ async def admin_logout(current_admin: AdminBase = Depends(get_current_active_adm
 @admin_router.get("/me", response_model=AdminBase)
 async def admin_me(current_admin: AdminBase = Depends(get_current_active_admin)):
     return current_admin
+
+
+@admin_router.post("/change-password")
+async def admin_change_password(payload: AdminChangePasswordIn, current_admin: AdminBase = Depends(get_current_active_admin)):
+    validate_password_confirmation(payload.new_password, payload.confirm_password)
+    admin = await get_admin_by_id(current_admin.id)
+    if not admin or admin.get("is_active", True) is False:
+        raise HTTPException(status_code=401, detail="Could not validate credentials")
+    if not verify_password(payload.current_password, admin.get("hashed_password", "")):
+        raise HTTPException(status_code=400, detail="Current password is incorrect")
+    now = datetime.now(timezone.utc).isoformat()
+    await db.admins.update_one(
+        {"id": current_admin.id},
+        {"$set": {"hashed_password": get_password_hash(payload.new_password), "updated_at": now}},
+    )
+    return {"success": True, "message": "Password changed successfully"}
+
+
+@admin_router.get("/users")
+async def admin_list_users(current_admin: AdminBase = Depends(get_current_super_admin)):
+    rows = await db.admins.find({}, {"_id": 0, "hashed_password": 0}).sort("created_at", 1).to_list(200)
+    return [admin_doc_to_public(row).model_dump() for row in rows]
+
+
+@admin_router.post("/users")
+async def admin_create_user(payload: AdminUserCreateIn, current_admin: AdminBase = Depends(get_current_super_admin)):
+    validate_password_confirmation(payload.password, payload.confirm_password)
+    role = validate_admin_role(payload.role)
+    email = str(payload.email).lower().strip()
+    existing = await db.admins.find_one({"email": email})
+    if existing:
+        raise HTTPException(status_code=409, detail="An admin with this email already exists")
+    now = datetime.now(timezone.utc).isoformat()
+    doc = {
+        "id": str(uuid.uuid4()),
+        "name": payload.name.strip(),
+        "email": email,
+        "role": role,
+        "permissions": ["super_admin", "admin", "editor"] if role == "super_admin" else ["admin"],
+        "is_active": bool(payload.is_active),
+        "hashed_password": get_password_hash(payload.password),
+        "created_at": now,
+        "updated_at": now,
+        "last_login": None,
+    }
+    try:
+        await db.admins.insert_one(doc)
+    except DuplicateKeyError:
+        raise HTTPException(status_code=409, detail="An admin with this email already exists")
+    return admin_doc_to_public(doc).model_dump()
+
+
+@admin_router.put("/users/{admin_id}")
+async def admin_update_user(admin_id: str, payload: AdminUserUpdateIn, current_admin: AdminBase = Depends(get_current_super_admin)):
+    role = validate_admin_role(payload.role)
+    is_active = bool(payload.is_active)
+    if admin_id == current_admin.id and not is_active:
+        raise HTTPException(status_code=409, detail="You cannot disable your own admin account")
+    await assert_not_last_super_admin(admin_id, next_role=role, next_active=is_active)
+    email = str(payload.email).lower().strip()
+    duplicate = await db.admins.find_one({"email": email, "id": {"$ne": admin_id}})
+    if duplicate:
+        raise HTTPException(status_code=409, detail="An admin with this email already exists")
+    now = datetime.now(timezone.utc).isoformat()
+    result = await db.admins.update_one(
+        {"id": admin_id},
+        {
+            "$set": {
+                "name": payload.name.strip(),
+                "email": email,
+                "role": role,
+                "permissions": ["super_admin", "admin", "editor"] if role == "super_admin" else ["admin"],
+                "is_active": is_active,
+                "updated_at": now,
+            }
+        },
+    )
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Admin user not found")
+    updated = await get_admin_by_id(admin_id)
+    return admin_doc_to_public(updated).model_dump()
+
+
+@admin_router.post("/users/{admin_id}/reset-password")
+async def admin_reset_user_password(admin_id: str, payload: AdminResetPasswordIn, current_admin: AdminBase = Depends(get_current_super_admin)):
+    validate_password_confirmation(payload.password, payload.confirm_password)
+    admin = await get_admin_by_id(admin_id)
+    if not admin:
+        raise HTTPException(status_code=404, detail="Admin user not found")
+    now = datetime.now(timezone.utc).isoformat()
+    await db.admins.update_one(
+        {"id": admin_id},
+        {"$set": {"hashed_password": get_password_hash(payload.password), "updated_at": now}},
+    )
+    return {"success": True, "message": "Password reset successfully"}
 
 
 @admin_router.get("/dashboard")
@@ -1750,6 +2188,95 @@ async def admin_get_page(page_id: str, current_admin: AdminBase = Depends(get_cu
     if not page:
         raise HTTPException(status_code=404, detail="Page not found")
     return page
+
+
+@admin_router.get("/cms/pages")
+async def admin_cms_pages(current_admin: AdminBase = Depends(get_current_active_admin)):
+    rows = await db.cms_pages.find({}, {"_id": 0}).sort("page_key", 1).to_list(100)
+    by_key = {row.get("page_key"): row for row in rows}
+    result = []
+    for page_key in ["home", "courses", "about", "assets", "works", "hire"]:
+        result.append(by_key.get(page_key) or _cms_page_doc(page_key))
+    return result
+
+
+@admin_router.get("/cms/pages/{page_key}")
+async def admin_cms_page(page_key: str, current_admin: AdminBase = Depends(get_current_active_admin)):
+    page_key = _normalize_cms_page_key(page_key)
+    return await _cms_page_response(page_key, public=False)
+
+
+@admin_router.put("/cms/pages/{page_key}")
+async def admin_update_cms_page(page_key: str, payload: CmsPageIn, current_admin: AdminBase = Depends(get_current_active_admin)):
+    page_key = _normalize_cms_page_key(page_key)
+    existing = await db.cms_pages.find_one({"page_key": page_key}, {"_id": 0})
+    doc = _cms_page_doc(page_key, payload, existing)
+    await db.cms_pages.update_one({"page_key": page_key}, {"$set": doc}, upsert=True)
+    return await _cms_page_response(page_key, public=False)
+
+
+@admin_router.post("/cms/pages/{page_key}/sections")
+async def admin_create_cms_section(page_key: str, payload: CmsSectionIn, current_admin: AdminBase = Depends(get_current_active_admin)):
+    page_key = _normalize_cms_page_key(page_key)
+    page = await db.cms_pages.find_one({"page_key": page_key}, {"_id": 0})
+    if not page:
+        await db.cms_pages.update_one({"page_key": page_key}, {"$set": _cms_page_doc(page_key)}, upsert=True)
+    if payload.sort_order is None:
+        payload.sort_order = await db.cms_sections.count_documents({"page_key": page_key})
+    doc = _cms_section_doc(page_key, payload)
+    await db.cms_sections.insert_one(doc)
+    return {"success": True, "section": doc}
+
+
+@admin_router.put("/cms/sections/{section_id}")
+async def admin_update_cms_section(section_id: str, payload: CmsSectionIn, current_admin: AdminBase = Depends(get_current_active_admin)):
+    existing = await db.cms_sections.find_one({"id": section_id}, {"_id": 0})
+    if not existing:
+        raise HTTPException(status_code=404, detail="CMS section not found")
+    doc = _cms_section_doc(existing["page_key"], payload, existing)
+    await db.cms_sections.update_one({"id": section_id}, {"$set": doc})
+    return {"success": True, "section": doc}
+
+
+@admin_router.delete("/cms/sections/{section_id}")
+async def admin_delete_cms_section(section_id: str, current_admin: AdminBase = Depends(get_current_active_admin)):
+    section = await db.cms_sections.find_one({"id": section_id}, {"_id": 0})
+    if not section:
+        raise HTTPException(status_code=404, detail="CMS section not found")
+    result = await db.cms_sections.delete_one({"id": section_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="CMS section not found")
+    remaining = await db.cms_sections.find({"page_key": section["page_key"]}, {"_id": 0}).sort("sort_order", 1).to_list(200)
+    for index, row in enumerate(remaining):
+        await db.cms_sections.update_one({"id": row["id"]}, {"$set": {"sort_order": index, "updated_at": datetime.now(timezone.utc).isoformat()}})
+    return {"success": True}
+
+
+@admin_router.patch("/cms/sections/{section_id}/visibility")
+async def admin_cms_section_visibility(section_id: str, payload: CmsVisibilityIn, current_admin: AdminBase = Depends(get_current_active_admin)):
+    result = await db.cms_sections.update_one(
+        {"id": section_id},
+        {"$set": {"enabled": payload.enabled, "updated_at": datetime.now(timezone.utc).isoformat()}},
+    )
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="CMS section not found")
+    section = await db.cms_sections.find_one({"id": section_id}, {"_id": 0})
+    return {"success": True, "section": section}
+
+
+@admin_router.patch("/cms/pages/{page_key}/sections/reorder")
+async def admin_reorder_cms_sections(page_key: str, payload: CmsReorderIn, current_admin: AdminBase = Depends(get_current_active_admin)):
+    page_key = _normalize_cms_page_key(page_key)
+    existing = await db.cms_sections.find({"page_key": page_key}, {"_id": 0}).to_list(300)
+    existing_ids = {row["id"] for row in existing}
+    ordered_ids = [section_id for section_id in payload.section_ids if section_id in existing_ids]
+    for row in existing:
+        if row["id"] not in ordered_ids:
+            ordered_ids.append(row["id"])
+    now = datetime.now(timezone.utc).isoformat()
+    for index, item_id in enumerate(ordered_ids):
+        await db.cms_sections.update_one({"id": item_id, "page_key": page_key}, {"$set": {"sort_order": index, "updated_at": now}})
+    return await _cms_page_response(page_key, public=False)
 
 
 @admin_router.get("/products")
@@ -2172,6 +2699,61 @@ async def admin_media(current_admin: AdminBase = Depends(get_current_active_admi
         raise HTTPException(status_code=500, detail="Could not load media")
 
 
+@admin_router.post("/media/upload")
+async def admin_upload_media_library(file: UploadFile = File(...), current_admin: AdminBase = Depends(get_current_active_admin)):
+    file_ext, max_bytes, media_type = _validate_media_library_upload(file)
+    content = await file.read(max_bytes + 1)
+    if len(content) > max_bytes:
+        limit_mb = max_bytes // (1024 * 1024)
+        raise HTTPException(status_code=413, detail=f"File exceeds the {limit_mb} MB upload limit")
+
+    bucket = os.environ.get("CLOUDFLARE_R2_BUCKET", "pranvith-assets-public").strip()
+    public_base = os.environ.get("CLOUDFLARE_R2_PUBLIC_BASE_URL", "").strip().rstrip("/")
+    if not bucket or not public_base:
+        raise HTTPException(status_code=500, detail="Cloudflare public R2 bucket is not configured")
+
+    key = _r2_media_library_key(file_ext, media_type)
+    try:
+        _r2_client().put_object(
+            Bucket=bucket,
+            Key=key,
+            Body=content,
+            ContentType=file.content_type,
+        )
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Media library R2 upload failed key=%s content_type=%s size=%d", key, file.content_type, len(content))
+        raise HTTPException(status_code=502, detail="Cloudflare R2 upload failed")
+
+    original_name = Path(file.filename or "").name
+    public_url = f"{public_base}/{key}"
+    now = datetime.now(timezone.utc).isoformat()
+    media_record = {
+        "id": str(uuid.uuid4()),
+        "filename": Path(key).name,
+        "original_filename": original_name,
+        "title": original_name,
+        "type": file.content_type,
+        "mime_type": file.content_type,
+        "size": len(content),
+        "url": public_url,
+        "public_url": public_url,
+        "r2_key": key,
+        "r2_bucket": bucket,
+        "media_type": media_type,
+        "thumbnail": None,
+        "description": "",
+        "used_by": [],
+        "created_at": now,
+        "updated_at": now,
+        "uploaded_at": now,
+        "tags": [],
+    }
+    await db.media.insert_one(media_record)
+    return {"success": True, "media": media_record, "url": public_url}
+
+
 @admin_router.get("/settings")
 async def admin_settings(current_admin: AdminBase = Depends(get_current_active_admin)):
     try:
@@ -2550,6 +3132,135 @@ def _validate_r2_private_upload(file: UploadFile, purpose: str) -> tuple[str, st
     return file_ext, safe_filename, R2_MAX_PRIVATE_BYTES
 
 
+def _validate_media_library_upload(file: UploadFile) -> tuple[str, int, str]:
+    original_name = Path(file.filename or "").name
+    file_ext = Path(original_name).suffix.lower()
+    if file_ext in R2_IMAGE_TYPES:
+        allowed_types = R2_IMAGE_TYPES[file_ext]
+        media_type = "image"
+        max_bytes = R2_MAX_IMAGE_BYTES
+    elif file_ext in R2_VIDEO_TYPES:
+        allowed_types = R2_VIDEO_TYPES[file_ext]
+        media_type = "video"
+        max_bytes = R2_MAX_VIDEO_BYTES
+    elif file_ext in {".pdf", ".zip"}:
+        allowed_types = ALLOWED_UPLOAD_TYPES.get(file_ext)
+        media_type = "file"
+        max_bytes = MAX_UPLOAD_BYTES
+    else:
+        raise HTTPException(status_code=415, detail="Unsupported file type")
+    if not allowed_types or file.content_type not in allowed_types:
+        raise HTTPException(status_code=415, detail="Unsupported file type")
+    return file_ext, max_bytes, media_type
+
+
+def _r2_media_library_key(file_ext: str, media_type: str) -> str:
+    today = datetime.now(timezone.utc).strftime("%Y/%m")
+    return f"media-library/{media_type}/{today}/{uuid.uuid4()}{file_ext}"
+
+
+def _document_contains_value(value: Any, target: str) -> bool:
+    if isinstance(value, str):
+        return value == target
+    if isinstance(value, list):
+        return any(_document_contains_value(item, target) for item in value)
+    if isinstance(value, dict):
+        return any(_document_contains_value(item, target) for item in value.values())
+    return False
+
+
+async def _media_usage_locations(media_url: str) -> list[str]:
+    if not media_url:
+        return []
+
+    checks = [
+        ("products", "product"),
+        ("pages", "page"),
+        ("cms_pages", "CMS page"),
+        ("cms_sections", "CMS section"),
+        ("settings", "website settings"),
+        ("courses", "course"),
+        ("testimonials", "testimonial"),
+        ("blog_posts", "blog post"),
+    ]
+    locations = []
+    for collection_name, label in checks:
+        collection = getattr(db, collection_name, None)
+        if collection is None:
+            continue
+        try:
+            rows = await collection.find({}, {"_id": 0}).to_list(500)
+        except Exception:
+            logger.exception("Media usage check failed collection=%s", collection_name)
+            continue
+        for row in rows:
+            if _document_contains_value(row, media_url):
+                name = row.get("name") or row.get("title") or row.get("slug") or row.get("id") or label
+                locations.append(f"{label}: {name}")
+                break
+    return locations
+
+
+def _safe_local_upload_path(media_url: str) -> Optional[Path]:
+    prefix = "/api/uploads/"
+    if not media_url or not media_url.startswith(prefix):
+        return None
+    filename = Path(media_url.replace(prefix, "", 1)).name
+    if not filename or filename != media_url.replace(prefix, "", 1):
+        raise HTTPException(status_code=400, detail="Unsafe media path")
+    upload_root = UPLOAD_DIR.resolve()
+    target = (upload_root / filename).resolve()
+    if upload_root not in target.parents and target != upload_root:
+        raise HTTPException(status_code=400, detail="Unsafe media path")
+    return target
+
+
+def _r2_public_key_from_url(media_url: str) -> Optional[str]:
+    public_base = os.environ.get("CLOUDFLARE_R2_PUBLIC_BASE_URL", "").strip().rstrip("/")
+    if not public_base or not media_url:
+        return None
+    if not media_url.startswith(f"{public_base}/"):
+        return None
+    key = media_url.replace(f"{public_base}/", "", 1).strip("/")
+    if not key or ".." in Path(key).parts:
+        raise HTTPException(status_code=400, detail="Unsafe media key")
+    return key
+
+
+def _media_r2_key_and_bucket(media: dict) -> tuple[Optional[str], Optional[str]]:
+    key = media.get("key") or media.get("object_key") or media.get("r2_key")
+    bucket = media.get("bucket") or media.get("r2_bucket") or os.environ.get("CLOUDFLARE_R2_BUCKET", "pranvith-assets-public").strip()
+    if not key:
+        key = _r2_public_key_from_url(media.get("url") or "")
+    if key:
+        parts = Path(str(key)).parts
+        if str(key).startswith("/") or ".." in parts:
+            raise HTTPException(status_code=400, detail="Unsafe media key")
+    return key, bucket
+
+
+def _delete_media_storage(media: dict) -> dict:
+    media_url = media.get("url") or ""
+    local_path = _safe_local_upload_path(media_url)
+    if local_path:
+        if local_path.exists():
+            local_path.unlink()
+        return {"storage": "local", "deleted": True}
+
+    key, bucket = _media_r2_key_and_bucket(media)
+    if key and bucket:
+        try:
+            _r2_client().delete_object(Bucket=bucket, Key=key)
+        except HTTPException:
+            raise
+        except Exception:
+            logger.exception("R2 delete failed key=%s bucket=%s", key, bucket)
+            raise HTTPException(status_code=502, detail="Cloudflare R2 delete failed")
+        return {"storage": "r2", "deleted": True}
+
+    return {"storage": "external_or_unknown", "deleted": False}
+
+
 @admin_router.post("/uploads/public")
 async def admin_upload_public_media(
     file: UploadFile = File(...),
@@ -2699,10 +3410,22 @@ async def admin_update_media(media_id: str, payload: MediaIn, current_admin: Adm
 
 @admin_router.delete("/media/{media_id}")
 async def admin_delete_media(media_id: str, current_admin: AdminBase = Depends(get_current_active_admin)):
+    media = await db.media.find_one({"id": media_id}, {"_id": 0})
+    if not media:
+        raise HTTPException(status_code=404, detail="Media item not found")
+
+    usage_locations = await _media_usage_locations(media.get("url") or "")
+    if usage_locations:
+        raise HTTPException(
+            status_code=409,
+            detail="This media file is currently used on the website. Remove it from the page/product first.",
+        )
+
+    storage_result = _delete_media_storage(media)
     result = await db.media.delete_one({"id": media_id})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Media item not found")
-    return {"success": True}
+    return {"success": True, **storage_result}
 
 
 async def prepare_cms_collections():
@@ -2715,6 +3438,8 @@ async def prepare_cms_collections():
         "orders",
         "customers",
         "media",
+        "cms_pages",
+        "cms_sections",
         "settings",
         "seed_state",
         "downloads",
@@ -2751,6 +3476,18 @@ async def prepare_cms_collections():
     except Exception:
         pass
     try:
+        await db.cms_pages.create_index("page_key", unique=True)
+    except Exception:
+        pass
+    try:
+        await db.cms_sections.create_index([("page_key", 1), ("sort_order", 1)])
+    except Exception:
+        pass
+    try:
+        await db.media.create_index("r2_key")
+    except Exception:
+        pass
+    try:
         await db.webhook_events.create_index("id", unique=True)
     except Exception:
         pass
@@ -2774,17 +3511,17 @@ async def synchronize_default_admin():
     existing = await db.admins.find_one({"email": default_email})
     now = datetime.now(timezone.utc).isoformat()
     if existing:
-        await db.admins.update_one(
-            {"email": default_email},
-            {
-                "$set": {
-                    "hashed_password": get_password_hash(default_password),
-                    "updated_at": now,
-                }
-            },
-        )
-        logger.info("Admin password synchronized")
-        return {"action": "password_synchronized", "email": default_email}
+        updates = {
+            "role": "super_admin",
+            "permissions": ["super_admin", "admin", "editor"],
+            "is_active": True,
+            "updated_at": now,
+        }
+        if not existing.get("hashed_password"):
+            updates["hashed_password"] = get_password_hash(default_password)
+        await db.admins.update_one({"email": default_email}, {"$set": updates})
+        logger.info("Default admin synchronized")
+        return {"action": "synchronized", "email": default_email}
 
     admin_doc = {
         "id": str(uuid.uuid4()),
@@ -2792,6 +3529,7 @@ async def synchronize_default_admin():
         "email": default_email,
         "role": "super_admin",
         "permissions": ["super_admin", "admin", "editor"],
+        "is_active": True,
         "hashed_password": get_password_hash(default_password),
         "created_at": now,
         "updated_at": now,
@@ -4461,6 +5199,21 @@ async def _seed_db():
             )
         logger.info("Upserted %d pages", len(PAGES))
 
+        # Seed database-backed CMS pages/sections without overwriting admin edits.
+        for page in CMS_PAGES:
+            await db.cms_pages.update_one(
+                {"page_key": page["page_key"]},
+                {"$setOnInsert": dict(page)},
+                upsert=True,
+            )
+        for section in CMS_SECTIONS:
+            await db.cms_sections.update_one(
+                {"page_key": section["page_key"], "section_id": section["section_id"]},
+                {"$setOnInsert": dict(section)},
+                upsert=True,
+            )
+        logger.info("Ensured %d CMS pages and %d CMS sections", len(CMS_PAGES), len(CMS_SECTIONS))
+
         # Initialize the catalog once. Admin-managed products are authoritative
         # after this marker is written, so deleted products stay deleted.
         await initialize_default_products()
@@ -4482,7 +5235,7 @@ async def _seed_db():
         # One-shot brand migration: replace legacy 'PranavithDOP' with 'PranvithDOP'
         # in any user/CMS content that was seeded under the old brand name.
         try:
-            for coll_name in ("faqs", "pages", "blog_posts", "settings", "products"):
+            for coll_name in ("faqs", "pages", "cms_pages", "cms_sections", "blog_posts", "settings", "products"):
                 cursor = db[coll_name].find({}, {"_id": 1})
                 async for doc in cursor:
                     full = await db[coll_name].find_one({"_id": doc["_id"]})
@@ -4504,6 +5257,14 @@ async def _seed_db():
             logger.warning("subscribers index skipped: %s", ie)
         try:
             await db.pages.create_index("slug", unique=True)
+        except Exception:
+            pass
+        try:
+            await db.cms_pages.create_index("page_key", unique=True)
+        except Exception:
+            pass
+        try:
+            await db.cms_sections.create_index([("page_key", 1), ("sort_order", 1)])
         except Exception:
             pass
         try:

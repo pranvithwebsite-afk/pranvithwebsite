@@ -152,7 +152,7 @@ export const courses = [
     discount: '70% OFF',
     price: 2999,
     original: 9999,
-    image: 'https://images.unsplash.com/photo-1574717024653-61fd2cf4d44d?w=800&q=80',
+    image: '',
     tag: 'Premiere Pro',
     color: 'from-purple-600 to-indigo-700',
   },
@@ -164,7 +164,7 @@ export const courses = [
     discount: '85% OFF',
     price: 1500,
     original: 9999,
-    image: 'https://images.unsplash.com/photo-1519741497674-611481863552?w=800&q=80',
+    image: '',
     tag: 'AI Editing',
     color: 'from-amber-500 to-orange-600',
   },
@@ -176,7 +176,7 @@ export const courses = [
     discount: 'COMPLETE COURSE',
     price: 2999,
     original: null,
-    image: 'https://images.unsplash.com/photo-1626785774573-4b799315345d?w=800&q=80',
+    image: '',
     tag: 'After Effects',
     color: 'from-violet-600 to-purple-700',
   },
@@ -207,19 +207,19 @@ export const whatYoullLearn = [
 ];
 
 export const studentVideos = [
-  { id: 1, name: 'Student 1', thumb: 'https://images.unsplash.com/photo-1492691527719-9d1e07e534b4?w=600&q=80' },
-  { id: 2, name: 'Student 2', thumb: 'https://images.unsplash.com/photo-1535191042502-e6a9a3d407e7?w=600&q=80' },
-  { id: 3, name: 'Student 3', thumb: 'https://images.unsplash.com/photo-1542038784456-1ea8e935640e?w=600&q=80' },
-  { id: 4, name: 'Student 4', thumb: 'https://images.unsplash.com/photo-1551817958-d9d86fb29431?w=600&q=80' },
-  { id: 5, name: 'Student 5', thumb: 'https://images.unsplash.com/photo-1492619375914-88005aa9e8fb?w=600&q=80' },
+  { id: 1, name: 'Student 1', thumb: '' },
+  { id: 2, name: 'Student 2', thumb: '' },
+  { id: 3, name: 'Student 3', thumb: '' },
+  { id: 4, name: 'Student 4', thumb: '' },
+  { id: 5, name: 'Student 5', thumb: '' },
 ];
 
 export const ourWorks = [
-  { id: 1, thumb: 'https://images.unsplash.com/photo-1492619375914-88005aa9e8fb?w=600&q=80' },
-  { id: 2, thumb: 'https://images.unsplash.com/photo-1492691527719-9d1e07e534b4?w=600&q=80' },
-  { id: 3, thumb: 'https://images.unsplash.com/photo-1542038784456-1ea8e935640e?w=600&q=80' },
-  { id: 4, thumb: 'https://images.unsplash.com/photo-1535191042502-e6a9a3d407e7?w=600&q=80' },
-  { id: 5, thumb: 'https://images.unsplash.com/photo-1551817958-d9d86fb29431?w=600&q=80' },
+  { id: 1, thumb: '' },
+  { id: 2, thumb: '' },
+  { id: 3, thumb: '' },
+  { id: 4, thumb: '' },
+  { id: 5, thumb: '' },
 ];
 
 export const testimonials = [
@@ -273,3 +273,4 @@ export const footerLinks = {
     phone: '+91 9059867883',
   },
 };
+

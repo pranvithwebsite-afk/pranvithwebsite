@@ -25,6 +25,7 @@ import Customers from './admin/pages/Customers';
 import Enquiries from './admin/pages/Enquiries';
 import Media from './admin/pages/Media';
 import Settings from './admin/pages/Settings';
+import AdminUsers from './admin/pages/AdminUsers';
 
 function App() {
   return (
@@ -44,6 +45,7 @@ function App() {
                 <Route path="customers" element={<Customers />} />
                 <Route path="enquiries" element={<Enquiries />} />
                 <Route path="media" element={<Media />} />
+                <Route path="admin-users" element={<AdminUsers />} />
                 <Route path="settings" element={<Settings />} />
               </Route>
             </Route>

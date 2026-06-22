@@ -6,6 +6,8 @@ import { Search, Loader2, Share2 } from 'lucide-react';
 import { fetchProducts } from '../lib/api';
 import { FALLBACK_IMAGE, dedupeCatalogItems, getCatalogItemKey, handleImageError, safeImageSrc, shareProduct } from '../lib/utils';
 import CheckoutModal from '../components/CheckoutModal';
+import CmsPageRenderer from '../components/cms/CmsPageRenderer';
+import { useCmsPage } from '../hooks/useCmsPage';
 
 const defaultBackgrounds = [
   'linear-gradient(135deg, #1e3a8a 0%, #0c1e4d 60%, #050b1f 100%)',
@@ -56,6 +58,7 @@ const normalize = (item = {}, index) => {
 
 const Assets = () => {
   const navigate = useNavigate();
+  const { page: cmsPage } = useCmsPage('assets');
   const [query, setQuery] = useState('');
   const [sort, setSort] = useState('newest');
   const [priceFilter, setPriceFilter] = useState('all');
@@ -102,25 +105,24 @@ const Assets = () => {
     );
     return list;
   }, [products, query, sort, priceFilter]);
+  const settings = cmsPage?.settings || {};
+  const showProductListing = settings.show_product_listing !== false;
+  const showFilters = settings.show_filters !== false;
 
   return (
     <main className="page bg-[#070314] text-white min-h-screen">
       <Header />
 
-      <section className="pt-8 pb-10">
-        <div className="max-w-7xl mx-auto px-6">
-          <div className="rounded-2xl bg-gradient-to-r from-violet-900/40 via-indigo-900/30 to-violet-900/40 border border-violet-500/20 px-8 py-7">
-            <h1 className="text-2xl md:text-4xl font-bold tracking-tight" data-testid="assets-page-title">Creative Assets Store</h1>
-            <p className="mt-2 text-sm text-white/65">
-              Premium LUTs, sound packs, motion templates and more — built for editors.
-            </p>
-          </div>
-        </div>
-      </section>
+      {cmsPage?.sections?.length ? (
+        <CmsPageRenderer page={cmsPage} />
+      ) : (
+        <section className="px-6 py-12 text-center text-white/60">Assets intro content is not published yet.</section>
+      )}
 
-      <section className="pb-24">
+
+      {showProductListing && <section className="pb-24">
         <div className="max-w-7xl mx-auto px-6 grid grid-cols-1 lg:grid-cols-[260px_1fr] gap-8">
-          <aside className="lg:sticky lg:top-28 h-fit rounded-2xl bg-[#0d0820]/60 border border-violet-500/15 p-6">
+          {showFilters && <aside className="lg:sticky lg:top-28 h-fit rounded-2xl bg-[#0d0820]/60 border border-violet-500/15 p-6">
             <h3 className="text-violet-400 text-xs font-bold tracking-[0.3em] mb-5">FILTERS</h3>
 
             <div className="relative mb-7">
@@ -147,7 +149,7 @@ const Assets = () => {
               <RadioRow name="price" value="free" checked={priceFilter === 'free'} onChange={() => setPriceFilter('free')} label="Free" />
               <RadioRow name="price" value="paid" checked={priceFilter === 'paid'} onChange={() => setPriceFilter('paid')} label="Paid" />
             </div>
-          </aside>
+          </aside>}
 
           <div>
             {loading ? (
@@ -176,7 +178,7 @@ const Assets = () => {
             )}
           </div>
         </div>
-      </section>
+      </section>}
 
       <Footer />
       <CheckoutModal

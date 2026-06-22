@@ -18,6 +18,9 @@ const formatDate = (value) => {
   return date.toLocaleDateString('en-IN', { dateStyle: 'medium' });
 };
 
+const mediaUrl = (item = {}) => item.public_url || item.url || '';
+const mediaMime = (item = {}) => item.type || item.mime_type || '';
+
 const Media = () => {
   const [media, setMedia] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -104,14 +107,16 @@ const Media = () => {
     await handleFileUpload(file);
   };
 
-  const handleDelete = async (id) => {
-    if (!window.confirm('Delete this file?')) return;
+  const handleDelete = async (item) => {
+    const name = item?.title || item?.filename || 'this media file';
+    if (!window.confirm(`Are you sure you want to delete this media file?\n\n${name}`)) return;
     try {
-      await deleteAdminMedia(id);
-      toast.success('File deleted');
-      loadMedia();
+      await deleteAdminMedia(item.id);
+      toast.success('Media deleted');
+      setMedia((items) => items.filter((mediaItem) => mediaItem.id !== item.id));
     } catch (error) {
-      toast.error('Failed to delete file');
+      const detail = error?.response?.data?.detail || 'Failed to delete media';
+      toast.error(error?.response?.status === 409 ? 'This media is used on the website. Remove it first.' : detail);
     }
   };
 
@@ -178,8 +183,8 @@ const Media = () => {
             <MediaCard
               key={item.id}
               item={item}
-              onDelete={() => handleDelete(item.id)}
-              onCopyUrl={() => copyToClipboard(item.url)}
+              onDelete={() => handleDelete(item)}
+              onCopyUrl={() => copyToClipboard(mediaUrl(item))}
             />
           ))}
         </div>
@@ -189,10 +194,12 @@ const Media = () => {
 };
 
 const MediaCard = ({ item, onDelete, onCopyUrl }) => {
-  const isImage = item.type.startsWith('image/');
-  const isVideo = item.type.startsWith('video/');
-  const isPdf = item.type === 'application/pdf';
-  const isZip = item.type.includes('zip');
+  const mime = mediaMime(item);
+  const url = mediaUrl(item);
+  const isImage = mime.startsWith('image/') || item.media_type === 'image';
+  const isVideo = mime.startsWith('video/') || item.media_type === 'video';
+  const isPdf = mime === 'application/pdf';
+  const isZip = mime.includes('zip');
 
   return (
     <div className="rounded-2xl border border-slate-800 bg-slate-950 overflow-hidden hover:border-slate-700 transition">
@@ -200,14 +207,14 @@ const MediaCard = ({ item, onDelete, onCopyUrl }) => {
       <div className="relative aspect-square bg-slate-900 flex items-center justify-center overflow-hidden group">
         {isImage ? (
           <img
-            src={safeImageSrc(item.url)}
-            alt={item.title}
+            src={safeImageSrc(url)}
+            alt={item.title || item.original_filename || item.filename || 'Media'}
             className="w-full h-full object-cover group-hover:scale-105 transition"
             onError={handleImageError}
           />
         ) : isVideo ? (
           <video
-            src={item.url}
+            src={url}
             className="w-full h-full object-cover"
             controls
           />
@@ -239,15 +246,23 @@ const MediaCard = ({ item, onDelete, onCopyUrl }) => {
 
       {/* Info */}
       <div className="p-3">
-        <p className="text-sm font-semibold text-white truncate">{item.title}</p>
-        <p className="mt-1 truncate text-xs text-slate-500">{item.type}</p>
+        <p className="text-sm font-semibold text-white truncate">{item.title || item.original_filename || item.filename}</p>
+        <p className="mt-1 truncate text-xs text-slate-500">{mime || item.media_type}</p>
         <p className="mt-1 text-xs text-slate-500">{formatFileSize(item.size)} | {formatDate(item.uploaded_at)}</p>
-        <button
-          onClick={onCopyUrl}
-          className="mt-2 w-full px-3 py-1.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-100 text-xs font-semibold transition"
-        >
-          Copy URL
-        </button>
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          <button
+            onClick={onCopyUrl}
+            className="px-3 py-1.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-100 text-xs font-semibold transition"
+          >
+            Copy URL
+          </button>
+          <button
+            onClick={onDelete}
+            className="px-3 py-1.5 rounded border border-red-500/30 bg-red-500/10 hover:bg-red-500/20 text-red-100 text-xs font-semibold transition"
+          >
+            Delete
+          </button>
+        </div>
       </div>
     </div>
   );

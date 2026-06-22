@@ -25,8 +25,8 @@ const FALLBACK_PRODUCTS = [
     sale_price: 0,
     is_free: true,
     description: 'A PranvithDOP asset. Live catalog details load from the backend when available.',
-    hero_image: '/assets/color-gradient.png',
-    images: ['/assets/color-gradient.png'],
+    hero_image: '',
+    images: [],
     published: true,
     created_at: '2026-01-01T00:00:00+00:00',
   },
@@ -161,6 +161,11 @@ export const fetchPageBySlug = async (slug) => {
   return data;
 };
 
+export const fetchCmsPage = async (pageKey) => {
+  const { data } = await api.get(`/cms/pages/${encodeURIComponent(pageKey)}`);
+  return data;
+};
+
 export const fetchPages = async () => {
   const { data } = await api.get('/pages');
   return data;
@@ -186,6 +191,31 @@ export const fetchAdminMe = async () => {
   return data;
 };
 
+export const changeAdminPassword = async (payload) => {
+  const { data } = await adminApi.post('/admin/change-password', payload);
+  return data;
+};
+
+export const fetchAdminUsers = async () => {
+  const { data } = await adminApi.get('/admin/users');
+  return data;
+};
+
+export const createAdminUser = async (payload) => {
+  const { data } = await adminApi.post('/admin/users', payload);
+  return data;
+};
+
+export const updateAdminUser = async (adminId, payload) => {
+  const { data } = await adminApi.put(`/admin/users/${encodeURIComponent(adminId)}`, payload);
+  return data;
+};
+
+export const resetAdminUserPassword = async (adminId, payload) => {
+  const { data } = await adminApi.post(`/admin/users/${encodeURIComponent(adminId)}/reset-password`, payload);
+  return data;
+};
+
 export const fetchAdminDashboardStats = async () => {
   const { data } = await adminApi.get('/admin/dashboard');
   return data;
@@ -193,6 +223,46 @@ export const fetchAdminDashboardStats = async () => {
 
 export const fetchAdminPages = async () => {
   const { data } = await adminApi.get('/admin/pages');
+  return data;
+};
+
+export const fetchAdminCmsPages = async () => {
+  const { data } = await adminApi.get('/admin/cms/pages');
+  return data;
+};
+
+export const fetchAdminCmsPage = async (pageKey) => {
+  const { data } = await adminApi.get(`/admin/cms/pages/${encodeURIComponent(pageKey)}`);
+  return data;
+};
+
+export const updateAdminCmsPage = async (pageKey, payload) => {
+  const { data } = await adminApi.put(`/admin/cms/pages/${encodeURIComponent(pageKey)}`, payload);
+  return data;
+};
+
+export const createAdminCmsSection = async (pageKey, payload) => {
+  const { data } = await adminApi.post(`/admin/cms/pages/${encodeURIComponent(pageKey)}/sections`, payload);
+  return data;
+};
+
+export const updateAdminCmsSection = async (sectionId, payload) => {
+  const { data } = await adminApi.put(`/admin/cms/sections/${encodeURIComponent(sectionId)}`, payload);
+  return data;
+};
+
+export const deleteAdminCmsSection = async (sectionId) => {
+  const { data } = await adminApi.delete(`/admin/cms/sections/${encodeURIComponent(sectionId)}`);
+  return data;
+};
+
+export const updateAdminCmsSectionVisibility = async (sectionId, enabled) => {
+  const { data } = await adminApi.patch(`/admin/cms/sections/${encodeURIComponent(sectionId)}/visibility`, { enabled });
+  return data;
+};
+
+export const reorderAdminCmsSections = async (pageKey, sectionIds) => {
+  const { data } = await adminApi.patch(`/admin/cms/pages/${encodeURIComponent(pageKey)}/sections/reorder`, { section_ids: sectionIds });
   return data;
 };
 
@@ -361,8 +431,9 @@ export const deleteAdminProduct = async (productId) => {
 export const uploadAdminFile = async (file, onUploadProgress) => {
   const formData = new FormData();
   formData.append('file', file);
-  const { data } = await adminApi.post('/admin/upload', formData, {
+  const { data } = await adminApi.post('/admin/media/upload', formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
+    timeout: 120000,
     onUploadProgress,
   });
   return data;
