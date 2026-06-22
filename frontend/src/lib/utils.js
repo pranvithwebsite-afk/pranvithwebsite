@@ -1,4 +1,5 @@
 import { clsx } from "clsx";
+import { toast } from "sonner";
 import { twMerge } from "tailwind-merge"
 
 export function cn(...inputs) {
@@ -102,4 +103,34 @@ export function handleImageError(event, fallback = FALLBACK_IMAGE) {
   if (!img || img.dataset.fallbackApplied === 'true') return;
   img.dataset.fallbackApplied = 'true';
   img.src = fallback;
+}
+
+export async function shareProduct(product, fallbackUrl) {
+  const slug = product?.slug;
+  const productUrl = fallbackUrl || (slug && typeof window !== 'undefined'
+    ? `${window.location.origin}/assets/${slug}`
+    : '');
+
+  if (!productUrl) {
+    toast.error('Product link unavailable');
+    return;
+  }
+
+  try {
+    if (typeof navigator !== 'undefined' && navigator.share) {
+      await navigator.share({
+        title: product?.name || product?.title || 'Product',
+        text: product?.description || product?.name || product?.title || 'Product',
+        url: productUrl,
+      });
+    } else if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(productUrl);
+    } else {
+      throw new Error('Clipboard is not available');
+    }
+    toast.success('Product link copied');
+  } catch (error) {
+    if (error?.name === 'AbortError') return;
+    toast.error('Could not copy product link');
+  }
 }

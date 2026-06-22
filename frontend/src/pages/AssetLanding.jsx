@@ -11,11 +11,13 @@ import {
   ArrowRight,
   Loader2,
   Download,
+  Share2,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { fetchProductBySlug } from '../lib/api';
-import { dedupeFaqs, handleImageError, safeImageSrc } from '../lib/utils';
+import { dedupeFaqs, handleImageError, safeImageSrc, shareProduct } from '../lib/utils';
 import CheckoutModal from '../components/CheckoutModal';
+import SafeVideoEmbed, { getSafeVideoEmbedUrl, isDirectVideoUrl } from '../components/SafeVideoEmbed';
 
 const AssetLanding = () => {
   const { slug } = useParams();
@@ -76,6 +78,10 @@ const AssetLanding = () => {
     setCheckoutOpen(true);
   };
 
+  const onShare = () => {
+    shareProduct(product, `${window.location.origin}/assets/${product.slug}`);
+  };
+
   const features = product.features || [];
   const benefits = product.benefits || [];
   const faqs = dedupeFaqs(landing.faqs || product.faqs || []).slice(0, 10);
@@ -116,26 +122,35 @@ const AssetLanding = () => {
                       {isFree ? 'Free' : `₹${price.toLocaleString('en-IN')}`}
                     </p>
                   </div>
-                  <button
-                    onClick={onPrimaryCta}
-                    disabled={busy}
-                    data-testid="asset-buy-now"
-                    className="inline-flex items-center justify-center gap-2 rounded-3xl bg-violet-600 px-8 py-4 text-sm font-semibold uppercase tracking-[0.12em] text-white transition hover:bg-violet-500 disabled:opacity-60"
-                  >
-                    {busy ? (
-                      <><Loader2 size={16} className="animate-spin" /> Please wait...</>
-                    ) : (
-                      <>{isFree ? 'Get for Free' : 'Buy Now'} <ArrowRight size={18} /></>
-                    )}
-                  </button>
+                  <div className="flex flex-col gap-3 sm:min-w-[220px]">
+                    <button
+                      onClick={onPrimaryCta}
+                      disabled={busy}
+                      data-testid="asset-buy-now"
+                      className="inline-flex items-center justify-center gap-2 rounded-3xl bg-violet-600 px-8 py-4 text-sm font-semibold uppercase tracking-[0.12em] text-white transition hover:bg-violet-500 disabled:opacity-60"
+                    >
+                      {busy ? (
+                        <><Loader2 size={16} className="animate-spin" /> Please wait...</>
+                      ) : (
+                        <>{isFree ? 'Get for Free' : 'Buy Now'} <ArrowRight size={18} /></>
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={onShare}
+                      className="inline-flex items-center justify-center gap-2 rounded-3xl border border-violet-400/25 bg-white/5 px-8 py-4 text-sm font-semibold uppercase tracking-[0.12em] text-white transition hover:border-violet-300/60 hover:bg-violet-500/15"
+                    >
+                      <Share2 size={17} /> Share
+                    </button>
+                  </div>
                 </div>
               </div>
 
               <div className="rounded-[2rem] border border-white/10 bg-[#090712] overflow-hidden shadow-[0_30px_80px_rgba(0,0,0,0.35)]">
                 {heroImage ? (
-                  <img src={heroImage} alt={product.name} className="w-full aspect-[4/5] object-cover" data-testid="asset-hero-image" onError={handleImageError} />
+                  <img src={heroImage} alt={product.name} className="w-full max-h-[420px] aspect-[4/3] object-cover sm:max-h-none sm:aspect-[4/5]" data-testid="asset-hero-image" onError={handleImageError} />
                 ) : (
-                  <div className="w-full aspect-[4/5] bg-gradient-to-br from-violet-700 to-fuchsia-900 flex items-center justify-center text-2xl font-black text-white px-6 text-center">
+                  <div className="w-full max-h-[420px] aspect-[4/3] bg-gradient-to-br from-violet-700 to-fuchsia-900 flex items-center justify-center text-2xl font-black text-white px-6 text-center sm:max-h-none sm:aspect-[4/5]">
                     {product.name}
                   </div>
                 )}
@@ -331,9 +346,10 @@ const AssetLanding = () => {
 
 const ProductMediaSection = ({ product, galleryImages }) => {
   const hasGallery = Array.isArray(galleryImages) && galleryImages.length > 0;
+  const productVideoUrl = product.video_type === 'youtube' ? product.youtube_url : product.video_url;
   const hasVideo = product.video_type === 'youtube'
-    ? !!getYouTubeEmbedUrl(product.youtube_url)
-    : product.video_type === 'direct' && !!product.video_url;
+    ? !!getSafeVideoEmbedUrl('youtube', product.youtube_url)
+    : !!productVideoUrl && (product.video_type === 'direct' || isDirectVideoUrl(productVideoUrl) || !!getSafeVideoEmbedUrl(product.video_type, productVideoUrl));
   if (!hasGallery && !hasVideo) return null;
 
   return (
@@ -360,36 +376,19 @@ const ProductMediaSection = ({ product, galleryImages }) => {
           <div>
             <h2 className="text-3xl font-bold tracking-tight mb-8">Product Video</h2>
             <div className="overflow-hidden rounded-[2rem] border border-white/10 bg-black shadow-[0_30px_80px_rgba(0,0,0,0.35)]">
-              {product.video_type === 'youtube' ? (
-                <iframe
-                  title={`${product.name} video`}
-                  src={getYouTubeEmbedUrl(product.youtube_url)}
-                  className="aspect-video w-full"
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                  allowFullScreen
-                />
-              ) : (
-                <video src={product.video_url} controls className="aspect-video w-full bg-black object-contain" />
-              )}
+              <SafeVideoEmbed
+                videoType={product.video_type === 'direct' ? 'video_file' : product.video_type}
+                videoUrl={productVideoUrl}
+                title={`${product.name} video`}
+                poster={product.hero_image || galleryImages[0]}
+                className="w-full rounded-none"
+              />
             </div>
           </div>
         )}
       </div>
     </section>
   );
-};
-
-const getYouTubeEmbedUrl = (url) => {
-  try {
-    const parsed = new URL(url);
-    const host = parsed.hostname.replace(/^www\./, '');
-    let id = '';
-    if (host === 'youtu.be') id = parsed.pathname.slice(1);
-    if (host.endsWith('youtube.com')) id = parsed.searchParams.get('v') || parsed.pathname.split('/').pop();
-    return id ? `https://www.youtube.com/embed/${id}` : '';
-  } catch (_) {
-    return '';
-  }
 };
 
 const BeforeAfterSlider = ({ beforeImage, afterImage }) => {

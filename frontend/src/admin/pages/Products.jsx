@@ -12,6 +12,7 @@ import {
   uploadAdminPrivateDownload,
 } from '../../lib/api';
 import { toast } from 'sonner';
+import SafeVideoEmbed from '../../components/SafeVideoEmbed';
 
 const defaultProductForm = {
   slug: '',
@@ -876,36 +877,26 @@ const ProductVideoSection = ({
           onFile={onUpload}
         />
         {formData.video_url && (
-          <video src={formData.video_url} controls className="mt-3 aspect-video w-full rounded-xl border border-slate-800 bg-black object-contain" />
+          <SafeVideoEmbed
+            videoType="video_file"
+            videoUrl={formData.video_url}
+            title="Product video preview"
+            className="mt-3 aspect-video w-full rounded-xl border border-slate-800 bg-black"
+          />
         )}
       </div>
     )}
   </div>
 );
 
-const getYouTubeEmbedUrl = (url) => {
-  try {
-    const parsed = new URL(url);
-    const host = parsed.hostname.replace(/^www\./, '');
-    let id = '';
-    if (host === 'youtu.be') id = parsed.pathname.slice(1);
-    if (host.endsWith('youtube.com')) id = parsed.searchParams.get('v') || parsed.pathname.split('/').pop();
-    return id ? `https://www.youtube.com/embed/${id}` : '';
-  } catch (_) {
-    return '';
-  }
-};
-
 const YouTubePreview = ({ url }) => {
-  const embedUrl = getYouTubeEmbedUrl(url);
-  if (!embedUrl) return null;
+  if (!url) return null;
   return (
-    <iframe
+    <SafeVideoEmbed
+      videoType="youtube"
+      videoUrl={url}
       title="YouTube preview"
-      src={embedUrl}
       className="mt-3 aspect-video w-full rounded-xl border border-slate-800 bg-black"
-      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-      allowFullScreen
     />
   );
 };

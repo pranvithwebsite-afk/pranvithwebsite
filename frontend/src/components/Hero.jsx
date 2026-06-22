@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { ArrowRight, Sparkles } from 'lucide-react';
 import { handleImageError, safeImageSrc, safePublicHref } from '../lib/utils';
 import { fetchPublicSettings } from '../lib/api';
+import SafeVideoEmbed, { getSafeVideoEmbedUrl, isDirectVideoUrl } from './SafeVideoEmbed';
 
 const fallbackHero = {
   badge_text: 'Learn premium editing, LUTs, transitions, and storytelling workflows that get results.',
@@ -18,38 +19,6 @@ const fallbackHero = {
   hero_media_muted: true,
   hero_media_loop: true,
 };
-
-const getVideoEmbedUrl = (value, autoplay, muted, loop) => {
-  const url = String(value || '').trim();
-  if (!url) return '';
-  try {
-    const parsed = new URL(url);
-    const host = parsed.hostname.replace(/^www\./, '');
-    const params = new URLSearchParams();
-    if (autoplay) params.set('autoplay', '1');
-    if (muted) params.set('mute', '1');
-    if (loop) params.set('loop', '1');
-
-    if (host === 'youtu.be') {
-      const id = parsed.pathname.split('/').filter(Boolean)[0];
-      return id ? `https://www.youtube.com/embed/${id}?${params.toString()}` : '';
-    }
-    if (host === 'youtube.com' || host === 'm.youtube.com') {
-      const id = parsed.searchParams.get('v') || parsed.pathname.split('/').filter(Boolean).pop();
-      return id ? `https://www.youtube.com/embed/${id}?${params.toString()}` : '';
-    }
-    if (host === 'vimeo.com') {
-      const id = parsed.pathname.split('/').filter(Boolean)[0];
-      return id ? `https://player.vimeo.com/video/${id}?${params.toString()}` : '';
-    }
-    if (host === 'player.vimeo.com') return url;
-  } catch {
-    return '';
-  }
-  return '';
-};
-
-const isDirectVideo = (value) => /\.(mp4|webm)(\?.*)?$/i.test(String(value || '').trim());
 
 const Hero = ({ pageData }) => {
   const [settingsHero, setSettingsHero] = useState(null);
@@ -79,34 +48,18 @@ const Hero = ({ pageData }) => {
   const hero = { ...legacyHero, ...(settingsHero || {}) };
   const mediaUrl = hero.hero_media_url || fallbackHero.hero_media_url;
   const mediaType = hero.hero_media_url ? hero.hero_media_type : 'image';
-  const directVideo = mediaType === 'video_file' || (mediaType === 'video_url' && isDirectVideo(mediaUrl));
-  const embedUrl = mediaType === 'video_url' && !directVideo
-    ? getVideoEmbedUrl(mediaUrl, hero.hero_media_autoplay, hero.hero_media_muted, hero.hero_media_loop)
-    : '';
+  const directVideo = mediaType === 'video_file' || (mediaType === 'video_url' && isDirectVideoUrl(mediaUrl));
+  const embedUrl = mediaType === 'video_url' && !directVideo ? getSafeVideoEmbedUrl('video_url', mediaUrl) : '';
 
   const media = useMemo(() => {
-    if (embedUrl) {
+    if (embedUrl || directVideo) {
       return (
-        <iframe
-          src={embedUrl}
+        <SafeVideoEmbed
+          videoType={directVideo ? 'video_file' : 'video_url'}
+          videoUrl={mediaUrl}
           title="Home hero video"
-          className="absolute inset-0 h-full w-full"
-          allow="autoplay; encrypted-media; picture-in-picture"
-          allowFullScreen
-        />
-      );
-    }
-    if (directVideo && mediaUrl) {
-      return (
-        <video
-          src={mediaUrl}
-          poster={hero.hero_media_poster_url || undefined}
-          autoPlay={!!hero.hero_media_autoplay}
-          muted={!!hero.hero_media_muted}
-          loop={!!hero.hero_media_loop}
-          playsInline
-          controls={!hero.hero_media_autoplay}
-          className="absolute inset-0 h-full w-full object-cover opacity-40"
+          poster={hero.hero_media_poster_url}
+          className="absolute inset-0 h-full w-full rounded-none opacity-40"
         />
       );
     }
@@ -118,7 +71,7 @@ const Hero = ({ pageData }) => {
         onError={handleImageError}
       />
     );
-  }, [directVideo, embedUrl, hero.hero_media_autoplay, hero.hero_media_loop, hero.hero_media_muted, hero.hero_media_poster_url, mediaUrl]);
+  }, [directVideo, embedUrl, hero.hero_media_poster_url, mediaUrl]);
 
   return (
     <section className="relative pt-8 pb-12 overflow-hidden">

@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { fetchAdminDashboardStats } from '../../lib/api';
+import { RefreshCw } from 'lucide-react';
+import { toast } from 'sonner';
+import { fetchAdminDashboardStats, formatApiErrorDetail, recheckRazorpayPayments } from '../../lib/api';
 
 const metrics = [
   { key: 'totalRevenue', label: 'Total Revenue', prefix: '₹' },
@@ -11,10 +13,12 @@ const metrics = [
 const Dashboard = () => {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [rechecking, setRechecking] = useState(false);
   const [error, setError] = useState('');
 
-  useEffect(() => {
-    fetchAdminDashboardStats()
+  const loadStats = () => {
+    setLoading(true);
+    return fetchAdminDashboardStats()
       .then((data) => {
         setStats(data);
         setError('');
@@ -24,7 +28,27 @@ const Dashboard = () => {
         setError('Dashboard stats could not be loaded.');
       })
       .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    loadStats();
   }, []);
+
+  const handleRecheckRazorpay = async () => {
+    setRechecking(true);
+    try {
+      const result = await recheckRazorpayPayments();
+      toast.success(`Razorpay payments rechecked (${result?.checked || 0} orders).`);
+      await loadStats();
+    } catch (err) {
+      const data = err?.response?.data;
+      const message = data?.details ? `${data.message}: ${data.details}` : formatApiErrorDetail(data?.detail || data?.message || err?.message);
+      toast.error(message || 'Razorpay payments could not be rechecked.');
+      await loadStats();
+    } finally {
+      setRechecking(false);
+    }
+  };
 
   return (
     <section className="space-y-6">
@@ -42,6 +66,15 @@ const Dashboard = () => {
             <p className="mt-2 text-lg font-medium text-white">{stats?.role || 'Admin'}</p>
           </div>
         </div>
+        <button
+          type="button"
+          onClick={handleRecheckRazorpay}
+          disabled={rechecking}
+          className="mt-5 inline-flex h-11 items-center gap-2 rounded-2xl border border-violet-500/30 bg-violet-500/10 px-4 text-sm font-semibold text-violet-100 transition hover:bg-violet-500/20 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          <RefreshCw size={15} className={rechecking ? 'animate-spin' : ''} />
+          {rechecking ? 'Rechecking...' : 'Recheck Razorpay Payments'}
+        </button>
       </div>
 
       {error && <div className="rounded-3xl border border-rose-500/20 bg-rose-500/10 p-5 text-rose-100">{error}</div>}

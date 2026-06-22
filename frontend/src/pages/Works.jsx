@@ -5,6 +5,7 @@ import { Play } from 'lucide-react';
 import { fetchPublicSettings } from '../lib/api';
 import { portfolioProjects } from '../data/portfolio';
 import { handleImageError, safeImageSrc } from '../lib/utils';
+import SafeVideoEmbed from '../components/SafeVideoEmbed';
 
 const filters = ['All', 'Commercial', 'Wedding', 'Drone', 'Editing', 'Product', 'Film'];
 
@@ -123,17 +124,29 @@ const Works = () => {
                 </a>
               )}
             </div>
-            <a href={showreel.video_url || '#works-grid'} className="group relative block aspect-video overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br from-violet-950 via-slate-950 to-black">
-              {showreel.thumbnail_image_url && (
-                <img src={safeImageSrc(showreel.thumbnail_image_url)} alt={showreel.heading} className="h-full w-full object-cover opacity-75 transition group-hover:scale-105 group-hover:opacity-95" onError={handleImageError} />
+            <div className="group relative aspect-video overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br from-violet-950 via-slate-950 to-black">
+              {showreel.video_url ? (
+                <SafeVideoEmbed
+                  videoType={showreel.video_type}
+                  videoUrl={showreel.video_url}
+                  title={showreel.heading}
+                  poster={showreel.thumbnail_image_url}
+                  className="h-full w-full rounded-none"
+                />
+              ) : (
+                <>
+                  {showreel.thumbnail_image_url && (
+                    <img src={safeImageSrc(showreel.thumbnail_image_url)} alt={showreel.heading} className="h-full w-full object-cover opacity-75 transition group-hover:scale-105 group-hover:opacity-95" onError={handleImageError} />
+                  )}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/15 to-transparent" />
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <span className="flex h-16 w-16 items-center justify-center rounded-full bg-violet-600/90 text-white shadow-2xl shadow-violet-900/50 transition group-hover:scale-110">
+                      <Play size={24} fill="currentColor" />
+                    </span>
+                  </div>
+                </>
               )}
-              <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/15 to-transparent" />
-              <div className="absolute inset-0 flex items-center justify-center">
-                <span className="flex h-16 w-16 items-center justify-center rounded-full bg-violet-600/90 text-white shadow-2xl shadow-violet-900/50 transition group-hover:scale-110">
-                  <Play size={24} fill="currentColor" />
-                </span>
-              </div>
-            </a>
+            </div>
           </div>
         </section>
       )}

@@ -236,6 +236,11 @@ export const syncRazorpayStatus = async (orderId) => {
   return data;
 };
 
+export const recheckRazorpayPayments = async () => {
+  const { data } = await adminApi.post('/admin/orders/recheck-razorpay');
+  return data;
+};
+
 export const fetchAdminMedia = async () => {
   const { data } = await adminApi.get('/admin/media');
   return data;

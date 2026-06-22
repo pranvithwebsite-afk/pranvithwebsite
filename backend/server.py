@@ -92,6 +92,7 @@ def mongodb_public_error(exc: Exception) -> str:
 RAZORPAY_KEY_ID = os.environ.get('RAZORPAY_KEY_ID', '')
 RAZORPAY_KEY_SECRET = os.environ.get('RAZORPAY_KEY_SECRET', '')
 RAZORPAY_AUTH_ERROR_MESSAGE = "Payment gateway authentication failed. Check Razorpay live keys in Vercel."
+SUCCESSFUL_REVENUE_STATUSES = ("paid", "captured", "completed", "success")
 razorpay_client = None
 if RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET:
     try:
@@ -114,6 +115,15 @@ def razorpay_config_summary() -> dict:
         "razorpay_key_id_present": bool(RAZORPAY_KEY_ID),
         "razorpay_key_secret_present": bool(RAZORPAY_KEY_SECRET),
         "razorpay_key_mode": razorpay_key_mode(),
+    }
+
+
+def successful_revenue_order_filter() -> dict:
+    return {
+        "$or": [
+            {"payment_status": {"$in": list(SUCCESSFUL_REVENUE_STATUSES)}},
+            {"status": {"$in": list(SUCCESSFUL_REVENUE_STATUSES)}},
+        ]
     }
 
 
@@ -165,7 +175,7 @@ async def add_security_headers(request: Request, call_next):
     response = await call_next(request)
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"
-    response.headers["Referrer-Policy"] = "no-referrer"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
     response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
     response.headers["Cross-Origin-Resource-Policy"] = "same-site"
     if request.url.path.startswith("/api/admin"):
@@ -1697,6 +1707,7 @@ async def admin_dashboard(current_admin: AdminBase = Depends(get_current_active_
     orders_count = await db.orders.count_documents({})
     customers_count = await db.customers.count_documents({})
     revenue_result = await db.orders.aggregate([
+        {"$match": successful_revenue_order_filter()},
         {"$group": {"_id": None, "total": {"$sum": "$amount"}}}
     ]).to_list(length=1)
     total_revenue = revenue_result[0]["total"] if revenue_result else 0
@@ -1956,6 +1967,90 @@ async def admin_sync_razorpay_status(order_id: str, current_admin: AdminBase = D
         "reason": sync_result.get("reason"),
         "message": "Razorpay status synced",
         "order": _public_order_payload(synced_order),
+    }
+
+
+@admin_router.post("/orders/recheck-razorpay")
+async def admin_recheck_razorpay_payments(current_admin: AdminBase = Depends(get_current_active_admin)):
+    if db is None:
+        return JSONResponse(
+            status_code=503,
+            content={"success": False, "message": "Razorpay recheck failed", "details": "Database not configured"},
+        )
+    if not RAZORPAY_KEY_ID or not RAZORPAY_KEY_SECRET or razorpay_client is None:
+        logger.warning("Bulk Razorpay recheck failed error=%s summary=%s", RAZORPAY_AUTH_ERROR_MESSAGE, razorpay_config_summary())
+        return JSONResponse(
+            status_code=400,
+            content={"success": False, "message": "Razorpay recheck failed", "details": RAZORPAY_AUTH_ERROR_MESSAGE},
+        )
+
+    try:
+        rows = await db.orders.find(
+            {
+                "$or": [
+                    {"razorpay_order_id": {"$exists": True, "$nin": [None, ""]}},
+                    {"razorpay_payment_id": {"$exists": True, "$nin": [None, ""]}},
+                ]
+            },
+            {"_id": 0},
+        ).sort("created_at", -1).to_list(500)
+    except Exception as exc:
+        safe_detail = mongodb_public_error(exc)
+        logger.exception("Bulk Razorpay recheck order load failed error=%s", safe_detail)
+        return JSONResponse(
+            status_code=503,
+            content={"success": False, "message": "Razorpay recheck failed", "details": safe_detail},
+        )
+
+    checked = 0
+    updated_paid = 0
+    failed = 0
+    results = []
+    for order in rows:
+        checked += 1
+        order_id = order.get("razorpay_order_id") or order.get("id")
+        try:
+            if order.get("razorpay_order_id") and not str(order.get("razorpay_order_id")).startswith("payment_link_"):
+                sync_result = await _sync_order_with_razorpay(order, send_email=False)
+            else:
+                sync_result = await _sync_payment_with_razorpay(order, send_email=False)
+            synced_order = sync_result.get("order") or {}
+            if sync_result.get("verified_paid"):
+                updated_paid += 1
+            results.append({
+                "order_id": order_id,
+                "success": True,
+                "verified_paid": bool(sync_result.get("verified_paid")),
+                "payment_status": sync_result.get("local_status") or synced_order.get("payment_status"),
+                "razorpay_payment_status": sync_result.get("razorpay_payment_status"),
+                "reason": sync_result.get("reason"),
+            })
+        except HTTPException as exc:
+            failed += 1
+            safe_detail = exc.detail if isinstance(exc.detail, str) else "Razorpay recheck failed"
+            logger.warning("Bulk Razorpay recheck failed order_id=%s error=%s", order_id, safe_detail)
+            results.append({
+                "order_id": order_id,
+                "success": False,
+                "details": safe_detail,
+            })
+        except Exception as exc:
+            failed += 1
+            safe_detail = _razorpay_public_error(exc)
+            logger.exception("Bulk Razorpay recheck crashed order_id=%s error=%s", order_id, safe_detail)
+            results.append({
+                "order_id": order_id,
+                "success": False,
+                "details": safe_detail,
+            })
+
+    return {
+        "success": True,
+        "message": "Razorpay payments rechecked",
+        "checked": checked,
+        "updated_paid": updated_paid,
+        "failed": failed,
+        "results": results[:50],
     }
 
 
@@ -3578,6 +3673,37 @@ async def _sync_order_with_razorpay(order: dict, send_email: bool = False) -> di
     return {"verified_paid": False, "order": corrected, "reason": reason, "razorpay_payment_status": payment_statuses, "local_status": corrected.get("payment_status")}
 
 
+async def _sync_payment_with_razorpay(order: dict, send_email: bool = False) -> dict:
+    payment_id = order.get("razorpay_payment_id")
+    if not payment_id:
+        raise HTTPException(status_code=400, detail="Order does not have a Razorpay payment ID")
+
+    payment = await _fetch_razorpay_payment(payment_id)
+    payment_status = payment.get("status")
+    expected_amount = _expected_order_amount(order)
+    expected_currency = (order.get("currency") or "INR").upper()
+    payment_currency = (payment.get("currency") or "").upper()
+    if payment_status == "captured" and payment.get("captured") is True:
+        if int(payment.get("amount") or 0) != expected_amount:
+            corrected = await _mark_order_not_paid(order, "failed", "Razorpay payment amount mismatch", payment_id)
+            return {"verified_paid": False, "order": corrected, "reason": "Razorpay payment amount mismatch", "razorpay_payment_status": payment_status, "local_status": corrected.get("payment_status")}
+        if payment_currency != expected_currency:
+            corrected = await _mark_order_not_paid(order, "failed", "Razorpay payment currency mismatch", payment_id)
+            return {"verified_paid": False, "order": corrected, "reason": "Razorpay payment currency mismatch", "razorpay_payment_status": payment_status, "local_status": corrected.get("payment_status")}
+        product = await _find_checkout_product(order.get("product_id"), order.get("product_slug"))
+        payment_order_id = payment.get("order_id")
+        fulfillment_order = {**order}
+        if payment_order_id and str(order.get("razorpay_order_id") or "").startswith("payment_link_"):
+            fulfillment_order["razorpay_order_id"] = payment_order_id
+        fulfillment = await _fulfill_paid_order(fulfillment_order, product, payment_id, send_email=send_email)
+        return {"verified_paid": True, "order": fulfillment["order"], "reason": None, "razorpay_payment_status": payment_status, "local_status": "paid"}
+
+    next_status = "failed" if payment_status == "failed" else "pending"
+    reason = payment.get("error_description") or payment.get("error_reason") or f"Razorpay payment is {payment_status or 'not captured'}"
+    corrected = await _mark_order_not_paid(order, next_status, reason, payment_id)
+    return {"verified_paid": False, "order": corrected, "reason": reason, "razorpay_payment_status": payment_status, "local_status": corrected.get("payment_status")}
+
+
 async def _fulfill_paid_order(order: dict, product: dict, payment_id: str, send_email: bool = True) -> dict:
     now = datetime.now(timezone.utc).isoformat()
     was_paid = order.get("status") == "paid" or order.get("payment_status") == "paid"
@@ -3603,6 +3729,8 @@ async def _fulfill_paid_order(order: dict, product: dict, payment_id: str, send_
         "download_url": download_url,
         **download_fields,
     }
+    if order.get("razorpay_order_id"):
+        paid_fields["razorpay_order_id"] = order.get("razorpay_order_id")
 
     await db.orders.update_one(
         {"$or": [{"razorpay_order_id": order.get("razorpay_order_id")}, {"id": order.get("id")}]},
@@ -4141,7 +4269,7 @@ async def order_download(order_id: str, token: str):
     return RedirectResponse(
         download_url,
         status_code=302,
-        headers={"Cache-Control": "no-store", "Referrer-Policy": "no-referrer"},
+        headers={"Cache-Control": "no-store", "Referrer-Policy": "strict-origin-when-cross-origin"},
     )
 
 
@@ -4177,7 +4305,7 @@ async def protected_product_download(order_id: str, product_id: str, token: Opti
     return RedirectResponse(
         download_url,
         status_code=302,
-        headers={"Cache-Control": "no-store", "Referrer-Policy": "no-referrer"},
+        headers={"Cache-Control": "no-store", "Referrer-Policy": "strict-origin-when-cross-origin"},
     )
 
 

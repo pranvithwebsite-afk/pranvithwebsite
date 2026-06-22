@@ -2,9 +2,9 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
-import { Search, Loader2 } from 'lucide-react';
+import { Search, Loader2, Share2 } from 'lucide-react';
 import { fetchProducts } from '../lib/api';
-import { FALLBACK_IMAGE, dedupeCatalogItems, getCatalogItemKey, handleImageError, safeImageSrc } from '../lib/utils';
+import { FALLBACK_IMAGE, dedupeCatalogItems, getCatalogItemKey, handleImageError, safeImageSrc, shareProduct } from '../lib/utils';
 import CheckoutModal from '../components/CheckoutModal';
 
 const defaultBackgrounds = [
@@ -163,7 +163,7 @@ const Assets = () => {
                 No assets match your filters.
               </div>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6" data-testid="assets-grid">
+              <div className="grid grid-cols-2 gap-3 md:grid-cols-3 md:gap-5 xl:grid-cols-4" data-testid="assets-grid">
                 {filtered.map((p, index) => (
                   <ProductCard
                     key={getCatalogItemKey(p, index)}
@@ -246,26 +246,37 @@ const ProductCard = ({ p, onView, onBuy }) => (
           </div>
         </div>
       )}
-      <span className={`absolute top-4 left-4 px-3 py-1 rounded-full text-[11px] font-bold tracking-wider ${
+      <span className={`absolute top-3 left-3 px-2.5 py-1 rounded-full text-[10px] sm:text-[11px] font-bold tracking-wider ${
         p.isFree ? 'bg-violet-500 text-white' : 'bg-rose-500 text-white'
       }`}>
         {p.badge}
       </span>
+      <button
+        type="button"
+        aria-label={`Share ${p.title}`}
+        onClick={(e) => {
+          e.stopPropagation();
+          shareProduct(p);
+        }}
+        className="absolute right-3 top-3 inline-flex h-8 w-8 items-center justify-center rounded-full border border-white/15 bg-black/55 text-white/90 backdrop-blur transition hover:border-violet-400/60 hover:bg-violet-600/80"
+      >
+        <Share2 size={15} />
+      </button>
     </div>
-    <div className="p-5 flex-1 flex flex-col">
-      <h3 className="text-base md:text-lg font-semibold text-white">{p.title}</h3>
-      <div className="mt-2 flex items-center gap-2">
+    <div className="p-3 sm:p-4 flex-1 flex flex-col">
+      <h3 className="text-sm sm:text-base font-semibold text-white leading-snug">{p.title}</h3>
+      <div className="mt-2 flex flex-wrap items-center gap-1.5 sm:gap-2">
         {p.original && (
           <span className="text-sm text-white/40 line-through">₹{p.original.toLocaleString('en-IN')}.00</span>
         )}
-        <span className="text-base font-bold text-white">
+        <span className="text-sm sm:text-base font-bold text-white">
           {p.isFree ? 'Free' : `₹${p.price.toLocaleString('en-IN')}.00`}
         </span>
       </div>
       <button
         onClick={(e) => { e.stopPropagation(); p.isFree ? onView() : onBuy(); }}
         data-testid={`view-asset-btn-${p.slug}`}
-        className="mt-4 w-full inline-flex items-center justify-center gap-2 bg-violet-600 hover:bg-violet-500 transition-colors text-white py-2.5 rounded-lg text-sm font-semibold"
+        className="mt-4 w-full inline-flex items-center justify-center gap-2 bg-violet-600 hover:bg-violet-500 transition-colors text-white py-2.5 rounded-lg text-xs sm:text-sm font-semibold"
       >
         {p.isFree ? 'Get Free' : 'Buy Now'}
       </button>

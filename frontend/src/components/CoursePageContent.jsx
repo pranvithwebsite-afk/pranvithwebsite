@@ -4,6 +4,7 @@ import { courses, faqs, studentVideos, testimonials, whatYoullLearn } from '../d
 import { fetchPublicSettings } from '../lib/api';
 import { handleImageError, safeImageSrc } from '../lib/utils';
 import RightForYou from './RightForYou';
+import SafeVideoEmbed from './SafeVideoEmbed';
 
 const fallbackThumbnail = courses[0]?.image || '';
 
@@ -110,44 +111,6 @@ export const CourseComingSoon = ({ visibility = defaultCourseVisibility }) => {
 
 const enabledSorted = (items = []) =>
   [...items].filter((item) => item.enabled !== false).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
-
-const getYoutubeId = (url) => {
-  try {
-    const parsed = new URL(url);
-    if (parsed.hostname.includes('youtu.be')) return parsed.pathname.replace('/', '');
-    if (parsed.searchParams.get('v')) return parsed.searchParams.get('v');
-    const embed = parsed.pathname.match(/\/embed\/([^/?]+)/);
-    return embed?.[1] || '';
-  } catch {
-    return '';
-  }
-};
-
-const getVimeoId = (url) => {
-  try {
-    const parsed = new URL(url);
-    const match = parsed.pathname.match(/(?:video\/)?(\d+)/);
-    return match?.[1] || '';
-  } catch {
-    return '';
-  }
-};
-
-const isDirectVideo = (url = '') => /\.(mp4|webm)(\?.*)?$/i.test(url);
-
-const getEmbedUrl = (video) => {
-  const url = video?.video_url || '';
-  if (!url) return '';
-  if (video.video_type === 'youtube' || /youtu\.?be|youtube\.com/i.test(url)) {
-    const id = getYoutubeId(url);
-    return id ? `https://www.youtube.com/embed/${id}?rel=0` : '';
-  }
-  if (video.video_type === 'vimeo' || /vimeo\.com/i.test(url)) {
-    const id = getVimeoId(url);
-    return id ? `https://player.vimeo.com/video/${id}` : '';
-  }
-  return '';
-};
 
 const mergeCourseContent = (remote) => ({
   ...defaultCoursePageContent,
@@ -373,9 +336,6 @@ const CoursePageContent = ({ children }) => {
 };
 
 const VideoModal = ({ video, onClose }) => {
-  const embedUrl = getEmbedUrl(video);
-  const direct = video.video_type === 'video_file' || isDirectVideo(video.video_url);
-
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 px-4 py-8 backdrop-blur">
       <div className="relative w-full max-w-5xl overflow-hidden rounded-3xl border border-white/10 bg-[#090316]">
@@ -383,20 +343,13 @@ const VideoModal = ({ video, onClose }) => {
           <X size={18} />
         </button>
         <div className="aspect-video w-full bg-black">
-          {direct ? (
-            <video src={video.video_url} poster={video.thumbnail_image_url} className="h-full w-full" controls playsInline preload="metadata" />
-          ) : embedUrl ? (
-            <iframe
-              src={embedUrl}
-              title={`${video.student_name} testimonial video`}
-              className="h-full w-full"
-              loading="lazy"
-              allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-              allowFullScreen
-            />
-          ) : (
-            <div className="flex h-full items-center justify-center text-white/60">Video unavailable</div>
-          )}
+          <SafeVideoEmbed
+            videoType={video.video_type}
+            videoUrl={video.video_url}
+            title={`${video.student_name} testimonial video`}
+            poster={video.thumbnail_image_url}
+            className="h-full w-full rounded-none"
+          />
         </div>
       </div>
     </div>
