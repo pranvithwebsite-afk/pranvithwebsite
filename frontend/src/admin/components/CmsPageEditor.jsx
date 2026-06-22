@@ -20,7 +20,6 @@ const CmsPageEditor = ({ pageKey, title, path, mediaItems, onBack }) => {
   const [selected, setSelected] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [settingsJson, setSettingsJson] = useState('{}');
 
   const sections = useMemo(() => [...(page?.sections || [])].sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0)), [page]);
 
@@ -29,7 +28,6 @@ const CmsPageEditor = ({ pageKey, title, path, mediaItems, onBack }) => {
     try {
       const data = await fetchAdminCmsPage(pageKey);
       setPage(data);
-      setSettingsJson(JSON.stringify(data.settings || {}, null, 2));
       setSelected((current) => current ? data.sections?.find((section) => section.id === current.id) || null : data.sections?.[0] || null);
     } catch (error) {
       toast.error(error?.response?.data?.detail || 'Could not load CMS page');
@@ -47,7 +45,6 @@ const CmsPageEditor = ({ pageKey, title, path, mediaItems, onBack }) => {
   const savePage = async (status) => {
     try {
       setSaving(true);
-      const settings = settingsJson.trim() ? JSON.parse(settingsJson) : {};
       const data = await updateAdminCmsPage(pageKey, {
         title: page.title,
         subtitle: page.subtitle,
@@ -55,12 +52,12 @@ const CmsPageEditor = ({ pageKey, title, path, mediaItems, onBack }) => {
         status: status || page.status,
         seo_title: page.seo_title,
         seo_description: page.seo_description,
-        settings,
+        settings: page.settings || {},
       });
       setPage(data);
       toast.success(status === 'published' ? 'Page published' : 'Page saved');
     } catch (error) {
-      toast.error(error?.message === 'Unexpected token' ? 'Page settings JSON is invalid' : error?.response?.data?.detail || 'Could not save page');
+      toast.error(error?.response?.data?.detail || 'Could not save page');
     } finally {
       setSaving(false);
     }
@@ -136,7 +133,6 @@ const CmsPageEditor = ({ pageKey, title, path, mediaItems, onBack }) => {
               <option value="hidden">hidden</option>
             </select>
           </Field>
-          <Field label="Page settings JSON"><textarea value={settingsJson} onChange={(event) => setSettingsJson(event.target.value)} rows={6} className={`${fieldClass} resize-none font-mono text-sm`} /></Field>
         </div>
       </div>
 
@@ -150,7 +146,7 @@ const CmsPageEditor = ({ pageKey, title, path, mediaItems, onBack }) => {
           </div>
           <SectionOrderList sections={sections} selectedId={selected?.id} onSelect={setSelected} onMove={moveSection} onDelete={deleteSection} onVisibilityChange={setVisibility} />
         </div>
-        <CmsSectionEditor section={selected} mediaItems={mediaItems} saving={saving} onSave={saveSection} />
+        <CmsSectionEditor pageKey={pageKey} section={selected} mediaItems={mediaItems} saving={saving} onSave={saveSection} />
       </div>
     </section>
   );

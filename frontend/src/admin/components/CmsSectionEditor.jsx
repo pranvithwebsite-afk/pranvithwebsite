@@ -20,40 +20,161 @@ const emptySection = {
   enabled: true,
 };
 
-const CmsSectionEditor = ({ section, mediaItems, onSave, saving }) => {
+const SIMPLE_DEFAULT_SCHEMA = {
+  sectionFields: ['section_id', 'type', 'title', 'description', 'enabled'],
+  itemFields: ['title', 'description', 'sort_order', 'enabled'],
+};
+
+const SECTION_EDITOR_SCHEMAS = {
+  'home:hero': { sectionFields: ['section_id', 'type', 'title', 'subtitle', 'description', 'button_text', 'button_link', 'media_type', 'media_url', 'poster_url', 'enabled'] },
+  'home:featured-assets': { sectionFields: ['section_id', 'type', 'title', 'subtitle', 'description', 'button_text', 'button_link', 'enabled'], itemFields: ['title', 'category', 'description', 'thumbnail_image_url', 'video_url', 'sort_order', 'enabled'] },
+  'home:instagram-profile': {
+    sectionFields: ['section_id', 'type', 'title', 'description', 'button_text', 'button_link', 'media_url', 'enabled'],
+    dataFields: ['username', 'display_name', 'followers_count', 'following_count', 'bio_line_1', 'bio_line_2', 'bio_line_3', 'bio_line_4', 'link_text', 'link_url', 'follow_button_url'],
+    itemFields: ['title', 'type', 'coverText', 'thumbnail_image_url', 'link_url', 'sort_order', 'enabled'],
+  },
+  'home:services': { sectionFields: ['section_id', 'type', 'title', 'subtitle', 'enabled'], itemFields: ['title', 'description', 'button_link', 'sort_order', 'enabled'] },
+  'home:showreel': { sectionFields: ['section_id', 'type', 'title', 'subtitle', 'description', 'button_text', 'button_link', 'media_type', 'media_url', 'poster_url', 'enabled'], itemFields: ['title', 'category', 'description', 'thumbnail_image_url', 'video_url', 'sort_order', 'enabled'] },
+  'home:cta': { sectionFields: ['section_id', 'type', 'title', 'description', 'button_text', 'button_link', 'enabled'] },
+  'home:faq': { sectionFields: ['section_id', 'type', 'title', 'subtitle', 'description', 'button_text', 'button_link', 'enabled'], itemFields: ['question', 'answer', 'sort_order', 'enabled'] },
+
+  'courses:coming-soon': { sectionFields: ['section_id', 'type', 'title', 'subtitle', 'button_text', 'button_link', 'enabled'] },
+  'courses:hero': { sectionFields: ['section_id', 'type', 'title', 'subtitle', 'button_text', 'button_link', 'media_url', 'enabled'] },
+  'courses:right-for-you': { sectionFields: ['section_id', 'type', 'title', 'button_text', 'button_link', 'enabled'], dataFields: ['cta_text'], itemFields: ['title', 'description', 'sort_order', 'enabled'] },
+  'courses:what-youll-learn': { sectionFields: ['section_id', 'type', 'title', 'subtitle', 'enabled'], itemFields: ['title', 'description', 'sort_order', 'enabled'] },
+  'courses:course-list': { sectionFields: ['section_id', 'type', 'title', 'subtitle', 'description', 'enabled'], dataFields: ['show_course_list'] },
+  'courses:faq': { sectionFields: ['section_id', 'type', 'title', 'enabled'], itemFields: ['question', 'answer', 'sort_order', 'enabled'] },
+
+  'about:hero': { sectionFields: ['section_id', 'type', 'title', 'subtitle', 'description', 'button_text', 'button_link', 'media_url', 'enabled'], dataFields: ['secondary_button_text', 'secondary_button_link'] },
+  'about:stats': { sectionFields: ['section_id', 'type', 'title', 'enabled'], itemFields: ['title', 'description', 'sort_order', 'enabled'], itemLabels: { title: 'Stat Number', description: 'Stat Label' } },
+  'about:creative-positioning': { sectionFields: ['section_id', 'type', 'title', 'description', 'enabled'] },
+  'about:gear-workflow': { sectionFields: ['section_id', 'type', 'title', 'enabled'], itemFields: ['title', 'sort_order', 'enabled'], itemLabels: { title: 'Gear Item' } },
+
+  'assets:hero': { sectionFields: ['section_id', 'type', 'title', 'subtitle', 'description', 'enabled'] },
+
+  'works:hero': { sectionFields: ['section_id', 'type', 'title', 'subtitle', 'description', 'enabled'] },
+  'works:showreel': { sectionFields: ['section_id', 'type', 'title', 'subtitle', 'description', 'button_text', 'button_link', 'media_type', 'media_url', 'poster_url', 'enabled'] },
+  'works:projects': { sectionFields: ['section_id', 'type', 'title', 'enabled'], itemFields: ['title', 'category', 'description', 'thumbnail_image_url', 'video_url', 'equipment', 'client', 'date', 'sort_order', 'enabled'] },
+  'works:cta': { sectionFields: ['section_id', 'type', 'title', 'description', 'button_text', 'button_link', 'enabled'] },
+
+  'hire:hero': { sectionFields: ['section_id', 'type', 'title', 'subtitle', 'description', 'enabled'] },
+  'hire:services': { sectionFields: ['section_id', 'type', 'title', 'enabled'], itemFields: ['title', 'sort_order', 'enabled'], itemLabels: { title: 'Benefit Text' } },
+  'hire:info-cards': { sectionFields: ['section_id', 'type', 'title', 'enabled'], itemFields: ['title', 'description', 'sort_order', 'enabled'] },
+  'hire:enquiry-form': { sectionFields: ['section_id', 'type', 'title', 'description', 'button_text', 'enabled'], dataFields: ['project_types'] },
+};
+
+const FIELD_LABELS = {
+  section_id: 'Section ID',
+  type: 'Type',
+  title: 'Title',
+  subtitle: 'Subtitle',
+  description: 'Description',
+  button_text: 'Button Text',
+  button_link: 'Button Link',
+  media_type: 'Media Type',
+  media_url: 'Image / Video URL',
+  poster_url: 'Poster / Thumbnail URL',
+  enabled: 'Section Enabled',
+  question: 'Question',
+  answer: 'Answer',
+  category: 'Category',
+  thumbnail_image_url: 'Thumbnail Image',
+  image_url: 'Image',
+  video_url: 'Video URL',
+  link_url: 'Link URL',
+  coverText: 'Cover Text',
+  sort_order: 'Sort Order',
+  equipment: 'Equipment',
+  client: 'Client',
+  date: 'Date',
+  student_name: 'Student Name',
+  course_name: 'Course Name',
+  review_text: 'Review Text',
+  rating: 'Rating',
+  cta_text: 'CTA Text',
+  show_course_list: 'Show Course List',
+  project_types: 'Project Type Options',
+  username: 'Instagram Username',
+  display_name: 'Display Name',
+  followers_count: 'Followers Count',
+  following_count: 'Following Count',
+  bio_line_1: 'Bio Line 1',
+  bio_line_2: 'Bio Line 2',
+  bio_line_3: 'Bio Line 3',
+  bio_line_4: 'Bio Line 4',
+  link_text: 'Profile Link Text',
+  follow_button_url: 'Follow Button URL',
+  secondary_button_text: 'Secondary Button Text',
+  secondary_button_link: 'Secondary Button Link',
+};
+
+const mediaFields = new Set(['media_url', 'poster_url', 'thumbnail_image_url', 'image_url']);
+const videoFields = new Set(['video_url']);
+const longTextFields = new Set(['description', 'answer', 'review_text']);
+const booleanFields = new Set(['enabled', 'show_course_list']);
+const numberFields = new Set(['sort_order', 'rating']);
+
+const getSchema = (pageKey, section) => {
+  const sectionId = section?.section_id || '';
+  return SECTION_EDITOR_SCHEMAS[`${pageKey}:${sectionId}`] || SIMPLE_DEFAULT_SCHEMA;
+};
+
+const getFieldLabel = (field, labels = {}) => labels[field] || FIELD_LABELS[field] || field.replaceAll('_', ' ');
+
+const normalizeDataValue = (field, value) => {
+  if (field === 'project_types') {
+    if (Array.isArray(value)) return value.join('\n');
+    return '';
+  }
+  if (typeof value === 'boolean') return value;
+  return value ?? '';
+};
+
+const denormalizeDataValue = (field, value) => {
+  if (field === 'project_types') {
+    return String(value || '').split('\n').map((item) => item.trim()).filter(Boolean);
+  }
+  return value;
+};
+
+const createEmptyItem = (fields = []) => fields.reduce((item, field) => {
+  if (field === 'enabled') return { ...item, enabled: true };
+  if (field === 'sort_order') return item;
+  if (numberFields.has(field)) return { ...item, [field]: 0 };
+  return { ...item, [field]: '' };
+}, {});
+
+const CmsSectionEditor = ({ pageKey, section, mediaItems, onSave, saving }) => {
   const [draft, setDraft] = useState(section || emptySection);
-  const [dataJson, setDataJson] = useState(JSON.stringify(section?.data || {}, null, 2));
-  const [jsonError, setJsonError] = useState('');
 
   useEffect(() => {
     setDraft(section || emptySection);
-    setDataJson(JSON.stringify(section?.data || {}, null, 2));
-    setJsonError('');
   }, [section]);
 
+  const schema = useMemo(() => getSchema(pageKey, draft), [pageKey, draft]);
+  const data = draft.data && typeof draft.data === 'object' ? draft.data : {};
+  const items = Array.isArray(data.items) ? data.items : [];
+
   const update = (field, value) => setDraft((current) => ({ ...current, [field]: value }));
-  const parsedData = useMemo(() => {
-    try {
-      return dataJson.trim() ? JSON.parse(dataJson) : {};
-    } catch {
-      return null;
-    }
-  }, [dataJson]);
-  const items = Array.isArray(parsedData?.items) ? parsedData.items : [];
-  const setDataValue = (field, value) => {
-    const base = parsedData && typeof parsedData === 'object' ? parsedData : {};
-    setDataJson(JSON.stringify({ ...base, [field]: value }, null, 2));
-    setJsonError('');
-  };
-  const updateItems = (nextItems) => setDataValue('items', nextItems.map((item, index) => ({
-    ...item,
-    sort_order: item.sort_order ?? index,
-  })));
-  const addItem = () => updateItems([
-    ...items,
-    { title: '', subtitle: '', description: '', image_url: '', video_url: '', poster_url: '', button_text: '', button_link: '', category: '', enabled: true, sort_order: items.length },
-  ]);
+  const updateData = (field, value) => setDraft((current) => ({
+    ...current,
+    data: {
+      ...(current.data || {}),
+      [field]: denormalizeDataValue(field, value),
+    },
+  }));
+  const updateItems = (nextItems) => setDraft((current) => ({
+    ...current,
+    data: {
+      ...(current.data || {}),
+      items: nextItems.map((item, index) => ({
+        ...item,
+        sort_order: item.sort_order ?? index,
+      })),
+    },
+  }));
   const updateItem = (index, field, value) => updateItems(items.map((item, itemIndex) => itemIndex === index ? { ...item, [field]: value } : item));
+  const addItem = () => updateItems([...items, { ...createEmptyItem(schema.itemFields || []), sort_order: items.length }]);
   const deleteItem = (index) => {
     if (!window.confirm('Delete this item?')) return;
     updateItems(items.filter((_, itemIndex) => itemIndex !== index).map((item, itemIndex) => ({ ...item, sort_order: itemIndex })));
@@ -65,93 +186,81 @@ const CmsSectionEditor = ({ section, mediaItems, onSave, saving }) => {
     [next[index], next[nextIndex]] = [next[nextIndex], next[index]];
     updateItems(next.map((item, itemIndex) => ({ ...item, sort_order: itemIndex })));
   };
-  const save = () => {
-    try {
-      const parsed = dataJson.trim() ? JSON.parse(dataJson) : {};
-      setJsonError('');
-      onSave({ ...draft, data: parsed });
-    } catch {
-      setJsonError('Data JSON is invalid.');
-    }
-  };
+  const save = () => onSave({ ...draft, data });
 
   return (
     <div className="rounded-2xl border border-slate-800 bg-slate-950 p-5">
       <h2 className="text-xl font-semibold text-white">{draft?.id ? 'Edit Section' : 'Add Section'}</h2>
       <div className="mt-5 grid gap-4 lg:grid-cols-2">
-        <Field label="Section id"><input value={draft.section_id || ''} onChange={(event) => update('section_id', event.target.value)} className={fieldClass} /></Field>
-        <Field label="Section type">
-          <select value={draft.type || 'text'} onChange={(event) => update('type', event.target.value)} className={fieldClass}>
-            {sectionTypes.map((type) => <option key={type} value={type}>{type}</option>)}
-          </select>
-        </Field>
-        <Field label="Title"><input value={draft.title || ''} onChange={(event) => update('title', event.target.value)} className={fieldClass} /></Field>
-        <Field label="Subtitle"><input value={draft.subtitle || ''} onChange={(event) => update('subtitle', event.target.value)} className={fieldClass} /></Field>
-        <Field label="Description"><textarea value={draft.description || ''} onChange={(event) => update('description', event.target.value)} rows={4} className={`${fieldClass} resize-none`} /></Field>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Button text"><input value={draft.button_text || ''} onChange={(event) => update('button_text', event.target.value)} className={fieldClass} /></Field>
-          <Field label="Button link"><input value={draft.button_link || ''} onChange={(event) => update('button_link', event.target.value)} className={fieldClass} /></Field>
-        </div>
-        <Field label="Media type">
-          <select value={draft.media_type || 'auto'} onChange={(event) => update('media_type', event.target.value)} className={fieldClass}>
-            {mediaTypes.map((type) => <option key={type} value={type}>{type}</option>)}
-          </select>
-        </Field>
-        <label className="flex items-center gap-3 rounded-xl border border-slate-800 bg-slate-900 px-4 py-3 text-white">
-          <input type="checkbox" checked={draft.enabled !== false} onChange={(event) => update('enabled', event.target.checked)} className="h-5 w-5 accent-violet-600" />
-          Section enabled
-        </label>
-        <MediaUrlInput label="Image/video URL" value={draft.media_url || ''} onChange={(value) => update('media_url', value)} mediaItems={mediaItems} />
-        <MediaUrlInput label="Poster/thumbnail URL" value={draft.poster_url || ''} onChange={(value) => update('poster_url', value)} accept="image/*" mediaItems={mediaItems} />
-        <Field label="Cards/items/advanced data JSON">
-          <textarea value={dataJson} onChange={(event) => setDataJson(event.target.value)} rows={10} className={`${fieldClass} resize-none font-mono text-sm`} />
-          {jsonError && <p className="mt-2 text-sm text-rose-300">{jsonError}</p>}
-        </Field>
+        {(schema.sectionFields || SIMPLE_DEFAULT_SCHEMA.sectionFields).map((field) => (
+          <SectionField
+            key={field}
+            field={field}
+            value={draft[field]}
+            onChange={(value) => update(field, value)}
+            mediaItems={mediaItems}
+          />
+        ))}
       </div>
-      <div className="mt-6 rounded-2xl border border-slate-800 bg-slate-900/50 p-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h3 className="text-lg font-semibold text-white">Cards / Items</h3>
-            <p className="mt-1 text-xs text-slate-500">Structured editor for data.items. Raw JSON stays available above for advanced fields.</p>
-          </div>
-          <button type="button" onClick={addItem} className="rounded-lg border border-slate-700 px-3 py-2 text-sm font-semibold text-white hover:border-violet-500">Add item</button>
-        </div>
-        {!parsedData && <p className="mt-3 rounded-xl border border-rose-500/20 bg-rose-500/10 px-3 py-2 text-sm text-rose-100">Fix invalid JSON before editing items.</p>}
-        {parsedData && items.length === 0 && <p className="mt-4 text-sm text-slate-500">No items yet.</p>}
-        {parsedData && items.length > 0 && (
-          <div className="mt-4 space-y-4">
-            {items.map((item, index) => (
-              <div key={`${item.title || 'item'}-${index}`} className="rounded-2xl border border-slate-800 bg-slate-950 p-4">
-                <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-                  <p className="text-sm font-semibold text-white">Item {index + 1}</p>
-                  <div className="flex flex-wrap gap-2">
-                    <button type="button" onClick={() => moveItem(index, -1)} disabled={index === 0} className="rounded-lg border border-slate-700 px-2 py-1 text-xs text-white disabled:opacity-40">Up</button>
-                    <button type="button" onClick={() => moveItem(index, 1)} disabled={index === items.length - 1} className="rounded-lg border border-slate-700 px-2 py-1 text-xs text-white disabled:opacity-40">Down</button>
-                    <button type="button" onClick={() => deleteItem(index)} className="rounded-lg border border-rose-500/30 px-2 py-1 text-xs text-rose-100">Delete</button>
-                  </div>
-                </div>
-                <div className="grid gap-4 lg:grid-cols-2">
-                  <Field label="Item title"><input value={item.title || item.question || item.student_name || ''} onChange={(event) => updateItem(index, item.question !== undefined ? 'question' : item.student_name !== undefined ? 'student_name' : 'title', event.target.value)} className={fieldClass} /></Field>
-                  <Field label="Subtitle / category"><input value={item.subtitle || item.category || item.course_name || ''} onChange={(event) => updateItem(index, item.category !== undefined ? 'category' : item.course_name !== undefined ? 'course_name' : 'subtitle', event.target.value)} className={fieldClass} /></Field>
-                  <Field label="Description / answer"><textarea value={item.description || item.answer || item.review_text || item.comment_text || ''} onChange={(event) => updateItem(index, item.answer !== undefined ? 'answer' : item.review_text !== undefined ? 'review_text' : item.comment_text !== undefined ? 'comment_text' : 'description', event.target.value)} rows={3} className={`${fieldClass} resize-none`} /></Field>
-                  <Field label="Button text"><input value={item.button_text || ''} onChange={(event) => updateItem(index, 'button_text', event.target.value)} className={fieldClass} /></Field>
-                  <Field label="Button link"><input value={item.button_link || item.link_url || ''} onChange={(event) => updateItem(index, item.link_url !== undefined ? 'link_url' : 'button_link', event.target.value)} className={fieldClass} /></Field>
-                  <Field label="Sort order"><input type="number" value={item.sort_order ?? index} onChange={(event) => updateItem(index, 'sort_order', Number(event.target.value))} className={fieldClass} /></Field>
-                  <label className="flex items-center gap-3 rounded-xl border border-slate-800 bg-slate-900 px-4 py-3 text-white">
-                    <input type="checkbox" checked={item.enabled !== false} onChange={(event) => updateItem(index, 'enabled', event.target.checked)} className="h-5 w-5 accent-violet-600" />
-                    Item enabled
-                  </label>
-                </div>
-                <div className="mt-4 grid gap-4 lg:grid-cols-3">
-                  <MediaUrlInput label="Image / thumbnail URL" value={item.image_url || item.thumbnail_image_url || item.thumbnail_url || ''} onChange={(value) => updateItem(index, item.thumbnail_image_url !== undefined ? 'thumbnail_image_url' : item.thumbnail_url !== undefined ? 'thumbnail_url' : 'image_url', value)} accept="image/*" mediaItems={mediaItems} />
-                  <MediaUrlInput label="Video URL" value={item.video_url || ''} onChange={(value) => updateItem(index, 'video_url', value)} accept="video/*" mediaItems={mediaItems} />
-                  <MediaUrlInput label="Poster URL" value={item.poster_url || ''} onChange={(value) => updateItem(index, 'poster_url', value)} accept="image/*" mediaItems={mediaItems} />
-                </div>
-              </div>
+
+      {(schema.dataFields || []).length > 0 && (
+        <div className="mt-6 rounded-2xl border border-slate-800 bg-slate-900/50 p-4">
+          <h3 className="text-lg font-semibold text-white">Section Details</h3>
+          <div className="mt-4 grid gap-4 lg:grid-cols-2">
+            {schema.dataFields.map((field) => (
+              <DataField
+                key={field}
+                field={field}
+                value={normalizeDataValue(field, data[field])}
+                onChange={(value) => updateData(field, value)}
+              />
             ))}
           </div>
-        )}
-      </div>
+        </div>
+      )}
+
+      {(schema.itemFields || []).length > 0 && (
+        <div className="mt-6 rounded-2xl border border-slate-800 bg-slate-900/50 p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h3 className="text-lg font-semibold text-white">Items</h3>
+              <p className="mt-1 text-xs text-slate-500">Only the fields used by this public section are shown.</p>
+            </div>
+            <button type="button" onClick={addItem} className="rounded-lg border border-slate-700 px-3 py-2 text-sm font-semibold text-white hover:border-violet-500">Add item</button>
+          </div>
+          {items.length === 0 ? (
+            <p className="mt-4 text-sm text-slate-500">No items yet.</p>
+          ) : (
+            <div className="mt-4 space-y-4">
+              {items.map((item, index) => (
+                <div key={`${item.title || item.question || 'item'}-${index}`} className="rounded-2xl border border-slate-800 bg-slate-950 p-4">
+                  <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-sm font-semibold text-white">Item {index + 1}</p>
+                    <div className="flex flex-wrap gap-2">
+                      <button type="button" onClick={() => moveItem(index, -1)} disabled={index === 0} className="rounded-lg border border-slate-700 px-2 py-1 text-xs text-white disabled:opacity-40">Up</button>
+                      <button type="button" onClick={() => moveItem(index, 1)} disabled={index === items.length - 1} className="rounded-lg border border-slate-700 px-2 py-1 text-xs text-white disabled:opacity-40">Down</button>
+                      <button type="button" onClick={() => deleteItem(index)} className="rounded-lg border border-rose-500/30 px-2 py-1 text-xs text-rose-100">Delete</button>
+                    </div>
+                  </div>
+                  <div className="grid gap-4 lg:grid-cols-2">
+                    {schema.itemFields.map((field) => (
+                      <ItemField
+                        key={field}
+                        field={field}
+                        labels={schema.itemLabels}
+                        value={field === 'sort_order' ? item.sort_order ?? index : item[field]}
+                        onChange={(value) => updateItem(index, field, value)}
+                        mediaItems={mediaItems}
+                      />
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       <button type="button" onClick={save} disabled={saving} className="mt-5 rounded-lg bg-green-600 px-5 py-3 text-sm font-semibold text-white hover:bg-green-500 disabled:opacity-60">
         {saving ? 'Saving...' : 'Save Section'}
       </button>
@@ -159,9 +268,82 @@ const CmsSectionEditor = ({ section, mediaItems, onSave, saving }) => {
   );
 };
 
+const SectionField = ({ field, value, onChange, mediaItems }) => {
+  if (field === 'type') {
+    return (
+      <Field label="Section Type">
+        <select value={value || 'text'} onChange={(event) => onChange(event.target.value)} className={fieldClass}>
+          {sectionTypes.map((type) => <option key={type} value={type}>{type}</option>)}
+        </select>
+      </Field>
+    );
+  }
+  if (field === 'media_type') {
+    return (
+      <Field label={FIELD_LABELS[field]}>
+        <select value={value || 'auto'} onChange={(event) => onChange(event.target.value)} className={fieldClass}>
+          {mediaTypes.map((type) => <option key={type} value={type}>{type}</option>)}
+        </select>
+      </Field>
+    );
+  }
+  return <EditableField field={field} value={value} onChange={onChange} mediaItems={mediaItems} label={FIELD_LABELS[field]} />;
+};
+
+const DataField = ({ field, value, onChange }) => (
+  <EditableField field={field} value={value} onChange={onChange} label={FIELD_LABELS[field]} />
+);
+
+const ItemField = ({ field, labels, value, onChange, mediaItems }) => (
+  <EditableField field={field} value={value} onChange={onChange} mediaItems={mediaItems} label={getFieldLabel(field, labels)} />
+);
+
+const EditableField = ({ field, value, onChange, mediaItems, label }) => {
+  if (booleanFields.has(field)) {
+    return (
+      <label className="flex items-center gap-3 rounded-xl border border-slate-800 bg-slate-900 px-4 py-3 text-white">
+        <input type="checkbox" checked={value !== false} onChange={(event) => onChange(event.target.checked)} className="h-5 w-5 accent-violet-600" />
+        {label}
+      </label>
+    );
+  }
+  if (mediaFields.has(field) || videoFields.has(field)) {
+    const accept = field === 'media_url' ? 'image/*,video/*' : videoFields.has(field) ? 'video/*' : 'image/*';
+    return (
+      <MediaUrlInput
+        label={label}
+        value={value || ''}
+        onChange={onChange}
+        accept={accept}
+        mediaItems={mediaItems}
+      />
+    );
+  }
+  if (numberFields.has(field)) {
+    return (
+      <Field label={label}>
+        <input type="number" value={value ?? 0} onChange={(event) => onChange(Number(event.target.value))} className={fieldClass} />
+      </Field>
+    );
+  }
+  if (longTextFields.has(field) || field === 'project_types') {
+    return (
+      <Field label={label}>
+        <textarea value={value || ''} onChange={(event) => onChange(event.target.value)} rows={field === 'project_types' ? 7 : 4} className={`${fieldClass} resize-none`} />
+        {field === 'project_types' && <p className="mt-2 text-xs text-slate-500">One option per line.</p>}
+      </Field>
+    );
+  }
+  return (
+    <Field label={label}>
+      <input value={value || ''} onChange={(event) => onChange(event.target.value)} className={fieldClass} />
+    </Field>
+  );
+};
+
 const Field = ({ label, children }) => (
   <label className="block text-sm text-slate-300">
-    <span className="capitalize text-slate-400">{label}</span>
+    <span className="text-slate-400">{label}</span>
     <div className="mt-2">{children}</div>
   </label>
 );
