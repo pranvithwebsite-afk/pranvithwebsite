@@ -186,7 +186,14 @@ const CmsSectionEditor = ({ pageKey, section, mediaItems, onSave, saving }) => {
     [next[index], next[nextIndex]] = [next[nextIndex], next[index]];
     updateItems(next.map((item, itemIndex) => ({ ...item, sort_order: itemIndex })));
   };
-  const save = () => onSave({ ...draft, data });
+  const save = () => onSave({
+    ...(section || {}),
+    ...draft,
+    data: {
+      ...(section?.data || {}),
+      ...(draft.data || {}),
+    },
+  });
 
   return (
     <div className="rounded-2xl border border-slate-800 bg-slate-950 p-5">

@@ -46,6 +46,7 @@ const CmsPageEditor = ({ pageKey, title, path, mediaItems, onBack }) => {
     try {
       setSaving(true);
       const data = await updateAdminCmsPage(pageKey, {
+        ...(page || {}),
         title: page.title,
         subtitle: page.subtitle,
         path: page.path,
