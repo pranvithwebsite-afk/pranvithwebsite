@@ -45,7 +45,7 @@ const Hero = ({ pageData }) => {
     primary_button_link: pageData?.buttonUrl || fallbackHero.primary_button_link,
     hero_media_url: pageData?.image || fallbackHero.hero_media_url,
   };
-  const hero = { ...legacyHero, ...(settingsHero || {}) };
+  const hero = { ...fallbackHero, ...(settingsHero || {}), ...legacyHero };
   const mediaUrl = hero.hero_media_url || '';
   const mediaType = hero.hero_media_type === 'auto'
     ? detectMediaType(mediaUrl)

@@ -6,7 +6,6 @@ import { Search, Loader2, Share2 } from 'lucide-react';
 import { fetchProducts } from '../lib/api';
 import { FALLBACK_IMAGE, dedupeCatalogItems, getCatalogItemKey, handleImageError, safeImageSrc, shareProduct } from '../lib/utils';
 import CheckoutModal from '../components/CheckoutModal';
-import CmsPageRenderer from '../components/cms/CmsPageRenderer';
 import { useCmsPage } from '../hooks/useCmsPage';
 
 const defaultBackgrounds = [
@@ -108,15 +107,23 @@ const Assets = () => {
   const settings = cmsPage?.settings || {};
   const showProductListing = settings.show_product_listing !== false;
   const showFilters = settings.show_filters !== false;
+  const heroSection = (cmsPage?.sections || []).find((section) => section.section_id === 'hero' || section.type === 'hero');
 
   return (
     <main className="page bg-[#070314] text-white min-h-screen">
       <Header />
 
-      {cmsPage?.sections?.length ? (
-        <CmsPageRenderer page={cmsPage} />
-      ) : (
-        <section className="px-6 py-12 text-center text-white/60">Assets intro content is not published yet.</section>
+      {heroSection?.enabled !== false && (
+        <section className="pt-8 pb-10">
+          <div className="max-w-7xl mx-auto px-6">
+            <div className="rounded-2xl bg-gradient-to-r from-violet-900/40 via-indigo-900/30 to-violet-900/40 border border-violet-500/20 px-8 py-7">
+              <h1 className="text-2xl md:text-4xl font-bold tracking-tight" data-testid="assets-page-title">{heroSection?.title || cmsPage?.title || 'Creative Assets Store'}</h1>
+              <p className="mt-2 text-sm text-white/65">
+                {heroSection?.subtitle || heroSection?.description || cmsPage?.subtitle || 'Premium LUTs, sound packs, motion templates and more - built for editors.'}
+              </p>
+            </div>
+          </div>
+        </section>
       )}
 
 

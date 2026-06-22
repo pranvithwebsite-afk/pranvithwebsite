@@ -126,12 +126,16 @@ const mergeCourseContent = (remote) => ({
   faqs: Array.isArray(remote?.faqs) ? remote.faqs : defaultCoursePageContent.faqs,
 });
 
-const CoursePageContent = ({ children }) => {
-  const [content, setContent] = useState(defaultCoursePageContent);
+const CoursePageContent = ({ children, contentOverride }) => {
+  const [content, setContent] = useState(() => mergeCourseContent(contentOverride));
   const [activeVideo, setActiveVideo] = useState(null);
   const carouselRef = useRef(null);
 
   useEffect(() => {
+    if (contentOverride) {
+      setContent(mergeCourseContent(contentOverride));
+      return undefined;
+    }
     let mounted = true;
     fetchPublicSettings()
       .then((settings) => {
@@ -143,7 +147,7 @@ const CoursePageContent = ({ children }) => {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [contentOverride]);
 
   const learnItems = useMemo(() => enabledSorted(content.learn_items), [content.learn_items]);
   const videoCards = useMemo(() => enabledSorted(content.testimonial_videos), [content.testimonial_videos]);
