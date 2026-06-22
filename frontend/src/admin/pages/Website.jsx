@@ -3,6 +3,7 @@ import { ArrowDown, ArrowLeft, ArrowUp, Plus, Save, Trash2, X } from 'lucide-rea
 import { toast } from 'sonner';
 import { fetchAdminMedia, fetchAdminPages, fetchAdminSettings, saveAdminSettings } from '../../lib/api';
 import { defaultCoursePageContent, defaultCourseVisibility } from '../../components/CoursePageContent';
+import SafeVideoEmbed, { detectMediaType, isImageUrl, isSafeMediaUrl } from '../../components/SafeVideoEmbed';
 import { portfolioProjects } from '../../data/portfolio';
 
 const requiredPages = [
@@ -63,8 +64,8 @@ const defaultHomeHero = {
   primary_button_link: '/assets',
   secondary_button_text: 'Join Community',
   secondary_button_link: '/courses',
-  hero_media_type: 'image',
-  hero_media_url: 'https://images.unsplash.com/photo-1574717024653-61fd2cf4d44d?w=1600&q=80',
+  hero_media_type: 'auto',
+  hero_media_url: '',
   hero_media_poster_url: '',
   hero_media_autoplay: true,
   hero_media_muted: true,
@@ -450,7 +451,10 @@ const PageEditor = ({ page, settings, mediaItems, onBack, onSave, saving }) => {
 };
 
 const HomeEditor = ({ draft, update, mediaItems }) => {
-  const updateHero = (field, value) => update('home_hero', { ...draft.home_hero, [field]: value });
+  const updateHero = (field, value) => {
+    const next = typeof field === 'object' ? field : { [field]: value };
+    update('home_hero', { ...draft.home_hero, ...next });
+  };
   const updateInstagram = (field, value) => update('instagram_profile', { ...draft.instagram_profile, [field]: value });
   const updateVisibility = (next) => update('home_visibility', normalizeHomeVisibility(next));
 
@@ -510,42 +514,92 @@ const HomeVisibilityEditor = ({ visibility, onChange }) => {
   );
 };
 
-const HomeHeroEditor = ({ hero, mediaItems, onChange }) => (
-  <div className="rounded-3xl border border-slate-800 bg-slate-950 p-5">
-    <h2 className="text-xl font-semibold text-white">Home Hero Section</h2>
-    <div className="mt-5 grid gap-4 lg:grid-cols-2">
-      <Field label="Badge text"><input value={hero.badge_text || ''} onChange={(event) => onChange('badge_text', event.target.value)} className={fieldClass} /></Field>
-      <Field label="Hero title"><input value={hero.hero_title || ''} onChange={(event) => onChange('hero_title', event.target.value)} className={fieldClass} /></Field>
-      <Field label="Hero subtitle"><textarea value={hero.hero_subtitle || ''} onChange={(event) => onChange('hero_subtitle', event.target.value)} rows={4} className={`${fieldClass} resize-none`} /></Field>
-      <Field label="Hero media type">
-        <select value={hero.hero_media_type || 'image'} onChange={(event) => onChange('hero_media_type', event.target.value)} className={fieldClass}>
-          <option value="image">image</option>
-          <option value="video_file">video_file</option>
-          <option value="video_url">video_url</option>
-        </select>
-      </Field>
-      <Field label="Primary button text"><input value={hero.primary_button_text || ''} onChange={(event) => onChange('primary_button_text', event.target.value)} className={fieldClass} /></Field>
-      <Field label="Primary button link"><input value={hero.primary_button_link || ''} onChange={(event) => onChange('primary_button_link', event.target.value)} className={fieldClass} /></Field>
-      <Field label="Secondary button text"><input value={hero.secondary_button_text || ''} onChange={(event) => onChange('secondary_button_text', event.target.value)} className={fieldClass} /></Field>
-      <Field label="Secondary button link"><input value={hero.secondary_button_link || ''} onChange={(event) => onChange('secondary_button_link', event.target.value)} className={fieldClass} /></Field>
-      <Field label="Hero media URL"><input value={hero.hero_media_url || ''} onChange={(event) => onChange('hero_media_url', event.target.value)} className={fieldClass} /></Field>
-      <Field label="Poster/thumbnail URL"><input value={hero.hero_media_poster_url || ''} onChange={(event) => onChange('hero_media_poster_url', event.target.value)} className={fieldClass} /></Field>
-    </div>
-    {mediaItems.length > 0 && (
-      <div className="mt-4">
-        <select value="" onChange={(event) => event.target.value && onChange('hero_media_url', event.target.value)} className={fieldClass}>
-          <option value="">Select uploaded hero image/video</option>
-          {mediaItems.map((item) => <option key={item.id} value={item.url}>{item.title || item.url}</option>)}
-        </select>
+const HomeHeroEditor = ({ hero, mediaItems, onChange }) => {
+  const mediaUrl = hero.hero_media_url || '';
+  const selectedType = hero.hero_media_type || 'auto';
+  const detectedType = detectMediaType(mediaUrl);
+  const effectiveType = selectedType === 'auto' ? detectedType : selectedType;
+  const hasSafeMedia = !!mediaUrl && isSafeMediaUrl(mediaUrl);
+
+  const setMediaUrl = (value) => {
+    onChange({
+      hero_media_url: value,
+      hero_media_type: 'auto',
+    });
+  };
+
+  const removeMedia = () => {
+    onChange({
+      hero_media_url: '',
+      hero_media_poster_url: '',
+      hero_media_type: 'auto',
+    });
+  };
+
+  return (
+    <div className="rounded-3xl border border-slate-800 bg-slate-950 p-5">
+      <h2 className="text-xl font-semibold text-white">Home Hero Section</h2>
+      <div className="mt-5 grid gap-4 lg:grid-cols-2">
+        <Field label="Badge text"><input value={hero.badge_text || ''} onChange={(event) => onChange('badge_text', event.target.value)} className={fieldClass} /></Field>
+        <Field label="Hero title"><input value={hero.hero_title || ''} onChange={(event) => onChange('hero_title', event.target.value)} className={fieldClass} /></Field>
+        <Field label="Hero subtitle"><textarea value={hero.hero_subtitle || ''} onChange={(event) => onChange('hero_subtitle', event.target.value)} rows={4} className={`${fieldClass} resize-none`} /></Field>
+        <Field label="Hero media type">
+          <select value={selectedType} onChange={(event) => onChange('hero_media_type', event.target.value)} className={fieldClass}>
+            <option value="auto">auto</option>
+            <option value="image">image</option>
+            <option value="video_file">video_file</option>
+            <option value="video_url">video_url</option>
+          </select>
+        </Field>
+        <Field label="Primary button text"><input value={hero.primary_button_text || ''} onChange={(event) => onChange('primary_button_text', event.target.value)} className={fieldClass} /></Field>
+        <Field label="Primary button link"><input value={hero.primary_button_link || ''} onChange={(event) => onChange('primary_button_link', event.target.value)} className={fieldClass} /></Field>
+        <Field label="Secondary button text"><input value={hero.secondary_button_text || ''} onChange={(event) => onChange('secondary_button_text', event.target.value)} className={fieldClass} /></Field>
+        <Field label="Secondary button link"><input value={hero.secondary_button_link || ''} onChange={(event) => onChange('secondary_button_link', event.target.value)} className={fieldClass} /></Field>
+        <Field label="Hero media URL"><input value={mediaUrl} onChange={(event) => setMediaUrl(event.target.value)} className={fieldClass} /></Field>
+        <Field label="Poster/thumbnail URL"><input value={hero.hero_media_poster_url || ''} onChange={(event) => onChange('hero_media_poster_url', event.target.value)} className={fieldClass} /></Field>
       </div>
-    )}
-    <div className="mt-5 grid gap-3 sm:grid-cols-3">
-      <Toggle label="Autoplay" checked={hero.hero_media_autoplay} onChange={(value) => onChange('hero_media_autoplay', value)} />
-      <Toggle label="Muted" checked={hero.hero_media_muted} onChange={(value) => onChange('hero_media_muted', value)} />
-      <Toggle label="Loop" checked={hero.hero_media_loop} onChange={(value) => onChange('hero_media_loop', value)} />
+      {mediaItems.length > 0 && (
+        <div className="mt-4">
+          <select value="" onChange={(event) => event.target.value && setMediaUrl(event.target.value)} className={fieldClass}>
+            <option value="">Select uploaded hero image/video</option>
+            {mediaItems.map((item) => <option key={item.id} value={item.url}>{item.title || item.url}</option>)}
+          </select>
+        </div>
+      )}
+      <div className="mt-4 flex flex-wrap items-center gap-3">
+        <button type="button" onClick={removeMedia} className="rounded-lg border border-rose-500/30 px-3 py-2 text-sm text-rose-100 hover:border-rose-400">
+          Remove Hero Media
+        </button>
+        {selectedType === 'auto' && mediaUrl && (
+          <span className="text-xs text-slate-500">Detected: {detectedType || 'unsupported/invalid media URL'}</span>
+        )}
+      </div>
+      <HeroMediaPreview mediaUrl={mediaUrl} mediaType={effectiveType} poster={hero.hero_media_poster_url} hasSafeMedia={hasSafeMedia} />
+      <div className="mt-5 grid gap-3 sm:grid-cols-3">
+        <Toggle label="Autoplay" checked={hero.hero_media_autoplay} onChange={(value) => onChange('hero_media_autoplay', value)} />
+        <Toggle label="Muted" checked={hero.hero_media_muted} onChange={(value) => onChange('hero_media_muted', value)} />
+        <Toggle label="Loop" checked={hero.hero_media_loop} onChange={(value) => onChange('hero_media_loop', value)} />
+      </div>
     </div>
-  </div>
-);
+  );
+};
+
+const HeroMediaPreview = ({ mediaUrl, mediaType, poster, hasSafeMedia }) => {
+  if (!mediaUrl) {
+    return <p className="mt-4 rounded-2xl border border-slate-800 bg-slate-900/70 px-4 py-3 text-sm text-slate-400">No hero media selected.</p>;
+  }
+  if (!hasSafeMedia || !mediaType) {
+    return <p className="mt-4 rounded-2xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">Unsupported or unsafe media URL.</p>;
+  }
+  if (mediaType === 'image' || isImageUrl(mediaUrl)) {
+    return <img src={mediaUrl} alt="Home hero media preview" className="mt-4 aspect-video w-full rounded-2xl border border-slate-800 bg-slate-900 object-cover" />;
+  }
+  return (
+    <div className="mt-4 overflow-hidden rounded-2xl border border-slate-800 bg-black">
+      <SafeVideoEmbed videoType={mediaType} videoUrl={mediaUrl} poster={poster} title="Home hero media preview" className="w-full rounded-none" />
+    </div>
+  );
+};
 
 const InstagramEditor = ({ profile, onChange, update }) => {
   const cards = profile.cards || [];

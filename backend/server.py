@@ -779,8 +779,8 @@ DEFAULT_HOME_HERO = {
     "primary_button_link": "/assets",
     "secondary_button_text": "Join Community",
     "secondary_button_link": "/courses",
-    "hero_media_type": "image",
-    "hero_media_url": "https://images.unsplash.com/photo-1574717024653-61fd2cf4d44d?w=1600&q=80",
+    "hero_media_type": "auto",
+    "hero_media_url": "",
     "hero_media_poster_url": "",
     "hero_media_autoplay": True,
     "hero_media_muted": True,
@@ -1118,8 +1118,8 @@ def _safe_course_video_url(video_type: str, value: Optional[str]) -> str:
     host = (parsed.netloc or "").lower()
     path = (parsed.path or "").lower()
     if video_type == "video_file":
-        if not path.endswith((".mp4", ".webm")):
-            raise ValueError("video_file must be a direct mp4/webm URL")
+        if not path.endswith((".mp4", ".webm", ".mov")):
+            raise ValueError("video_file must be a direct mp4/webm/mov URL")
     elif video_type == "youtube":
         if host not in {"youtube.com", "www.youtube.com", "m.youtube.com", "youtu.be", "www.youtu.be"}:
             raise ValueError("youtube video URL must be a YouTube URL")
@@ -1127,12 +1127,12 @@ def _safe_course_video_url(video_type: str, value: Optional[str]) -> str:
         if host not in {"vimeo.com", "www.vimeo.com", "player.vimeo.com"}:
             raise ValueError("vimeo video URL must be a Vimeo URL")
     elif video_type == "video_url":
-        allowed = path.endswith((".mp4", ".webm")) or host in {
+        allowed = path.endswith((".mp4", ".webm", ".mov")) or host in {
             "youtube.com", "www.youtube.com", "m.youtube.com", "youtu.be", "www.youtu.be",
             "vimeo.com", "www.vimeo.com", "player.vimeo.com",
         }
         if not allowed:
-            raise ValueError("video_url must be YouTube, Vimeo, or a direct mp4/webm URL")
+            raise ValueError("video_url must be YouTube, Vimeo, or a direct mp4/webm/mov URL")
     return cleaned
 
 
@@ -1222,9 +1222,9 @@ def _safe_course_page(course_page: Optional[dict]) -> dict:
 
 def _safe_home_hero(hero: Optional[dict]) -> dict:
     source = {**DEFAULT_HOME_HERO, **(hero or {})}
-    media_type = str(source.get("hero_media_type") or "image").strip()
-    if media_type not in {"image", "video_file", "video_url"}:
-        raise ValueError("hero_media_type must be image, video_file, or video_url")
+    media_type = str(source.get("hero_media_type") or "auto").strip().lower()
+    if media_type not in {"auto", "image", "video_file", "video_url"}:
+        raise ValueError("hero_media_type must be auto, image, video_file, or video_url")
     return {
         "badge_text": str(source.get("badge_text") or "").strip()[:240],
         "hero_title": str(source.get("hero_title") or "").strip()[:160],
@@ -1246,18 +1246,24 @@ def _safe_hero_media_url(media_type: str, value: Optional[str]) -> str:
     cleaned = _reject_unsafe_url(value) or ""
     if not cleaned:
         return ""
-    if media_type != "video_url":
-        return cleaned
     if cleaned.startswith("/") and not cleaned.startswith("//"):
         return cleaned
     parsed = urlparse(cleaned)
     host = (parsed.netloc or "").lower()
     path = (parsed.path or "").lower()
-    is_youtube = host in {"youtube.com", "www.youtube.com", "m.youtube.com", "youtu.be", "www.youtu.be"}
+    is_youtube = host in {"youtube.com", "www.youtube.com", "m.youtube.com", "youtu.be", "www.youtu.be", "youtube-nocookie.com", "www.youtube-nocookie.com"}
     is_vimeo = host in {"vimeo.com", "www.vimeo.com", "player.vimeo.com"}
-    is_direct_video = path.endswith((".mp4", ".webm"))
-    if not (is_youtube or is_vimeo or is_direct_video):
-        raise ValueError("video_url must be YouTube, Vimeo, or a direct mp4/webm URL")
+    is_direct_video = path.endswith((".mp4", ".webm", ".mov"))
+    is_image = path.endswith((".jpg", ".jpeg", ".png", ".webp", ".gif"))
+
+    if media_type == "image" and not is_image:
+        raise ValueError("image hero media URL must be jpg, jpeg, png, webp, or gif")
+    if media_type == "video_file" and not is_direct_video:
+        raise ValueError("video_file hero media URL must be mp4, webm, or mov")
+    if media_type == "video_url" and not (is_youtube or is_vimeo or is_direct_video):
+        raise ValueError("video_url must be YouTube, Vimeo, or a direct mp4/webm/mov URL")
+    if media_type == "auto" and not (is_image or is_youtube or is_vimeo or is_direct_video):
+        raise ValueError("auto hero media URL must be an image, YouTube, Vimeo, or direct mp4/webm/mov URL")
     return cleaned
 
 

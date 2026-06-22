@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { ArrowRight, Sparkles } from 'lucide-react';
 import { handleImageError, safeImageSrc, safePublicHref } from '../lib/utils';
 import { fetchPublicSettings } from '../lib/api';
-import SafeVideoEmbed, { getSafeVideoEmbedUrl, isDirectVideoUrl } from './SafeVideoEmbed';
+import SafeVideoEmbed, { detectMediaType, getSafeVideoEmbedUrl, isDirectVideoUrl } from './SafeVideoEmbed';
 
 const fallbackHero = {
   badge_text: 'Learn premium editing, LUTs, transitions, and storytelling workflows that get results.',
@@ -12,8 +12,8 @@ const fallbackHero = {
   primary_button_link: '/assets',
   secondary_button_text: 'Join Community',
   secondary_button_link: '/courses',
-  hero_media_type: 'image',
-  hero_media_url: 'https://images.unsplash.com/photo-1574717024653-61fd2cf4d44d?w=1600&q=80',
+  hero_media_type: 'auto',
+  hero_media_url: '',
   hero_media_poster_url: '',
   hero_media_autoplay: true,
   hero_media_muted: true,
@@ -46,8 +46,11 @@ const Hero = ({ pageData }) => {
     hero_media_url: pageData?.image || fallbackHero.hero_media_url,
   };
   const hero = { ...legacyHero, ...(settingsHero || {}) };
-  const mediaUrl = hero.hero_media_url || fallbackHero.hero_media_url;
-  const mediaType = hero.hero_media_url ? hero.hero_media_type : 'image';
+  const mediaUrl = hero.hero_media_url || '';
+  const mediaType = hero.hero_media_type === 'auto'
+    ? detectMediaType(mediaUrl)
+    : (hero.hero_media_type || 'auto');
+  const hasMedia = !!mediaUrl && !!mediaType;
   const directVideo = mediaType === 'video_file' || (mediaType === 'video_url' && isDirectVideoUrl(mediaUrl));
   const embedUrl = mediaType === 'video_url' && !directVideo ? getSafeVideoEmbedUrl('video_url', mediaUrl) : '';
 
@@ -63,15 +66,20 @@ const Hero = ({ pageData }) => {
         />
       );
     }
+    if (!hasMedia) {
+      return (
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_20%,rgba(124,58,237,0.35),transparent_42%),linear-gradient(135deg,#1a0a3a,#0f0625_48%,#070314)]" />
+      );
+    }
     return (
       <img
-        src={safeImageSrc(mediaUrl, fallbackHero.hero_media_url)}
+        src={safeImageSrc(mediaUrl, '')}
         alt="video editor"
         className="absolute inset-0 w-full h-full object-cover opacity-30"
         onError={handleImageError}
       />
     );
-  }, [directVideo, embedUrl, hero.hero_media_poster_url, mediaUrl]);
+  }, [directVideo, embedUrl, hasMedia, hero.hero_media_poster_url, mediaUrl]);
 
   return (
     <section className="relative pt-8 pb-12 overflow-hidden">

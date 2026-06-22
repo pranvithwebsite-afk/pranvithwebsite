@@ -2,11 +2,24 @@ import React from 'react';
 
 const YOUTUBE_HOSTS = new Set(['youtube.com', 'www.youtube.com', 'm.youtube.com', 'youtu.be', 'www.youtu.be', 'youtube-nocookie.com', 'www.youtube-nocookie.com']);
 const VIMEO_HOSTS = new Set(['vimeo.com', 'www.vimeo.com', 'player.vimeo.com']);
-const DIRECT_VIDEO_EXT = /\.(mp4|webm)(\?.*)?$/i;
+const DIRECT_VIDEO_EXT = /\.(mp4|webm|mov)(\?.*)?$/i;
+const IMAGE_EXT = /\.(jpe?g|png|webp|gif)(\?.*)?$/i;
 
-const parseHttpUrl = (value) => {
+const isSafeRelativePath = (value) => {
+  const raw = String(value || '').trim();
+  return raw.startsWith('/') && !raw.startsWith('//') && !/[\u0000-\u001f]/.test(raw);
+};
+
+const parseSafeUrl = (value) => {
   const raw = String(value || '').trim();
   if (!raw) return null;
+  if (isSafeRelativePath(raw)) {
+    try {
+      return new URL(raw, 'https://pranvithdop.local');
+    } catch {
+      return null;
+    }
+  }
   try {
     const parsed = new URL(raw);
     return ['http:', 'https:'].includes(parsed.protocol) ? parsed : null;
@@ -15,10 +28,12 @@ const parseHttpUrl = (value) => {
   }
 };
 
+export const isSafeMediaUrl = (value) => !!parseSafeUrl(value);
+
 const cleanVideoId = (value) => String(value || '').trim().replace(/[^a-zA-Z0-9_-]/g, '');
 
 export const getYouTubeId = (url) => {
-  const parsed = parseHttpUrl(url);
+  const parsed = parseSafeUrl(url);
   if (!parsed) return '';
   const host = parsed.hostname.toLowerCase();
   if (!YOUTUBE_HOSTS.has(host)) return '';
@@ -32,7 +47,7 @@ export const getYouTubeId = (url) => {
 };
 
 export const getVimeoId = (url) => {
-  const parsed = parseHttpUrl(url);
+  const parsed = parseSafeUrl(url);
   if (!parsed) return '';
   const host = parsed.hostname.toLowerCase();
   if (!VIMEO_HOSTS.has(host)) return '';
@@ -42,17 +57,31 @@ export const getVimeoId = (url) => {
 };
 
 export const isDirectVideoUrl = (url) => {
-  const parsed = parseHttpUrl(url);
-  return !!parsed && DIRECT_VIDEO_EXT.test(parsed.href);
+  const parsed = parseSafeUrl(url);
+  return !!parsed && DIRECT_VIDEO_EXT.test(String(url || '').trim());
+};
+
+export const isImageUrl = (url) => {
+  const parsed = parseSafeUrl(url);
+  return !!parsed && IMAGE_EXT.test(String(url || '').trim());
+};
+
+export const detectMediaType = (url) => {
+  const raw = String(url || '').trim();
+  if (!raw || !isSafeMediaUrl(raw)) return '';
+  if (isImageUrl(raw)) return 'image';
+  if (isDirectVideoUrl(raw)) return 'video_file';
+  if (getYouTubeId(raw) || getVimeoId(raw)) return 'video_url';
+  return '';
 };
 
 export const getSafeVideoEmbedUrl = (videoType, videoUrl) => {
   const type = String(videoType || '').trim().toLowerCase();
   const url = String(videoUrl || '').trim();
-  const youtubeId = (type === 'youtube' || type === 'video_url' || !type) ? getYouTubeId(url) : '';
+  const youtubeId = (type === 'youtube' || type === 'video_url' || type === 'auto' || !type) ? getYouTubeId(url) : '';
   if (youtubeId) return `https://www.youtube-nocookie.com/embed/${youtubeId}?rel=0`;
 
-  const vimeoId = (type === 'vimeo' || type === 'video_url' || !type) ? getVimeoId(url) : '';
+  const vimeoId = (type === 'vimeo' || type === 'video_url' || type === 'auto' || !type) ? getVimeoId(url) : '';
   if (vimeoId) return `https://player.vimeo.com/video/${vimeoId}`;
 
   return '';
@@ -64,8 +93,10 @@ const externalVideoLabel = (videoType, videoUrl) => {
 };
 
 const getSafeExternalUrl = (videoUrl) => {
-  const parsed = parseHttpUrl(videoUrl);
-  return parsed ? parsed.href : '';
+  const raw = String(videoUrl || '').trim();
+  if (isSafeRelativePath(raw)) return raw;
+  const parsed = parseSafeUrl(raw);
+  return parsed && parsed.origin !== 'https://pranvithdop.local' ? parsed.href : '';
 };
 
 const getSafePosterUrl = (value) => {
