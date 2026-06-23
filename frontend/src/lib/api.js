@@ -261,8 +261,16 @@ export const updateAdminCmsSectionVisibility = async (sectionId, enabled) => {
   return data;
 };
 
-export const reorderAdminCmsSections = async (pageKey, sectionIds) => {
-  const { data } = await adminApi.patch(`/admin/cms/pages/${encodeURIComponent(pageKey)}/sections/reorder`, { section_ids: sectionIds });
+export const reorderAdminCmsSections = async (pageKey, sections) => {
+  const sectionOrders = (sections || []).map((section, index) => (
+    typeof section === 'string'
+      ? { id: section, sort_order: index + 1 }
+      : { id: section.id, sort_order: section.sort_order ?? index + 1 }
+  ));
+  const { data } = await adminApi.patch(`/admin/cms/pages/${encodeURIComponent(pageKey)}/sections/reorder`, {
+    section_ids: sectionOrders.map((section) => section.id),
+    section_orders: sectionOrders,
+  });
   return data;
 };
 

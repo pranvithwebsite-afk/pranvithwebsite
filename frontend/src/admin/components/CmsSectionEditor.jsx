@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import MediaUrlInput from './MediaUrlInput';
 
 const fieldClass = 'w-full rounded-xl border border-slate-800 bg-slate-900 px-4 py-3 text-white outline-none focus:border-violet-500';
-const sectionTypes = ['hero', 'text', 'image_text', 'video', 'showreel', 'services_cards', 'portfolio_grid', 'product_showcase', 'course_showcase', 'testimonial_videos', 'reviews', 'faq', 'cta', 'contact_form', 'gallery', 'before_after'];
+const sectionTypes = ['hero', 'text', 'image_text', 'video', 'showreel', 'services_cards', 'portfolio_grid', 'product_showcase', 'course_showcase', 'testimonial_videos', 'video_reviews', 'reviews', 'testimonials', 'faq', 'cta', 'contact_form', 'gallery', 'before_after'];
 const mediaTypes = ['auto', 'image', 'video_file', 'youtube', 'vimeo'];
 
 const emptySection = {
@@ -43,6 +43,26 @@ const SECTION_EDITOR_SCHEMAS = {
   'courses:right-for-you': { sectionFields: ['section_id', 'type', 'title', 'button_text', 'button_link', 'enabled'], dataFields: ['cta_text'], itemFields: ['title', 'description', 'sort_order', 'enabled'] },
   'courses:what-youll-learn': { sectionFields: ['section_id', 'type', 'title', 'subtitle', 'enabled'], itemFields: ['title', 'description', 'sort_order', 'enabled'] },
   'courses:course-list': { sectionFields: ['section_id', 'type', 'title', 'subtitle', 'description', 'enabled'], dataFields: ['show_course_list'] },
+  'courses:student-videos': {
+    sectionFields: ['section_id', 'type', 'title', 'enabled'],
+    itemFields: ['title', 'subtitle', 'description', 'image_url', 'video_url', 'sort_order', 'enabled'],
+    itemLabels: { title: 'Video Title / Student Name', subtitle: 'Course / Role', description: 'Review Text', image_url: 'Thumbnail Image' },
+  },
+  'courses:student-reviews': {
+    sectionFields: ['section_id', 'type', 'title', 'enabled'],
+    itemFields: ['title', 'subtitle', 'description', 'rating', 'image_url', 'sort_order', 'enabled'],
+    itemLabels: { title: 'Student Name', subtitle: 'Course / Role', description: 'Review Text', image_url: 'Student Photo' },
+  },
+  'courses:testimonial_videos': {
+    sectionFields: ['section_id', 'type', 'title', 'enabled'],
+    itemFields: ['student_name', 'course_name', 'review_text', 'thumbnail_image_url', 'video_url', 'sort_order', 'enabled'],
+    itemLabels: { student_name: 'Video Title / Student Name', course_name: 'Course / Role', review_text: 'Review Text', thumbnail_image_url: 'Thumbnail Image' },
+  },
+  'courses:reviews': {
+    sectionFields: ['section_id', 'type', 'title', 'enabled'],
+    itemFields: ['student_name', 'course_name', 'review_text', 'rating', 'student_image_url', 'sort_order', 'enabled'],
+    itemLabels: { student_name: 'Student Name', course_name: 'Course / Role', review_text: 'Review Text', student_image_url: 'Student Photo' },
+  },
   'courses:faq': { sectionFields: ['section_id', 'type', 'title', 'enabled'], itemFields: ['question', 'answer', 'sort_order', 'enabled'] },
 
   'about:hero': { sectionFields: ['section_id', 'type', 'title', 'subtitle', 'description', 'button_text', 'button_link', 'media_url', 'enabled'], dataFields: ['secondary_button_text', 'secondary_button_link'] },
@@ -55,6 +75,11 @@ const SECTION_EDITOR_SCHEMAS = {
   'works:hero': { sectionFields: ['section_id', 'type', 'title', 'subtitle', 'description', 'enabled'] },
   'works:showreel': { sectionFields: ['section_id', 'type', 'title', 'subtitle', 'description', 'button_text', 'button_link', 'media_type', 'media_url', 'poster_url', 'enabled'] },
   'works:projects': { sectionFields: ['section_id', 'type', 'title', 'enabled'], itemFields: ['title', 'category', 'description', 'thumbnail_image_url', 'video_url', 'equipment', 'client', 'date', 'sort_order', 'enabled'] },
+  'works:client-testimonials': {
+    sectionFields: ['section_id', 'type', 'title', 'subtitle', 'description', 'enabled'],
+    itemFields: ['title', 'subtitle', 'description', 'rating', 'image_url', 'sort_order', 'enabled'],
+    itemLabels: { title: 'Client Name', subtitle: 'Client Role / Company', description: 'Testimonial Text', image_url: 'Client Photo / Logo' },
+  },
   'works:cta': { sectionFields: ['section_id', 'type', 'title', 'description', 'button_text', 'button_link', 'enabled'] },
 
   'hire:hero': { sectionFields: ['section_id', 'type', 'title', 'subtitle', 'description', 'enabled'] },

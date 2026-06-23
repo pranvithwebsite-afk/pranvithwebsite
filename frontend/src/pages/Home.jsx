@@ -8,6 +8,7 @@ import TransformVision from '../components/TransformVision';
 import OurWorks from '../components/OurWorks';
 import FAQ from '../components/FAQ';
 import Footer from '../components/Footer';
+import { usePublicPageLoading } from '../components/PublicPageLoader';
 import { useCmsPage } from '../hooks/useCmsPage';
 import { safePublicHref } from '../lib/utils';
 
@@ -38,7 +39,8 @@ const homeOrderFromCms = (sections = []) => {
 };
 
 const Home = () => {
-  const { page } = useCmsPage('home');
+  const { page, loading } = useCmsPage('home');
+  usePublicPageLoading(loading);
   const cmsSections = page?.sections || [];
   const findSection = sectionByKey(cmsSections);
   const heroSection = findSection('hero');

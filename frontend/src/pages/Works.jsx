@@ -5,6 +5,8 @@ import { Play } from 'lucide-react';
 import { handleImageError, safeImageSrc, safePublicHref } from '../lib/utils';
 import SafeVideoEmbed, { getYouTubeThumbnail } from '../components/SafeVideoEmbed';
 import { useCmsPage } from '../hooks/useCmsPage';
+import ClientTestimonialsSection from '../components/ClientTestimonialsSection';
+import { usePublicPageLoading } from '../components/PublicPageLoader';
 
 const filters = ['All', 'Commercial', 'Wedding', 'Drone', 'Editing', 'Product', 'Film'];
 
@@ -21,12 +23,14 @@ const getWorkThumbnail = (item = {}) => {
 };
 
 const Works = () => {
-  const { page } = useCmsPage('works');
+  const { page, loading } = useCmsPage('works');
+  usePublicPageLoading(loading);
   const [active, setActive] = useState('All');
   const sections = page?.sections || [];
   const hero = section(sections, 'hero') || {};
   const showreel = section(sections, 'showreel') || {};
   const projectsSection = section(sections, 'projects') || section(sections, 'portfolio_grid') || {};
+  const clientTestimonialsSection = section(sections, 'client-testimonials') || section(sections, 'testimonials') || {};
   const ctaSection = section(sections, 'cta') || {};
   const allProjects = useMemo(() => enabledSorted(projectsSection.data?.items || []), [projectsSection.data]);
   const projects = useMemo(() => (
@@ -123,6 +127,7 @@ const Works = () => {
           )}
         </div>
       </section>}
+      {clientTestimonialsSection.section_id && <ClientTestimonialsSection section={clientTestimonialsSection} />}
       {ctaSection.section_id && (
         <section className="px-6 pb-24">
           <div className="mx-auto max-w-5xl rounded-3xl border border-violet-500/20 bg-gradient-to-r from-[#1a124a]/70 to-[#0f0830]/60 px-6 py-8 text-center shadow-2xl shadow-violet-950/20 md:px-10">

@@ -297,9 +297,11 @@ CMS_SECTIONS = [
         {"title": "AI Editing Tools", "description": "Use modern AI tools to speed up captions, cleanup, reframing, and creative workflows.", "enabled": True},
     ]}, sort_order=3),
     _cms_section("courses", "course-list", "course_showcase", "MASTER VIDEO EDITING", "Choose a course and start learning with practical, cinematic workflows.", data={"show_course_list": True}, sort_order=4),
+    _cms_section("courses", "student-videos", "video_reviews", "Student Video Reviews", data={"items": []}, sort_order=5),
+    _cms_section("courses", "student-reviews", "testimonials", "Student Reviews", data={"items": []}, sort_order=6),
     _cms_section("courses", "faq", "faq", "FAQ", "", data={"items": [
         {"question": "Do I need prior editing experience?", "answer": "No. The course content is beginner-friendly and moves into practical professional workflows.", "enabled": True},
-    ]}, sort_order=5),
+    ]}, sort_order=7),
     _cms_section("about", "hero", "image_text", "DOP, filmmaker, editor, drone pilot, and visual storyteller.", "About Pranvith Dop", "PranvithDOP creates cinematic visuals for brands, creators, weddings, products, and digital campaigns.", "Book a project", "/hire", "image", "/assets/brand-profile.png", sort_order=0),
     _cms_section("about", "stats", "services_cards", "Creative Highlights", "", data={"items": [
         {"title": "250+", "description": "Film, ad & edit projects", "enabled": True},
@@ -322,7 +324,12 @@ CMS_SECTIONS = [
     _cms_section("works", "hero", "hero", "Films, commercials, aerials, and edits crafted for impact.", "PORTFOLIO", "A curated portfolio of PranvithDOP cinematography, drone work, product visuals, and post-production projects.", sort_order=0),
     _cms_section("works", "showreel", "showreel", "A cinematic portfolio of light, movement, and emotion.", "FEATURED SHOWREEL", "Commercials, wedding stories, drone sequences, product frames, and post-production work shaped for premium digital delivery.", "View all works", "/works", sort_order=1),
     _cms_section("works", "projects", "portfolio_grid", "Portfolio Projects", "", data={"items": []}, sort_order=2),
-    _cms_section("works", "cta", "cta", "Ready to build the next frame?", "", "Share your project and we will shape a visual plan around the story.", "Hire PranvithDOP", "/hire", sort_order=3),
+    _cms_section("works", "client-testimonials", "testimonials", "Trusted for films, brands, weddings, and launch visuals.", "Client words", data={"items": [
+        {"title": "Arjun Reddy", "subtitle": "Commercial Film", "description": "The visuals felt premium from the first frame. The lighting, movement, and edit gave our campaign a real production-house finish.", "rating": 5, "enabled": True, "sort_order": 0},
+        {"title": "Meera & Karthik", "subtitle": "Wedding Film", "description": "Our wedding film feels emotional and cinematic without looking forced. Every important moment was captured beautifully.", "rating": 5, "enabled": True, "sort_order": 1},
+        {"title": "Saanvi Studio", "subtitle": "Product Campaign", "description": "Fast, precise, and tasteful. The product frames and reels were ready for ads and social launch.", "rating": 5, "enabled": True, "sort_order": 2},
+    ]}, sort_order=3),
+    _cms_section("works", "cta", "cta", "Ready to build the next frame?", "", "Share your project and we will shape a visual plan around the story.", "Hire PranvithDOP", "/hire", sort_order=4),
     _cms_section("hire", "hero", "hero", "Build a film, campaign, or visual story with cinematic intent.", "Book PranvithDOP", "Tell us about your shoot, brand film, wedding, reel, product campaign, or edit. We will shape the look, schedule, and creative plan around the story you want people to feel.", sort_order=0),
     _cms_section("hire", "services", "services_cards", "What We Can Build", "", data={"items": [
         {"title": "Cinematic wedding, commercial, drone, and brand storytelling", "enabled": True},

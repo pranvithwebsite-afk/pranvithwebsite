@@ -6,6 +6,7 @@ import { Search, Loader2, Share2 } from 'lucide-react';
 import { fetchProducts } from '../lib/api';
 import { FALLBACK_IMAGE, dedupeCatalogItems, getCatalogItemKey, handleImageError, safeImageSrc, shareProduct } from '../lib/utils';
 import CheckoutModal from '../components/CheckoutModal';
+import { usePublicPageLoading } from '../components/PublicPageLoader';
 import { useCmsPage } from '../hooks/useCmsPage';
 
 const defaultBackgrounds = [
@@ -57,7 +58,7 @@ const normalize = (item = {}, index) => {
 
 const Assets = () => {
   const navigate = useNavigate();
-  const { page: cmsPage } = useCmsPage('assets');
+  const { page: cmsPage, loading: cmsLoading } = useCmsPage('assets');
   const [query, setQuery] = useState('');
   const [sort, setSort] = useState('newest');
   const [priceFilter, setPriceFilter] = useState('all');
@@ -65,6 +66,7 @@ const Assets = () => {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [checkoutProduct, setCheckoutProduct] = useState(null);
+  usePublicPageLoading(cmsLoading || loading);
 
   useEffect(() => {
     (async () => {

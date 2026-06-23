@@ -15,20 +15,49 @@ import SectionOrderList from './SectionOrderList';
 
 const fieldClass = 'w-full rounded-xl border border-slate-800 bg-slate-900 px-4 py-3 text-white outline-none focus:border-violet-500';
 
+const getSortOrder = (section, index) => {
+  const order = Number(section?.sort_order);
+  return Number.isFinite(order) ? order : index + 1;
+};
+
+const normalizeSectionOrder = (sections = []) =>
+  sections
+    .map((section, index) => ({ section, originalIndex: index }))
+    .sort((a, b) => {
+      const orderDelta = getSortOrder(a.section, a.originalIndex) - getSortOrder(b.section, b.originalIndex);
+      return orderDelta || a.originalIndex - b.originalIndex;
+    })
+    .map(({ section }) => section)
+    .map((section, index) => ({ ...section, sort_order: index + 1 }));
+
+const normalizePageSections = (page) => ({
+  ...(page || {}),
+  sections: normalizeSectionOrder(page?.sections || []),
+});
+
+const isCurrentPageSection = (section, currentPageKey) =>
+  !section?.page_key || section.page_key === currentPageKey;
+
 const CmsPageEditor = ({ pageKey, title, path, mediaItems, onBack }) => {
   const [page, setPage] = useState(null);
   const [selected, setSelected] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [reordering, setReordering] = useState(false);
 
-  const sections = useMemo(() => [...(page?.sections || [])].sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0)), [page]);
+  const currentPageKey = page?.page_key || pageKey;
+  const sections = useMemo(
+    () => normalizeSectionOrder((page?.sections || []).filter((section) => isCurrentPageSection(section, currentPageKey))),
+    [currentPageKey, page]
+  );
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
       const data = await fetchAdminCmsPage(pageKey);
-      setPage(data);
-      setSelected((current) => current ? data.sections?.find((section) => section.id === current.id) || null : data.sections?.[0] || null);
+      const normalizedPage = normalizePageSections(data);
+      setPage(normalizedPage);
+      setSelected((current) => current ? normalizedPage.sections?.find((section) => section.id === current.id) || null : normalizedPage.sections?.[0] || null);
     } catch (error) {
       toast.error(error?.response?.data?.detail || 'Could not load CMS page');
     } finally {
@@ -55,7 +84,7 @@ const CmsPageEditor = ({ pageKey, title, path, mediaItems, onBack }) => {
         seo_description: page.seo_description,
         settings: page.settings || {},
       });
-      setPage(data);
+      setPage(normalizePageSections(data));
       toast.success(status === 'published' ? 'Page published' : 'Page saved');
     } catch (error) {
       toast.error(error?.response?.data?.detail || 'Could not save page');
@@ -81,10 +110,38 @@ const CmsPageEditor = ({ pageKey, title, path, mediaItems, onBack }) => {
   const moveSection = async (index, direction) => {
     const next = [...sections];
     const nextIndex = index + direction;
-    if (nextIndex < 0 || nextIndex >= next.length) return;
+    if (reordering || nextIndex < 0 || nextIndex >= next.length) return;
+
+    const previousPage = page;
     [next[index], next[nextIndex]] = [next[nextIndex], next[index]];
-    const data = await reorderAdminCmsSections(pageKey, next.map((section) => section.id));
-    setPage(data);
+    const reorderedSections = next.map((section, sectionIndex) => ({ ...section, sort_order: sectionIndex + 1 }));
+
+    setPage((current) => ({
+      ...(current || {}),
+      sections: (current?.sections || []).map((section) => {
+        const reordered = reorderedSections.find((item) => item.id === section.id);
+        return reordered || section;
+      }),
+    }));
+    setSelected((current) => current ? reorderedSections.find((section) => section.id === current.id) || current : null);
+
+    try {
+      setReordering(true);
+      const data = await reorderAdminCmsSections(currentPageKey, reorderedSections.map((section) => ({
+        id: section.id,
+        sort_order: section.sort_order,
+      })));
+      const normalizedPage = normalizePageSections(data);
+      setPage(normalizedPage);
+      setSelected((current) => current ? normalizedPage.sections?.find((section) => section.id === current.id) || current : normalizedPage.sections?.[0] || null);
+      toast.success('Section order saved');
+    } catch (error) {
+      setPage(previousPage);
+      setSelected((current) => current ? previousPage?.sections?.find((section) => section.id === current.id) || current : previousPage?.sections?.[0] || null);
+      toast.error(error?.response?.data?.detail || 'Could not save section order');
+    } finally {
+      setReordering(false);
+    }
   };
 
   const deleteSection = async (section) => {
@@ -145,7 +202,7 @@ const CmsPageEditor = ({ pageKey, title, path, mediaItems, onBack }) => {
               <Plus size={14} /> Add
             </button>
           </div>
-          <SectionOrderList sections={sections} selectedId={selected?.id} onSelect={setSelected} onMove={moveSection} onDelete={deleteSection} onVisibilityChange={setVisibility} />
+          <SectionOrderList sections={sections} selectedId={selected?.id} onSelect={setSelected} onMove={moveSection} onDelete={deleteSection} onVisibilityChange={setVisibility} disabled={reordering} />
         </div>
         <CmsSectionEditor pageKey={pageKey} section={selected} mediaItems={mediaItems} saving={saving} onSave={saveSection} />
       </div>

@@ -263,9 +263,9 @@ export const footerLinks = {
     { name: 'Courses', path: '/courses' },
     { name: 'About Us', path: '/about' },
     { name: 'Our Works', path: '/works' },
-    { name: 'Contact', path: '/contact' },
-    { name: 'Privacy Policy', path: '/privacy' },
-    { name: 'FAQ', path: '/faq' },
+    { name: 'Assets', path: '/assets' },
+    { name: 'Privacy Policy', path: '/privacy-policy' },
+    { name: 'FAQ', path: '/#faq' },
   ],
   contact: {
     location: 'Hyderabad, India',

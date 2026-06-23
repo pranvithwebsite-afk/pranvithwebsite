@@ -4,6 +4,7 @@ import Footer from '../components/Footer';
 import { CalendarDays, CheckCircle2, MapPin, Send, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 import { submitHireRequest } from '../lib/api';
+import { usePublicPageLoading } from '../components/PublicPageLoader';
 import { useCmsPage } from '../hooks/useCmsPage';
 
 const initialForm = {
@@ -23,7 +24,8 @@ const section = (sections, idOrType) =>
   (sections || []).find((item) => item.section_id === idOrType || item.type === idOrType);
 
 const Hire = () => {
-  const { page } = useCmsPage('hire');
+  const { page, loading } = useCmsPage('hire');
+  usePublicPageLoading(loading);
   const sections = page?.sections || [];
   const hero = section(sections, 'hero') || {};
   const services = section(sections, 'services') || {};

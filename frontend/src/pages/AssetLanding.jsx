@@ -17,6 +17,7 @@ import { toast } from 'sonner';
 import { fetchProductBySlug } from '../lib/api';
 import { dedupeFaqs, handleImageError, safeImageSrc, shareProduct } from '../lib/utils';
 import CheckoutModal from '../components/CheckoutModal';
+import { usePublicPageLoading } from '../components/PublicPageLoader';
 import SafeVideoEmbed, { getSafeVideoEmbedUrl, isDirectVideoUrl } from '../components/SafeVideoEmbed';
 
 const AssetLanding = () => {
@@ -27,6 +28,7 @@ const AssetLanding = () => {
   const [busy, setBusy] = useState(false);
   const [notFound, setNotFound] = useState(false);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
+  usePublicPageLoading(loading);
 
   useEffect(() => {
     setLoading(true);

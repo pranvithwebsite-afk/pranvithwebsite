@@ -3,6 +3,7 @@ import Header from '../components/Header';
 import Footer from '../components/Footer';
 import CoursesSection from '../components/Courses';
 import CoursePageContent, { CourseComingSoon, defaultCourseVisibility } from '../components/CoursePageContent';
+import { usePublicPageLoading } from '../components/PublicPageLoader';
 import { useCmsPage } from '../hooks/useCmsPage';
 
 const enabledSorted = (items = []) =>
@@ -11,20 +12,65 @@ const enabledSorted = (items = []) =>
 const section = (sections, idOrType) =>
   (sections || []).find((item) => item.section_id === idOrType || item.type === idOrType);
 
+const sectionByAny = (sections, keys = []) =>
+  keys.reduce((found, key) => found || section(sections, key), null);
+
+const normalizeKey = (value) => String(value || '').trim().toLowerCase().replace(/[\s_]+/g, '-');
+
+const isComingSoonSection = (item = {}) => {
+  const sectionKey = normalizeKey(item.section_key);
+  const sectionId = normalizeKey(item.section_id);
+  const type = normalizeKey(item.type);
+  const title = normalizeKey(item.title);
+
+  if (sectionKey === 'coming-soon' || sectionId === 'coming-soon') return true;
+  if (title === 'courses-coming-soon') return true;
+  return type === 'cta' && title === 'courses-coming-soon';
+};
+
+const normalizeVideoReview = (item = {}, index) => ({
+  ...item,
+  student_name: item.student_name || item.title || 'Student',
+  course_name: item.course_name || item.subtitle || item.category || '',
+  review_text: item.review_text || item.description || '',
+  thumbnail_image_url: item.thumbnail_image_url || item.image_url || '',
+  video_type: item.video_type || 'auto',
+  video_url: item.video_url || '',
+  enabled: item.enabled !== false,
+  sort_order: item.sort_order ?? index,
+});
+
+const normalizeRating = (value) => {
+  const rating = Number(value || 5);
+  return Number.isFinite(rating) && rating > 0 ? rating : 5;
+};
+
+const normalizeTextReview = (item = {}, index) => ({
+  ...item,
+  student_name: item.student_name || item.title || 'Student',
+  course_name: item.course_name || item.subtitle || item.category || '',
+  review_text: item.review_text || item.description || '',
+  student_image_url: item.student_image_url || item.image_url || '',
+  rating: normalizeRating(item.rating || item.meta?.rating),
+  enabled: item.enabled !== false,
+  sort_order: item.sort_order ?? index,
+});
+
 const Courses = () => {
-  const { page } = useCmsPage('courses');
+  const { page, loading } = useCmsPage('courses');
+  usePublicPageLoading(loading);
   const pageHidden = page?.status === 'hidden';
-  const sections = page?.sections || [];
+  const sections = (page?.sections || []).filter((item) => item.enabled !== false);
   const settings = { ...defaultCourseVisibility, ...(page?.settings || {}) };
-  const comingSoon = section(sections, 'coming-soon') || {};
+  const comingSoon = sections.find(isComingSoonSection) || null;
+  const showComingSoon = !!comingSoon;
   const hero = section(sections, 'hero') || {};
   const rightForYou = section(sections, 'right-for-you') || {};
   const learn = section(sections, 'what-youll-learn') || section(sections, 'course_showcase') || {};
   const courseList = section(sections, 'course-list') || {};
-  const videos = section(sections, 'testimonial_videos') || {};
-  const reviews = section(sections, 'reviews') || {};
+  const videos = sectionByAny(sections, ['student-videos', 'video_reviews', 'testimonial_videos']) || {};
+  const reviews = sectionByAny(sections, ['student-reviews', 'testimonials', 'reviews']) || {};
   const faq = section(sections, 'faq') || {};
-  const coursesEnabled = settings.courses_enabled === true;
 
   const courseContent = {
     hero: {
@@ -39,8 +85,8 @@ const Courses = () => {
     course_list_section: courseList.section_id ? courseList : null,
     show_course_list: courseList.section_id ? courseList.data?.show_course_list !== false : false,
     learn_items: enabledSorted(learn.data?.items),
-    testimonial_videos: enabledSorted(videos.data?.items),
-    text_reviews: enabledSorted(reviews.data?.items),
+    testimonial_videos: enabledSorted(videos.data?.items).map(normalizeVideoReview),
+    text_reviews: enabledSorted(reviews.data?.items).map(normalizeTextReview),
     comments: [],
     faqs: enabledSorted(faq.data?.items).map((item, index) => ({
       question: item.question || item.title,
@@ -53,14 +99,14 @@ const Courses = () => {
   return (
     <main className="page bg-[#070314] text-white">
       <Header />
-      {pageHidden ? null : (!coursesEnabled || settings.show_coming_soon !== false ? (
+      {loading || pageHidden ? null : (showComingSoon ? (
         <CourseComingSoon
           visibility={{
             ...settings,
-            coming_soon_title: comingSoon.title || settings.coming_soon_title,
-            coming_soon_subtitle: comingSoon.subtitle || settings.coming_soon_subtitle,
-            coming_soon_button_text: comingSoon.button_text || settings.coming_soon_button_text,
-            coming_soon_button_link: comingSoon.button_link || settings.coming_soon_button_link,
+            coming_soon_title: comingSoon?.title || settings.coming_soon_title,
+            coming_soon_subtitle: comingSoon?.subtitle || settings.coming_soon_subtitle,
+            coming_soon_button_text: comingSoon?.button_text || settings.coming_soon_button_text,
+            coming_soon_button_link: comingSoon?.button_link || settings.coming_soon_button_link,
           }}
         />
       ) : (

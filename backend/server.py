@@ -273,7 +273,9 @@ CMS_SECTION_TYPES = {
     "product_showcase",
     "course_showcase",
     "testimonial_videos",
+    "video_reviews",
     "reviews",
+    "testimonials",
     "faq",
     "cta",
     "contact_form",
@@ -363,6 +365,7 @@ class CmsSectionIn(BaseModel):
 
 class CmsReorderIn(BaseModel):
     section_ids: List[str]
+    section_orders: Optional[List[Dict[str, Any]]] = None
 
 
 class CmsVisibilityIn(BaseModel):
@@ -2250,7 +2253,7 @@ async def admin_create_cms_section(page_key: str, payload: CmsSectionIn, current
     if not page:
         await db.cms_pages.update_one({"page_key": page_key}, {"$set": _cms_page_doc(page_key)}, upsert=True)
     if payload.sort_order is None:
-        payload.sort_order = await db.cms_sections.count_documents({"page_key": page_key})
+        payload.sort_order = await db.cms_sections.count_documents({"page_key": page_key}) + 1
     doc = _cms_section_doc(page_key, payload)
     await db.cms_sections.insert_one(doc)
     return {"success": True, "section": doc}
@@ -2276,7 +2279,7 @@ async def admin_delete_cms_section(section_id: str, current_admin: AdminBase = D
         raise HTTPException(status_code=404, detail="CMS section not found")
     remaining = await db.cms_sections.find({"page_key": section["page_key"]}, {"_id": 0}).sort("sort_order", 1).to_list(200)
     for index, row in enumerate(remaining):
-        await db.cms_sections.update_one({"id": row["id"]}, {"$set": {"sort_order": index, "updated_at": datetime.now(timezone.utc).isoformat()}})
+        await db.cms_sections.update_one({"id": row["id"]}, {"$set": {"sort_order": index + 1, "updated_at": datetime.now(timezone.utc).isoformat()}})
     return {"success": True}
 
 
@@ -2295,15 +2298,29 @@ async def admin_cms_section_visibility(section_id: str, payload: CmsVisibilityIn
 @admin_router.patch("/cms/pages/{page_key}/sections/reorder")
 async def admin_reorder_cms_sections(page_key: str, payload: CmsReorderIn, current_admin: AdminBase = Depends(get_current_active_admin)):
     page_key = _normalize_cms_page_key(page_key)
-    existing = await db.cms_sections.find({"page_key": page_key}, {"_id": 0}).to_list(300)
+    existing = await db.cms_sections.find({"page_key": page_key}, {"_id": 0}).sort("sort_order", 1).to_list(300)
     existing_ids = {row["id"] for row in existing}
-    ordered_ids = [section_id for section_id in payload.section_ids if section_id in existing_ids]
+    ordered_ids = []
+    if payload.section_orders:
+        ordered_rows = []
+        for item in payload.section_orders:
+            item_id = str(item.get("id") or "").strip()
+            if item_id in existing_ids:
+                try:
+                    sort_order = int(item.get("sort_order"))
+                except (TypeError, ValueError):
+                    sort_order = len(ordered_rows) + 1
+                ordered_rows.append({"id": item_id, "sort_order": sort_order})
+        ordered_rows.sort(key=lambda row: row["sort_order"])
+        ordered_ids = [row["id"] for row in ordered_rows]
+    if not ordered_ids:
+        ordered_ids = [section_id for section_id in payload.section_ids if section_id in existing_ids]
     for row in existing:
         if row["id"] not in ordered_ids:
             ordered_ids.append(row["id"])
     now = datetime.now(timezone.utc).isoformat()
     for index, item_id in enumerate(ordered_ids):
-        await db.cms_sections.update_one({"id": item_id, "page_key": page_key}, {"$set": {"sort_order": index, "updated_at": now}})
+        await db.cms_sections.update_one({"id": item_id, "page_key": page_key}, {"$set": {"sort_order": index + 1, "updated_at": now}})
     return await _cms_page_response(page_key, public=False)
 
 

@@ -36,7 +36,7 @@ const FAQ = ({ section }) => {
   if (section && faqs.length === 0) return null;
 
   return (
-    <section className="relative py-24">
+    <section id="faq" className="relative py-24">
       <div className="max-w-4xl mx-auto px-6">
         <div className="text-center mb-14">
           <span className="inline-block px-4 py-1.5 rounded-full bg-white/5 border border-white/10 text-xs text-white/80">

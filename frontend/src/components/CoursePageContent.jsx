@@ -4,7 +4,7 @@ import { courses, faqs, studentVideos, testimonials, whatYoullLearn } from '../d
 import { fetchPublicSettings } from '../lib/api';
 import { handleImageError, safeImageSrc } from '../lib/utils';
 import RightForYou from './RightForYou';
-import SafeVideoEmbed from './SafeVideoEmbed';
+import SafeVideoEmbed, { getYouTubeThumbnail } from './SafeVideoEmbed';
 
 const fallbackThumbnail = courses[0]?.image || '';
 
@@ -244,7 +244,7 @@ const CoursePageContent = ({ children, contentOverride }) => {
                   className="group relative h-[440px] w-[280px] shrink-0 snap-start overflow-hidden rounded-[2rem] border border-white/10 bg-white/[0.04] text-left shadow-xl shadow-black/25 transition hover:-translate-y-1 hover:border-violet-300/40"
                 >
                   <img
-                    src={safeImageSrc(item.thumbnail_image_url || studentVideos[index % studentVideos.length]?.thumb || fallbackThumbnail)}
+                    src={safeImageSrc(item.thumbnail_image_url || getYouTubeThumbnail(item.video_url, 'hqdefault') || studentVideos[index % studentVideos.length]?.thumb || fallbackThumbnail)}
                     alt={item.student_name}
                     className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
                     loading="lazy"

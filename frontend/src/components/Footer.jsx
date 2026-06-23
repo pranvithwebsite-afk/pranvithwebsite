@@ -108,8 +108,8 @@ const Footer = () => {
         <div className="mt-14 pt-6 border-t border-white/10 flex flex-col md:flex-row items-center justify-between gap-3">
           <p className="text-xs text-white/55">© {new Date().getFullYear()} PranvithDOP. All rights reserved.</p>
           <div className="flex items-center gap-6 text-xs text-white/55">
-            <a href="#" className="hover:text-white">Terms</a>
-            <a href="#" className="hover:text-white">Privacy</a>
+            <Link to="/privacy#terms" className="hover:text-white">Terms</Link>
+            <Link to="/privacy#privacy" className="hover:text-white">Privacy</Link>
           </div>
         </div>
       </div>

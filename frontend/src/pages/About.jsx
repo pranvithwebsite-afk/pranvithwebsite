@@ -4,6 +4,7 @@ import Header from '../components/Header';
 import Footer from '../components/Footer';
 import { Award, Camera, Clock, Film, Plane, Sparkles } from 'lucide-react';
 import { handleImageError, safeImageSrc, safePublicHref } from '../lib/utils';
+import { usePublicPageLoading } from '../components/PublicPageLoader';
 import { useCmsPage } from '../hooks/useCmsPage';
 
 const statIcons = [Film, Camera, Plane, Clock];
@@ -11,7 +12,8 @@ const findSection = (sections, idOrType) =>
   (sections || []).find((section) => section.section_id === idOrType || section.type === idOrType);
 
 const About = () => {
-  const { page } = useCmsPage('about');
+  const { page, loading } = useCmsPage('about');
+  usePublicPageLoading(loading);
   const sections = page?.sections || [];
   const hero = findSection(sections, 'hero') || findSection(sections, 'image_text') || {};
   const statsSection = findSection(sections, 'stats') || {};
