@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import MediaUrlInput from './MediaUrlInput';
 
 const fieldClass = 'w-full rounded-xl border border-slate-800 bg-slate-900 px-4 py-3 text-white outline-none focus:border-violet-500';
@@ -169,12 +169,29 @@ const createEmptyItem = (fields = []) => fields.reduce((item, field) => {
   return { ...item, [field]: '' };
 }, {});
 
+const getSectionIdentity = (section) => section?.id || section?.section_id || 'new-section';
+
+const getItemIdentity = (item = {}, index) =>
+  item.id || item.local_id || item._id || item.__cmsLocalId || `item-${index}`;
+
+const stripEditorOnlyItemFields = (item = {}) => {
+  const { __cmsLocalId, ...rest } = item;
+  return rest;
+};
+
 const CmsSectionEditor = ({ pageKey, section, mediaItems, onSave, saving }) => {
   const [draft, setDraft] = useState(section || emptySection);
+  const localItemCounter = useRef(0);
+  const sectionIdentity = `${pageKey}:${getSectionIdentity(section)}`;
+  const previousSectionIdentity = useRef(sectionIdentity);
 
   useEffect(() => {
-    setDraft(section || emptySection);
-  }, [section]);
+    const nextIdentity = `${pageKey}:${getSectionIdentity(section)}`;
+    if (previousSectionIdentity.current !== nextIdentity) {
+      previousSectionIdentity.current = nextIdentity;
+      setDraft(section || emptySection);
+    }
+  }, [pageKey, section, sectionIdentity]);
 
   const schema = useMemo(() => getSchema(pageKey, draft), [pageKey, draft]);
   const data = draft.data && typeof draft.data === 'object' ? draft.data : {};
@@ -199,7 +216,11 @@ const CmsSectionEditor = ({ pageKey, section, mediaItems, onSave, saving }) => {
     },
   }));
   const updateItem = (index, field, value) => updateItems(items.map((item, itemIndex) => itemIndex === index ? { ...item, [field]: value } : item));
-  const addItem = () => updateItems([...items, { ...createEmptyItem(schema.itemFields || []), sort_order: items.length }]);
+  const addItem = () => {
+    const localId = `cms-item-${localItemCounter.current}`;
+    localItemCounter.current += 1;
+    updateItems([...items, { ...createEmptyItem(schema.itemFields || []), __cmsLocalId: localId, sort_order: items.length }]);
+  };
   const deleteItem = (index) => {
     if (!window.confirm('Delete this item?')) return;
     updateItems(items.filter((_, itemIndex) => itemIndex !== index).map((item, itemIndex) => ({ ...item, sort_order: itemIndex })));
@@ -211,14 +232,22 @@ const CmsSectionEditor = ({ pageKey, section, mediaItems, onSave, saving }) => {
     [next[index], next[nextIndex]] = [next[nextIndex], next[index]];
     updateItems(next.map((item, itemIndex) => ({ ...item, sort_order: itemIndex })));
   };
-  const save = () => onSave({
-    ...(section || {}),
-    ...draft,
-    data: {
+  const save = () => {
+    const mergedData = {
       ...(section?.data || {}),
       ...(draft.data || {}),
-    },
-  });
+    };
+
+    if (Array.isArray(mergedData.items)) {
+      mergedData.items = mergedData.items.map(stripEditorOnlyItemFields);
+    }
+
+    onSave({
+      ...(section || {}),
+      ...draft,
+      data: mergedData,
+    });
+  };
 
   return (
     <div className="rounded-2xl border border-slate-800 bg-slate-950 p-5">
@@ -265,7 +294,7 @@ const CmsSectionEditor = ({ pageKey, section, mediaItems, onSave, saving }) => {
           ) : (
             <div className="mt-4 space-y-4">
               {items.map((item, index) => (
-                <div key={`${item.title || item.question || 'item'}-${index}`} className="rounded-2xl border border-slate-800 bg-slate-950 p-4">
+                <div key={getItemIdentity(item, index)} className="rounded-2xl border border-slate-800 bg-slate-950 p-4">
                   <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
                     <p className="text-sm font-semibold text-white">Item {index + 1}</p>
                     <div className="flex flex-wrap gap-2">
