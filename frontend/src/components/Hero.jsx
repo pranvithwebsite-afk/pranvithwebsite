@@ -26,8 +26,14 @@ const compactObject = (value) =>
 
 const Hero = ({ pageData }) => {
   const [settingsHero, setSettingsHero] = useState(null);
+  const hasCmsHero = !!pageData;
 
   useEffect(() => {
+    if (hasCmsHero) {
+      setSettingsHero(null);
+      return undefined;
+    }
+
     let mounted = true;
     fetchPublicSettings()
       .then((settings) => {
@@ -39,7 +45,7 @@ const Hero = ({ pageData }) => {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [hasCmsHero]);
 
   const cmsHero = pageData ? compactObject({
     badge_text: cleanText(pageData.badgeText),

@@ -22,7 +22,8 @@ const initialForm = {
 const projectTypes = ['Commercial Ad', 'Wedding Cinematography', 'Drone Shoot', 'Product Shoot', 'Film / Music Video', 'Editing / DI', 'Other'];
 
 const section = (sections, idOrType) =>
-  (sections || []).find((item) => item.section_id === idOrType || item.type === idOrType);
+  (sections || []).find((item) => item.section_id === idOrType)
+  || (sections || []).find((item) => item.type === idOrType);
 
 const Hire = () => {
   const { page, loading } = useCmsPage('hire');

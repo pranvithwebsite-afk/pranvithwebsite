@@ -15,7 +15,8 @@ const enabledSorted = (items = []) =>
   [...items].filter((item) => item.enabled !== false).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
 
 const section = (sections, idOrType) =>
-  (sections || []).find((item) => item.section_id === idOrType || item.type === idOrType);
+  (sections || []).find((item) => item.section_id === idOrType)
+  || (sections || []).find((item) => item.type === idOrType);
 
 const getWorkThumbnail = (item = {}) => {
   const customThumbnail = item.thumbnail_image_url || item.thumbnail_url || item.image_url;

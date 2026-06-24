@@ -21,6 +21,10 @@ const defaultBackgrounds = [
   'linear-gradient(135deg, #0ea5e9 0%, #1e3a8a 100%)',
 ];
 
+const findSection = (sections = [], idOrType) =>
+  sections.find((section) => section.section_id === idOrType)
+  || sections.find((section) => section.type === idOrType);
+
 const normalize = (item = {}, index) => {
   const numericPrice = Number(item.price ?? 0);
   const numericSalePrice = item.sale_price == null ? null : Number(item.sale_price);
@@ -111,7 +115,7 @@ const Assets = () => {
   const pageHidden = cmsPage?.status === 'hidden';
   const showProductListing = !pageHidden && settings.show_product_listing !== false;
   const showFilters = settings.show_filters !== false;
-  const heroSection = (cmsPage?.sections || []).find((section) => section.section_id === 'hero' || section.type === 'hero');
+  const heroSection = findSection(cmsPage?.sections || [], 'hero');
 
   if (cmsLoading || loading) return <PageReadyPlaceholder />;
 

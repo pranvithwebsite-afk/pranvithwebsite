@@ -20,8 +20,12 @@ export const defaultCourseVisibility = {
 export const defaultCoursePageContent = {
   show_right_for_you: true,
   right_for_you_section: null,
+  learn_section: null,
   show_course_list: true,
   course_list_section: null,
+  videos_section: null,
+  reviews_section: null,
+  faq_section: null,
   hero: {
     badge: 'Courses',
     heading: 'Master Cinematic Video Editing',
@@ -158,6 +162,10 @@ const CoursePageContent = ({ children, contentOverride }) => {
   const reviews = useMemo(() => enabledSorted(content.text_reviews), [content.text_reviews]);
   const comments = useMemo(() => enabledSorted(content.comments), [content.comments]);
   const faqItems = useMemo(() => enabledSorted(content.faqs), [content.faqs]);
+  const learnSection = content.learn_section || {};
+  const videosSection = content.videos_section || {};
+  const reviewsSection = content.reviews_section || {};
+  const faqSection = content.faq_section || {};
 
   const scrollCarousel = (direction) => {
     carouselRef.current?.scrollBy({ left: direction * 320, behavior: 'smooth' });
@@ -199,8 +207,9 @@ const CoursePageContent = ({ children, contentOverride }) => {
         <section className="px-6 py-16">
           <div className="mx-auto max-w-7xl">
             <div className="mb-10 text-center">
-              <p className="text-sm font-semibold uppercase tracking-[0.35em] text-violet-300">What You'll Learn</p>
-              <h2 className="mt-3 text-4xl font-bold tracking-tight md:text-5xl">Skills that turn timelines into stories.</h2>
+              <p className="text-sm font-semibold uppercase tracking-[0.35em] text-violet-300">{learnSection.title || "What You'll Learn"}</p>
+              <h2 className="mt-3 text-4xl font-bold tracking-tight md:text-5xl">{learnSection.subtitle || 'Skills that turn timelines into stories.'}</h2>
+              {learnSection.description && <p className="mx-auto mt-4 max-w-2xl text-white/62">{learnSection.description}</p>}
             </div>
             <div className="grid gap-5 md:grid-cols-3">
               {learnItems.map((item) => (
@@ -224,11 +233,11 @@ const CoursePageContent = ({ children, contentOverride }) => {
           <div className="mx-auto max-w-7xl">
             <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
               <div>
-                <p className="text-sm font-bold uppercase tracking-[0.35em] text-violet-300">Student Testimonials</p>
+                <p className="text-sm font-bold uppercase tracking-[0.35em] text-violet-300">{videosSection.title || 'Student Testimonials'}</p>
                 <h2 className="mt-3 max-w-3xl text-4xl font-bold tracking-tight md:text-5xl">
-                  Real people. Real transformations.
+                  {videosSection.subtitle || 'Real people. Real transformations.'}
                 </h2>
-                <p className="mt-4 max-w-2xl text-white/62">Hear from our students who mastered video editing.</p>
+                <p className="mt-4 max-w-2xl text-white/62">{videosSection.description || 'Hear from our students who mastered video editing.'}</p>
               </div>
               <div className="hidden gap-2 md:flex">
                 <button type="button" onClick={() => scrollCarousel(-1)} className="rounded-full border border-white/10 bg-white/5 p-3 text-white hover:bg-violet-600"><ArrowLeft size={18} /></button>
@@ -279,7 +288,8 @@ const CoursePageContent = ({ children, contentOverride }) => {
       {reviews.length > 0 && (
         <section className="px-6 py-16">
           <div className="mx-auto max-w-7xl">
-            <h2 className="text-center text-4xl font-bold tracking-tight md:text-5xl">Student Reviews</h2>
+            <h2 className="text-center text-4xl font-bold tracking-tight md:text-5xl">{reviewsSection.title || 'Student Reviews'}</h2>
+            {reviewsSection.description && <p className="mx-auto mt-4 max-w-2xl text-center text-white/62">{reviewsSection.description}</p>}
             <div className="mt-10 grid gap-5 md:grid-cols-2">
               {reviews.map((review) => (
                 <article key={`${review.student_name}-${review.sort_order}`} className="rounded-3xl border border-white/10 bg-white/[0.04] p-6">
@@ -323,7 +333,8 @@ const CoursePageContent = ({ children, contentOverride }) => {
       {faqItems.length > 0 && (
         <section className="px-6 py-16">
           <div className="mx-auto max-w-5xl">
-            <h2 className="text-center text-4xl font-bold tracking-tight">Course FAQ</h2>
+            <h2 className="text-center text-4xl font-bold tracking-tight">{faqSection.title || 'Course FAQ'}</h2>
+            {faqSection.description && <p className="mx-auto mt-4 max-w-2xl text-center text-white/62">{faqSection.description}</p>}
             <div className="mt-8 divide-y divide-white/10 rounded-3xl border border-white/10 bg-white/[0.04]">
               {faqItems.map((item) => (
                 <details key={`${item.question}-${item.sort_order}`} className="group p-6">

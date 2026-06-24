@@ -252,7 +252,7 @@ class PageIn(BaseModel):
     published: bool = True
 
 
-CMS_PAGE_KEYS = {"home", "courses", "about", "assets", "works", "hire"}
+CMS_PAGE_KEYS = {"home", "courses", "about", "assets", "works", "hire", "privacy", "terms"}
 CMS_PAGE_PATHS = {
     "home": "/",
     "courses": "/courses",
@@ -260,6 +260,8 @@ CMS_PAGE_PATHS = {
     "assets": "/assets",
     "works": "/works",
     "hire": "/hire",
+    "privacy": "/privacy",
+    "terms": "/privacy#terms",
 }
 CMS_STATUSES = {"published", "draft", "hidden"}
 CMS_SECTION_TYPES = {
@@ -641,6 +643,7 @@ class SettingsPayload(BaseModel):
     course_visibility: Optional[Dict[str, Any]] = None
     page_settings: Optional[Dict[str, Any]] = None
     works_page: Optional[Dict[str, Any]] = None
+    footer: Optional[Dict[str, Any]] = None
 
     @field_validator("logo_url")
     @classmethod
@@ -681,6 +684,11 @@ class SettingsPayload(BaseModel):
     @classmethod
     def validate_works_page(cls, value):
         return _safe_works_page(value)
+
+    @field_validator("footer")
+    @classmethod
+    def validate_footer(cls, value):
+        return _safe_footer(value)
 
 
 class HireRequestIn(BaseModel):
@@ -843,8 +851,28 @@ async def public_settings():
             "course_page": DEFAULT_COURSE_PAGE,
             "course_visibility": DEFAULT_COURSE_VISIBILITY,
             "page_settings": DEFAULT_PAGE_SETTINGS,
-            "works_page": DEFAULT_WORKS_PAGE,
-        }
+    "works_page": DEFAULT_WORKS_PAGE,
+    "footer": {
+        "brand_title": "PranvithDOP",
+        "description": "Empowering creators with AI-driven tools and professional video editing resources.\nJoin the future of content creation.",
+        "youtube_link": "#",
+        "instagram_link": "#",
+        "explore_links": [
+            {"name": "Home", "path": "/"},
+            {"name": "Courses", "path": "/courses"},
+            {"name": "Assets", "path": "/assets"},
+            {"name": "Our Works", "path": "/works"},
+            {"name": "Hire From Us", "path": "/hire"},
+            {"name": "Privacy Policy", "path": "/privacy#privacy"},
+        ],
+        "contact_location": "Hyderabad, India",
+        "contact_email": "info@pranvithdop.com",
+        "contact_phone": "+91 9059867883",
+        "newsletter_heading": "Stay Updated",
+        "newsletter_description": "Subscribe to our newsletter for the latest AI tools and editing tips.",
+        "subscribe_button_text": "Subscribe",
+    },
+}
     return _safe_settings(settings_doc)
 
 

@@ -11,7 +11,8 @@ const enabledSorted = (items = []) =>
   [...items].filter((item) => item.enabled !== false).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
 
 const section = (sections, idOrType) =>
-  (sections || []).find((item) => item.section_id === idOrType || item.type === idOrType);
+  (sections || []).find((item) => item.section_id === idOrType)
+  || (sections || []).find((item) => item.type === idOrType);
 
 const sectionByAny = (sections, keys = []) =>
   keys.reduce((found, key) => found || section(sections, key), null);
@@ -89,7 +90,11 @@ const Courses = () => {
     },
     show_right_for_you: !!rightForYou.section_id,
     right_for_you_section: rightForYou.section_id ? rightForYou : null,
+    learn_section: learn.section_id ? learn : null,
     course_list_section: courseList.section_id ? courseList : null,
+    videos_section: videos.section_id ? videos : null,
+    reviews_section: reviews.section_id ? reviews : null,
+    faq_section: faq.section_id ? faq : null,
     show_course_list: courseList.section_id ? courseList.data?.show_course_list !== false : false,
     learn_items: enabledSorted(learn.data?.items),
     testimonial_videos: enabledSorted(videos.data?.items).map(normalizeVideoReview),

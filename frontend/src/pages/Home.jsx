@@ -30,7 +30,8 @@ const sectionToHomeKey = {
 };
 
 const sectionByKey = (sections = []) => (key) =>
-  sections.find((section) => section.section_id === key || section.type === key);
+  sections.find((section) => section.section_id === key)
+  || sections.find((section) => section.type === key);
 
 const firstText = (...values) =>
   values.find((value) => typeof value === 'string' && value.trim()) || '';
@@ -60,7 +61,7 @@ const Home = () => {
     badgeText: firstText(heroSection.subtitle, heroSection.data?.badge_text),
     headline: firstText(heroSection.title, heroSection.data?.title, heroSection.data?.heading, heroSection.data?.hero_title),
     subheadline: firstText(heroSection.description, heroSection.data?.description, heroSection.data?.hero_subtitle),
-    image: firstText(heroSection.media_url, heroSection.data?.media_url, heroSection.data?.hero_media_url),
+    image: firstText(heroSection.media_url, heroSection.image_url, heroSection.video_url, heroSection.data?.media_url, heroSection.data?.hero_media_url, heroSection.data?.image_url, heroSection.data?.video_url),
     mediaType: firstText(heroSection.media_type, heroSection.data?.media_type, heroSection.data?.hero_media_type),
     posterUrl: firstText(heroSection.poster_url, heroSection.data?.poster_url, heroSection.data?.hero_media_poster_url),
     buttonText: firstText(heroSection.button_text, heroSection.data?.button_text, heroSection.data?.primary_button_text),

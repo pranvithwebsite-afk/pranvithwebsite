@@ -39,17 +39,17 @@ const SECTION_EDITOR_SCHEMAS = {
   'home:faq': { sectionFields: ['section_id', 'type', 'title', 'subtitle', 'description', 'button_text', 'button_link', 'enabled'], itemFields: ['question', 'answer', 'sort_order', 'enabled'] },
 
   'courses:coming-soon': { sectionFields: ['section_id', 'type', 'title', 'subtitle', 'button_text', 'button_link', 'enabled'] },
-  'courses:hero': { sectionFields: ['section_id', 'type', 'title', 'subtitle', 'button_text', 'button_link', 'media_url', 'enabled'] },
+  'courses:hero': { sectionFields: ['section_id', 'type', 'title', 'subtitle', 'description', 'button_text', 'button_link', 'media_url', 'enabled'] },
   'courses:right-for-you': { sectionFields: ['section_id', 'type', 'title', 'button_text', 'button_link', 'enabled'], dataFields: ['cta_text'], itemFields: ['title', 'description', 'sort_order', 'enabled'] },
   'courses:what-youll-learn': { sectionFields: ['section_id', 'type', 'title', 'subtitle', 'enabled'], itemFields: ['title', 'description', 'sort_order', 'enabled'] },
   'courses:course-list': { sectionFields: ['section_id', 'type', 'title', 'subtitle', 'description', 'enabled'], dataFields: ['show_course_list'] },
   'courses:student-videos': {
-    sectionFields: ['section_id', 'type', 'title', 'enabled'],
+    sectionFields: ['section_id', 'type', 'title', 'subtitle', 'description', 'enabled'],
     itemFields: ['title', 'subtitle', 'description', 'image_url', 'video_url', 'sort_order', 'enabled'],
     itemLabels: { title: 'Video Title / Student Name', subtitle: 'Course / Role', description: 'Review Text', image_url: 'Thumbnail Image' },
   },
   'courses:student-reviews': {
-    sectionFields: ['section_id', 'type', 'title', 'enabled'],
+    sectionFields: ['section_id', 'type', 'title', 'subtitle', 'description', 'enabled'],
     itemFields: ['title', 'subtitle', 'description', 'rating', 'image_url', 'sort_order', 'enabled'],
     itemLabels: { title: 'Student Name', subtitle: 'Course / Role', description: 'Review Text', image_url: 'Student Photo' },
   },
@@ -63,7 +63,7 @@ const SECTION_EDITOR_SCHEMAS = {
     itemFields: ['student_name', 'course_name', 'review_text', 'rating', 'student_image_url', 'sort_order', 'enabled'],
     itemLabels: { student_name: 'Student Name', course_name: 'Course / Role', review_text: 'Review Text', student_image_url: 'Student Photo' },
   },
-  'courses:faq': { sectionFields: ['section_id', 'type', 'title', 'enabled'], itemFields: ['question', 'answer', 'sort_order', 'enabled'] },
+  'courses:faq': { sectionFields: ['section_id', 'type', 'title', 'subtitle', 'description', 'enabled'], itemFields: ['question', 'answer', 'sort_order', 'enabled'] },
 
   'about:hero': { sectionFields: ['section_id', 'type', 'title', 'subtitle', 'description', 'button_text', 'button_link', 'media_url', 'enabled'], dataFields: ['secondary_button_text', 'secondary_button_link'] },
   'about:stats': { sectionFields: ['section_id', 'type', 'title', 'enabled'], itemFields: ['title', 'description', 'sort_order', 'enabled'], itemLabels: { title: 'Stat Number', description: 'Stat Label' } },

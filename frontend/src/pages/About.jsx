@@ -10,7 +10,8 @@ import { useCmsPage } from '../hooks/useCmsPage';
 
 const statIcons = [Film, Camera, Plane, Clock];
 const findSection = (sections, idOrType) =>
-  (sections || []).find((section) => section.section_id === idOrType || section.type === idOrType);
+  (sections || []).find((section) => section.section_id === idOrType)
+  || (sections || []).find((section) => section.type === idOrType);
 
 const About = () => {
   const { page, loading } = useCmsPage('about');
