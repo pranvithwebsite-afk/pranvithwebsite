@@ -20,6 +20,10 @@ const fallbackHero = {
   hero_media_loop: true,
 };
 
+const cleanText = (value) => (typeof value === 'string' && value.trim() ? value : undefined);
+const compactObject = (value) =>
+  Object.fromEntries(Object.entries(value).filter(([, item]) => item !== undefined));
+
 const Hero = ({ pageData }) => {
   const [settingsHero, setSettingsHero] = useState(null);
 
@@ -37,15 +41,19 @@ const Hero = ({ pageData }) => {
     };
   }, []);
 
-  const legacyHero = {
-    ...fallbackHero,
-    badge_text: pageData?.subheadline || fallbackHero.badge_text,
-    hero_title: pageData?.headline || fallbackHero.hero_title,
-    primary_button_text: pageData?.buttonText || fallbackHero.primary_button_text,
-    primary_button_link: pageData?.buttonUrl || fallbackHero.primary_button_link,
-    hero_media_url: pageData?.image || fallbackHero.hero_media_url,
-  };
-  const hero = { ...fallbackHero, ...(settingsHero || {}), ...legacyHero };
+  const cmsHero = pageData ? compactObject({
+    badge_text: cleanText(pageData.badgeText),
+    hero_title: cleanText(pageData.headline),
+    hero_subtitle: cleanText(pageData.subheadline),
+    primary_button_text: cleanText(pageData.buttonText),
+    primary_button_link: cleanText(pageData.buttonUrl),
+    secondary_button_text: cleanText(pageData.secondaryButtonText),
+    secondary_button_link: cleanText(pageData.secondaryButtonUrl),
+    hero_media_type: cleanText(pageData.mediaType),
+    hero_media_url: cleanText(pageData.image),
+    hero_media_poster_url: cleanText(pageData.posterUrl),
+  }) : {};
+  const hero = { ...fallbackHero, ...(settingsHero || {}), ...cmsHero };
   const mediaUrl = hero.hero_media_url || '';
   const mediaType = hero.hero_media_type === 'auto'
     ? detectMediaType(mediaUrl)

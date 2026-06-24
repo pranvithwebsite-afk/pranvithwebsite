@@ -23,6 +23,7 @@ export const defaultCoursePageContent = {
   show_course_list: true,
   course_list_section: null,
   hero: {
+    badge: 'Courses',
     heading: 'Master Cinematic Video Editing',
     subtitle: 'Learn practical editing workflows, storytelling, color, sound, and delivery systems for real creator and client projects.',
     button_text: 'Explore Courses',
@@ -168,7 +169,7 @@ const CoursePageContent = ({ children, contentOverride }) => {
         <div className="absolute left-1/2 top-0 h-96 w-96 -translate-x-1/2 rounded-full bg-violet-600/20 blur-3xl" />
         <div className="relative mx-auto grid max-w-7xl gap-10 lg:grid-cols-[0.95fr_1.05fr] lg:items-center">
           <div className="text-center lg:text-left">
-            <p className="text-sm font-semibold uppercase tracking-[0.35em] text-violet-300">Courses</p>
+            <p className="text-sm font-semibold uppercase tracking-[0.35em] text-violet-300">{content.hero.badge}</p>
             <h1 className="mt-4 text-5xl font-bold leading-tight tracking-tight md:text-7xl">{content.hero.heading}</h1>
             <p className="mx-auto mt-5 max-w-2xl text-lg leading-8 text-white/68 lg:mx-0">{content.hero.subtitle}</p>
             {content.hero.button_text && (

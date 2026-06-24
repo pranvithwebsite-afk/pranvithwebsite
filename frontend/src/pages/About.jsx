@@ -5,6 +5,7 @@ import Footer from '../components/Footer';
 import { Award, Camera, Clock, Film, Plane, Sparkles } from 'lucide-react';
 import { handleImageError, safeImageSrc, safePublicHref } from '../lib/utils';
 import { usePublicPageLoading } from '../components/PublicPageLoader';
+import PageReadyPlaceholder from '../components/PageReadyPlaceholder';
 import { useCmsPage } from '../hooks/useCmsPage';
 
 const statIcons = [Film, Camera, Plane, Clock];
@@ -25,11 +26,14 @@ const About = () => {
   const gearItems = Array.isArray(gearSection.data?.items)
     ? gearSection.data.items.filter((item) => item.enabled !== false).sort((a, b) => Number(a.sort_order || 0) - Number(b.sort_order || 0))
     : [];
+  const showHero = hero.section_id || !page;
+
+  if (loading) return <PageReadyPlaceholder />;
 
   return (
     <main className="page bg-[#070314] text-white">
       <Header />
-      {hero.section_id && <section className="relative overflow-hidden px-6 py-24">
+      {showHero && <section className="relative overflow-hidden px-6 py-24">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_40%_0%,rgba(124,58,237,0.22),transparent_45%)]" />
         <div className="relative mx-auto grid max-w-7xl gap-12 lg:grid-cols-[0.9fr_1.1fr] lg:items-center">
           {hero.enabled !== false && (

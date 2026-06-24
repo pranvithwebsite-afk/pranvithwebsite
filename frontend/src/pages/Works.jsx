@@ -7,6 +7,7 @@ import SafeVideoEmbed, { getYouTubeThumbnail } from '../components/SafeVideoEmbe
 import { useCmsPage } from '../hooks/useCmsPage';
 import ClientTestimonialsSection from '../components/ClientTestimonialsSection';
 import { usePublicPageLoading } from '../components/PublicPageLoader';
+import PageReadyPlaceholder from '../components/PageReadyPlaceholder';
 
 const filters = ['All', 'Commercial', 'Wedding', 'Drone', 'Editing', 'Product', 'Film'];
 
@@ -41,11 +42,14 @@ const Works = () => {
     const categoryFilters = filters.filter((filter) => filter === 'All' || available.has(filter));
     return categoryFilters.length > 1 ? categoryFilters : filters;
   }, [allProjects]);
+  const showHero = hero.section_id || !page;
+
+  if (loading) return <PageReadyPlaceholder />;
 
   return (
     <main className="page bg-[#070314] text-white">
       <Header />
-      {hero.section_id && (
+      {showHero && (
         <section className="relative overflow-hidden px-6 pb-12 pt-16 text-center">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(124,58,237,0.22),transparent_45%)]" />
           <div className="relative mx-auto max-w-5xl">

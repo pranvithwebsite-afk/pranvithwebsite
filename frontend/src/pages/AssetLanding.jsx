@@ -18,6 +18,7 @@ import { fetchProductBySlug } from '../lib/api';
 import { dedupeFaqs, handleImageError, safeImageSrc, shareProduct } from '../lib/utils';
 import CheckoutModal from '../components/CheckoutModal';
 import { usePublicPageLoading } from '../components/PublicPageLoader';
+import PageReadyPlaceholder from '../components/PageReadyPlaceholder';
 import SafeVideoEmbed, { getSafeVideoEmbedUrl, isDirectVideoUrl } from '../components/SafeVideoEmbed';
 
 const AssetLanding = () => {
@@ -42,17 +43,7 @@ const AssetLanding = () => {
       .finally(() => setLoading(false));
   }, [slug]);
 
-  if (loading) {
-    return (
-      <main className="page bg-[#070314] text-white min-h-screen">
-        <Header />
-        <div className="pt-16 pb-24 flex justify-center text-white/60 text-sm">
-          <Loader2 size={16} className="animate-spin mr-2" /> Loading asset...
-        </div>
-        <Footer />
-      </main>
-    );
-  }
+  if (loading) return <PageReadyPlaceholder />;
 
   if (notFound || !product) {
     return (

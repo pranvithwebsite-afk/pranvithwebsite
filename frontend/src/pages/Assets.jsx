@@ -2,11 +2,12 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
-import { Search, Loader2, Share2 } from 'lucide-react';
+import { Search, Share2 } from 'lucide-react';
 import { fetchProducts } from '../lib/api';
 import { FALLBACK_IMAGE, dedupeCatalogItems, getCatalogItemKey, handleImageError, safeImageSrc, shareProduct } from '../lib/utils';
 import CheckoutModal from '../components/CheckoutModal';
 import { usePublicPageLoading } from '../components/PublicPageLoader';
+import PageReadyPlaceholder from '../components/PageReadyPlaceholder';
 import { useCmsPage } from '../hooks/useCmsPage';
 
 const defaultBackgrounds = [
@@ -112,6 +113,8 @@ const Assets = () => {
   const showFilters = settings.show_filters !== false;
   const heroSection = (cmsPage?.sections || []).find((section) => section.section_id === 'hero' || section.type === 'hero');
 
+  if (cmsLoading || loading) return <PageReadyPlaceholder />;
+
   return (
     <main className="page bg-[#070314] text-white min-h-screen">
       <Header />
@@ -162,11 +165,7 @@ const Assets = () => {
           </aside>}
 
           <div>
-            {loading ? (
-              <div className="flex items-center gap-2 text-white/60 text-sm" data-testid="assets-loading">
-                <Loader2 size={14} className="animate-spin" /> Loading assets...
-              </div>
-            ) : loadError ? (
+            {loadError ? (
               <div className="rounded-2xl border border-rose-500/20 bg-rose-500/5 p-12 text-center text-white/70" data-testid="assets-error">
                 Assets could not be loaded. Please refresh and try again.
               </div>

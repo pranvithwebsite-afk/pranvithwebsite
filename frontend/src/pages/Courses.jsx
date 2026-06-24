@@ -4,6 +4,7 @@ import Footer from '../components/Footer';
 import CoursesSection from '../components/Courses';
 import CoursePageContent, { CourseComingSoon, defaultCourseVisibility } from '../components/CoursePageContent';
 import { usePublicPageLoading } from '../components/PublicPageLoader';
+import PageReadyPlaceholder from '../components/PageReadyPlaceholder';
 import { useCmsPage } from '../hooks/useCmsPage';
 
 const enabledSorted = (items = []) =>
@@ -14,6 +15,9 @@ const section = (sections, idOrType) =>
 
 const sectionByAny = (sections, keys = []) =>
   keys.reduce((found, key) => found || section(sections, key), null);
+
+const firstText = (...values) =>
+  values.find((value) => typeof value === 'string' && value.trim()) || '';
 
 const normalizeKey = (value) => String(value || '').trim().toLowerCase().replace(/[\s_]+/g, '-');
 
@@ -72,13 +76,16 @@ const Courses = () => {
   const reviews = sectionByAny(sections, ['student-reviews', 'testimonials', 'reviews']) || {};
   const faq = section(sections, 'faq') || {};
 
+  if (loading || pageHidden) return <PageReadyPlaceholder />;
+
   const courseContent = {
     hero: {
-      heading: hero.title || page?.title,
-      subtitle: hero.description || page?.subtitle,
-      button_text: hero.button_text,
-      button_link: hero.button_link,
-      media_url: hero.media_url,
+      badge: firstText(hero.subtitle, hero.data?.subtitle, hero.data?.badge, hero.data?.badge_text),
+      heading: firstText(hero.title, hero.data?.title, hero.data?.heading, hero.data?.heroTitle, hero.data?.hero_title, page?.title),
+      subtitle: firstText(hero.description, hero.data?.description, hero.data?.subtitle, page?.subtitle),
+      button_text: firstText(hero.button_text, hero.data?.button_text, hero.data?.primary_button_text),
+      button_link: firstText(hero.button_link, hero.data?.button_link, hero.data?.primary_button_link),
+      media_url: firstText(hero.media_url, hero.data?.media_url, hero.data?.hero_media_url, hero.data?.image_url),
     },
     show_right_for_you: !!rightForYou.section_id,
     right_for_you_section: rightForYou.section_id ? rightForYou : null,
@@ -99,7 +106,7 @@ const Courses = () => {
   return (
     <main className="page bg-[#070314] text-white">
       <Header />
-      {loading || pageHidden ? null : (showComingSoon ? (
+      {showComingSoon ? (
         <CourseComingSoon
           visibility={{
             ...settings,
@@ -113,7 +120,7 @@ const Courses = () => {
         <CoursePageContent contentOverride={courseContent}>
           {courseContent.show_course_list && <CoursesSection section={courseContent.course_list_section} />}
         </CoursePageContent>
-      ))}
+      )}
       <Footer />
     </main>
   );

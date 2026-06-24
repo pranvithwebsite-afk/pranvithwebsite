@@ -9,6 +9,7 @@ import OurWorks from '../components/OurWorks';
 import FAQ from '../components/FAQ';
 import Footer from '../components/Footer';
 import { usePublicPageLoading } from '../components/PublicPageLoader';
+import PageReadyPlaceholder from '../components/PageReadyPlaceholder';
 import { useCmsPage } from '../hooks/useCmsPage';
 import { safePublicHref } from '../lib/utils';
 
@@ -31,11 +32,14 @@ const sectionToHomeKey = {
 const sectionByKey = (sections = []) => (key) =>
   sections.find((section) => section.section_id === key || section.type === key);
 
+const firstText = (...values) =>
+  values.find((value) => typeof value === 'string' && value.trim()) || '';
+
 const homeOrderFromCms = (sections = []) => {
   const order = sections
     .map((section) => sectionToHomeKey[section.section_id] || sectionToHomeKey[section.type])
     .filter(Boolean);
-  return order.length ? order : [];
+  return order.length ? order : ['hero', 'featuredAssets', 'instagramProfile', 'services', 'showreel', 'cta', 'footerCta'];
 };
 
 const Home = () => {
@@ -53,19 +57,26 @@ const Home = () => {
   const order = homeOrderFromCms(cmsSections);
 
   const heroData = heroSection ? {
-    headline: heroSection.title,
-    subheadline: heroSection.subtitle,
-    image: heroSection.media_url,
-    buttonText: heroSection.button_text,
-    buttonUrl: heroSection.button_link,
+    badgeText: firstText(heroSection.subtitle, heroSection.data?.badge_text),
+    headline: firstText(heroSection.title, heroSection.data?.title, heroSection.data?.heading, heroSection.data?.hero_title),
+    subheadline: firstText(heroSection.description, heroSection.data?.description, heroSection.data?.hero_subtitle),
+    image: firstText(heroSection.media_url, heroSection.data?.media_url, heroSection.data?.hero_media_url),
+    mediaType: firstText(heroSection.media_type, heroSection.data?.media_type, heroSection.data?.hero_media_type),
+    posterUrl: firstText(heroSection.poster_url, heroSection.data?.poster_url, heroSection.data?.hero_media_poster_url),
+    buttonText: firstText(heroSection.button_text, heroSection.data?.button_text, heroSection.data?.primary_button_text),
+    buttonUrl: firstText(heroSection.button_link, heroSection.data?.button_link, heroSection.data?.primary_button_link),
+    secondaryButtonText: firstText(heroSection.data?.secondary_button_text),
+    secondaryButtonUrl: firstText(heroSection.data?.secondary_button_link),
   } : null;
+
+  if (loading) return <PageReadyPlaceholder />;
 
   return (
     <main className="page relative overflow-hidden bg-[#070314] text-white">
       <Header />
       {order.map((sectionKey) => {
         const sections = {
-          hero: heroSection ? <Hero key="hero" pageData={heroData} /> : null,
+          hero: <Hero key="hero" pageData={heroData} />,
           featuredAssets: <OurWorks key="featuredAssets" section={worksSection} />,
           instagramProfile: instagramSection ? <TransformVision key="instagramProfile" section={instagramSection} /> : null,
           services: servicesSection ? <ServicesSection key="services" section={servicesSection} /> : null,
