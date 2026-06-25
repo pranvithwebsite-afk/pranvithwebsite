@@ -284,7 +284,7 @@ CMS_SECTION_TYPES = {
     "gallery",
     "before_after",
 }
-CMS_MEDIA_TYPES = {"auto", "image", "video_file", "youtube", "vimeo"}
+CMS_MEDIA_TYPES = {"auto", "image", "video_file", "video_url", "youtube", "vimeo"}
 
 
 class CmsPageIn(BaseModel):

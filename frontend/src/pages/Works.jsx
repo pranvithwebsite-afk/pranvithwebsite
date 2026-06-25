@@ -3,7 +3,7 @@ import Header from '../components/Header';
 import Footer from '../components/Footer';
 import { Play } from 'lucide-react';
 import { handleImageError, safeImageSrc, safePublicHref } from '../lib/utils';
-import SafeVideoEmbed, { getYouTubeThumbnail } from '../components/SafeVideoEmbed';
+import SafeVideoEmbed, { detectMediaType, getYouTubeThumbnail } from '../components/SafeVideoEmbed';
 import { useCmsPage } from '../hooks/useCmsPage';
 import ClientTestimonialsSection from '../components/ClientTestimonialsSection';
 import { usePublicPageLoading } from '../components/PublicPageLoader';
@@ -19,9 +19,16 @@ const section = (sections, idOrType) =>
   || (sections || []).find((item) => item.type === idOrType);
 
 const getWorkThumbnail = (item = {}) => {
-  const customThumbnail = item.thumbnail_image_url || item.thumbnail_url || item.image_url;
+  const customThumbnail = item.poster_url || item.thumbnail_image_url || item.thumbnail_url || item.image_url;
   if (customThumbnail) return customThumbnail;
-  return getYouTubeThumbnail(item.video_url, 'hqdefault') || null;
+  return getYouTubeThumbnail(getWorkVideoUrl(item), 'hqdefault') || null;
+};
+
+const workVideoMediaTypes = new Set(['video_file', 'video_url', 'youtube', 'vimeo']);
+
+const getWorkVideoUrl = (item = {}) => {
+  const mediaType = item.media_type || item.video_type || detectMediaType(item.media_url);
+  return item.video_url || (workVideoMediaTypes.has(mediaType) ? item.media_url : '') || '';
 };
 
 const Works = () => {
@@ -31,6 +38,9 @@ const Works = () => {
   const sections = page?.sections || [];
   const hero = section(sections, 'hero') || {};
   const showreel = section(sections, 'showreel') || {};
+  const videoMediaTypes = new Set(['video_file', 'video_url', 'youtube', 'vimeo']);
+  const showreelVideoUrl = showreel.video_url || showreel.data?.video_url || (videoMediaTypes.has(showreel.media_type) ? showreel.media_url : '') || (videoMediaTypes.has(showreel.data?.media_type) ? showreel.data?.media_url : '') || (videoMediaTypes.has(detectMediaType(showreel.media_url)) ? showreel.media_url : '') || (videoMediaTypes.has(detectMediaType(showreel.data?.media_url)) ? showreel.data?.media_url : '');
+  const showreelPosterUrl = showreel.poster_url || showreel.thumbnail_url || showreel.image_url || showreel.data?.poster_url || showreel.data?.thumbnail_url || showreel.data?.image_url;
   const projectsSection = section(sections, 'projects') || section(sections, 'portfolio_grid') || {};
   const clientTestimonialsSection = section(sections, 'client-testimonials') || section(sections, 'testimonials') || {};
   const ctaSection = section(sections, 'cta') || {};
@@ -75,12 +85,12 @@ const Works = () => {
               )}
             </div>
             <div className="group relative aspect-video overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br from-violet-950 via-slate-950 to-black">
-              {showreel.media_url ? (
+              {showreelVideoUrl ? (
                 <SafeVideoEmbed
-                  videoType={showreel.media_type}
-                  videoUrl={showreel.media_url}
+                  videoType={showreel.media_type || showreel.data?.media_type || detectMediaType(showreelVideoUrl)}
+                  videoUrl={showreelVideoUrl}
                   title={showreel.title}
-                  poster={showreel.poster_url}
+                  posterUrl={showreelPosterUrl}
                   className="h-full w-full rounded-none"
                 />
               ) : (
@@ -153,29 +163,28 @@ const Works = () => {
 
 const ProjectCard = ({ project }) => {
   const thumbnail = getWorkThumbnail(project);
-  const hasVideo = !!project.video_url;
-  const Wrapper = hasVideo ? 'a' : 'div';
-  const wrapperProps = hasVideo ? {
-    href: safePublicHref(project.video_url, '#'),
-    target: '_blank',
-    rel: 'noopener noreferrer',
-  } : {};
+  const videoUrl = getWorkVideoUrl(project);
+  const hasVideo = !!videoUrl;
 
   return (
-    <Wrapper {...wrapperProps} className="group block h-full overflow-hidden rounded-3xl border border-white/10 bg-white/[0.04] transition duration-300 hover:-translate-y-1 hover:border-violet-400/50">
+    <div className="group block h-full overflow-hidden rounded-3xl border border-white/10 bg-white/[0.04] transition duration-300 hover:-translate-y-1 hover:border-violet-400/50">
       <div className="relative aspect-[16/11] overflow-hidden bg-gradient-to-br from-violet-950 via-slate-950 to-black">
-        {thumbnail ? (
+        {hasVideo ? (
+          <SafeVideoEmbed
+            videoType={project.video_type || 'video_url'}
+            videoUrl={videoUrl}
+            title={project.title}
+            posterUrl={thumbnail}
+            className="h-full w-full rounded-none border-0"
+            aspectRatio="aspect-[16/11]"
+          />
+        ) : thumbnail ? (
           <img src={safeImageSrc(thumbnail)} alt={project.title} loading="lazy" className="h-full w-full object-cover opacity-75 transition duration-500 group-hover:scale-105 group-hover:opacity-95" onError={handleImageError} />
         ) : (
           <div className="flex h-full w-full items-center justify-center px-6 text-center text-sm font-semibold uppercase tracking-[0.24em] text-violet-200/70">PranvithDOP</div>
         )}
-        <div className="absolute inset-0 bg-gradient-to-t from-[#070314] via-transparent to-transparent" />
-        <span className="absolute left-4 top-4 rounded-full bg-black/60 px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-violet-200">{project.category || 'Film'}</span>
-        {hasVideo && (
-          <span className="absolute left-1/2 top-1/2 flex h-14 w-14 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-violet-600/90 text-white shadow-[0_0_40px_rgba(139,92,246,0.65)] transition group-hover:scale-110 group-hover:bg-violet-500">
-            <Play size={20} fill="currentColor" className="ml-0.5" />
-          </span>
-        )}
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#070314] via-transparent to-transparent" />
+        <span className="pointer-events-none absolute left-4 top-4 rounded-full bg-black/60 px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-violet-200">{project.category || 'Film'}</span>
       </div>
       <div className="p-6">
         <h3 className="text-xl font-semibold text-white">{project.title}</h3>
@@ -186,7 +195,7 @@ const ProjectCard = ({ project }) => {
           {project.date && <p>Date: {project.date}</p>}
         </div>
       </div>
-    </Wrapper>
+    </div>
   );
 };
 

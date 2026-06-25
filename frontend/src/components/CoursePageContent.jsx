@@ -33,6 +33,9 @@ export const defaultCoursePageContent = {
     button_text: 'Explore Courses',
     button_link: '#courses',
     media_url: fallbackThumbnail,
+    video_url: '',
+    media_type: 'auto',
+    poster_url: '',
   },
   learn_items: whatYoullLearn.map((item, index) => ({
     title: item.tag,
@@ -120,6 +123,11 @@ export const CourseComingSoon = ({ visibility = defaultCourseVisibility }) => {
 const enabledSorted = (items = []) =>
   [...items].filter((item) => item.enabled !== false).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
 
+const getVideoUrl = (item = {}) => item.video_url || item.media_url || '';
+
+const getPosterUrl = (item = {}, fallback = '') =>
+  item.poster_url || item.thumbnail_url || item.thumbnail_image_url || item.image_url || fallback;
+
 const mergeCourseContent = (remote) => ({
   ...defaultCoursePageContent,
   ...(remote || {}),
@@ -190,13 +198,24 @@ const CoursePageContent = ({ children, contentOverride }) => {
             )}
           </div>
           <div className="overflow-hidden rounded-[2rem] border border-white/10 bg-white/[0.04] shadow-2xl shadow-violet-950/30">
-            <img
-              src={safeImageSrc(content.hero.media_url || fallbackThumbnail)}
-              alt="Course preview"
-              className="aspect-[16/10] h-full w-full object-cover"
-              loading="lazy"
-              onError={handleImageError}
-            />
+            {content.hero.video_url ? (
+              <SafeVideoEmbed
+                videoType={content.hero.media_type || 'video_url'}
+                videoUrl={content.hero.video_url}
+                title={content.hero.heading || 'Course preview'}
+                posterUrl={content.hero.poster_url || content.hero.media_url || fallbackThumbnail}
+                className="h-full w-full rounded-none border-0"
+                aspectRatio="aspect-[16/10]"
+              />
+            ) : (
+              <img
+                src={safeImageSrc(content.hero.media_url || fallbackThumbnail)}
+                alt="Course preview"
+                className="aspect-[16/10] h-full w-full object-cover"
+                loading="lazy"
+                onError={handleImageError}
+              />
+            )}
           </div>
         </div>
       </section>
@@ -250,11 +269,11 @@ const CoursePageContent = ({ children, contentOverride }) => {
                 <button
                   key={`${item.student_name}-${index}`}
                   type="button"
-                  onClick={() => item.video_url && setActiveVideo(item)}
+                  onClick={() => getVideoUrl(item) && setActiveVideo(item)}
                   className="group relative h-[440px] w-[280px] shrink-0 snap-start overflow-hidden rounded-[2rem] border border-white/10 bg-white/[0.04] text-left shadow-xl shadow-black/25 transition hover:-translate-y-1 hover:border-violet-300/40"
                 >
                   <img
-                    src={safeImageSrc(item.thumbnail_image_url || getYouTubeThumbnail(item.video_url, 'hqdefault') || studentVideos[index % studentVideos.length]?.thumb || fallbackThumbnail)}
+                    src={safeImageSrc(getPosterUrl(item) || getYouTubeThumbnail(getVideoUrl(item), 'hqdefault') || studentVideos[index % studentVideos.length]?.thumb || fallbackThumbnail)}
                     alt={item.student_name}
                     className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
                     loading="lazy"
@@ -363,11 +382,12 @@ const VideoModal = ({ video, onClose }) => {
         </button>
         <div className="aspect-video w-full bg-black">
           <SafeVideoEmbed
-            videoType={video.video_type}
-            videoUrl={video.video_url}
+            videoType={video.video_type || video.media_type}
+            videoUrl={getVideoUrl(video)}
             title={`${video.student_name} testimonial video`}
-            poster={video.thumbnail_image_url}
+            posterUrl={getPosterUrl(video)}
             className="h-full w-full rounded-none"
+            showPlayOverlay={false}
           />
         </div>
       </div>

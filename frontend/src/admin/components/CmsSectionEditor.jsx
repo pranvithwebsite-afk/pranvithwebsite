@@ -3,7 +3,7 @@ import MediaUrlInput from './MediaUrlInput';
 
 const fieldClass = 'w-full rounded-xl border border-slate-800 bg-slate-900 px-4 py-3 text-white outline-none focus:border-violet-500';
 const sectionTypes = ['hero', 'text', 'image_text', 'video', 'showreel', 'services_cards', 'portfolio_grid', 'product_showcase', 'course_showcase', 'testimonial_videos', 'video_reviews', 'reviews', 'testimonials', 'faq', 'cta', 'contact_form', 'gallery', 'before_after'];
-const mediaTypes = ['auto', 'image', 'video_file', 'youtube', 'vimeo'];
+const mediaTypes = ['auto', 'image', 'video_file', 'video_url', 'youtube', 'vimeo'];
 
 const emptySection = {
   section_id: '',
@@ -27,14 +27,14 @@ const SIMPLE_DEFAULT_SCHEMA = {
 
 const SECTION_EDITOR_SCHEMAS = {
   'home:hero': { sectionFields: ['section_id', 'type', 'title', 'subtitle', 'description', 'button_text', 'button_link', 'media_type', 'media_url', 'video_url', 'poster_url', 'image_url', 'thumbnail_url', 'enabled'] },
-  'home:featured-assets': { sectionFields: ['section_id', 'type', 'title', 'subtitle', 'description', 'button_text', 'button_link', 'enabled'], itemFields: ['title', 'category', 'description', 'thumbnail_image_url', 'video_url', 'sort_order', 'enabled'] },
+  'home:featured-assets': { sectionFields: ['section_id', 'type', 'title', 'subtitle', 'description', 'button_text', 'button_link', 'enabled'], itemFields: ['title', 'category', 'description', 'media_type', 'media_url', 'video_url', 'poster_url', 'thumbnail_image_url', 'image_url', 'sort_order', 'enabled'] },
   'home:instagram-profile': {
     sectionFields: ['section_id', 'type', 'title', 'description', 'button_text', 'button_link', 'media_url', 'enabled'],
     dataFields: ['username', 'display_name', 'followers_count', 'following_count', 'bio_line_1', 'bio_line_2', 'bio_line_3', 'bio_line_4', 'link_text', 'link_url', 'follow_button_url'],
     itemFields: ['title', 'type', 'coverText', 'thumbnail_image_url', 'link_url', 'sort_order', 'enabled'],
   },
   'home:services': { sectionFields: ['section_id', 'type', 'title', 'subtitle', 'enabled'], itemFields: ['title', 'description', 'button_link', 'sort_order', 'enabled'] },
-  'home:showreel': { sectionFields: ['section_id', 'type', 'title', 'subtitle', 'description', 'button_text', 'button_link', 'media_type', 'media_url', 'poster_url', 'enabled'], itemFields: ['title', 'category', 'description', 'thumbnail_image_url', 'video_url', 'sort_order', 'enabled'] },
+  'home:showreel': { sectionFields: ['section_id', 'type', 'title', 'subtitle', 'description', 'button_text', 'button_link', 'media_type', 'media_url', 'video_url', 'poster_url', 'thumbnail_url', 'image_url', 'enabled'], itemFields: ['title', 'category', 'description', 'media_type', 'media_url', 'video_url', 'poster_url', 'thumbnail_image_url', 'thumbnail_url', 'image_url', 'sort_order', 'enabled'] },
   'home:cta': { sectionFields: ['section_id', 'type', 'title', 'description', 'button_text', 'button_link', 'enabled'] },
   'home:faq': { sectionFields: ['section_id', 'type', 'title', 'subtitle', 'description', 'button_text', 'button_link', 'enabled'], itemFields: ['question', 'answer', 'sort_order', 'enabled'] },
 
@@ -45,7 +45,7 @@ const SECTION_EDITOR_SCHEMAS = {
   'courses:course-list': { sectionFields: ['section_id', 'type', 'title', 'subtitle', 'description', 'enabled'], dataFields: ['show_course_list'] },
   'courses:student-videos': {
     sectionFields: ['section_id', 'type', 'title', 'subtitle', 'description', 'enabled'],
-    itemFields: ['title', 'subtitle', 'description', 'image_url', 'video_url', 'sort_order', 'enabled'],
+    itemFields: ['title', 'subtitle', 'description', 'media_type', 'media_url', 'image_url', 'poster_url', 'thumbnail_url', 'video_url', 'sort_order', 'enabled'],
     itemLabels: { title: 'Video Title / Student Name', subtitle: 'Course / Role', description: 'Review Text', image_url: 'Thumbnail Image' },
   },
   'courses:student-reviews': {
@@ -55,7 +55,7 @@ const SECTION_EDITOR_SCHEMAS = {
   },
   'courses:testimonial_videos': {
     sectionFields: ['section_id', 'type', 'title', 'enabled'],
-    itemFields: ['student_name', 'course_name', 'review_text', 'thumbnail_image_url', 'video_url', 'sort_order', 'enabled'],
+    itemFields: ['student_name', 'course_name', 'review_text', 'media_type', 'media_url', 'poster_url', 'thumbnail_image_url', 'thumbnail_url', 'image_url', 'video_url', 'sort_order', 'enabled'],
     itemLabels: { student_name: 'Video Title / Student Name', course_name: 'Course / Role', review_text: 'Review Text', thumbnail_image_url: 'Thumbnail Image' },
   },
   'courses:reviews': {
@@ -73,8 +73,8 @@ const SECTION_EDITOR_SCHEMAS = {
   'assets:hero': { sectionFields: ['section_id', 'type', 'title', 'subtitle', 'description', 'enabled'] },
 
   'works:hero': { sectionFields: ['section_id', 'type', 'title', 'subtitle', 'description', 'enabled'] },
-  'works:showreel': { sectionFields: ['section_id', 'type', 'title', 'subtitle', 'description', 'button_text', 'button_link', 'media_type', 'media_url', 'poster_url', 'enabled'] },
-  'works:projects': { sectionFields: ['section_id', 'type', 'title', 'enabled'], itemFields: ['title', 'category', 'description', 'thumbnail_image_url', 'video_url', 'equipment', 'client', 'date', 'sort_order', 'enabled'] },
+  'works:showreel': { sectionFields: ['section_id', 'type', 'title', 'subtitle', 'description', 'button_text', 'button_link', 'media_type', 'media_url', 'video_url', 'poster_url', 'thumbnail_url', 'image_url', 'enabled'] },
+  'works:projects': { sectionFields: ['section_id', 'type', 'title', 'enabled'], itemFields: ['title', 'category', 'description', 'media_type', 'media_url', 'poster_url', 'thumbnail_image_url', 'thumbnail_url', 'image_url', 'video_url', 'equipment', 'client', 'date', 'sort_order', 'enabled'] },
   'works:client-testimonials': {
     sectionFields: ['section_id', 'type', 'title', 'subtitle', 'description', 'enabled'],
     itemFields: ['title', 'subtitle', 'description', 'rating', 'image_url', 'sort_order', 'enabled'],
@@ -408,6 +408,15 @@ const ItemField = ({ field, labels, value, onChange, mediaItems }) => (
 );
 
 const EditableField = ({ field, value, onChange, mediaItems, label }) => {
+  if (field === 'media_type') {
+    return (
+      <Field label={label}>
+        <select value={value || 'auto'} onChange={(event) => onChange(event.target.value)} className={fieldClass}>
+          {mediaTypes.map((type) => <option key={type} value={type}>{type}</option>)}
+        </select>
+      </Field>
+    );
+  }
   if (booleanFields.has(field)) {
     return (
       <label className="flex items-center gap-3 rounded-xl border border-slate-800 bg-slate-900 px-4 py-3 text-white">

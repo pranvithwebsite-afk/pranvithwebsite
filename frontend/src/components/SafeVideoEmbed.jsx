@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Play } from 'lucide-react';
 
-const YOUTUBE_HOSTS = new Set(['youtube.com', 'www.youtube.com', 'm.youtube.com', 'youtu.be', 'www.youtu.be', 'youtube-nocookie.com', 'www.youtube-nocookie.com']);
+const YOUTUBE_HOSTS = new Set(['youtube.com', 'www.youtube.com', 'm.youtube.com', 'music.youtube.com', 'youtu.be', 'www.youtu.be', 'youtube-nocookie.com', 'www.youtube-nocookie.com']);
 const VIMEO_HOSTS = new Set(['vimeo.com', 'www.vimeo.com', 'player.vimeo.com']);
 const DIRECT_VIDEO_EXT = /\.(mp4|webm|mov)(\?.*)?$/i;
 const IMAGE_EXT = /\.(jpe?g|png|webp|gif)(\?.*)?$/i;
@@ -43,7 +43,7 @@ export const getYouTubeId = (url) => {
     return cleanVideoId(parsed.pathname.split('/').filter(Boolean)[0]);
   }
   const parts = parsed.pathname.split('/').filter(Boolean);
-  if (parts[0] === 'embed' || parts[0] === 'shorts') return cleanVideoId(parts[1]);
+  if (parts[0] === 'embed' || parts[0] === 'shorts' || parts[0] === 'live' || parts[0] === 'v') return cleanVideoId(parts[1]);
   return cleanVideoId(parsed.searchParams.get('v'));
 };
 
@@ -56,6 +56,8 @@ export const getVimeoId = (url) => {
   const id = host === 'player.vimeo.com' && parts[0] === 'video' ? parts[1] : parts[0];
   return /^\d+$/.test(id || '') ? id : '';
 };
+
+export const isYouTubeUrl = (url) => !!getYouTubeId(url);
 
 export const isDirectVideoUrl = (url) => {
   const parsed = parseSafeUrl(url);
@@ -80,7 +82,7 @@ export const getSafeVideoEmbedUrl = (videoType, videoUrl) => {
   const type = String(videoType || '').trim().toLowerCase();
   const url = String(videoUrl || '').trim();
   const youtubeId = (type === 'youtube' || type === 'video_url' || type === 'auto' || !type) ? getYouTubeId(url) : '';
-  if (youtubeId) return `https://www.youtube-nocookie.com/embed/${youtubeId}?rel=0`;
+  if (youtubeId) return `https://www.youtube.com/embed/${youtubeId}?rel=0&modestbranding=1`;
 
   const vimeoId = (type === 'vimeo' || type === 'video_url' || type === 'auto' || !type) ? getVimeoId(url) : '';
   if (vimeoId) return `https://player.vimeo.com/video/${vimeoId}`;
@@ -127,7 +129,9 @@ const SafeVideoEmbed = ({
   videoUrl,
   title = 'Video',
   poster = '',
+  posterUrl = '',
   className = '',
+  aspectRatio = 'aspect-video',
   autoplayOnClick = true,
   showPlayOverlay = true,
 }) => {
@@ -139,17 +143,17 @@ const SafeVideoEmbed = ({
   const embedUrl = getSafeVideoEmbedUrl(type, videoUrl);
   const directVideo = type === 'direct' || type === 'video_file' || isDirectVideoUrl(videoUrl);
   const externalUrl = getSafeExternalUrl(videoUrl);
-  const posterUrl = getSafePosterUrl(poster);
-  const youtubeThumbnail = !posterUrl || posterFailed ? getYouTubeThumbnail(videoUrl, youtubeMaxFailed ? 'hqdefault' : 'maxresdefault') : '';
-  const thumbnailUrl = thumbnailUnavailable ? '' : (posterUrl && !posterFailed ? posterUrl : youtubeThumbnail);
-  const wrapperClass = `group relative aspect-video overflow-hidden rounded-[inherit] border border-violet-500/15 bg-black ${className}`.trim();
+  const safePosterUrl = getSafePosterUrl(posterUrl || poster);
+  const youtubeThumbnail = !safePosterUrl || posterFailed ? getYouTubeThumbnail(videoUrl, youtubeMaxFailed ? 'hqdefault' : 'maxresdefault') : '';
+  const thumbnailUrl = thumbnailUnavailable ? '' : (safePosterUrl && !posterFailed ? safePosterUrl : youtubeThumbnail);
+  const wrapperClass = `group relative ${aspectRatio || 'aspect-video'} overflow-hidden rounded-[inherit] border border-violet-500/15 bg-black ${className}`.trim();
 
   if (activated && directVideo && externalUrl) {
     return (
       <div className={wrapperClass}>
         <video
           src={externalUrl}
-          poster={posterUrl || undefined}
+          poster={safePosterUrl || undefined}
           controls
           autoPlay={autoplayOnClick}
           playsInline
@@ -169,19 +173,9 @@ const SafeVideoEmbed = ({
           className="absolute inset-0 h-full w-full"
           loading="lazy"
           referrerPolicy="strict-origin-when-cross-origin"
-          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+          allow="autoplay; encrypted-media; picture-in-picture"
           allowFullScreen
         />
-        {externalUrl && (
-          <a
-            href={externalUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="absolute bottom-3 right-3 rounded-full border border-white/15 bg-black/70 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-violet-600"
-          >
-            {externalVideoLabel(type, videoUrl)}
-          </a>
-        )}
       </div>
     );
   }
@@ -201,7 +195,7 @@ const SafeVideoEmbed = ({
             className="absolute inset-0 h-full w-full object-cover transition duration-500 group-hover:scale-105"
             loading="lazy"
             onError={() => {
-              if (posterUrl && !posterFailed) setPosterFailed(true);
+              if (safePosterUrl && !posterFailed) setPosterFailed(true);
               else if (youtubeThumbnail && !youtubeMaxFailed) setYoutubeMaxFailed(true);
               else setThumbnailUnavailable(true);
             }}

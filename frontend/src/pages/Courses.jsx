@@ -3,6 +3,7 @@ import Header from '../components/Header';
 import Footer from '../components/Footer';
 import CoursesSection from '../components/Courses';
 import CoursePageContent, { CourseComingSoon, defaultCourseVisibility } from '../components/CoursePageContent';
+import { detectMediaType } from '../components/SafeVideoEmbed';
 import { usePublicPageLoading } from '../components/PublicPageLoader';
 import PageReadyPlaceholder from '../components/PageReadyPlaceholder';
 import { useCmsPage } from '../hooks/useCmsPage';
@@ -38,9 +39,10 @@ const normalizeVideoReview = (item = {}, index) => ({
   student_name: item.student_name || item.title || 'Student',
   course_name: item.course_name || item.subtitle || item.category || '',
   review_text: item.review_text || item.description || '',
-  thumbnail_image_url: item.thumbnail_image_url || item.image_url || '',
-  video_type: item.video_type || 'auto',
-  video_url: item.video_url || '',
+  thumbnail_image_url: item.thumbnail_image_url || item.thumbnail_url || item.poster_url || item.image_url || '',
+  video_type: item.video_type || item.media_type || 'auto',
+  video_url: item.video_url || (['video_file', 'video_url', 'youtube', 'vimeo'].includes(item.media_type) || ['video_file', 'video_url', 'youtube', 'vimeo'].includes(detectMediaType(item.media_url)) ? item.media_url : '') || '',
+  media_url: item.media_url || '',
   enabled: item.enabled !== false,
   sort_order: item.sort_order ?? index,
 });
@@ -87,6 +89,9 @@ const Courses = () => {
       button_text: firstText(hero.button_text, hero.data?.button_text, hero.data?.primary_button_text),
       button_link: firstText(hero.button_link, hero.data?.button_link, hero.data?.primary_button_link),
       media_url: firstText(hero.media_url, hero.data?.media_url, hero.data?.hero_media_url, hero.data?.image_url),
+      video_url: firstText(hero.video_url, hero.data?.video_url, ['video_file', 'video_url', 'youtube', 'vimeo'].includes(hero.media_type) ? hero.media_url : '', ['video_file', 'video_url', 'youtube', 'vimeo'].includes(hero.data?.media_type) ? hero.data?.media_url : '', ['video_file', 'video_url', 'youtube', 'vimeo'].includes(detectMediaType(hero.media_url)) ? hero.media_url : '', ['video_file', 'video_url', 'youtube', 'vimeo'].includes(detectMediaType(hero.data?.media_url)) ? hero.data?.media_url : ''),
+      media_type: firstText(hero.media_type, hero.data?.media_type, hero.data?.hero_media_type),
+      poster_url: firstText(hero.poster_url, hero.thumbnail_url, hero.image_url, hero.data?.poster_url, hero.data?.thumbnail_url, hero.data?.image_url),
     },
     show_right_for_you: !!rightForYou.section_id,
     right_for_you_section: rightForYou.section_id ? rightForYou : null,

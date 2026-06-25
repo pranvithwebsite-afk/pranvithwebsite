@@ -1,16 +1,62 @@
 import React from 'react';
 import { ArrowRight } from 'lucide-react';
-import SafeVideoEmbed from '../SafeVideoEmbed';
+import SafeVideoEmbed, { detectMediaType } from '../SafeVideoEmbed';
 import { handleImageError, safeImageSrc } from '../../lib/utils';
 
 const enabledItems = (items = []) =>
   [...items].filter((item) => item?.enabled !== false).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
 
+const videoMediaTypes = new Set(['video_file', 'video_url', 'youtube', 'vimeo']);
+
+const firstText = (...values) =>
+  values.find((value) => typeof value === 'string' && value.trim()) || '';
+
+const mediaTypeFor = (value = {}) => value.media_type || value.data?.media_type || detectMediaType(value.video_url || value.media_url || value.data?.video_url || value.data?.media_url);
+
+const getVideoUrl = (value = {}) => {
+  const data = value.data || {};
+  const sectionMediaType = mediaTypeFor(value);
+  const dataMediaType = data.media_type || detectMediaType(data.media_url);
+  return firstText(
+    value.video_url,
+    data.video_url,
+    videoMediaTypes.has(sectionMediaType) ? value.media_url : '',
+    videoMediaTypes.has(dataMediaType) ? data.media_url : '',
+    videoMediaTypes.has(detectMediaType(value.media_url)) ? value.media_url : '',
+    videoMediaTypes.has(detectMediaType(data.media_url)) ? data.media_url : ''
+  );
+};
+
+const getPosterUrl = (value = {}) => {
+  const data = value.data || {};
+  return firstText(
+    value.poster_url,
+    value.thumbnail_url,
+    value.thumbnail_image_url,
+    value.image_url,
+    data.poster_url,
+    data.thumbnail_url,
+    data.thumbnail_image_url,
+    data.image_url
+  );
+};
+
 const MediaBlock = ({ section }) => {
-  const url = section.media_url;
+  const data = section.data || {};
+  const videoUrl = getVideoUrl(section);
+  const url = videoUrl || section.media_url || data.media_url;
   if (!url) return null;
-  if (section.media_type === 'video_file' || section.media_type === 'youtube' || section.media_type === 'vimeo') {
-    return <SafeVideoEmbed videoType={section.media_type} videoUrl={url} poster={section.poster_url} title={section.title} className="w-full rounded-2xl" />;
+  const mediaType = section.media_type || data.media_type || detectMediaType(url);
+  if (videoUrl || videoMediaTypes.has(mediaType)) {
+    return (
+      <SafeVideoEmbed
+        videoType={mediaType}
+        videoUrl={url}
+        posterUrl={getPosterUrl(section)}
+        title={section.title}
+        className="w-full rounded-2xl"
+      />
+    );
   }
   return <img src={safeImageSrc(url)} alt={section.title || 'CMS media'} className="aspect-video w-full rounded-2xl object-cover" onError={handleImageError} />;
 };
@@ -44,7 +90,7 @@ const CmsSectionRenderer = ({ section, children }) => {
               </a>
             )}
           </div>
-          {section.media_url && <div className="mx-auto mt-10 max-w-4xl"><MediaBlock section={section} /></div>}
+          {(section.media_url || section.video_url || data.video_url) && <div className="mx-auto mt-10 max-w-4xl"><MediaBlock section={section} /></div>}
         </div>
       </section>
     );
@@ -78,7 +124,15 @@ const CmsSectionRenderer = ({ section, children }) => {
           <div className="grid gap-5 md:grid-cols-3">
             {items.map((item, index) => (
               <article key={`${item.title || item.question || index}`} className="rounded-2xl border border-white/10 bg-white/[0.04] p-6">
-                {(item.thumbnail_url || item.thumbnail_image_url || item.image_url) && (
+                {getVideoUrl(item) ? (
+                  <SafeVideoEmbed
+                    videoType={mediaTypeFor(item)}
+                    videoUrl={getVideoUrl(item)}
+                    posterUrl={getPosterUrl(item)}
+                    title={item.title || item.student_name || 'Video'}
+                    className="mb-5 w-full rounded-xl"
+                  />
+                ) : (item.thumbnail_url || item.thumbnail_image_url || item.image_url) && (
                   <img src={safeImageSrc(item.thumbnail_url || item.thumbnail_image_url || item.image_url)} alt={item.title || 'Item'} className="mb-5 aspect-video w-full rounded-xl object-cover" onError={handleImageError} />
                 )}
                 <h3 className="text-xl font-semibold text-white">{item.title || item.question || item.student_name}</h3>

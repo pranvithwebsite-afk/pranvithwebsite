@@ -7,6 +7,7 @@ import { handleImageError, safeImageSrc, safePublicHref } from '../lib/utils';
 import { usePublicPageLoading } from '../components/PublicPageLoader';
 import PageReadyPlaceholder from '../components/PageReadyPlaceholder';
 import { useCmsPage } from '../hooks/useCmsPage';
+import SafeVideoEmbed, { detectMediaType } from '../components/SafeVideoEmbed';
 
 const statIcons = [Film, Camera, Plane, Clock];
 
@@ -59,6 +60,9 @@ const About = () => {
     : [];
 
   const showHero = hero.section_id || !page;
+  const videoMediaTypes = new Set(['video_file', 'video_url', 'youtube', 'vimeo']);
+  const heroVideoUrl = hero.video_url || hero.data?.video_url || (videoMediaTypes.has(hero.media_type) ? hero.media_url : '') || (videoMediaTypes.has(hero.data?.media_type) ? hero.data?.media_url : '') || (videoMediaTypes.has(detectMediaType(hero.media_url)) ? hero.media_url : '') || (videoMediaTypes.has(detectMediaType(hero.data?.media_url)) ? hero.data?.media_url : '');
+  const heroPosterUrl = hero.poster_url || hero.thumbnail_url || hero.image_url || hero.data?.poster_url || hero.data?.thumbnail_url || hero.data?.image_url;
 
   if (loading) return <PageReadyPlaceholder />;
 
@@ -75,7 +79,16 @@ const About = () => {
               {hero.enabled !== false && (
                 <div className="overflow-hidden rounded-3xl border border-violet-500/20 bg-white/[0.04] p-3 shadow-[0_30px_120px_rgba(124,58,237,0.18)]">
                   <div className="relative flex aspect-[4/5] items-center justify-center overflow-hidden rounded-2xl bg-[radial-gradient(circle_at_30%_20%,rgba(236,72,153,0.35),transparent_35%),linear-gradient(145deg,#1e0a45,#070314)]">
-                    {hero.media_url ? (
+                    {heroVideoUrl ? (
+                      <SafeVideoEmbed
+                        videoType={hero.media_type || hero.data?.media_type || detectMediaType(heroVideoUrl)}
+                        videoUrl={heroVideoUrl}
+                        title={hero.title || 'About video'}
+                        posterUrl={heroPosterUrl}
+                        className="h-full w-full rounded-none border-0"
+                        aspectRatio="aspect-[4/5]"
+                      />
+                    ) : hero.media_url ? (
                       <img
                         src={safeImageSrc(hero.media_url)}
                         alt="PranvithDOP profile"

@@ -1,15 +1,21 @@
 import React, { useMemo } from 'react';
-import { Play } from 'lucide-react';
 import { handleImageError, safeImageSrc, safePublicHref } from '../lib/utils';
-import { getYouTubeThumbnail } from './SafeVideoEmbed';
+import SafeVideoEmbed, { detectMediaType, getYouTubeThumbnail } from './SafeVideoEmbed';
 
 const enabledSorted = (items = []) =>
   [...items].filter((item) => item.enabled !== false).sort((a, b) => Number(a.sort_order || 0) - Number(b.sort_order || 0));
 
 const getWorkThumbnail = (item = {}) => {
-  const customThumbnail = item.thumbnail_image_url || item.thumbnail_url || item.image_url;
+  const customThumbnail = item.poster_url || item.thumbnail_image_url || item.thumbnail_url || item.image_url;
   if (customThumbnail) return customThumbnail;
-  return getYouTubeThumbnail(item.video_url, 'hqdefault') || null;
+  return getYouTubeThumbnail(getWorkVideoUrl(item), 'hqdefault') || null;
+};
+
+const videoMediaTypes = new Set(['video_file', 'video_url', 'youtube', 'vimeo']);
+
+const getWorkVideoUrl = (item = {}) => {
+  const mediaType = item.media_type || item.video_type || detectMediaType(item.media_url);
+  return item.video_url || (videoMediaTypes.has(mediaType) ? item.media_url : '') || '';
 };
 
 const OurWorks = ({ section }) => {
@@ -30,34 +36,36 @@ const OurWorks = ({ section }) => {
         <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
           {visibleProjects.map((project, index) => {
             const thumbnail = getWorkThumbnail(project);
-            const hasVideo = !!project.video_url;
+            const videoUrl = getWorkVideoUrl(project);
+            const hasVideo = !!videoUrl;
             return (
-              <a
+              <article
                 key={`${project.title}-${index}`}
-                href={safePublicHref(project.video_url || project.button_link, '/works')}
-                target={hasVideo ? '_blank' : undefined}
-                rel={hasVideo ? 'noopener noreferrer' : undefined}
                 className="group overflow-hidden rounded-3xl border border-white/10 bg-white/[0.04] transition hover:-translate-y-1 hover:border-violet-400/50"
               >
                 <div className="relative aspect-[16/11] overflow-hidden bg-gradient-to-br from-violet-950 via-slate-950 to-black">
-                  {thumbnail ? (
+                  {hasVideo ? (
+                    <SafeVideoEmbed
+                      videoType={project.video_type || 'video_url'}
+                      videoUrl={videoUrl}
+                      title={project.title}
+                      posterUrl={thumbnail}
+                      className="h-full w-full rounded-none border-0"
+                      aspectRatio="aspect-[16/11]"
+                    />
+                  ) : thumbnail ? (
                     <img src={safeImageSrc(thumbnail)} alt={project.title} loading="lazy" className="h-full w-full object-cover opacity-75 transition duration-500 group-hover:scale-105 group-hover:opacity-95" onError={handleImageError} />
                   ) : (
                     <div className="flex h-full w-full items-center justify-center px-6 text-center text-sm font-semibold uppercase tracking-[0.24em] text-violet-200/70">PranvithDOP</div>
                   )}
-                  <div className="absolute inset-0 bg-gradient-to-t from-[#070314] via-transparent to-transparent" />
-                  <span className="absolute left-4 top-4 rounded-full bg-black/60 px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-violet-200">{project.category}</span>
-                  {hasVideo && (
-                    <span className="absolute left-1/2 top-1/2 flex h-14 w-14 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-violet-600/90 text-white shadow-[0_0_40px_rgba(139,92,246,0.65)] transition group-hover:scale-110 group-hover:bg-violet-500">
-                      <Play size={20} fill="currentColor" className="ml-0.5" />
-                    </span>
-                  )}
+                  <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#070314] via-transparent to-transparent" />
+                  <span className="pointer-events-none absolute left-4 top-4 rounded-full bg-black/60 px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-violet-200">{project.category}</span>
                 </div>
                 <div className="p-5">
                   <h3 className="text-lg font-semibold text-white">{project.title}</h3>
                   <p className="mt-2 line-clamp-2 text-sm leading-relaxed text-white/60">{project.description}</p>
                 </div>
-              </a>
+              </article>
             );
           })}
         </div>

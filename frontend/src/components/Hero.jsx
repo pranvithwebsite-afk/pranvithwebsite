@@ -1,8 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ArrowRight, Play, Sparkles, X } from 'lucide-react';
+import { ArrowRight, Sparkles } from 'lucide-react';
 import { handleImageError, safeImageSrc, safePublicHref } from '../lib/utils';
 import { fetchPublicSettings } from '../lib/api';
-import SafeVideoEmbed, { detectMediaType, getYouTubeThumbnail, isDirectVideoUrl } from './SafeVideoEmbed';
+import SafeVideoEmbed, { detectMediaType, getYouTubeThumbnail } from './SafeVideoEmbed';
 
 const fallbackHero = {
   badge_text: 'Learn premium editing, LUTs, transitions, and storytelling workflows that get results.',
@@ -26,7 +26,6 @@ const compactObject = (value) =>
 
 const Hero = ({ pageData }) => {
   const [settingsHero, setSettingsHero] = useState(null);
-  const [videoOpen, setVideoOpen] = useState(false);
   const hasCmsHero = !!pageData;
 
   useEffect(() => {
@@ -77,26 +76,14 @@ const Hero = ({ pageData }) => {
   const media = useMemo(() => {
     if (hasVideo) {
       return (
-        <button
-          type="button"
-          onClick={() => setVideoOpen(true)}
-          className="group absolute inset-0 block h-full w-full text-left"
-          aria-label="Play Home hero video"
-        >
-          {posterUrl ? (
-            <img
-              src={safeImageSrc(posterUrl, '')}
-              alt="video preview"
-              className="absolute inset-0 h-full w-full object-cover opacity-70 transition duration-500 group-hover:scale-105"
-              onError={handleImageError}
-            />
-          ) : (
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_20%,rgba(124,58,237,0.35),transparent_42%),linear-gradient(135deg,#1a0a3a,#0f0625_48%,#070314)]" />
-          )}
-          <span className="absolute left-1/2 top-1/2 flex h-16 w-16 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-white/20 bg-violet-600 text-white shadow-[0_0_35px_rgba(139,92,246,0.75)] transition group-hover:scale-110 group-hover:bg-violet-500 sm:h-20 sm:w-20">
-            <Play size={28} fill="currentColor" className="ml-1" />
-          </span>
-        </button>
+        <SafeVideoEmbed
+          videoType={mediaType}
+          videoUrl={videoUrl}
+          title={hero.hero_title || 'Home hero video'}
+          posterUrl={posterUrl}
+          className="h-full w-full rounded-none border-0"
+          aspectRatio="h-full"
+        />
       );
     }
     if (!hasMedia) {
@@ -112,7 +99,7 @@ const Hero = ({ pageData }) => {
         onError={handleImageError}
       />
     );
-  }, [hasMedia, hasVideo, imageUrl, posterUrl]);
+  }, [hasMedia, hasVideo, imageUrl, mediaType, posterUrl, videoUrl, hero.hero_title]);
 
   return (
     <section className="relative -mt-[var(--navbar-height)] overflow-hidden pb-12 pt-[calc(var(--navbar-height)+2rem)]">
@@ -168,40 +155,8 @@ const Hero = ({ pageData }) => {
           </div>
         </div>
       </div>
-      {videoOpen && (
-        <VideoModal
-          videoType={mediaType}
-          videoUrl={videoUrl}
-          poster={posterUrl}
-          onClose={() => setVideoOpen(false)}
-        />
-      )}
     </section>
   );
 };
-
-const VideoModal = ({ videoType, videoUrl, poster, onClose }) => (
-  <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/85 px-4 py-8 backdrop-blur-sm" role="dialog" aria-modal="true">
-    <button
-      type="button"
-      onClick={onClose}
-      className="absolute right-4 top-4 inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/15 bg-white/10 text-white transition hover:bg-white/20"
-      aria-label="Close video"
-    >
-      <X size={20} />
-    </button>
-    <div className="w-full max-w-5xl overflow-hidden rounded-3xl border border-white/10 bg-black shadow-2xl">
-      <SafeVideoEmbed
-        videoType={videoType || (isDirectVideoUrl(videoUrl) ? 'video_file' : 'video_url')}
-        videoUrl={videoUrl}
-        title="Home hero video"
-        poster={poster}
-        showPlayOverlay={false}
-        autoplayOnClick
-        className="w-full rounded-none border-0"
-      />
-    </div>
-  </div>
-);
 
 export default Hero;
