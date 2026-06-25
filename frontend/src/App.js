@@ -65,6 +65,7 @@ function App() {
               <Route path="/hire" element={<Hire />} />
               <Route path="/privacy" element={<Privacy />} />
               <Route path="/privacy-policy" element={<Privacy />} />
+              <Route path="/terms" element={<Privacy />} />
               <Route path="/commercial-video-production" element={<ServicePage type="commercial" />} />
               <Route path="/wedding-cinematography" element={<ServicePage type="wedding" />} />
               <Route path="/drone-cinematography" element={<ServicePage type="drone" />} />

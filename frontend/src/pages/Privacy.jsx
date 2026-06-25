@@ -1,6 +1,9 @@
 import React from 'react';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
+import { usePublicPageLoading } from '../components/PublicPageLoader';
+import PageReadyPlaceholder from '../components/PageReadyPlaceholder';
+import { useCmsPage } from '../hooks/useCmsPage';
 
 const termsSections = [
   {
@@ -101,47 +104,70 @@ const LegalSection = ({ section }) => (
   </section>
 );
 
-const Privacy = () => (
-  <main className="page bg-[#070314] text-white">
-    <Header />
-    <section className="px-6 py-16">
-      <div className="mx-auto max-w-5xl">
-        <p className="text-xs font-semibold uppercase tracking-[0.35em] text-violet-300">Legal</p>
-        <h1 className="mt-4 text-4xl font-bold tracking-tight md:text-6xl">Terms & Conditions</h1>
-        <p className="mt-6 max-w-3xl text-sm leading-7 text-white/68">
-          These Terms & Conditions are a legal agreement between you and <strong className="text-white">Pranvith DOP</strong>. By using our website, products, digital assets, courses, services, or any related content, you agree to follow these terms.
-        </p>
-        <p className="mt-3 max-w-3xl text-sm leading-7 text-white/68">
-          Please read these terms carefully. If you do not agree, please do not use our website or services.
-        </p>
-      </div>
-    </section>
+const findLegalSection = (page) =>
+  (page?.sections || []).find((section) => section.section_id === 'legal-sections')
+  || (page?.sections || []).find((section) => section.type === 'text');
 
-    <div id="terms" className="mx-auto max-w-5xl px-6 pb-12">
-      <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-6 md:p-8">
-        {termsSections.map((section) => <LegalSection key={section.title} section={section} />)}
-      </div>
-    </div>
+const cmsItemsOrFallback = (section, fallback) => {
+  const items = section?.data?.items;
+  return Array.isArray(items) && items.length ? items.filter((item) => item.enabled !== false) : fallback;
+};
 
-    <section id="privacy" className="px-6 py-16">
-      <div className="mx-auto max-w-5xl">
-        <p className="text-xs font-semibold uppercase tracking-[0.35em] text-violet-300">Privacy Policy</p>
-        <h2 className="mt-4 text-4xl font-bold tracking-tight md:text-6xl">Privacy Policy - Pranvith DOP</h2>
-        <p className="mt-4 text-sm text-white/55">Last Updated: 23 June 2026</p>
-        <p className="mt-6 max-w-3xl text-sm leading-7 text-white/68">
-          This Privacy Policy explains how Pranvith DOP collects, uses, stores, and protects your information when you use our website, products, digital downloads, courses, and services.
-        </p>
-        <p className="mt-3 max-w-3xl text-sm leading-7 text-white/68">By using our website or services, you agree to this Privacy Policy.</p>
-      </div>
-    </section>
+const Privacy = () => {
+  const { page: privacyPage, loading: privacyLoading } = useCmsPage('privacy');
+  const { page: termsPage, loading: termsLoading } = useCmsPage('terms');
+  const loading = privacyLoading || termsLoading;
+  usePublicPageLoading(loading);
 
-    <div className="mx-auto max-w-5xl px-6 pb-20">
-      <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-6 md:p-8">
-        {privacySections.map((section) => <LegalSection key={section.title} section={section} />)}
+  if (loading) return <PageReadyPlaceholder />;
+
+  const termsSection = findLegalSection(termsPage);
+  const privacySection = findLegalSection(privacyPage);
+  const visibleTermsSections = cmsItemsOrFallback(termsSection, termsSections);
+  const visiblePrivacySections = cmsItemsOrFallback(privacySection, privacySections);
+
+  return (
+    <main className="page bg-[#070314] text-white">
+      <Header />
+      <section className="px-6 py-16">
+        <div className="mx-auto max-w-5xl">
+          <p className="text-xs font-semibold uppercase tracking-[0.35em] text-violet-300">{termsPage?.subtitle || 'Legal'}</p>
+          <h1 className="mt-4 text-4xl font-bold tracking-tight md:text-6xl">{termsPage?.title || 'Terms & Conditions'}</h1>
+          <p className="mt-6 max-w-3xl text-sm leading-7 text-white/68">
+            {termsSection?.description || <>These Terms & Conditions are a legal agreement between you and <strong className="text-white">Pranvith DOP</strong>. By using our website, products, digital assets, courses, services, or any related content, you agree to follow these terms.</>}
+          </p>
+          <p className="mt-3 max-w-3xl text-sm leading-7 text-white/68">
+            {termsSection?.data?.intro_after || 'Please read these terms carefully. If you do not agree, please do not use our website or services.'}
+          </p>
+        </div>
+      </section>
+
+      <div id="terms" className="mx-auto max-w-5xl px-6 pb-12">
+        <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-6 md:p-8">
+          {visibleTermsSections.map((section) => <LegalSection key={section.title} section={section} />)}
+        </div>
       </div>
-    </div>
-    <Footer />
-  </main>
-);
+
+      <section id="privacy" className="px-6 py-16">
+        <div className="mx-auto max-w-5xl">
+          <p className="text-xs font-semibold uppercase tracking-[0.35em] text-violet-300">{privacyPage?.title || 'Privacy Policy'}</p>
+          <h2 className="mt-4 text-4xl font-bold tracking-tight md:text-6xl">{privacyPage?.subtitle || 'Privacy Policy - Pranvith DOP'}</h2>
+          <p className="mt-4 text-sm text-white/55">{privacySection?.subtitle || 'Last Updated: 23 June 2026'}</p>
+          <p className="mt-6 max-w-3xl text-sm leading-7 text-white/68">
+            {privacySection?.description || 'This Privacy Policy explains how Pranvith DOP collects, uses, stores, and protects your information when you use our website, products, digital downloads, courses, and services.'}
+          </p>
+          <p className="mt-3 max-w-3xl text-sm leading-7 text-white/68">{privacySection?.data?.intro_after || 'By using our website or services, you agree to this Privacy Policy.'}</p>
+        </div>
+      </section>
+
+      <div className="mx-auto max-w-5xl px-6 pb-20">
+        <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-6 md:p-8">
+          {visiblePrivacySections.map((section) => <LegalSection key={section.title} section={section} />)}
+        </div>
+      </div>
+      <Footer />
+    </main>
+  );
+};
 
 export default Privacy;

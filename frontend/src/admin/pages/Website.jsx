@@ -10,6 +10,8 @@ const requiredPages = [
   { title: 'Assets', page_key: 'assets', path: '/assets' },
   { title: 'Our Works', page_key: 'works', path: '/works' },
   { title: 'Hire From Us', page_key: 'hire', path: '/hire' },
+  { title: 'Privacy Policy', page_key: 'privacy', path: '/privacy#privacy' },
+  { title: 'Terms & Conditions', page_key: 'terms', path: '/privacy#terms' },
 ];
 
 const mergeRequiredPages = (items = []) => requiredPages.map((required) => {

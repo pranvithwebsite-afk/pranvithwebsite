@@ -851,28 +851,9 @@ async def public_settings():
             "course_page": DEFAULT_COURSE_PAGE,
             "course_visibility": DEFAULT_COURSE_VISIBILITY,
             "page_settings": DEFAULT_PAGE_SETTINGS,
-    "works_page": DEFAULT_WORKS_PAGE,
-    "footer": {
-        "brand_title": "PranvithDOP",
-        "description": "Empowering creators with AI-driven tools and professional video editing resources.\nJoin the future of content creation.",
-        "youtube_link": "#",
-        "instagram_link": "#",
-        "explore_links": [
-            {"name": "Home", "path": "/"},
-            {"name": "Courses", "path": "/courses"},
-            {"name": "Assets", "path": "/assets"},
-            {"name": "Our Works", "path": "/works"},
-            {"name": "Hire From Us", "path": "/hire"},
-            {"name": "Privacy Policy", "path": "/privacy#privacy"},
-        ],
-        "contact_location": "Hyderabad, India",
-        "contact_email": "info@pranvithdop.com",
-        "contact_phone": "+91 9059867883",
-        "newsletter_heading": "Stay Updated",
-        "newsletter_description": "Subscribe to our newsletter for the latest AI tools and editing tips.",
-        "subscribe_button_text": "Subscribe",
-    },
-}
+            "works_page": DEFAULT_WORKS_PAGE,
+            "footer": DEFAULT_FOOTER,
+        }
     return _safe_settings(settings_doc)
 
 
@@ -895,13 +876,17 @@ PUBLIC_SETTINGS_FIELDS = {
     "course_visibility",
     "page_settings",
     "works_page",
+    "footer",
 }
 
 
 def _safe_settings(settings: Optional[dict]) -> dict:
+    source = dict(settings or {})
+    if "footer" not in source:
+        source["footer"] = DEFAULT_FOOTER
     safe = {
         key: value
-        for key, value in (settings or {}).items()
+        for key, value in source.items()
         if key in PUBLIC_SETTINGS_FIELDS
     }
     if "instagram_profile" in safe:
@@ -918,7 +903,59 @@ def _safe_settings(settings: Optional[dict]) -> dict:
         safe["page_settings"] = _safe_page_settings(safe.get("page_settings"))
     if "works_page" in safe:
         safe["works_page"] = _safe_works_page(safe.get("works_page"))
+    if "footer" in safe:
+        safe["footer"] = _safe_footer(safe.get("footer"))
     return safe
+
+
+DEFAULT_FOOTER = {
+    "brand_title": "PranvithDOP",
+    "description": "Empowering creators with AI-driven tools and professional video editing resources.\nJoin the future of content creation.",
+    "youtube_link": "#",
+    "instagram_link": "#",
+    "explore_links": [
+        {"name": "Courses", "path": "/courses"},
+        {"name": "About Us", "path": "/about"},
+        {"name": "Our Works", "path": "/works"},
+        {"name": "Assets", "path": "/assets"},
+        {"name": "Privacy Policy", "path": "/privacy-policy"},
+        {"name": "FAQ", "path": "/#faq"},
+    ],
+    "contact_location": "Hyderabad, India",
+    "contact_email": "info@pranvithdop.com",
+    "contact_phone": "+91 9059867883",
+    "newsletter_heading": "Stay Updated",
+    "newsletter_description": "Subscribe to our newsletter for the latest AI tools and editing tips.",
+    "subscribe_button_text": "Subscribe",
+}
+
+
+def _safe_footer(footer: Optional[dict]) -> dict:
+    source = {**DEFAULT_FOOTER, **(footer or {})}
+    links = []
+    for index, link in enumerate(source.get("explore_links") or []):
+        if not isinstance(link, dict):
+            continue
+        links.append({
+            "name": str(link.get("name") or "").strip()[:80],
+            "path": _reject_unsafe_url(link.get("path") or "") or "",
+            "enabled": bool(link.get("enabled", True)),
+            "sort_order": int(link.get("sort_order", index) or 0),
+        })
+    links.sort(key=lambda item: item.get("sort_order", 0))
+    return {
+        "brand_title": str(source.get("brand_title") or "").strip()[:120],
+        "description": str(source.get("description") or "").strip()[:700],
+        "youtube_link": _reject_unsafe_url(source.get("youtube_link") or "") or "",
+        "instagram_link": _reject_unsafe_url(source.get("instagram_link") or "") or "",
+        "explore_links": links[:40],
+        "contact_location": str(source.get("contact_location") or "").strip()[:180],
+        "contact_email": str(source.get("contact_email") or "").strip()[:180],
+        "contact_phone": str(source.get("contact_phone") or "").strip()[:80],
+        "newsletter_heading": str(source.get("newsletter_heading") or "").strip()[:120],
+        "newsletter_description": str(source.get("newsletter_description") or "").strip()[:500],
+        "subscribe_button_text": str(source.get("subscribe_button_text") or "").strip()[:80],
+    }
 
 
 DEFAULT_HOME_HERO = {
@@ -2835,12 +2872,7 @@ async def admin_settings(current_admin: AdminBase = Depends(get_current_active_a
         logger.exception("Admin settings fetch failed")
         raise HTTPException(status_code=500, detail="Could not load settings")
     if not settings_doc:
-        return {
-            "site_name": "PranvithDOP",
-            "theme": "default",
-            "notifications_enabled": True,
-            "site_description": "A modern CMS foundation for pages, products, orders, customers, media and settings.",
-        }
+        return _safe_settings(SETTINGS)
     return _safe_settings(settings_doc)
 
 
@@ -5301,9 +5333,9 @@ async def _seed_db():
             await db.blog_posts.insert_many([dict(p) for p in BLOG_POSTS])
             logger.info("Seeded %d blog posts", len(BLOG_POSTS))
 
-        # Seed default settings (upsert so brand changes propagate)
-        await db.settings.update_one({}, {"$set": dict(SETTINGS)}, upsert=True)
-        logger.info("Upserted default settings")
+        # Seed default settings once. Admin-managed settings are authoritative after insert.
+        await db.settings.update_one({}, {"$setOnInsert": dict(SETTINGS)}, upsert=True)
+        logger.info("Ensured default settings")
 
         # One-shot brand migration: replace legacy 'PranavithDOP' with 'PranvithDOP'
         # in any user/CMS content that was seeded under the old brand name.

@@ -21,6 +21,22 @@ const initialForm = {
 
 const projectTypes = ['Commercial Ad', 'Wedding Cinematography', 'Drone Shoot', 'Product Shoot', 'Film / Music Video', 'Editing / DI', 'Other'];
 
+const defaultFormContent = {
+  name_label: 'Name',
+  name_placeholder: 'Your name',
+  email_label: 'Email',
+  email_placeholder: 'you@example.com',
+  phone_label: 'Phone',
+  phone_placeholder: '+91 ...',
+  project_type_label: 'Project type',
+  project_type_placeholder: 'Select type',
+  message_label: 'Message',
+  message_placeholder: 'Tell us the story, format, deliverables, references, and timeline...',
+  submit_button_text: 'Send Project Enquiry',
+  success_message: 'Request sent!',
+  validation_message: 'Please enter your name, email, and project message',
+};
+
 const section = (sections, idOrType) =>
   (sections || []).find((item) => item.section_id === idOrType)
   || (sections || []).find((item) => item.type === idOrType);
@@ -42,6 +58,7 @@ const Hire = () => {
   const visibleProjectTypes = Array.isArray(formSection.data?.project_types) && formSection.data.project_types.length
     ? formSection.data.project_types
     : projectTypes;
+  const formContent = { ...defaultFormContent, ...(formSection.data || {}) };
   const showForm = page?.settings?.show_enquiry_form !== false && !!formSection.section_id;
   const showMainSection = hero.section_id || services.section_id || infoCardsSection.section_id || showForm || !page;
 
@@ -54,13 +71,13 @@ const Hire = () => {
   const submit = async (event) => {
     event.preventDefault();
     if (!form.name.trim() || !form.email.trim() || !form.message.trim()) {
-      toast.error('Please enter your name, email, and project message');
+      toast.error(formContent.validation_message || defaultFormContent.validation_message);
       return;
     }
     try {
       setBusy(true);
       const res = await submitHireRequest(form);
-      toast.success(res?.message || 'Request sent!');
+      toast.success(res?.message || formContent.success_message || defaultFormContent.success_message);
       setForm(initialForm);
     } catch (err) {
       const msg = err?.response?.data?.detail || 'Failed to send. Try again.';
@@ -123,13 +140,13 @@ const Hire = () => {
               <p className="mt-2 text-sm text-white/55">{formSection.description || 'A few details are enough. We will follow up with the right next step.'}</p>
 
               <div className="mt-7 grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <FormInput label="Name" value={form.name} onChange={(value) => updateField('name', value)} placeholder="Your name" />
-                <FormInput label="Email" type="email" value={form.email} onChange={(value) => updateField('email', value)} placeholder="you@example.com" />
-                <FormInput label="Phone" value={form.phone} onChange={(value) => updateField('phone', value)} placeholder="+91 ..." />
+                <FormInput label={formContent.name_label} value={form.name} onChange={(value) => updateField('name', value)} placeholder={formContent.name_placeholder} />
+                <FormInput label={formContent.email_label} type="email" value={form.email} onChange={(value) => updateField('email', value)} placeholder={formContent.email_placeholder} />
+                <FormInput label={formContent.phone_label} value={form.phone} onChange={(value) => updateField('phone', value)} placeholder={formContent.phone_placeholder} />
                 <label className="block">
-                  <span className="mb-1.5 block text-xs text-white/65">Project type</span>
+                  <span className="mb-1.5 block text-xs text-white/65">{formContent.project_type_label}</span>
                   <select value={form.project_type} onChange={(event) => updateField('project_type', event.target.value)} className="w-full rounded-xl border border-white/10 bg-[#120824] px-4 py-3 text-sm text-white outline-none transition focus:border-violet-400">
-                    <option value="">Select type</option>
+                    <option value="">{formContent.project_type_placeholder}</option>
                     {visibleProjectTypes.map((type) => <option key={type} value={type}>{type}</option>)}
                   </select>
                 </label>
@@ -137,13 +154,13 @@ const Hire = () => {
                 <FormInput label="Shoot / project date" type="date" value={form.project_date} onChange={(value) => updateField('project_date', value)} />
                 <FormInput label="Location" value={form.location} onChange={(value) => updateField('location', value)} placeholder="City, venue, or destination" className="sm:col-span-2" />
                 <label className="block sm:col-span-2">
-                  <span className="mb-1.5 block text-xs text-white/65">Message</span>
-                  <textarea value={form.message} onChange={(event) => updateField('message', event.target.value)} rows={5} className="w-full resize-none rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white outline-none transition focus:border-violet-400" placeholder="Tell us the story, format, deliverables, references, and timeline..." />
+                  <span className="mb-1.5 block text-xs text-white/65">{formContent.message_label}</span>
+                  <textarea value={form.message} onChange={(event) => updateField('message', event.target.value)} rows={5} className="w-full resize-none rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white outline-none transition focus:border-violet-400" placeholder={formContent.message_placeholder} />
                 </label>
               </div>
 
               <button type="submit" disabled={busy} className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-violet-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-violet-500 disabled:cursor-not-allowed disabled:opacity-60">
-                {busy ? 'Sending...' : formSection.button_text || 'Send Project Enquiry'} <Send size={15} />
+                {busy ? 'Sending...' : formSection.button_text || formContent.submit_button_text} <Send size={15} />
               </button>
             </form>
           )}

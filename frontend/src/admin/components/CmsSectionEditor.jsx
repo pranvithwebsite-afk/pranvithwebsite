@@ -85,7 +85,13 @@ const SECTION_EDITOR_SCHEMAS = {
   'hire:hero': { sectionFields: ['section_id', 'type', 'title', 'subtitle', 'description', 'enabled'] },
   'hire:services': { sectionFields: ['section_id', 'type', 'title', 'enabled'], itemFields: ['title', 'sort_order', 'enabled'], itemLabels: { title: 'Benefit Text' } },
   'hire:info-cards': { sectionFields: ['section_id', 'type', 'title', 'enabled'], itemFields: ['title', 'description', 'sort_order', 'enabled'] },
-  'hire:enquiry-form': { sectionFields: ['section_id', 'type', 'title', 'description', 'button_text', 'enabled'], dataFields: ['project_types'] },
+  'hire:enquiry-form': {
+    sectionFields: ['section_id', 'type', 'title', 'description', 'button_text', 'enabled'],
+    dataFields: ['name_label', 'name_placeholder', 'email_label', 'email_placeholder', 'phone_label', 'phone_placeholder', 'project_type_label', 'project_type_placeholder', 'project_types', 'message_label', 'message_placeholder', 'submit_button_text', 'success_message', 'validation_message'],
+  },
+
+  'privacy:legal-sections': { sectionFields: ['section_id', 'type', 'title', 'subtitle', 'description', 'enabled'], itemFields: ['title', 'paragraphs', 'bullets', 'after', 'sort_order', 'enabled'] },
+  'terms:legal-sections': { sectionFields: ['section_id', 'type', 'title', 'subtitle', 'description', 'enabled'], itemFields: ['title', 'paragraphs', 'bullets', 'after', 'sort_order', 'enabled'] },
 };
 
 const FIELD_LABELS = {
@@ -119,6 +125,22 @@ const FIELD_LABELS = {
   cta_text: 'CTA Text',
   show_course_list: 'Show Course List',
   project_types: 'Project Type Options',
+  name_label: 'Name Label',
+  name_placeholder: 'Name Placeholder',
+  email_label: 'Email Label',
+  email_placeholder: 'Email Placeholder',
+  phone_label: 'Phone Label',
+  phone_placeholder: 'Phone Placeholder',
+  project_type_label: 'Project Type Label',
+  project_type_placeholder: 'Project Type Placeholder',
+  message_label: 'Message Label',
+  message_placeholder: 'Message Placeholder',
+  submit_button_text: 'Submit Button Text',
+  success_message: 'Success Message',
+  validation_message: 'Validation Message',
+  paragraphs: 'Paragraphs',
+  bullets: 'Bullets',
+  after: 'After Paragraphs',
   username: 'Instagram Username',
   display_name: 'Display Name',
   followers_count: 'Followers Count',
@@ -135,7 +157,7 @@ const FIELD_LABELS = {
 
 const mediaFields = new Set(['media_url', 'poster_url', 'thumbnail_image_url', 'image_url']);
 const videoFields = new Set(['video_url']);
-const longTextFields = new Set(['description', 'answer', 'review_text']);
+const longTextFields = new Set(['description', 'answer', 'review_text', 'paragraphs', 'bullets', 'after']);
 const booleanFields = new Set(['enabled', 'show_course_list']);
 const numberFields = new Set(['sort_order', 'rating']);
 
@@ -151,12 +173,19 @@ const normalizeDataValue = (field, value) => {
     if (Array.isArray(value)) return value.join('\n');
     return '';
   }
+  if (['paragraphs', 'bullets', 'after'].includes(field)) {
+    if (Array.isArray(value)) return value.join('\n');
+    return value || '';
+  }
   if (typeof value === 'boolean') return value;
   return value ?? '';
 };
 
 const denormalizeDataValue = (field, value) => {
   if (field === 'project_types') {
+    return String(value || '').split('\n').map((item) => item.trim()).filter(Boolean);
+  }
+  if (['paragraphs', 'bullets', 'after'].includes(field)) {
     return String(value || '').split('\n').map((item) => item.trim()).filter(Boolean);
   }
   return value;
@@ -216,6 +245,7 @@ const CmsSectionEditor = ({ pageKey, section, mediaItems, onSave, saving }) => {
     },
   }));
   const updateItem = (index, field, value) => updateItems(items.map((item, itemIndex) => itemIndex === index ? { ...item, [field]: value } : item));
+  const updateNormalizedItem = (index, field, value) => updateItem(index, field, denormalizeDataValue(field, value));
   const addItem = () => {
     const localId = `cms-item-${localItemCounter.current}`;
     localItemCounter.current += 1;
@@ -309,8 +339,8 @@ const CmsSectionEditor = ({ pageKey, section, mediaItems, onSave, saving }) => {
                         key={field}
                         field={field}
                         labels={schema.itemLabels}
-                        value={field === 'sort_order' ? item.sort_order ?? index : item[field]}
-                        onChange={(value) => updateItem(index, field, value)}
+                        value={field === 'sort_order' ? item.sort_order ?? index : normalizeDataValue(field, item[field])}
+                        onChange={(value) => updateNormalizedItem(index, field, value)}
                         mediaItems={mediaItems}
                       />
                     ))}
@@ -390,8 +420,8 @@ const EditableField = ({ field, value, onChange, mediaItems, label }) => {
   if (longTextFields.has(field) || field === 'project_types') {
     return (
       <Field label={label}>
-        <textarea value={value || ''} onChange={(event) => onChange(event.target.value)} rows={field === 'project_types' ? 7 : 4} className={`${fieldClass} resize-none`} />
-        {field === 'project_types' && <p className="mt-2 text-xs text-slate-500">One option per line.</p>}
+        <textarea value={value || ''} onChange={(event) => onChange(event.target.value)} rows={field === 'project_types' || ['paragraphs', 'bullets', 'after'].includes(field) ? 7 : 4} className={`${fieldClass} resize-none`} />
+        {(field === 'project_types' || ['paragraphs', 'bullets', 'after'].includes(field)) && <p className="mt-2 text-xs text-slate-500">One entry per line.</p>}
       </Field>
     );
   }

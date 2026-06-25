@@ -16,9 +16,49 @@ const defaultSettings = {
   meta_pixel_id: '',
   ga4_id: '',
   gtm_id: '',
+  footer: {
+    brand_title: 'PranvithDOP',
+    description: 'Empowering creators with AI-driven tools and professional video editing resources.\nJoin the future of content creation.',
+    youtube_link: '#',
+    instagram_link: '#',
+    explore_links: [
+      { name: 'Courses', path: '/courses' },
+      { name: 'About Us', path: '/about' },
+      { name: 'Our Works', path: '/works' },
+      { name: 'Assets', path: '/assets' },
+      { name: 'Privacy Policy', path: '/privacy-policy' },
+      { name: 'FAQ', path: '/#faq' },
+    ],
+    contact_location: 'Hyderabad, India',
+    contact_email: 'info@pranvithdop.com',
+    contact_phone: '+91 9059867883',
+    newsletter_heading: 'Stay Updated',
+    newsletter_description: 'Subscribe to our newsletter for the latest AI tools and editing tips.',
+    subscribe_button_text: 'Subscribe',
+  },
 };
 
 const fieldClass = 'w-full rounded-2xl border border-slate-800 bg-slate-900 px-4 py-3 text-white outline-none focus:border-violet-500';
+
+const encodeFooterLinks = (links = []) =>
+  (Array.isArray(links) ? links : [])
+    .map((link) => `${link.name || ''}|${link.path || ''}`)
+    .join('\n');
+
+const decodeFooterLinks = (value) =>
+  String(value || '')
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line, index) => {
+      const [name, ...pathParts] = line.split('|');
+      return {
+        name: (name || '').trim(),
+        path: (pathParts.join('|') || '#').trim(),
+        enabled: true,
+        sort_order: index,
+      };
+    });
 
 const validateSettings = (settings) => {
   const errors = {};
@@ -48,7 +88,7 @@ const Settings = () => {
       .then((data) => {
         const loaded = data || {};
         setRawSettings(loaded);
-        setSettings({ ...defaultSettings, ...loaded });
+        setSettings({ ...defaultSettings, ...loaded, footer: { ...defaultSettings.footer, ...(loaded.footer || {}) } });
         setLoadError('');
       })
       .catch((error) => {
@@ -62,6 +102,16 @@ const Settings = () => {
   const update = (field, value) => {
     setSettings((current) => ({ ...current, [field]: value }));
     setErrors((current) => ({ ...current, [field]: '' }));
+  };
+
+  const updateFooter = (field, value) => {
+    setSettings((current) => ({
+      ...current,
+      footer: {
+        ...(current.footer || defaultSettings.footer),
+        [field]: value,
+      },
+    }));
   };
 
   const handleSave = async (event) => {
@@ -85,11 +135,12 @@ const Settings = () => {
         meta_pixel_id: settings.meta_pixel_id,
         ga4_id: settings.ga4_id,
         gtm_id: settings.gtm_id,
+        footer: settings.footer,
       };
       const result = await saveAdminSettings(payload);
       const saved = result.settings || payload;
       setRawSettings(saved);
-      setSettings({ ...defaultSettings, ...saved });
+      setSettings({ ...defaultSettings, ...saved, footer: { ...defaultSettings.footer, ...(saved.footer || {}) } });
       toast.success('Settings saved successfully');
     } catch (error) {
       console.error('[admin/settings] Failed to save settings', error?.response?.data?.detail || error?.message || error);
@@ -186,6 +237,54 @@ const Settings = () => {
             <input type="checkbox" checked={settings.notifications_enabled} onChange={(event) => update('notifications_enabled', event.target.checked)} className="h-5 w-5 rounded border-slate-700 bg-slate-900 text-violet-500" />
             Enable site notifications for global events
           </label>
+
+          <div className="rounded-3xl border border-slate-800 bg-slate-900/60 p-5">
+            <h2 className="text-xl font-semibold text-white">Footer / Global Content</h2>
+            <p className="mt-2 text-sm text-slate-500">These fields control the public footer across the website.</p>
+            <div className="mt-5 grid gap-6 lg:grid-cols-2">
+              <Field label="Brand title">
+                <input value={settings.footer?.brand_title || ''} onChange={(event) => updateFooter('brand_title', event.target.value)} className={fieldClass} />
+              </Field>
+              <Field label="YouTube link">
+                <input value={settings.footer?.youtube_link || ''} onChange={(event) => updateFooter('youtube_link', event.target.value)} className={fieldClass} />
+              </Field>
+              <Field label="Instagram link">
+                <input value={settings.footer?.instagram_link || ''} onChange={(event) => updateFooter('instagram_link', event.target.value)} className={fieldClass} />
+              </Field>
+              <Field label="Contact location">
+                <input value={settings.footer?.contact_location || ''} onChange={(event) => updateFooter('contact_location', event.target.value)} className={fieldClass} />
+              </Field>
+              <Field label="Contact email">
+                <input value={settings.footer?.contact_email || ''} onChange={(event) => updateFooter('contact_email', event.target.value)} className={fieldClass} />
+              </Field>
+              <Field label="Contact phone">
+                <input value={settings.footer?.contact_phone || ''} onChange={(event) => updateFooter('contact_phone', event.target.value)} className={fieldClass} />
+              </Field>
+              <Field label="Newsletter heading">
+                <input value={settings.footer?.newsletter_heading || ''} onChange={(event) => updateFooter('newsletter_heading', event.target.value)} className={fieldClass} />
+              </Field>
+              <Field label="Subscribe button text">
+                <input value={settings.footer?.subscribe_button_text || ''} onChange={(event) => updateFooter('subscribe_button_text', event.target.value)} className={fieldClass} />
+              </Field>
+            </div>
+            <div className="mt-6 grid gap-6 lg:grid-cols-2">
+              <Field label="Footer description">
+                <textarea value={settings.footer?.description || ''} onChange={(event) => updateFooter('description', event.target.value)} rows={5} className={`${fieldClass} resize-none`} />
+              </Field>
+              <Field label="Newsletter description">
+                <textarea value={settings.footer?.newsletter_description || ''} onChange={(event) => updateFooter('newsletter_description', event.target.value)} rows={5} className={`${fieldClass} resize-none`} />
+              </Field>
+            </div>
+            <Field label="Explore links">
+              <textarea
+                value={encodeFooterLinks(settings.footer?.explore_links)}
+                onChange={(event) => updateFooter('explore_links', decodeFooterLinks(event.target.value))}
+                rows={7}
+                className={`${fieldClass} mt-2 resize-none`}
+              />
+              <p className="mt-2 text-xs text-slate-500">One link per line as Label|/path.</p>
+            </Field>
+          </div>
 
           <div className="flex justify-end">
             <button type="submit" disabled={saving} className="inline-flex items-center gap-2 rounded-2xl bg-violet-600 px-5 py-3 text-sm font-semibold text-white hover:bg-violet-500 disabled:opacity-50">

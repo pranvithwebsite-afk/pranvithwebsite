@@ -38,6 +38,11 @@ const normalizePageSections = (page) => ({
 const isCurrentPageSection = (section, currentPageKey) =>
   !section?.page_key || section.page_key === currentPageKey;
 
+const PAGE_HELPERS = {
+  assets: 'Product cards are managed from Products admin, not CMS sections.',
+  courses: 'Course/product cards are managed from catalog/course admin, not CMS sections.',
+};
+
 const CmsPageEditor = ({ pageKey, title, path, mediaItems, onBack }) => {
   const [page, setPage] = useState(null);
   const [selected, setSelected] = useState(null);
@@ -179,6 +184,9 @@ const CmsPageEditor = ({ pageKey, title, path, mediaItems, onBack }) => {
 
       <div className="rounded-2xl border border-slate-800 bg-slate-950 p-5">
         <h2 className="text-xl font-semibold text-white">Page Settings</h2>
+        {PAGE_HELPERS[pageKey] && (
+          <p className="mt-2 rounded-xl border border-sky-500/20 bg-sky-500/10 px-4 py-3 text-sm text-sky-100">{PAGE_HELPERS[pageKey]}</p>
+        )}
         <div className="mt-5 grid gap-4 lg:grid-cols-2">
           <Field label="Page title"><input value={page.title || ''} onChange={(event) => updatePageField('title', event.target.value)} className={fieldClass} /></Field>
           <Field label="Page subtitle"><input value={page.subtitle || ''} onChange={(event) => updatePageField('subtitle', event.target.value)} className={fieldClass} /></Field>
