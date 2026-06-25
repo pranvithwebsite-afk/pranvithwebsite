@@ -88,6 +88,10 @@ export const getSafeVideoEmbedUrl = (videoType, videoUrl) => {
   return '';
 };
 
+export const extractYouTubeId = getYouTubeId;
+
+export const getYouTubeEmbedUrl = (url) => getSafeVideoEmbedUrl('youtube', url);
+
 export const getYouTubeThumbnail = (url, quality = 'maxresdefault') => {
   const id = getYouTubeId(url);
   return id ? `https://img.youtube.com/vi/${id}/${quality}.jpg` : '';

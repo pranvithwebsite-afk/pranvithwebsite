@@ -26,7 +26,7 @@ const SIMPLE_DEFAULT_SCHEMA = {
 };
 
 const SECTION_EDITOR_SCHEMAS = {
-  'home:hero': { sectionFields: ['section_id', 'type', 'title', 'subtitle', 'description', 'button_text', 'button_link', 'media_type', 'media_url', 'poster_url', 'enabled'] },
+  'home:hero': { sectionFields: ['section_id', 'type', 'title', 'subtitle', 'description', 'button_text', 'button_link', 'media_type', 'media_url', 'video_url', 'poster_url', 'image_url', 'thumbnail_url', 'enabled'] },
   'home:featured-assets': { sectionFields: ['section_id', 'type', 'title', 'subtitle', 'description', 'button_text', 'button_link', 'enabled'], itemFields: ['title', 'category', 'description', 'thumbnail_image_url', 'video_url', 'sort_order', 'enabled'] },
   'home:instagram-profile': {
     sectionFields: ['section_id', 'type', 'title', 'description', 'button_text', 'button_link', 'media_url', 'enabled'],
@@ -39,7 +39,7 @@ const SECTION_EDITOR_SCHEMAS = {
   'home:faq': { sectionFields: ['section_id', 'type', 'title', 'subtitle', 'description', 'button_text', 'button_link', 'enabled'], itemFields: ['question', 'answer', 'sort_order', 'enabled'] },
 
   'courses:coming-soon': { sectionFields: ['section_id', 'type', 'title', 'subtitle', 'button_text', 'button_link', 'enabled'] },
-  'courses:hero': { sectionFields: ['section_id', 'type', 'title', 'subtitle', 'description', 'button_text', 'button_link', 'media_url', 'enabled'] },
+  'courses:hero': { sectionFields: ['section_id', 'type', 'title', 'subtitle', 'description', 'button_text', 'button_link', 'media_type', 'media_url', 'video_url', 'poster_url', 'image_url', 'thumbnail_url', 'enabled'] },
   'courses:right-for-you': { sectionFields: ['section_id', 'type', 'title', 'button_text', 'button_link', 'enabled'], dataFields: ['cta_text'], itemFields: ['title', 'description', 'sort_order', 'enabled'] },
   'courses:what-youll-learn': { sectionFields: ['section_id', 'type', 'title', 'subtitle', 'enabled'], itemFields: ['title', 'description', 'sort_order', 'enabled'] },
   'courses:course-list': { sectionFields: ['section_id', 'type', 'title', 'subtitle', 'description', 'enabled'], dataFields: ['show_course_list'] },
@@ -65,7 +65,7 @@ const SECTION_EDITOR_SCHEMAS = {
   },
   'courses:faq': { sectionFields: ['section_id', 'type', 'title', 'subtitle', 'description', 'enabled'], itemFields: ['question', 'answer', 'sort_order', 'enabled'] },
 
-  'about:hero': { sectionFields: ['section_id', 'type', 'title', 'subtitle', 'description', 'button_text', 'button_link', 'media_url', 'enabled'], dataFields: ['secondary_button_text', 'secondary_button_link'] },
+  'about:hero': { sectionFields: ['section_id', 'type', 'title', 'subtitle', 'description', 'button_text', 'button_link', 'media_type', 'media_url', 'video_url', 'poster_url', 'image_url', 'thumbnail_url', 'enabled'], dataFields: ['secondary_button_text', 'secondary_button_link'] },
   'about:stats': { sectionFields: ['section_id', 'type', 'title', 'enabled'], itemFields: ['title', 'description', 'sort_order', 'enabled'], itemLabels: { title: 'Stat Number', description: 'Stat Label' } },
   'about:creative-positioning': { sectionFields: ['section_id', 'type', 'title', 'description', 'enabled'] },
   'about:gear-workflow': { sectionFields: ['section_id', 'type', 'title', 'enabled'], itemFields: ['title', 'sort_order', 'enabled'], itemLabels: { title: 'Gear Item' } },
@@ -104,14 +104,15 @@ const FIELD_LABELS = {
   button_link: 'Button Link',
   media_type: 'Media Type',
   media_url: 'Image / Video URL',
+  video_url: 'Video URL',
+  image_url: 'Image URL',
+  thumbnail_url: 'Thumbnail URL',
   poster_url: 'Poster / Thumbnail URL',
   enabled: 'Section Enabled',
   question: 'Question',
   answer: 'Answer',
   category: 'Category',
   thumbnail_image_url: 'Thumbnail Image',
-  image_url: 'Image',
-  video_url: 'Video URL',
   link_url: 'Link URL',
   coverText: 'Cover Text',
   sort_order: 'Sort Order',
@@ -155,7 +156,7 @@ const FIELD_LABELS = {
   secondary_button_link: 'Secondary Button Link',
 };
 
-const mediaFields = new Set(['media_url', 'poster_url', 'thumbnail_image_url', 'image_url']);
+const mediaFields = new Set(['media_url', 'poster_url', 'thumbnail_image_url', 'image_url', 'thumbnail_url']);
 const videoFields = new Set(['video_url']);
 const longTextFields = new Set(['description', 'answer', 'review_text', 'paragraphs', 'bullets', 'after']);
 const booleanFields = new Set(['enabled', 'show_course_list']);
@@ -208,7 +209,19 @@ const stripEditorOnlyItemFields = (item = {}) => {
   return rest;
 };
 
-const CmsSectionEditor = ({ pageKey, section, mediaItems, onSave, saving }) => {
+const normalizeForCompare = (value) => {
+  if (Array.isArray(value)) return value.map(normalizeForCompare);
+  if (value && typeof value === 'object') {
+    return Object.keys(value)
+      .sort()
+      .reduce((next, key) => ({ ...next, [key]: normalizeForCompare(value[key]) }), {});
+  }
+  return value ?? '';
+};
+
+const stableSerialize = (value) => JSON.stringify(normalizeForCompare(value || {}));
+
+const CmsSectionEditor = ({ pageKey, section, mediaItems, onSave, saving, onDirtyChange }) => {
   const [draft, setDraft] = useState(section || emptySection);
   const localItemCounter = useRef(0);
   const sectionIdentity = `${pageKey}:${getSectionIdentity(section)}`;
@@ -221,6 +234,11 @@ const CmsSectionEditor = ({ pageKey, section, mediaItems, onSave, saving }) => {
       setDraft(section || emptySection);
     }
   }, [pageKey, section, sectionIdentity]);
+
+  useEffect(() => {
+    if (!onDirtyChange) return;
+    onDirtyChange(stableSerialize(draft) !== stableSerialize(section || emptySection));
+  }, [draft, onDirtyChange, section]);
 
   const schema = useMemo(() => getSchema(pageKey, draft), [pageKey, draft]);
   const data = draft.data && typeof draft.data === 'object' ? draft.data : {};

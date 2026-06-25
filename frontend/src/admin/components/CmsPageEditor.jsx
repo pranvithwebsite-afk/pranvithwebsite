@@ -49,6 +49,7 @@ const CmsPageEditor = ({ pageKey, title, path, mediaItems, onBack }) => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [reordering, setReordering] = useState(false);
+  const [sectionDirty, setSectionDirty] = useState(false);
 
   const currentPageKey = page?.page_key || pageKey;
   const sections = useMemo(
@@ -63,6 +64,7 @@ const CmsPageEditor = ({ pageKey, title, path, mediaItems, onBack }) => {
       const normalizedPage = normalizePageSections(data);
       setPage(normalizedPage);
       setSelected((current) => current ? normalizedPage.sections?.find((section) => section.id === current.id) || null : normalizedPage.sections?.[0] || null);
+      setSectionDirty(false);
     } catch (error) {
       toast.error(error?.response?.data?.detail || 'Could not load CMS page');
     } finally {
@@ -77,6 +79,10 @@ const CmsPageEditor = ({ pageKey, title, path, mediaItems, onBack }) => {
   const updatePageField = (field, value) => setPage((current) => ({ ...current, [field]: value }));
 
   const savePage = async (status) => {
+    if (status === 'published' && sectionDirty) {
+      toast.warning('Save section before publishing.');
+      return;
+    }
     try {
       setSaving(true);
       const data = await updateAdminCmsPage(pageKey, {
@@ -90,6 +96,7 @@ const CmsPageEditor = ({ pageKey, title, path, mediaItems, onBack }) => {
         settings: page.settings || {},
       });
       setPage(normalizePageSections(data));
+      await load();
       toast.success(status === 'published' ? 'Page published' : 'Page saved');
     } catch (error) {
       toast.error(error?.response?.data?.detail || 'Could not save page');
@@ -212,7 +219,7 @@ const CmsPageEditor = ({ pageKey, title, path, mediaItems, onBack }) => {
           </div>
           <SectionOrderList sections={sections} selectedId={selected?.id} onSelect={setSelected} onMove={moveSection} onDelete={deleteSection} onVisibilityChange={setVisibility} disabled={reordering} />
         </div>
-        <CmsSectionEditor pageKey={pageKey} section={selected} mediaItems={mediaItems} saving={saving} onSave={saveSection} />
+        <CmsSectionEditor pageKey={pageKey} section={selected} mediaItems={mediaItems} saving={saving} onSave={saveSection} onDirtyChange={setSectionDirty} />
       </div>
     </section>
   );

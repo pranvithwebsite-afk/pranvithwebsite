@@ -329,6 +329,9 @@ class CmsSectionIn(BaseModel):
     media_type: str = "auto"
     media_url: Optional[str] = None
     poster_url: Optional[str] = None
+    video_url: Optional[str] = None
+    image_url: Optional[str] = None
+    thumbnail_url: Optional[str] = None
     data: Dict[str, Any] = {}
     enabled: bool = True
     sort_order: Optional[int] = None
@@ -359,7 +362,7 @@ class CmsSectionIn(BaseModel):
             raise ValueError("Unsupported media type")
         return cleaned
 
-    @field_validator("button_link", "media_url", "poster_url")
+    @field_validator("button_link", "media_url", "poster_url", "video_url", "image_url", "thumbnail_url")
     @classmethod
     def validate_urls(cls, value):
         return _reject_unsafe_url(value)
@@ -1605,6 +1608,9 @@ def _cms_section_doc(page_key: str, payload: CmsSectionIn, existing: Optional[di
         "media_type": "auto",
         "media_url": "",
         "poster_url": "",
+        "video_url": "",
+        "image_url": "",
+        "thumbnail_url": "",
         "data": {},
         "enabled": True,
         "sort_order": 0,
@@ -1678,6 +1684,9 @@ async def _cms_page_response(page_key: str, public: bool = False) -> dict:
                 "media_type": section.get("media_type", "auto"),
                 "media_url": section.get("media_url", ""),
                 "poster_url": section.get("poster_url", ""),
+                "video_url": section.get("video_url", ""),
+                "image_url": section.get("image_url", ""),
+                "thumbnail_url": section.get("thumbnail_url", ""),
                 "data": section.get("data") or {},
             })
         safe_page["sections"] = public_sections

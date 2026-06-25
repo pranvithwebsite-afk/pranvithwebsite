@@ -1,8 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ArrowRight, Sparkles } from 'lucide-react';
+import { ArrowRight, Play, Sparkles, X } from 'lucide-react';
 import { handleImageError, safeImageSrc, safePublicHref } from '../lib/utils';
 import { fetchPublicSettings } from '../lib/api';
-import SafeVideoEmbed, { detectMediaType, getSafeVideoEmbedUrl, isDirectVideoUrl } from './SafeVideoEmbed';
+import SafeVideoEmbed, { detectMediaType, getYouTubeThumbnail, isDirectVideoUrl } from './SafeVideoEmbed';
 
 const fallbackHero = {
   badge_text: 'Learn premium editing, LUTs, transitions, and storytelling workflows that get results.',
@@ -26,6 +26,7 @@ const compactObject = (value) =>
 
 const Hero = ({ pageData }) => {
   const [settingsHero, setSettingsHero] = useState(null);
+  const [videoOpen, setVideoOpen] = useState(false);
   const hasCmsHero = !!pageData;
 
   useEffect(() => {
@@ -56,28 +57,46 @@ const Hero = ({ pageData }) => {
     secondary_button_text: cleanText(pageData.secondaryButtonText),
     secondary_button_link: cleanText(pageData.secondaryButtonUrl),
     hero_media_type: cleanText(pageData.mediaType),
-    hero_media_url: cleanText(pageData.image),
-    hero_media_poster_url: cleanText(pageData.posterUrl),
+    hero_media_url: cleanText(pageData.videoUrl || pageData.image),
+    hero_media_poster_url: cleanText(pageData.posterUrl || pageData.thumbnailUrl || pageData.imageUrl),
   }) : {};
   const hero = { ...fallbackHero, ...(settingsHero || {}), ...cmsHero };
-  const mediaUrl = hero.hero_media_url || '';
-  const mediaType = hero.hero_media_type === 'auto'
-    ? detectMediaType(mediaUrl)
-    : (hero.hero_media_type || 'auto');
-  const hasMedia = !!mediaUrl && !!mediaType;
-  const directVideo = mediaType === 'video_file' || (mediaType === 'video_url' && isDirectVideoUrl(mediaUrl));
-  const embedUrl = mediaType === 'video_url' && !directVideo ? getSafeVideoEmbedUrl('video_url', mediaUrl) : '';
+  const rawMediaUrl = hero.hero_media_url || '';
+  const explicitMediaType = hero.hero_media_type || 'auto';
+  const detectedMediaType = explicitMediaType === 'auto' ? detectMediaType(rawMediaUrl) : explicitMediaType;
+  const videoMediaTypes = new Set(['video_file', 'video_url', 'youtube', 'vimeo']);
+  const videoUrl = cleanText(pageData?.videoUrl) || (videoMediaTypes.has(detectedMediaType) ? rawMediaUrl : '');
+  const imageUrl = cleanText(pageData?.imageUrl) || (!videoUrl ? rawMediaUrl : '');
+  const posterUrl = hero.hero_media_poster_url || cleanText(pageData?.thumbnailUrl) || cleanText(pageData?.imageUrl) || getYouTubeThumbnail(videoUrl, 'maxresdefault');
+  const mediaType = videoUrl
+    ? (detectedMediaType === 'auto' || detectedMediaType === 'image' ? detectMediaType(videoUrl) : detectedMediaType)
+    : detectedMediaType;
+  const hasVideo = !!videoUrl;
+  const hasMedia = !!(videoUrl || imageUrl || posterUrl);
 
   const media = useMemo(() => {
-    if (embedUrl || directVideo) {
+    if (hasVideo) {
       return (
-        <SafeVideoEmbed
-          videoType={directVideo ? 'video_file' : 'video_url'}
-          videoUrl={mediaUrl}
-          title="Home hero video"
-          poster={hero.hero_media_poster_url}
-          className="absolute inset-0 h-full w-full rounded-none"
-        />
+        <button
+          type="button"
+          onClick={() => setVideoOpen(true)}
+          className="group absolute inset-0 block h-full w-full text-left"
+          aria-label="Play Home hero video"
+        >
+          {posterUrl ? (
+            <img
+              src={safeImageSrc(posterUrl, '')}
+              alt="video preview"
+              className="absolute inset-0 h-full w-full object-cover opacity-70 transition duration-500 group-hover:scale-105"
+              onError={handleImageError}
+            />
+          ) : (
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_20%,rgba(124,58,237,0.35),transparent_42%),linear-gradient(135deg,#1a0a3a,#0f0625_48%,#070314)]" />
+          )}
+          <span className="absolute left-1/2 top-1/2 flex h-16 w-16 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-white/20 bg-violet-600 text-white shadow-[0_0_35px_rgba(139,92,246,0.75)] transition group-hover:scale-110 group-hover:bg-violet-500 sm:h-20 sm:w-20">
+            <Play size={28} fill="currentColor" className="ml-1" />
+          </span>
+        </button>
       );
     }
     if (!hasMedia) {
@@ -87,13 +106,13 @@ const Hero = ({ pageData }) => {
     }
     return (
       <img
-        src={safeImageSrc(mediaUrl, '')}
+        src={safeImageSrc(imageUrl, '')}
         alt="video editor"
         className="absolute inset-0 w-full h-full object-cover opacity-30"
         onError={handleImageError}
       />
     );
-  }, [directVideo, embedUrl, hasMedia, hero.hero_media_poster_url, mediaUrl]);
+  }, [hasMedia, hasVideo, imageUrl, posterUrl]);
 
   return (
     <section className="relative -mt-[var(--navbar-height)] overflow-hidden pb-12 pt-[calc(var(--navbar-height)+2rem)]">
@@ -149,8 +168,40 @@ const Hero = ({ pageData }) => {
           </div>
         </div>
       </div>
+      {videoOpen && (
+        <VideoModal
+          videoType={mediaType}
+          videoUrl={videoUrl}
+          poster={posterUrl}
+          onClose={() => setVideoOpen(false)}
+        />
+      )}
     </section>
   );
 };
+
+const VideoModal = ({ videoType, videoUrl, poster, onClose }) => (
+  <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/85 px-4 py-8 backdrop-blur-sm" role="dialog" aria-modal="true">
+    <button
+      type="button"
+      onClick={onClose}
+      className="absolute right-4 top-4 inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/15 bg-white/10 text-white transition hover:bg-white/20"
+      aria-label="Close video"
+    >
+      <X size={20} />
+    </button>
+    <div className="w-full max-w-5xl overflow-hidden rounded-3xl border border-white/10 bg-black shadow-2xl">
+      <SafeVideoEmbed
+        videoType={videoType || (isDirectVideoUrl(videoUrl) ? 'video_file' : 'video_url')}
+        videoUrl={videoUrl}
+        title="Home hero video"
+        poster={poster}
+        showPlayOverlay={false}
+        autoplayOnClick
+        className="w-full rounded-none border-0"
+      />
+    </div>
+  </div>
+);
 
 export default Hero;

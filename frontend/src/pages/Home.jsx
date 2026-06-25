@@ -36,6 +36,8 @@ const sectionByKey = (sections = []) => (key) =>
 const firstText = (...values) =>
   values.find((value) => typeof value === 'string' && value.trim()) || '';
 
+const videoMediaTypes = new Set(['video_file', 'video_url', 'youtube', 'vimeo']);
+
 const homeOrderFromCms = (sections = []) => {
   const order = sections
     .map((section) => sectionToHomeKey[section.section_id] || sectionToHomeKey[section.type])
@@ -61,9 +63,11 @@ const Home = () => {
     badgeText: firstText(heroSection.subtitle, heroSection.data?.badge_text),
     headline: firstText(heroSection.title, heroSection.data?.title, heroSection.data?.heading, heroSection.data?.hero_title),
     subheadline: firstText(heroSection.description, heroSection.data?.description, heroSection.data?.hero_subtitle),
-    image: firstText(heroSection.media_url, heroSection.image_url, heroSection.video_url, heroSection.data?.media_url, heroSection.data?.hero_media_url, heroSection.data?.image_url, heroSection.data?.video_url),
+    image: firstText(heroSection.image_url, heroSection.data?.image_url, !videoMediaTypes.has(heroSection.media_type) ? heroSection.media_url : '', !videoMediaTypes.has(heroSection.data?.hero_media_type) ? heroSection.data?.hero_media_url : ''),
+    videoUrl: firstText(heroSection.video_url, heroSection.data?.video_url, videoMediaTypes.has(heroSection.media_type) ? heroSection.media_url : '', videoMediaTypes.has(heroSection.data?.media_type) ? heroSection.data?.media_url : '', videoMediaTypes.has(heroSection.data?.hero_media_type) ? heroSection.data?.hero_media_url : ''),
+    thumbnailUrl: firstText(heroSection.thumbnail_url, heroSection.data?.thumbnail_url, heroSection.data?.thumbnail_image_url),
     mediaType: firstText(heroSection.media_type, heroSection.data?.media_type, heroSection.data?.hero_media_type),
-    posterUrl: firstText(heroSection.poster_url, heroSection.data?.poster_url, heroSection.data?.hero_media_poster_url),
+    posterUrl: firstText(heroSection.poster_url, heroSection.image_url, heroSection.thumbnail_url, heroSection.data?.poster_url, heroSection.data?.image_url, heroSection.data?.thumbnail_url, heroSection.data?.hero_media_poster_url),
     buttonText: firstText(heroSection.button_text, heroSection.data?.button_text, heroSection.data?.primary_button_text),
     buttonUrl: firstText(heroSection.button_link, heroSection.data?.button_link, heroSection.data?.primary_button_link),
     secondaryButtonText: firstText(heroSection.data?.secondary_button_text),
