@@ -115,6 +115,7 @@ export const navLinks = [
   { name: 'Home', path: '/' },
   { name: 'Courses', path: '/courses' },
   { name: 'About', path: '/about' },
+  { name: 'Services', path: '/services' },
   { name: 'Assets', path: '/assets' },
   { name: 'Our Works', path: '/works' },
   { name: 'Hire From Us', path: '/hire' },
@@ -262,6 +263,7 @@ export const footerLinks = {
   explore: [
     { name: 'Courses', path: '/courses' },
     { name: 'About Us', path: '/about' },
+    { name: 'Services', path: '/services' },
     { name: 'Our Works', path: '/works' },
     { name: 'Assets', path: '/assets' },
     { name: 'Privacy Policy', path: '/privacy-policy' },

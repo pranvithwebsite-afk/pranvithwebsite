@@ -11,6 +11,8 @@ import Hire from './pages/Hire';
 import Works from './pages/Works';
 import Privacy from './pages/Privacy';
 import ServicePage from './pages/ServicePage';
+import Services from './pages/Services';
+import ServiceDetail from './pages/ServiceDetail';
 import AssetLanding from './pages/AssetLanding';
 import PaymentSuccess from './pages/PaymentSuccess';
 import PaymentFailed from './pages/PaymentFailed';
@@ -22,6 +24,7 @@ import AdminLogin from './admin/pages/Login';
 import AdminDashboard from './admin/pages/Dashboard';
 import Website from './admin/pages/Website';
 import Products from './admin/pages/Products';
+import AdminServices from './admin/pages/Services';
 import Orders from './admin/pages/Orders';
 import Customers from './admin/pages/Customers';
 import Enquiries from './admin/pages/Enquiries';
@@ -43,6 +46,7 @@ function App() {
                   <Route index element={<AdminDashboard />} />
                   <Route path="dashboard" element={<AdminDashboard />} />
                   <Route path="website" element={<Website />} />
+                  <Route path="services" element={<AdminServices />} />
                   <Route path="products" element={<Products />} />
                   <Route path="orders" element={<Orders />} />
                   <Route path="customers" element={<Customers />} />
@@ -59,6 +63,8 @@ function App() {
               <Route path="/about" element={<About />} />
               <Route path="/assets" element={<Assets />} />
               <Route path="/assets/:slug" element={<AssetLanding />} />
+              <Route path="/services" element={<Services />} />
+              <Route path="/services/:slug" element={<ServiceDetail />} />
               <Route path="/payment-success" element={<PaymentSuccess />} />
               <Route path="/payment-failed" element={<PaymentFailed />} />
               <Route path="/works" element={<Works />} />

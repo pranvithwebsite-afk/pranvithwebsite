@@ -161,6 +161,16 @@ export const fetchPageBySlug = async (slug) => {
   return data;
 };
 
+export const fetchServices = async () => {
+  const { data } = await api.get('/services');
+  return data;
+};
+
+export const fetchServiceBySlug = async (slug) => {
+  const { data } = await api.get(`/services/${encodeURIComponent(slug)}`);
+  return data;
+};
+
 export const fetchCmsPage = async (pageKey) => {
   const { data } = await api.get(`/cms/pages/${encodeURIComponent(pageKey)}`);
   return data;
@@ -276,6 +286,36 @@ export const reorderAdminCmsSections = async (pageKey, sections) => {
 
 export const fetchAdminProducts = async () => {
   const { data } = await adminApi.get('/admin/products');
+  return data;
+};
+
+export const fetchAdminServices = async () => {
+  const { data } = await adminApi.get('/admin/services');
+  return data;
+};
+
+export const createAdminService = async (payload) => {
+  const { data } = await adminApi.post('/admin/services', payload);
+  return data;
+};
+
+export const updateAdminService = async (serviceId, payload) => {
+  const { data } = await adminApi.put(`/admin/services/${encodeURIComponent(serviceId)}`, payload);
+  return data;
+};
+
+export const deleteAdminService = async (serviceId) => {
+  const { data } = await adminApi.delete(`/admin/services/${encodeURIComponent(serviceId)}`);
+  return data;
+};
+
+export const publishAdminService = async (serviceId, isPublished) => {
+  const { data } = await adminApi.patch(`/admin/services/${encodeURIComponent(serviceId)}/publish`, { is_published: isPublished });
+  return data;
+};
+
+export const reorderAdminServices = async (serviceIds) => {
+  const { data } = await adminApi.patch('/admin/services/reorder', { service_ids: serviceIds });
   return data;
 };
 

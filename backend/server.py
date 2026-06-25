@@ -44,6 +44,7 @@ from seed_data import (
     BLOG_CATEGORIES,
     BLOG_POSTS,
     SETTINGS,
+    DEFAULT_SERVICES,
 )
 
 ROOT_DIR = Path(__file__).parent
@@ -487,6 +488,77 @@ class ProductIn(BaseModel):
         if value in {None, "", "youtube", "direct"}:
             return value
         raise ValueError("video_type must be youtube, direct, or empty")
+
+
+class ServiceContentItem(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    title: str = ""
+    description: str = ""
+
+
+class ServiceProcessStep(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    step: int = 1
+    title: str = ""
+    description: str = ""
+
+
+class Service(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str
+    title: str
+    slug: str
+    subtitle: Optional[str] = None
+    short_description: Optional[str] = None
+    description: Optional[str] = None
+    banner_url: Optional[str] = None
+    thumbnail_url: Optional[str] = None
+    icon: Optional[str] = None
+    category: Optional[str] = None
+    offers: List[ServiceContentItem] = []
+    why_choose: List[ServiceContentItem] = []
+    process_steps: List[ServiceProcessStep] = []
+    cta_title: Optional[str] = None
+    cta_button_text: Optional[str] = None
+    cta_button_url: Optional[str] = None
+    sort_order: int = 0
+    is_published: bool = True
+    created_at: str
+    updated_at: Optional[str] = None
+
+
+class ServiceIn(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    title: str = Field(min_length=1, max_length=180)
+    slug: Optional[str] = Field(default=None, max_length=180)
+    subtitle: Optional[str] = Field(default="", max_length=300)
+    short_description: Optional[str] = Field(default="", max_length=700)
+    description: Optional[str] = Field(default="", max_length=5000)
+    banner_url: Optional[str] = None
+    thumbnail_url: Optional[str] = None
+    icon: Optional[str] = Field(default="", max_length=80)
+    category: Optional[str] = Field(default="", max_length=120)
+    offers: List[ServiceContentItem] = []
+    why_choose: List[ServiceContentItem] = []
+    process_steps: List[ServiceProcessStep] = []
+    cta_title: Optional[str] = Field(default="", max_length=220)
+    cta_button_text: Optional[str] = Field(default="", max_length=120)
+    cta_button_url: Optional[str] = None
+    sort_order: int = 0
+    is_published: bool = True
+
+    @field_validator("banner_url", "thumbnail_url", "cta_button_url")
+    @classmethod
+    def validate_urls(cls, value):
+        return _reject_unsafe_url(value)
+
+
+class ServicePublishIn(BaseModel):
+    is_published: bool
+
+
+class ServiceReorderIn(BaseModel):
+    service_ids: List[str]
 
 
 class MediaItem(BaseModel):
@@ -1502,6 +1574,10 @@ def product_url_for_slug(slug: str) -> str:
     return f"/assets/{slug}"
 
 
+def service_url_for_slug(slug: str) -> str:
+    return f"/services/{slug}"
+
+
 MEDIA_URL_FIELDS = {
     "download_file",
     "download_file_url",
@@ -1716,6 +1792,77 @@ def _normalize_product_media_fields(doc: dict) -> dict:
     return doc
 
 
+def _normalize_service_items(items: Any) -> List[dict]:
+    safe_items = []
+    for item in (items or [])[:24]:
+        if not isinstance(item, dict):
+            continue
+        title = str(item.get("title") or "").strip()[:180]
+        description = str(item.get("description") or "").strip()[:1000]
+        if title or description:
+            safe_items.append({"title": title, "description": description})
+    return safe_items
+
+
+def _normalize_service_steps(items: Any) -> List[dict]:
+    safe_steps = []
+    for index, item in enumerate((items or [])[:16]):
+        if not isinstance(item, dict):
+            continue
+        try:
+            step = int(item.get("step") or index + 1)
+        except (TypeError, ValueError):
+            step = index + 1
+        title = str(item.get("title") or "").strip()[:180]
+        description = str(item.get("description") or "").strip()[:1000]
+        if title or description:
+            safe_steps.append({"step": max(step, 1), "title": title, "description": description})
+    return safe_steps
+
+
+def _normalize_service_doc(doc: dict, existing: Optional[dict] = None) -> dict:
+    now = datetime.now(timezone.utc).isoformat()
+    safe = dict(doc or {})
+    title = str(safe.get("title") or "").strip()
+    slug = normalize_slug(safe.get("slug") or title)
+    if not title:
+        raise HTTPException(status_code=422, detail="Service title is required")
+    if not slug:
+        raise HTTPException(status_code=422, detail="Service slug is required")
+    for field_name in ("banner_url", "thumbnail_url", "cta_button_url"):
+        safe[field_name] = _reject_unsafe_url(safe.get(field_name) or "")
+    safe["title"] = title[:180]
+    safe["slug"] = slug
+    safe["subtitle"] = str(safe.get("subtitle") or "").strip()[:300]
+    safe["short_description"] = str(safe.get("short_description") or "").strip()[:700]
+    safe["description"] = str(safe.get("description") or "").strip()[:5000]
+    safe["icon"] = str(safe.get("icon") or "").strip()[:80]
+    safe["category"] = str(safe.get("category") or "").strip()[:120]
+    safe["offers"] = _normalize_service_items(safe.get("offers"))
+    safe["why_choose"] = _normalize_service_items(safe.get("why_choose"))
+    safe["process_steps"] = _normalize_service_steps(safe.get("process_steps"))
+    safe["cta_title"] = str(safe.get("cta_title") or "").strip()[:220]
+    safe["cta_button_text"] = str(safe.get("cta_button_text") or "").strip()[:120]
+    try:
+        safe["sort_order"] = int(safe.get("sort_order") or 0)
+    except (TypeError, ValueError):
+        safe["sort_order"] = 0
+    safe["is_published"] = bool(safe.get("is_published", True))
+    if existing:
+        safe["id"] = existing.get("id")
+        safe["created_at"] = existing.get("created_at") or now
+        safe["updated_at"] = now
+    else:
+        safe["id"] = safe.get("id") or str(uuid.uuid4())
+        safe["created_at"] = safe.get("created_at") or now
+        safe["updated_at"] = safe.get("updated_at")
+    return safe
+
+
+def _public_service(service: dict) -> dict:
+    return _normalize_service_doc({k: v for k, v in dict(service).items() if k != "_id"})
+
+
 @api_router.get("/pages")
 async def public_pages():
     if db is None:
@@ -1814,6 +1961,28 @@ async def public_product_by_slug(slug: str):
         if not product:
             raise HTTPException(status_code=404, detail="Product not found")
         return _public_product(product)
+
+
+@api_router.get("/services", response_model=List[Service])
+async def public_services():
+    if db is None:
+        return [_public_service(service) for service in DEFAULT_SERVICES if service.get("is_published", True)]
+    rows = await db.services.find({"is_published": True}, {"_id": 0}).sort("sort_order", 1).to_list(200)
+    return [_public_service(row) for row in rows]
+
+
+@api_router.get("/services/{slug}", response_model=Service)
+async def public_service_by_slug(slug: str):
+    normalized_slug = normalize_slug(slug)
+    if db is None:
+        service = next((item for item in DEFAULT_SERVICES if item.get("slug") == normalized_slug and item.get("is_published", True)), None)
+        if not service:
+            raise HTTPException(status_code=404, detail="Service not found")
+        return _public_service(service)
+    service = await db.services.find_one({"slug": normalized_slug, "is_published": True}, {"_id": 0})
+    if not service:
+        raise HTTPException(status_code=404, detail="Service not found")
+    return _public_service(service)
 
 
 @api_router.get("/blog-posts")
@@ -2396,6 +2565,75 @@ async def admin_reorder_cms_sections(page_key: str, payload: CmsReorderIn, curre
     for index, item_id in enumerate(ordered_ids):
         await db.cms_sections.update_one({"id": item_id, "page_key": page_key}, {"$set": {"sort_order": index + 1, "updated_at": now}})
     return await _cms_page_response(page_key, public=False)
+
+
+@admin_router.get("/services", response_model=List[Service])
+async def admin_services(current_admin: AdminBase = Depends(get_current_active_admin)):
+    rows = await db.services.find({}, {"_id": 0}).sort("sort_order", 1).to_list(300)
+    return [_public_service(row) for row in rows]
+
+
+@admin_router.post("/services")
+async def admin_create_service(payload: ServiceIn, current_admin: AdminBase = Depends(get_current_active_admin)):
+    doc = _normalize_service_doc(payload.model_dump())
+    if not doc.get("sort_order"):
+        last = await db.services.find_one({}, {"_id": 0, "sort_order": 1}, sort=[("sort_order", -1)])
+        doc["sort_order"] = int((last or {}).get("sort_order") or 0) + 1
+    existing = await db.services.find_one({"slug": doc["slug"]})
+    if existing:
+        raise HTTPException(status_code=409, detail="Service slug already exists")
+    try:
+        await db.services.insert_one(doc)
+    except DuplicateKeyError:
+        raise HTTPException(status_code=409, detail="Service slug already exists")
+    return {"success": True, "service": doc}
+
+
+@admin_router.put("/services/{service_id}")
+async def admin_update_service(service_id: str, payload: ServiceIn, current_admin: AdminBase = Depends(get_current_active_admin)):
+    existing_doc = await db.services.find_one({"id": service_id}, {"_id": 0})
+    if not existing_doc:
+        raise HTTPException(status_code=404, detail="Service not found")
+    update_doc = _normalize_service_doc(payload.model_dump(exclude_none=True), existing=existing_doc)
+    duplicate = await db.services.find_one({"slug": update_doc["slug"], "id": {"$ne": service_id}})
+    if duplicate:
+        raise HTTPException(status_code=409, detail="Service slug already exists")
+    await db.services.update_one({"id": service_id}, {"$set": update_doc})
+    return {"success": True, "service": update_doc}
+
+
+@admin_router.delete("/services/{service_id}")
+async def admin_delete_service(service_id: str, current_admin: AdminBase = Depends(get_current_active_admin)):
+    result = await db.services.delete_one({"id": service_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Service not found")
+    return {"success": True}
+
+
+@admin_router.patch("/services/{service_id}/publish")
+async def admin_publish_service(service_id: str, payload: ServicePublishIn, current_admin: AdminBase = Depends(get_current_active_admin)):
+    result = await db.services.update_one(
+        {"id": service_id},
+        {"$set": {"is_published": payload.is_published, "updated_at": datetime.now(timezone.utc).isoformat()}},
+    )
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Service not found")
+    return {"success": True, "is_published": payload.is_published}
+
+
+@admin_router.patch("/services/reorder")
+async def admin_reorder_services(payload: ServiceReorderIn, current_admin: AdminBase = Depends(get_current_active_admin)):
+    existing = await db.services.find({}, {"_id": 0, "id": 1}).to_list(500)
+    existing_ids = {row["id"] for row in existing}
+    ordered_ids = [item_id for item_id in payload.service_ids if item_id in existing_ids]
+    for row in existing:
+        if row["id"] not in ordered_ids:
+            ordered_ids.append(row["id"])
+    now = datetime.now(timezone.utc).isoformat()
+    for index, service_id in enumerate(ordered_ids):
+        await db.services.update_one({"id": service_id}, {"$set": {"sort_order": index + 1, "updated_at": now}})
+    rows = await db.services.find({}, {"_id": 0}).sort("sort_order", 1).to_list(300)
+    return {"success": True, "services": [_public_service(row) for row in rows]}
 
 
 @admin_router.get("/products")
@@ -5332,6 +5570,10 @@ async def _seed_db():
         # after this marker is written, so deleted products stay deleted.
         await initialize_default_products()
 
+        if await db.services.count_documents({}) == 0:
+            await db.services.insert_many([_normalize_service_doc(dict(service)) for service in DEFAULT_SERVICES])
+            logger.info("Seeded %d services", len(DEFAULT_SERVICES))
+
         # Seed blog categories
         if await db.blog_categories.count_documents({}) == 0:
             await db.blog_categories.insert_many([dict(c) for c in BLOG_CATEGORIES])
@@ -5383,6 +5625,11 @@ async def _seed_db():
             pass
         try:
             await db.products.create_index("slug", unique=True)
+        except Exception:
+            pass
+        try:
+            await db.services.create_index("slug", unique=True)
+            await db.services.create_index([("is_published", 1), ("sort_order", 1)])
         except Exception:
             pass
         try:
