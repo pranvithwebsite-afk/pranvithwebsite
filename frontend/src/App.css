@@ -11,7 +11,7 @@
   place-items: center;
   background: #070314;
   opacity: 1;
-  transition: opacity 0.35s ease;
+  transition: opacity 0.18s ease;
 }
 
 .home-loading-screen--leaving {

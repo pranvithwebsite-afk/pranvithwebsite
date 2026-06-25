@@ -22,7 +22,7 @@ const PublicPageLoaderProvider = ({ children }) => {
   const location = useLocation();
   const adminRoute = isAdminPath(location.pathname);
   const [pageLoading, setPageLoadingState] = useState({});
-  const [routeReady, setRouteReady] = useState(false);
+  const [routeArmed, setRouteArmed] = useState(false);
   const [showLoader, setShowLoader] = useState(() => !isAdminPath(window.location.pathname));
   const [loaderLeaving, setLoaderLeaving] = useState(false);
 
@@ -41,34 +41,33 @@ const PublicPageLoaderProvider = ({ children }) => {
     if (adminRoute) {
       setShowLoader(false);
       setLoaderLeaving(false);
-      setRouteReady(true);
+      setRouteArmed(true);
       setPageLoadingState({});
       return undefined;
     }
 
     setShowLoader(true);
     setLoaderLeaving(false);
-    setRouteReady(false);
+    setRouteArmed(false);
 
-    const minimumTimer = window.setTimeout(() => setRouteReady(true), 350);
+    const armTimer = window.setTimeout(() => setRouteArmed(true), 0);
     const fallbackTimer = window.setTimeout(() => {
       setPageLoadingState({});
-      setRouteReady(true);
     }, 4500);
 
     return () => {
-      window.clearTimeout(minimumTimer);
+      window.clearTimeout(armTimer);
       window.clearTimeout(fallbackTimer);
     };
   }, [adminRoute, location.key, location.pathname]);
 
   useEffect(() => {
-    if (adminRoute || !showLoader || !routeReady || Object.keys(pageLoading).length > 0) return undefined;
+    if (adminRoute || !showLoader || !routeArmed || Object.keys(pageLoading).length > 0) return undefined;
 
     setLoaderLeaving(true);
-    const exitTimer = window.setTimeout(() => setShowLoader(false), 360);
+    const exitTimer = window.setTimeout(() => setShowLoader(false), 180);
     return () => window.clearTimeout(exitTimer);
-  }, [adminRoute, pageLoading, routeReady, showLoader]);
+  }, [adminRoute, pageLoading, routeArmed, showLoader]);
 
   const contextValue = useMemo(() => ({ setPageLoading }), [setPageLoading]);
 
