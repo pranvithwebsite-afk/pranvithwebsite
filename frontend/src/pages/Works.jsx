@@ -56,7 +56,7 @@ const Works = () => {
   const showHero = hero.section_id || !page;
 
   return (
-    <main className="page bg-[#070314] text-white">
+    <main className="page bg-[var(--bg-main)] text-white">
       <Header />
       {showHero && (
         <section className="relative overflow-hidden px-6 pb-12 pt-16 text-center">
@@ -181,7 +181,7 @@ const ProjectCard = ({ project }) => {
         ) : (
           <div className="flex h-full w-full items-center justify-center px-6 text-center text-sm font-semibold uppercase tracking-[0.24em] text-violet-200/70">PranvithDOP</div>
         )}
-        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#070314] via-transparent to-transparent" />
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[var(--bg-main)] via-transparent to-transparent" />
         <span className="pointer-events-none absolute left-4 top-4 rounded-full bg-black/60 px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-violet-200">{project.category || 'Film'}</span>
       </div>
       <div className="p-6">

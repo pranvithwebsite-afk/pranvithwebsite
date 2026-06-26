@@ -42,7 +42,7 @@ const ServiceDetail = () => {
 
   if (loading) {
     return (
-      <main className="min-h-screen bg-[#050610] text-white">
+      <main className="min-h-screen bg-[var(--bg-main)] text-white">
         <Header />
         <div className="mx-auto max-w-7xl px-6 pt-32">
           <div className="h-[520px] animate-pulse rounded-2xl border border-white/10 bg-white/[0.045]" />
@@ -56,7 +56,7 @@ const ServiceDetail = () => {
 
   if (error || !service) {
     return (
-      <main className="min-h-screen bg-[#050610] text-white">
+      <main className="min-h-screen bg-[var(--bg-main)] text-white">
         <Header />
         <section className="px-6 py-36 text-center">
           <h1 className="text-4xl font-bold">{error || 'Service not found.'}</h1>
@@ -73,7 +73,7 @@ const ServiceDetail = () => {
   const mediaType = detectMediaType(service.banner_url);
 
   return (
-    <main className="min-h-screen bg-[#050610] text-white">
+    <main className="min-h-screen bg-[var(--bg-main)] text-white">
       <Header />
       <section className="relative overflow-hidden px-6 pb-16 pt-32 md:pt-36">
         <div className="mx-auto grid max-w-6xl gap-8 rounded-3xl border border-violet-500/20 bg-gradient-to-r from-[#1a124a]/70 to-[#0f0830]/60 px-6 py-8 shadow-2xl shadow-violet-950/20 md:px-10 lg:grid-cols-[0.92fr_1.08fr] lg:items-center">

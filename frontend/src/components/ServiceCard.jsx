@@ -1,8 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowUpRight, Camera, Clapperboard, Globe, Heart, Music, Palette, Plane, PlaySquare, Scissors } from 'lucide-react';
-import { FALLBACK_IMAGE, handleImageError, safeImageSrc } from '../lib/utils';
-import OptimizedImage from './OptimizedImage';
 
 export const serviceIcons = {
   Camera,
@@ -18,47 +16,26 @@ export const serviceIcons = {
 
 const ServiceCard = ({ service, index = 0 }) => {
   const Icon = serviceIcons[service?.icon] || Camera;
-  const image = service?.thumbnail_url || service?.banner_url;
+  const linkTarget = `/services/${service.slug}`;
 
   return (
     <Link
-      to={`/services/${service.slug}`}
-      className="group relative flex min-h-[360px] overflow-hidden rounded-2xl border border-white/10 bg-[#090817]/80 shadow-[0_24px_80px_rgba(0,0,0,0.34)] transition duration-300 hover:-translate-y-1 hover:border-cyan-300/35 hover:shadow-[0_28px_90px_rgba(14,165,233,0.16)]"
+      to={linkTarget}
+      className="group rounded-3xl border border-[var(--border-cyan)] bg-[var(--panel-blue)] p-6 backdrop-blur transition duration-300 hover:-translate-y-1 hover:border-[var(--accent-cyan)] hover:bg-cyan-500/10"
       data-testid={`service-card-${service.slug}`}
     >
-      {image ? (
-        <OptimizedImage
-          src={safeImageSrc(image, FALLBACK_IMAGE)}
-          alt={service.title}
-          width={420}
-          height={360}
-          className="absolute inset-0 h-full w-full object-cover opacity-58 transition duration-500 group-hover:scale-105 group-hover:opacity-72"
-          onError={handleImageError}
-        />
-      ) : (
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_15%,rgba(14,165,233,0.30),transparent_34%),radial-gradient(circle_at_82%_78%,rgba(124,58,237,0.26),transparent_38%),linear-gradient(135deg,#050710,#0b1225_56%,#050611)]" />
-      )}
-      <div className="absolute inset-0 bg-gradient-to-t from-black via-black/58 to-black/10" />
-      <div className="relative flex h-full min-h-[360px] w-full flex-col justify-between p-5 sm:p-6">
-        <div className="flex items-center justify-between gap-4">
-          <span className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-cyan-300/20 bg-cyan-300/10 text-cyan-100 backdrop-blur">
-            <Icon size={20} />
-          </span>
-          <span className="rounded-full border border-white/10 bg-black/35 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.24em] text-white/68 backdrop-blur">
-            {service.category || `0${index + 1}`}
-          </span>
-        </div>
-        <div>
-          <h3 className="text-2xl font-bold tracking-tight text-white">{service.title}</h3>
-          <p className="mt-3 line-clamp-3 text-sm leading-6 text-white/70">{service.short_description || service.subtitle}</p>
-          <span className="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-cyan-200">
-            View service
-            <ArrowUpRight size={16} className="transition group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
-          </span>
-        </div>
+      <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-2xl border border-cyan-400/30 bg-cyan-500/15 text-cyan-200">
+        <Icon size={22} />
       </div>
+      <h3 className="text-xl font-semibold text-white">{service.title}</h3>
+      <p className="mt-3 text-sm leading-relaxed text-white/65">{service.short_description || service.subtitle || service.description}</p>
+      <span className="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-cyan-300 transition group-hover:text-white">
+        View service
+        <ArrowUpRight size={16} className="transition group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+      </span>
     </Link>
   );
 };
 
 export default ServiceCard;
+

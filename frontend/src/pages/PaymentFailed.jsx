@@ -12,7 +12,7 @@ const PaymentFailed = () => {
   const retryPath = slug ? `/assets/${slug}` : '/assets';
 
   return (
-    <main className="page min-h-screen bg-[#070314] text-white">
+    <main className="page min-h-screen bg-[var(--bg-main)] text-white">
       <Header />
       <section className="pt-8 pb-24">
         <div className="mx-auto max-w-3xl px-6">

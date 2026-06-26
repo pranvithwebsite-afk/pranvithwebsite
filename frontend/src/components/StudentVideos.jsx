@@ -23,8 +23,8 @@ const StudentVideos = () => {
 
       <div className="relative">
         {/* gradient masks */}
-        <div className="absolute left-0 top-0 bottom-0 w-32 z-10 bg-gradient-to-r from-[#070314] to-transparent pointer-events-none" />
-        <div className="absolute right-0 top-0 bottom-0 w-32 z-10 bg-gradient-to-l from-[#070314] to-transparent pointer-events-none" />
+        <div className="absolute left-0 top-0 bottom-0 w-32 z-10 bg-gradient-to-r from-[var(--bg-main)] to-transparent pointer-events-none" />
+        <div className="absolute right-0 top-0 bottom-0 w-32 z-10 bg-gradient-to-l from-[var(--bg-main)] to-transparent pointer-events-none" />
 
         <div className="flex gap-5 animate-marquee w-max">
           {items.map((s, idx) => (
@@ -44,7 +44,7 @@ const StudentVideos = () => {
               ) : (
                 <img src={safeImageSrc(s.thumb)} alt={s.name} className="absolute inset-0 w-full h-full object-cover opacity-70 group-hover:opacity-100 transition" onError={handleImageError} />
               )}
-              <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#070314] via-[#070314]/40 to-transparent" />
+              <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[var(--bg-main)] via-[var(--bg-main)]/40 to-transparent" />
               <p className="pointer-events-none absolute bottom-4 left-4 text-sm font-medium text-white/90">{s.name}</p>
             </div>
           ))}

@@ -71,7 +71,7 @@ const Courses = ({ section }) => {
                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                   onError={handleImageError}
                 />
-                <div className="absolute inset-0 bg-gradient-to-t from-[#070314] via-[#070314]/30 to-transparent" />
+                <div className="absolute inset-0 bg-gradient-to-t from-[var(--bg-main)] via-[var(--bg-main)]/30 to-transparent" />
                 <div className="absolute top-3 right-3 px-3 py-1 rounded-full bg-violet-600 text-white text-[11px] font-bold tracking-wider">
                   {c.discount}
                 </div>

@@ -85,7 +85,7 @@ const Hire = () => {
   };
 
   return (
-    <main className="page bg-[#070314] text-white">
+    <main className="page bg-[var(--bg-main)] text-white">
       <Header />
       {showMainSection && <section className="relative overflow-hidden px-6 pb-24 pt-12">
         <div className="absolute left-1/2 top-0 h-96 w-96 -translate-x-1/2 rounded-full bg-violet-600/20 blur-3xl" />
@@ -131,7 +131,7 @@ const Hire = () => {
           {showForm && (
             <form
               onSubmit={submit}
-              className="rounded-3xl border border-violet-500/20 bg-gradient-to-br from-[#13092f]/90 via-[#0b061b]/95 to-[#070314]/95 p-6 shadow-2xl shadow-violet-950/30 backdrop-blur md:p-8"
+              className="rounded-3xl border border-violet-500/20 bg-gradient-to-br from-[#13092f]/90 via-[#0b061b]/95 to-[var(--bg-main)]/95 p-6 shadow-2xl shadow-violet-950/30 backdrop-blur md:p-8"
             >
               <h2 className="text-2xl font-semibold text-white">{formSection.title || 'Start a project enquiry'}</h2>
               <p className="mt-2 text-sm text-white/55">{formSection.description || 'A few details are enough. We will follow up with the right next step.'}</p>

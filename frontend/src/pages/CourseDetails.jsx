@@ -49,7 +49,7 @@ const CourseDetails = () => {
 
   if (shouldShowCourseComingSoon(visibility)) {
     return (
-      <main className="page min-h-screen bg-[#070314] text-white">
+      <main className="page min-h-screen bg-[var(--bg-main)] text-white">
         <Header />
         <CourseComingSoon visibility={visibility} />
         <Footer />
@@ -58,7 +58,7 @@ const CourseDetails = () => {
   }
 
   return (
-    <main className="page min-h-screen bg-[#070314] text-white">
+    <main className="page min-h-screen bg-[var(--bg-main)] text-white">
       <Header />
       <section className="mx-auto grid max-w-7xl gap-10 px-6 pb-24 pt-8 lg:grid-cols-2 lg:items-center">
         <div className="overflow-hidden rounded-3xl border border-violet-500/20">

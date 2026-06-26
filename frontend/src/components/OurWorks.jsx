@@ -23,7 +23,7 @@ const OurWorks = ({ section }) => {
   if (!section) return null;
 
   return (
-    <section className="relative overflow-hidden bg-gradient-to-b from-[#070314] via-[#0a0420] to-[#070314] px-6 py-24">
+    <section className="relative overflow-hidden bg-gradient-to-b from-[var(--bg-main)] via-[#0a0420] to-[var(--bg-main)] px-6 py-24">
       <div className="relative mx-auto max-w-7xl">
         <div className="mb-12 text-center">
           <p className="text-xs font-semibold uppercase tracking-[0.35em] text-violet-300">Our Works</p>
@@ -58,7 +58,7 @@ const OurWorks = ({ section }) => {
                   ) : (
                     <div className="flex h-full w-full items-center justify-center px-6 text-center text-sm font-semibold uppercase tracking-[0.24em] text-violet-200/70">PranvithDOP</div>
                   )}
-                  <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#070314] via-transparent to-transparent" />
+                  <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[var(--bg-main)] via-transparent to-transparent" />
                   <span className="pointer-events-none absolute left-4 top-4 rounded-full bg-black/60 px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-violet-200">{project.category}</span>
                 </div>
                 <div className="p-5">

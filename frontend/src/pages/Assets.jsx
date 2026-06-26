@@ -118,7 +118,7 @@ const Assets = () => {
   const heroSection = findSection(cmsPage?.sections || [], 'hero');
 
   return (
-    <main className="page bg-[#070314] text-white min-h-screen">
+    <main className="page bg-[var(--bg-main)] text-white min-h-screen">
       <Header />
 
       {!pageHidden && heroSection?.section_id && (

@@ -27,8 +27,8 @@ const Header = () => {
       <nav
         className={`flex w-full max-w-[1160px] items-center justify-between gap-3 rounded-full border border-white/10 px-3 py-2 ring-1 ring-violet-500/10 backdrop-blur-xl transition-all duration-300 md:gap-8 md:px-5 ${
           scrolled
-            ? 'bg-[#080511]/82 shadow-[0_24px_90px_-34px_rgba(124,58,237,0.45)]'
-            : 'bg-[#080511]/68 shadow-[0_22px_80px_-36px_rgba(124,58,237,0.38)]'
+            ? 'bg-[var(--panel-dark)]/82 shadow-[0_24px_90px_-34px_rgba(124,58,237,0.45)]'
+            : 'bg-[var(--panel-dark)]/68 shadow-[0_22px_80px_-36px_rgba(124,58,237,0.38)]'
         }`}
       >
         <Link to="/" onClick={refreshHomeIfActive} className="flex items-center gap-2 shrink-0" data-testid="header-brand">
@@ -75,7 +75,7 @@ const Header = () => {
       </nav>
 
       {open && (
-        <div className="absolute left-4 right-4 top-[4.75rem] rounded-3xl border border-white/10 bg-[#090612]/90 p-3 shadow-[0_22px_70px_rgba(124,58,237,0.28)] ring-1 ring-violet-500/10 backdrop-blur-xl md:hidden">
+        <div className="absolute left-4 right-4 top-[4.75rem] rounded-3xl border border-white/10 bg-[var(--panel-dark)]/90 p-3 shadow-[0_22px_70px_rgba(124,58,237,0.28)] ring-1 ring-violet-500/10 backdrop-blur-xl md:hidden">
           <ul className="flex flex-col gap-1">
             {navLinks.map((l) => {
               const active = location.pathname === l.path;

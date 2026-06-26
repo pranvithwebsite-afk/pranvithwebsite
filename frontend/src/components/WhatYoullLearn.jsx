@@ -13,7 +13,7 @@ const WhatYoullLearn = () => {
           {whatYoullLearn.map((item, idx) => (
             <div
               key={item.tag}
-              className="relative rounded-3xl border border-violet-500/15 bg-gradient-to-br from-[#100830]/60 to-[#070314]/30 p-1 overflow-hidden"
+              className="relative rounded-3xl border border-violet-500/15 bg-gradient-to-br from-[#100830]/60 to-[var(--bg-main)]/30 p-1 overflow-hidden"
             >
               <div className="grid grid-cols-1 md:grid-cols-2 gap-0">
                 {/* Visual */}

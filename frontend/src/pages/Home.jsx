@@ -54,7 +54,7 @@ const Home = () => {
   const ctaSection = findSection('cta');
   const worksSection = findSection('featured-assets') || findSection('portfolio_grid');
   const instagramSection = findSection('instagram-profile') || findSection('instagram') || findSection('gallery');
-  const servicesSection = findSection('services') || findSection('services_cards');
+  const servicesSection = findSection('services') || findSection('services_cards') || findSection('home_services');
   const showreelSection = findSection('showreel');
   const faqSection = findSection('faq');
   const order = homeOrderFromCms(cmsSections);
@@ -75,7 +75,7 @@ const Home = () => {
   } : null;
 
   return (
-    <main className="page relative overflow-hidden bg-[#070314] text-white">
+    <main className="page relative overflow-hidden bg-[var(--bg-main)] text-white">
       <Header />
       {order.map((sectionKey) => {
         const sections = {
@@ -112,15 +112,15 @@ const Home = () => {
 
 const HomeCta = ({ section }) => (
   <section className="relative overflow-hidden px-6 py-20">
-    <div className="mx-auto max-w-6xl rounded-3xl border border-violet-500/20 bg-gradient-to-r from-[#1a124a]/70 to-[#0f0830]/60 px-6 py-8 shadow-2xl shadow-violet-950/20 md:px-10">
+    <div className="mx-auto max-w-6xl rounded-3xl border border-[var(--border-soft)] bg-[var(--panel-purple)] px-6 py-8 shadow-2xl shadow-black/20 md:px-10">
       <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.3em] text-violet-300">PranvithDOP</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.3em] text-[var(--accent-purple)]">{section?.data?.eyebrow || 'PranvithDOP'}</p>
           <h2 className="mt-3 text-2xl font-bold text-white md:text-4xl">{section?.title || 'Ready to create cinematic visuals?'}</h2>
           <p className="mt-2 max-w-2xl text-sm text-white/65">{section?.description || 'Explore assets, courses, showreels, and production services built for serious creators.'}</p>
         </div>
         {(section?.button_text || section?.button_link) && (
-          <a href={safePublicHref(section?.button_link, '/hire')} className="group inline-flex shrink-0 items-center gap-3 rounded-full bg-violet-600 px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-violet-500">
+          <a href={safePublicHref(section?.button_link, '/hire')} className="group inline-flex shrink-0 items-center gap-3 rounded-full bg-[var(--accent-purple)] px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-violet-500">
             {section?.button_text || 'Book a Project'}
             <span className="flex h-5 w-5 items-center justify-center rounded-full bg-white/20 transition-transform group-hover:translate-x-0.5">
               <ArrowRight size={11} />

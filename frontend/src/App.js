@@ -35,7 +35,7 @@ const Settings = lazy(() => import('./admin/pages/Settings'));
 const AdminUsers = lazy(() => import('./admin/pages/AdminUsers'));
 
 const RouteFallback = () => (
-  <main className="min-h-screen bg-[#070314] text-white">
+  <main className="min-h-screen bg-[var(--bg-main)] text-white">
     <div className="mx-auto max-w-7xl px-6 pt-28">
       <div className="h-10 w-52 animate-pulse rounded-full bg-white/8" />
       <div className="mt-8 h-72 animate-pulse rounded-3xl border border-white/10 bg-white/[0.04]" />
@@ -45,7 +45,7 @@ const RouteFallback = () => (
 
 function App() {
   return (
-    <div className="App bg-[#070314] min-h-screen text-white">
+    <div className="App bg-[var(--bg-main)] min-h-screen text-white">
       <BrowserRouter>
         <AdminAuthProvider>
           <PublicPageLoaderProvider>

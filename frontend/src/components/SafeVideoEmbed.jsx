@@ -227,7 +227,7 @@ const SafeVideoEmbed = ({
             }}
           />
         ) : (
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_35%,rgba(124,58,237,0.35),transparent_38%),linear-gradient(135deg,#1a0a3a,#0f0625_52%,#070314)]" />
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_35%,rgba(124,58,237,0.35),transparent_38%),linear-gradient(135deg,#1a0a3a,#0f0625_52%,var(--bg-main))]" />
         )}
         <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/75 via-black/20 to-transparent" />
         <span className="absolute left-1/2 top-1/2 flex h-16 w-16 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-white/20 bg-violet-600 text-white shadow-[0_0_35px_rgba(139,92,246,0.75)] transition group-hover:scale-110 group-hover:bg-violet-500 sm:h-20 sm:w-20">

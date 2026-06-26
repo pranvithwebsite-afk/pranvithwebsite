@@ -89,7 +89,7 @@ const Hero = ({ pageData }) => {
     }
     if (!hasMedia) {
       return (
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_20%,rgba(124,58,237,0.35),transparent_42%),linear-gradient(135deg,#1a0a3a,#0f0625_48%,#070314)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_20%,rgba(124,58,237,0.35),transparent_42%),linear-gradient(135deg,#1a0a3a,#0f0625_48%,var(--bg-main))]" />
       );
     }
     return (

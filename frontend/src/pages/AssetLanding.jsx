@@ -45,7 +45,7 @@ const AssetLanding = () => {
 
   if (loading) {
     return (
-      <main className="page min-h-screen bg-[#070314] text-white">
+      <main className="page min-h-screen bg-[var(--bg-main)] text-white">
         <Header />
         <section className="px-6 pb-16 pt-8">
           <div className="mx-auto max-w-7xl rounded-[2rem] border border-white/10 bg-white/[0.04] p-8 lg:p-12">
@@ -66,7 +66,7 @@ const AssetLanding = () => {
 
   if (notFound || !product) {
     return (
-      <main className="page bg-[#070314] text-white min-h-screen">
+      <main className="page bg-[var(--bg-main)] text-white min-h-screen">
         <Header />
         <div className="pt-16 pb-24 max-w-3xl mx-auto px-6 text-center">
           <h1 className="text-3xl font-bold">Asset not found</h1>
@@ -101,7 +101,7 @@ const AssetLanding = () => {
   const marketTable = landing.market_table || [];
 
   return (
-    <main className="page bg-[#070314] text-white min-h-screen">
+    <main className="page bg-[var(--bg-main)] text-white min-h-screen">
       <Header />
 
       {/* Hero */}

@@ -32,8 +32,8 @@ const Testimonials = () => {
       <div className="space-y-5">
         {/* Row 1 */}
         <div className="relative">
-          <div className="absolute left-0 top-0 bottom-0 w-24 z-10 bg-gradient-to-r from-[#070314] to-transparent pointer-events-none" />
-          <div className="absolute right-0 top-0 bottom-0 w-24 z-10 bg-gradient-to-l from-[#070314] to-transparent pointer-events-none" />
+          <div className="absolute left-0 top-0 bottom-0 w-24 z-10 bg-gradient-to-r from-[var(--bg-main)] to-transparent pointer-events-none" />
+          <div className="absolute right-0 top-0 bottom-0 w-24 z-10 bg-gradient-to-l from-[var(--bg-main)] to-transparent pointer-events-none" />
           <div className="flex gap-5 animate-marquee w-max">
             {all1.map((t, idx) => (
               <TestimonialCard key={`r1-${t.id || t.name || ''}-${idx}`} t={t} />
@@ -42,8 +42,8 @@ const Testimonials = () => {
         </div>
         {/* Row 2 - reverse direction visually using different speed */}
         <div className="relative">
-          <div className="absolute left-0 top-0 bottom-0 w-24 z-10 bg-gradient-to-r from-[#070314] to-transparent pointer-events-none" />
-          <div className="absolute right-0 top-0 bottom-0 w-24 z-10 bg-gradient-to-l from-[#070314] to-transparent pointer-events-none" />
+          <div className="absolute left-0 top-0 bottom-0 w-24 z-10 bg-gradient-to-r from-[var(--bg-main)] to-transparent pointer-events-none" />
+          <div className="absolute right-0 top-0 bottom-0 w-24 z-10 bg-gradient-to-l from-[var(--bg-main)] to-transparent pointer-events-none" />
           <div className="flex gap-5 animate-marquee-slow w-max" style={{ animationDirection: 'reverse' }}>
             {all2.map((t, idx) => (
               <TestimonialCard key={`r2-${t.id || t.name || ''}-${idx}`} t={t} />
@@ -56,7 +56,7 @@ const Testimonials = () => {
 };
 
 const TestimonialCard = ({ t }) => (
-  <div className="w-[340px] shrink-0 p-6 rounded-2xl border border-violet-500/15 bg-gradient-to-br from-[#100830]/60 to-[#070314]/60 hover:border-violet-500/40 transition">
+  <div className="w-[340px] shrink-0 p-6 rounded-2xl border border-violet-500/15 bg-gradient-to-br from-[#100830]/60 to-[var(--bg-main)]/60 hover:border-violet-500/40 transition">
     <div className="flex gap-0.5 mb-4">
       {Array.from({ length: t.rating }).map((_, i) => (
         <Star key={`${t.id || t.name}-star-${i}`} size={16} className="text-amber-400 fill-amber-400" />

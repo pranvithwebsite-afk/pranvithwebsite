@@ -335,14 +335,17 @@ CMS_SECTIONS = [
             {"title": "Drone shot preview", "type": "Video", "coverText": "DRONE", "enabled": True, "sort_order": 2},
         ],
     }, sort_order=2),
-    _cms_section("home", "services", "services_cards", "Services", "Cinematic production and post-production support.", data={"items": [
-        {"title": "Film Production", "description": "Narrative, branded, and creator-led films designed around story, light, and pacing.", "button_link": "/commercial-video-production", "enabled": True},
-        {"title": "Wedding Cinematography", "description": "Emotional wedding films with cinematic framing, audio, drone visuals, and premium edits.", "button_link": "/wedding-cinematography", "enabled": True},
-        {"title": "Commercial Ads", "description": "Campaign-ready ads for products, creators, local businesses, and digital launches.", "button_link": "/commercial-video-production", "enabled": True},
-        {"title": "Drone Cinematography", "description": "Licensed aerial visuals for locations, events, real estate, and cinematic sequences.", "button_link": "/drone-cinematography", "enabled": True},
-        {"title": "Video Editing", "description": "Editing, color grading, titles, sound polish, reels, YouTube videos, and brand films.", "button_link": "/hire", "enabled": True},
-        {"title": "Product & Commercial Photography", "description": "Clean product, campaign, and commercial photography for digital-first brands.", "button_link": "/hire", "enabled": True},
-    ]}, sort_order=3),
+    _cms_section("home", "services", "services_cards", "Services", "Cinematic production and post-production support.", data={
+    "eyebrow": "WHAT WE DO",
+    "items": [
+        {"title": "Film Production", "description": "Narrative, branded, and creator-led films designed around story, light, and pacing.", "link_url": "/commercial-video-production", "link_label": "Explore", "icon": "Camera", "category": "Production", "enabled": True},
+        {"title": "Wedding Cinematography", "description": "Emotional wedding films with cinematic framing, audio, drone visuals, and premium edits.", "link_url": "/wedding-cinematography", "link_label": "Explore", "icon": "Heart", "category": "Weddings", "enabled": True},
+        {"title": "Commercial Ads", "description": "Campaign-ready ads for products, creators, local businesses, and digital launches.", "link_url": "/commercial-video-production", "link_label": "Explore", "icon": "Clapperboard", "category": "Commercial", "enabled": True},
+        {"title": "Drone Cinematography", "description": "Licensed aerial visuals for locations, events, real estate, and cinematic sequences.", "link_url": "/drone-cinematography", "link_label": "Explore", "icon": "Plane", "category": "Aerial", "enabled": True},
+        {"title": "Video Editing", "description": "Editing, color grading, titles, sound polish, reels, YouTube videos, and brand films.", "link_url": "/hire", "link_label": "Book Now", "icon": "Scissors", "category": "Post-production", "enabled": True},
+        {"title": "Product Photography", "description": "Clean product, campaign, and commercial photography for digital-first brands.", "link_url": "/hire", "link_label": "Book Now", "icon": "Camera", "category": "Commercial", "enabled": True},
+    ]
+}, sort_order=3),
     _cms_section("home", "showreel", "showreel", "Featured Showreel", "A cinematic portfolio of light, movement, and emotion.", "Commercials, wedding stories, drone sequences, product frames, and post-production work shaped for premium digital delivery.", "View all works", "/works", data={"items": [
         {"title": "Cinematic Wedding Story", "category": "Wedding", "description": "Emotion-led wedding cinematography built around light, movement, vows, and family moments.", "video_url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ", "enabled": True, "sort_order": 0},
         {"title": "Aerial Location Film", "category": "Drone", "description": "Drone-led visuals for real estate, travel, and production establishing sequences.", "video_url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ", "enabled": True, "sort_order": 1},

@@ -65,7 +65,7 @@ const About = () => {
   const heroPosterUrl = hero.poster_url || hero.thumbnail_url || hero.image_url || hero.data?.poster_url || hero.data?.thumbnail_url || hero.data?.image_url;
 
   return (
-    <main className="page bg-[#070314] text-white">
+    <main className="page bg-[var(--bg-main)] text-white">
       <Header />
 
       <div className="flex flex-col">
@@ -76,7 +76,7 @@ const About = () => {
             <div className="relative mx-auto grid max-w-7xl gap-12 lg:grid-cols-[0.9fr_1.1fr] lg:items-center">
               {hero.enabled !== false && (
                 <div className="overflow-hidden rounded-3xl border border-violet-500/20 bg-white/[0.04] p-3 shadow-[0_30px_120px_rgba(124,58,237,0.18)]">
-                  <div className="relative flex aspect-[4/5] items-center justify-center overflow-hidden rounded-2xl bg-[radial-gradient(circle_at_30%_20%,rgba(236,72,153,0.35),transparent_35%),linear-gradient(145deg,#1e0a45,#070314)]">
+                  <div className="relative flex aspect-[4/5] items-center justify-center overflow-hidden rounded-2xl bg-[radial-gradient(circle_at_30%_20%,rgba(236,72,153,0.35),transparent_35%),linear-gradient(145deg,#1e0a45,var(--bg-main))]">
                     {heroVideoUrl ? (
                       <SafeVideoEmbed
                         videoType={hero.media_type || hero.data?.media_type || detectMediaType(heroVideoUrl)}
@@ -103,7 +103,7 @@ const About = () => {
                       <div className="h-full w-full" />
                     )}
 
-                    <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#070314]/30 via-transparent to-white/5" />
+                    <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[var(--bg-main)]/30 via-transparent to-white/5" />
                   </div>
                 </div>
               )}

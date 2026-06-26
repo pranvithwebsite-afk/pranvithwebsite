@@ -32,10 +32,10 @@ const Services = () => {
   }, []);
 
   return (
-    <main className="min-h-screen bg-[#050610] text-white">
+    <main className="min-h-screen bg-[var(--bg-main)] text-white">
       <Header />
       <section className="relative overflow-hidden px-6 pb-14 pt-32 md:pt-36">
-        <div className="mx-auto max-w-6xl rounded-3xl border border-violet-500/20 bg-gradient-to-r from-[#1a124a]/70 to-[#0f0830]/60 px-6 py-8 shadow-2xl shadow-violet-950/20 md:px-10">
+        <div className="mx-auto max-w-6xl rounded-3xl border border-[var(--border-soft)] bg-[var(--panel-blue)] px-6 py-8 shadow-2xl shadow-black/20 md:px-10">
           <div className="relative mx-auto max-w-7xl">
             <div className="max-w-3xl">
               <p className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-[0.38em] text-cyan-300">
