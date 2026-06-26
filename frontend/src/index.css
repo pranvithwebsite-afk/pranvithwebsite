@@ -34,19 +34,25 @@ h1, h2, h3, h4, h5, h6 {
 @layer base {
   :root {
     --navbar-height: 96px;
-    --bg-main: #03040c;
-    --bg-soft: #070b18;
-    --panel-dark: #080d1b;
-    --panel-blue: #061827;
-    --panel-purple: #120b2e;
-    --border-soft: rgba(120, 95, 255, 0.22);
-    --border-cyan: rgba(34, 211, 238, 0.25);
+
+    --bg-main: #05000d;
+    --bg-soft: #0b0318;
+
+    --panel-dark: #120d1d;
+    --panel-soft: #171025;
+    --panel-purple: #1a102d;
+
+    --border-soft: rgba(167, 139, 250, 0.18);
+    --border-strong: rgba(167, 139, 250, 0.32);
+
     --text-main: #ffffff;
-    --text-muted: rgba(255, 255, 255, 0.68);
-    --accent-cyan: #22d3ee;
-    --accent-purple: #a78bfa;
-    --radius: 0.75rem;
+    --text-muted: rgba(255, 255, 255, 0.62);
+
+    --accent-purple: #c4b5fd;
+    --accent-purple-strong: #a78bfa;
+
+    --shadow-purple: 0 0 45px rgba(124, 58, 237, 0.16);
+
+    --radius: 22px;
   }
 }
-
-

@@ -120,7 +120,7 @@ const HomeCta = ({ section }) => (
           <p className="mt-2 max-w-2xl text-sm text-white/65">{section?.description || 'Explore assets, courses, showreels, and production services built for serious creators.'}</p>
         </div>
         {(section?.button_text || section?.button_link) && (
-          <a href={safePublicHref(section?.button_link, '/hire')} className="group inline-flex shrink-0 items-center gap-3 rounded-full bg-[var(--accent-purple)] px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-violet-500">
+          <a href={safePublicHref(section?.button_link, '/hire')} className="group inline-flex shrink-0 items-center gap-3 rounded-full bg-accent-purple-strong px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-accent-purple">
             {section?.button_text || 'Book a Project'}
             <span className="flex h-5 w-5 items-center justify-center rounded-full bg-white/20 transition-transform group-hover:translate-x-0.5">
               <ArrowRight size={11} />

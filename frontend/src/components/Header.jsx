@@ -25,11 +25,7 @@ const Header = () => {
   return (
     <header className="fixed left-0 right-0 top-0 z-[80] flex justify-center px-4 pt-4 md:pt-5">
       <nav
-        className={`flex w-full max-w-[1160px] items-center justify-between gap-3 rounded-full border border-white/10 px-3 py-2 ring-1 ring-violet-500/10 backdrop-blur-xl transition-all duration-300 md:gap-8 md:px-5 ${
-          scrolled
-            ? 'bg-[var(--panel-dark)]/82 shadow-[0_24px_90px_-34px_rgba(124,58,237,0.45)]'
-            : 'bg-[var(--panel-dark)]/68 shadow-[0_22px_80px_-36px_rgba(124,58,237,0.38)]'
-        }`}
+        className={`flex w-full max-w-[1160px] items-center justify-between gap-3 rounded-full border border-[var(--border-soft)] bg-[rgba(12,4,27,0.72)] px-3 py-2 backdrop-blur-[18px] transition-all duration-300 md:gap-8 md:px-5`}
       >
         <Link to="/" onClick={refreshHomeIfActive} className="flex items-center gap-2 shrink-0" data-testid="header-brand">
           <div className="h-9 w-9 overflow-hidden rounded-full bg-gradient-to-br from-rose-500 to-orange-500 ring-2 ring-violet-400/45 shadow-[0_0_26px_rgba(139,92,246,0.32)]">
@@ -54,8 +50,8 @@ const Header = () => {
                   data-testid={`nav-${l.name.toLowerCase().replace(/\s+/g, '-')}`}
                   className={`rounded-full px-4 py-2 text-sm font-medium transition-all duration-200 ${
                     active
-                      ? 'bg-violet-500/12 text-violet-300 shadow-[inset_0_0_0_1px_rgba(167,139,250,0.16),0_0_22px_rgba(124,58,237,0.18)]'
-                      : 'text-white/78 hover:bg-white/5 hover:text-white hover:shadow-[0_0_22px_rgba(124,58,237,0.16)]'
+                      ? 'bg-[rgba(124,58,237,0.18)] text-accent-purple-strong'
+                      : 'text-white/78 hover:bg-white/5 hover:text-white'
                   }`}
                 >
                   {l.name}
@@ -75,7 +71,7 @@ const Header = () => {
       </nav>
 
       {open && (
-        <div className="absolute left-4 right-4 top-[4.75rem] rounded-3xl border border-white/10 bg-[var(--panel-dark)]/90 p-3 shadow-[0_22px_70px_rgba(124,58,237,0.28)] ring-1 ring-violet-500/10 backdrop-blur-xl md:hidden">
+        <div className="absolute left-4 right-4 top-[4.75rem] rounded-3xl border border-[var(--border-soft)] bg-[rgba(12,4,27,0.9)] p-3 shadow-[0_22px_70px_rgba(124,58,237,0.28)] backdrop-blur-xl md:hidden">
           <ul className="flex flex-col gap-1">
             {navLinks.map((l) => {
               const active = location.pathname === l.path;
@@ -90,7 +86,7 @@ const Header = () => {
                     data-testid={`mobile-nav-${l.name.toLowerCase().replace(/\s+/g, '-')}`}
                     className={`block rounded-2xl px-4 py-3 text-sm font-medium transition-all ${
                       active
-                        ? 'bg-violet-500/15 text-violet-200 shadow-[inset_0_0_0_1px_rgba(167,139,250,0.16)]'
+                        ? 'bg-[rgba(124,58,237,0.18)] text-accent-purple-strong'
                         : 'text-white/86 hover:bg-white/6 hover:text-white'
                     }`}
                   >

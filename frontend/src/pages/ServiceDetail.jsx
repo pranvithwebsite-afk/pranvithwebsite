@@ -60,7 +60,7 @@ const ServiceDetail = () => {
         <Header />
         <section className="px-6 py-36 text-center">
           <h1 className="text-4xl font-bold">{error || 'Service not found.'}</h1>
-          <Link to="/services" className="mt-6 inline-flex items-center gap-2 rounded-full bg-cyan-400 px-6 py-3 text-sm font-bold text-slate-950">
+          <Link to="/services" className="mt-6 inline-flex items-center gap-2 rounded-full bg-accent-purple-strong px-6 py-3 text-sm font-bold text-white">
             <ArrowLeft size={16} />
             Back to Services
           </Link>
@@ -141,3 +141,4 @@ const ServiceDetail = () => {
 };
 
 export default ServiceDetail;
+ServiceDetail;

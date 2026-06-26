@@ -150,9 +150,9 @@ const About = () => {
                 return (
                   <div
                     key={`${stat.label}-${index}`}
-                    className="rounded-3xl border border-violet-500/15 bg-[#100830]/60 p-6 text-center"
+                    className="rounded-3xl border border-[var(--border-soft)] bg-panel-soft p-6 text-center"
                   >
-                    <Icon size={28} className="mx-auto mb-4 text-violet-300" />
+                    <Icon size={28} className="mx-auto mb-4 text-accent-purple" />
                     <p className="text-3xl font-bold text-white">{stat.value}</p>
                     <p className="mt-2 text-xs uppercase tracking-wider text-white/50">
                       {stat.label}
@@ -205,6 +205,11 @@ const About = () => {
 
       <Footer />
     </main>
+  );
+};
+
+export default About;
+
   );
 };
 

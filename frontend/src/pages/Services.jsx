@@ -35,10 +35,10 @@ const Services = () => {
     <main className="min-h-screen bg-[var(--bg-main)] text-white">
       <Header />
       <section className="relative overflow-hidden px-6 pb-14 pt-32 md:pt-36">
-        <div className="mx-auto max-w-6xl rounded-3xl border border-[var(--border-soft)] bg-[var(--panel-blue)] px-6 py-8 shadow-2xl shadow-black/20 md:px-10">
+        <div className="mx-auto max-w-6xl rounded-3xl border border-violet-500/15 bg-[#100830]/60] px-6 py-8 shadow-2xl shadow-black/20 md:px-10">
           <div className="relative mx-auto max-w-7xl">
             <div className="max-w-3xl">
-              <p className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-[0.38em] text-cyan-300">
+              <p className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-[0.38em] text-violet-300">
                 <Film size={15} />
                 Services
               </p>
@@ -56,7 +56,7 @@ const Services = () => {
           {loading ? (
             <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
               {[0, 1, 2, 3, 4, 5].map((item) => (
-                <div key={item} className="h-[360px] animate-pulse rounded-2xl border border-white/10 bg-white/[0.045]" />
+                <div key={item} className="h-[360px] animate-pulse rounded-[22px] border border-[var(--border-soft)] bg-panel-soft" />
               ))}
             </div>
           ) : error ? (
@@ -68,10 +68,10 @@ const Services = () => {
               </button>
             </div>
           ) : services.length === 0 ? (
-            <div className="rounded-2xl border border-white/10 bg-white/[0.045] p-12 text-center">
+            <div className="rounded-2xl border border-[var(--border-soft)] bg-panel-soft p-12 text-center">
               <h2 className="text-2xl font-semibold text-white">No services published yet.</h2>
               <p className="mt-3 text-white/60">Please check back soon or send a project enquiry.</p>
-              <Link to="/hire" className="mt-6 inline-flex rounded-full bg-cyan-400 px-6 py-3 text-sm font-bold text-slate-950 hover:bg-cyan-300">
+              <Link to="/hire" className="mt-6 inline-flex rounded-full bg-accent-purple-strong px-6 py-3 text-sm font-bold text-white hover:bg-accent-purple">
                 Contact PranvithDOP
               </Link>
             </div>
