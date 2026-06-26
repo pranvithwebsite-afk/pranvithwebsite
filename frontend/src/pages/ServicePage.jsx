@@ -46,8 +46,7 @@ const ServicePage = ({ type }) => {
     <main className="page bg-[#070314] text-white">
       <Header />
       <section className="relative overflow-hidden px-6 py-24">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_15%,rgba(124,58,237,0.22),transparent_42%)]" />
-        <div className="relative mx-auto max-w-5xl text-center">
+        <div className="mx-auto max-w-6xl rounded-3xl border border-violet-500/20 bg-gradient-to-r from-[#1a124a]/70 to-[#0f0830]/60 px-6 py-8 text-center shadow-2xl shadow-violet-950/20 md:px-10">
           <p className="text-xs font-semibold uppercase tracking-[0.4em] text-violet-300">{content.eyebrow}</p>
           <h1 className="mt-5 text-5xl font-bold tracking-tight md:text-7xl">{content.heading}</h1>
           <p className="mx-auto mt-7 max-w-3xl text-lg leading-relaxed text-white/70">{content.body}</p>

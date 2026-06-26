@@ -35,17 +35,18 @@ const Services = () => {
     <main className="min-h-screen bg-[#050610] text-white">
       <Header />
       <section className="relative overflow-hidden px-6 pb-14 pt-32 md:pt-36">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_12%,rgba(14,165,233,0.20),transparent_36%),radial-gradient(circle_at_84%_18%,rgba(124,58,237,0.18),transparent_30%)]" />
-        <div className="relative mx-auto max-w-7xl">
-          <div className="max-w-3xl">
-            <p className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-[0.38em] text-cyan-300">
-              <Film size={15} />
-              Services
-            </p>
-            <h1 className="mt-5 text-5xl font-black tracking-tight text-white md:text-7xl">Cinematic services for stories, brands, and creators.</h1>
-            <p className="mt-6 text-lg leading-8 text-white/68">
-              Production, post-production, social content, and web experiences built with a polished PranvithDOP visual language.
-            </p>
+        <div className="mx-auto max-w-6xl rounded-3xl border border-violet-500/20 bg-gradient-to-r from-[#1a124a]/70 to-[#0f0830]/60 px-6 py-8 shadow-2xl shadow-violet-950/20 md:px-10">
+          <div className="relative mx-auto max-w-7xl">
+            <div className="max-w-3xl">
+              <p className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-[0.38em] text-cyan-300">
+                <Film size={15} />
+                Services
+              </p>
+              <h1 className="mt-5 text-5xl font-black tracking-tight text-white md:text-7xl">Cinematic services for stories, brands, and creators.</h1>
+              <p className="mt-6 text-lg leading-8 text-white/68">
+                Production, post-production, social content, and web experiences built with a polished PranvithDOP visual language.
+              </p>
+            </div>
           </div>
         </div>
       </section>

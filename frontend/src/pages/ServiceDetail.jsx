@@ -75,9 +75,8 @@ const ServiceDetail = () => {
     <main className="min-h-screen bg-[#050610] text-white">
       <Header />
       <section className="relative overflow-hidden px-6 pb-16 pt-32 md:pt-36">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_12%,rgba(14,165,233,0.20),transparent_36%),radial-gradient(circle_at_82%_18%,rgba(124,58,237,0.18),transparent_32%)]" />
-        <div className="relative mx-auto grid max-w-7xl gap-10 lg:grid-cols-[0.9fr_1.1fr] lg:items-center">
-          <div>
+        <div className="mx-auto grid max-w-6xl gap-8 rounded-3xl border border-violet-500/20 bg-gradient-to-r from-[#1a124a]/70 to-[#0f0830]/60 px-6 py-8 shadow-2xl shadow-violet-950/20 md:px-10 lg:grid-cols-[0.92fr_1.08fr] lg:items-center">
+          <div className="min-w-0">
             <Link to="/services" className="inline-flex items-center gap-2 text-sm font-semibold text-white/65 hover:text-white">
               <ArrowLeft size={16} />
               Services
