@@ -7,8 +7,8 @@ import { fetchProducts } from '../lib/api';
 import { FALLBACK_IMAGE, dedupeCatalogItems, getCatalogItemKey, handleImageError, safeImageSrc, shareProduct } from '../lib/utils';
 import CheckoutModal from '../components/CheckoutModal';
 import { usePublicPageLoading } from '../components/PublicPageLoader';
-import PageReadyPlaceholder from '../components/PageReadyPlaceholder';
 import { useCmsPage } from '../hooks/useCmsPage';
+import OptimizedImage from '../components/OptimizedImage';
 
 const defaultBackgrounds = [
   'linear-gradient(135deg, #1e3a8a 0%, #0c1e4d 60%, #050b1f 100%)',
@@ -57,7 +57,7 @@ const normalize = (item = {}, index) => {
     headline,
     subhead,
     badge: price === 0 || item.is_free ? 'FREE' : 'SALE!',
-    description: item.description || '',
+    description: item.short_description || item.description || '',
   };
 };
 
@@ -117,8 +117,6 @@ const Assets = () => {
   const showFilters = settings.show_filters !== false;
   const heroSection = findSection(cmsPage?.sections || [], 'hero');
 
-  if (cmsLoading || loading) return <PageReadyPlaceholder />;
-
   return (
     <main className="page bg-[#070314] text-white min-h-screen">
       <Header />
@@ -169,7 +167,13 @@ const Assets = () => {
           </aside>}
 
           <div>
-            {loadError ? (
+            {loading ? (
+              <div className="grid grid-cols-2 gap-3 md:grid-cols-3 md:gap-5 xl:grid-cols-4" aria-hidden="true">
+                {Array.from({ length: 8 }).map((_, index) => (
+                  <div key={index} className="h-[320px] animate-pulse rounded-2xl border border-violet-500/15 bg-white/[0.04]" />
+                ))}
+              </div>
+            ) : loadError ? (
               <div className="rounded-2xl border border-rose-500/20 bg-rose-500/5 p-12 text-center text-white/70" data-testid="assets-error">
                 Assets could not be loaded. Please refresh and try again.
               </div>
@@ -242,7 +246,7 @@ const ProductCard = ({ p, onView, onBuy }) => (
   >
     <div className="relative aspect-[4/5] overflow-hidden">
       {p.image ? (
-        <img src={safeImageSrc(p.image)} alt={p.title} className="absolute inset-0 w-full h-full object-cover" onError={handleImageError} />
+        <OptimizedImage src={p.image} alt={p.title} width={360} height={450} className="absolute inset-0 h-full w-full object-cover" fallback={FALLBACK_IMAGE} onError={handleImageError} />
       ) : (
         <div className="absolute inset-0" style={{ background: p.bg }} />
       )}

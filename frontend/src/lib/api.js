@@ -13,6 +13,28 @@ const BACKEND_URL = normalizeBackendUrl(
 export const API = `${BACKEND_URL}/api`;
 const DEVELOPMENT_CATALOG_API = 'https://pranvithdop.com/api';
 const USE_DEVELOPMENT_CATALOG = process.env.NODE_ENV === 'development';
+const sessionCache = new Map();
+
+const cachedRequest = async (key, request, ttlMs = 5 * 60 * 1000) => {
+  const now = Date.now();
+  const cached = sessionCache.get(key);
+  if (cached && cached.expires > now) {
+    return cached.value;
+  }
+  if (cached?.promise) return cached.promise;
+
+  const promise = request()
+    .then((value) => {
+      sessionCache.set(key, { value, expires: Date.now() + ttlMs });
+      return value;
+    })
+    .catch((error) => {
+      sessionCache.delete(key);
+      throw error;
+    });
+  sessionCache.set(key, { promise, expires: now + ttlMs });
+  return promise;
+};
 
 const FALLBACK_PRODUCTS = [
   {
@@ -108,8 +130,10 @@ export const fetchFAQs = async () => {
 };
 
 export const fetchPublicSettings = async () => {
-  const { data } = await api.get('/settings');
-  return data;
+  return cachedRequest('public-settings', async () => {
+    const { data } = await api.get('/settings');
+    return data;
+  }, 10 * 60 * 1000);
 };
 
 const fetchDevelopmentCatalog = async (path) => {
@@ -123,6 +147,7 @@ const getFallbackProductBySlug = (slug) =>
   FALLBACK_PRODUCTS.find((product) => product.slug === slug);
 
 export const fetchProducts = async () => {
+  return cachedRequest('products:list', async () => {
   if (USE_DEVELOPMENT_CATALOG && !BACKEND_URL) {
     try {
       return await fetchDevelopmentCatalog('/products');
@@ -154,6 +179,7 @@ export const fetchProducts = async () => {
     }
     return FALLBACK_PRODUCTS;
   }
+  }, 3 * 60 * 1000);
 };
 
 export const fetchPageBySlug = async (slug) => {
@@ -162,18 +188,24 @@ export const fetchPageBySlug = async (slug) => {
 };
 
 export const fetchServices = async () => {
-  const { data } = await api.get('/services');
-  return data;
+  return cachedRequest('services:list', async () => {
+    const { data } = await api.get('/services');
+    return data;
+  }, 5 * 60 * 1000);
 };
 
 export const fetchServiceBySlug = async (slug) => {
-  const { data } = await api.get(`/services/${encodeURIComponent(slug)}`);
-  return data;
+  return cachedRequest(`services:detail:${slug}`, async () => {
+    const { data } = await api.get(`/services/${encodeURIComponent(slug)}`);
+    return data;
+  }, 5 * 60 * 1000);
 };
 
 export const fetchCmsPage = async (pageKey) => {
-  const { data } = await api.get(`/cms/pages/${encodeURIComponent(pageKey)}`);
-  return data;
+  return cachedRequest(`cms:${pageKey}`, async () => {
+    const { data } = await api.get(`/cms/pages/${encodeURIComponent(pageKey)}`);
+    return data;
+  }, 5 * 60 * 1000);
 };
 
 export const fetchPages = async () => {
@@ -498,6 +530,7 @@ export const createFreeOrder = async (payload) => {
 };
 
 export const fetchProductBySlug = async (slug) => {
+  return cachedRequest(`products:detail:${slug}`, async () => {
   const path = `/products/${encodeURIComponent(slug)}`;
   if (USE_DEVELOPMENT_CATALOG && !BACKEND_URL) {
     try {
@@ -526,6 +559,7 @@ export const fetchProductBySlug = async (slug) => {
     if (fallbackProduct) return fallbackProduct;
     throw error;
   }
+  }, 3 * 60 * 1000);
 };
 
 export const fetchOrderAccess = async (orderId, token) => {

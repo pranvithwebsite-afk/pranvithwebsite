@@ -1,5 +1,4 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import { useLocation } from 'react-router-dom';
 import LoadingScreen from './LoadingScreen';
 
 const PublicPageLoaderContext = createContext({
@@ -19,62 +18,33 @@ export const usePublicPageLoading = (loading) => {
 };
 
 const PublicPageLoaderProvider = ({ children }) => {
-  const location = useLocation();
-  const adminRoute = isAdminPath(location.pathname);
-  const [pageLoading, setPageLoadingState] = useState({});
-  const [routeArmed, setRouteArmed] = useState(false);
   const [showLoader, setShowLoader] = useState(() => !isAdminPath(window.location.pathname));
   const [loaderLeaving, setLoaderLeaving] = useState(false);
 
   const setPageLoading = useCallback((id, loading) => {
-    setPageLoadingState((current) => {
-      if (!loading) {
-        const next = { ...current };
-        delete next[id];
-        return next;
-      }
-      return { ...current, [id]: true };
-    });
+    return undefined;
   }, []);
 
   useEffect(() => {
-    if (adminRoute) {
+    if (isAdminPath(window.location.pathname)) {
       setShowLoader(false);
-      setLoaderLeaving(false);
-      setRouteArmed(true);
-      setPageLoadingState({});
       return undefined;
     }
 
-    setShowLoader(true);
-    setLoaderLeaving(false);
-    setRouteArmed(false);
-
-    const armTimer = window.setTimeout(() => setRouteArmed(true), 0);
-    const fallbackTimer = window.setTimeout(() => {
-      setPageLoadingState({});
-    }, 4500);
-
+    const leaveTimer = window.setTimeout(() => setLoaderLeaving(true), 220);
+    const hideTimer = window.setTimeout(() => setShowLoader(false), 420);
     return () => {
-      window.clearTimeout(armTimer);
-      window.clearTimeout(fallbackTimer);
+      window.clearTimeout(leaveTimer);
+      window.clearTimeout(hideTimer);
     };
-  }, [adminRoute, location.key, location.pathname]);
-
-  useEffect(() => {
-    if (adminRoute || !showLoader || !routeArmed || Object.keys(pageLoading).length > 0) return undefined;
-
-    setLoaderLeaving(true);
-    const exitTimer = window.setTimeout(() => setShowLoader(false), 180);
-    return () => window.clearTimeout(exitTimer);
-  }, [adminRoute, pageLoading, routeArmed, showLoader]);
+  }, []);
 
   const contextValue = useMemo(() => ({ setPageLoading }), [setPageLoading]);
 
   return (
     <PublicPageLoaderContext.Provider value={contextValue}>
       {children}
-      {!adminRoute && showLoader && <LoadingScreen isLeaving={loaderLeaving} />}
+      {showLoader && <LoadingScreen isLeaving={loaderLeaving} />}
     </PublicPageLoaderContext.Provider>
   );
 };

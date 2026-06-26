@@ -5,7 +5,6 @@ import { CalendarDays, CheckCircle2, MapPin, Send, Sparkles } from 'lucide-react
 import { toast } from 'sonner';
 import { submitHireRequest } from '../lib/api';
 import { usePublicPageLoading } from '../components/PublicPageLoader';
-import PageReadyPlaceholder from '../components/PageReadyPlaceholder';
 import { useCmsPage } from '../hooks/useCmsPage';
 
 const initialForm = {
@@ -65,8 +64,6 @@ const Hire = () => {
   const [form, setForm] = useState(initialForm);
   const [busy, setBusy] = useState(false);
   const updateField = (field, value) => setForm((current) => ({ ...current, [field]: value }));
-
-  if (loading) return <PageReadyPlaceholder />;
 
   const submit = async (event) => {
     event.preventDefault();

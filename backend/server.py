@@ -183,6 +183,15 @@ async def add_security_headers(request: Request, call_next):
     response.headers["Cross-Origin-Resource-Policy"] = "same-site"
     if request.url.path.startswith("/api/admin"):
         response.headers["Cache-Control"] = "no-store"
+    elif request.method == "GET" and request.url.path in {
+        "/api/services",
+        "/api/products",
+    }:
+        response.headers.setdefault("Cache-Control", "public, max-age=60, stale-while-revalidate=300")
+    elif request.method == "GET" and request.url.path.startswith("/api/cms/pages/"):
+        response.headers.setdefault("Cache-Control", "public, max-age=60, stale-while-revalidate=300")
+    elif request.method == "GET" and request.url.path.startswith("/api/uploads/"):
+        response.headers.setdefault("Cache-Control", "public, max-age=31536000, immutable")
     return response
 
 
@@ -1912,27 +1921,73 @@ def _public_product(product: dict) -> dict:
     return safe
 
 
+def _public_product_summary(product: dict) -> dict:
+    safe = _public_product(product)
+    thumbnail_url = (
+        safe.get("thumbnail_url")
+        or safe.get("hero_image")
+        or (safe.get("product_images") or safe.get("images") or [""])[0]
+        or ""
+    )
+    return {
+        "id": safe.get("id"),
+        "title": safe.get("name") or safe.get("title"),
+        "name": safe.get("name") or safe.get("title"),
+        "slug": safe.get("slug"),
+        "price": safe.get("price"),
+        "sale_price": safe.get("sale_price"),
+        "is_free": safe.get("is_free"),
+        "thumbnail_url": thumbnail_url,
+        "hero_image": thumbnail_url,
+        "category": safe.get("category"),
+        "short_description": safe.get("short_description") or safe.get("description") or "",
+        "created_at": safe.get("created_at"),
+        "published": safe.get("published", True),
+    }
+
+
 @api_router.get("/products")
 async def public_products():
     if db is None:
-        products = [_public_product(product) for product in ASSET_PRODUCTS if product.get("published", True)]
+        products = [_public_product_summary(product) for product in ASSET_PRODUCTS if product.get("published", True)]
         logger.info("Product fetch source=fallback scope=public count=%d", len(products))
         return products
     try:
-        rows = await db.products.find({"published": True}, {"_id": 0, "download_file": 0, "download_file_url": 0, "download_file_key": 0, "download_file_name": 0, "download_file_bucket": 0, "payment_link": 0, "razorpay_payment_link_id": 0, "razorpay_payment_link_url": 0, "razorpay_payment_link_status": 0}).to_list(100)
+        rows = await db.products.find(
+            {"published": True},
+            {
+                "_id": 0,
+                "id": 1,
+                "slug": 1,
+                "name": 1,
+                "title": 1,
+                "category": 1,
+                "price": 1,
+                "sale_price": 1,
+                "is_free": 1,
+                "short_description": 1,
+                "description": 1,
+                "thumbnail_url": 1,
+                "hero_image": 1,
+                "images": 1,
+                "product_images": 1,
+                "created_at": 1,
+                "published": 1,
+            },
+        ).to_list(100)
         logger.info(
             "Product fetch source=mongodb database=%s collection=products scope=public count=%d",
             db_name,
             len(rows),
         )
-        return [_public_product(row) for row in rows]
+        return [_public_product_summary(row) for row in rows]
     except Exception as exc:
         logger.exception(
             "Public products endpoint failed; falling back to seeded catalog. database=%s collection=products error_type=%s",
             db_name,
             type(exc).__name__,
         )
-        products = [_public_product(product) for product in ASSET_PRODUCTS if product.get("published", True)]
+        products = [_public_product_summary(product) for product in ASSET_PRODUCTS if product.get("published", True)]
         return products
 
 
@@ -3076,6 +3131,7 @@ async def admin_upload_media_library(file: UploadFile = File(...), current_admin
             Key=key,
             Body=content,
             ContentType=file.content_type,
+            CacheControl="public, max-age=31536000, immutable",
         )
     except HTTPException:
         raise
@@ -3637,6 +3693,7 @@ async def admin_upload_public_media(
             Key=key,
             Body=content,
             ContentType=file.content_type,
+            CacheControl="public, max-age=31536000, immutable",
         )
     except HTTPException:
         raise

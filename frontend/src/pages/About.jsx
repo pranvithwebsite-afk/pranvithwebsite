@@ -5,9 +5,9 @@ import Footer from '../components/Footer';
 import { Award, Camera, Clock, Film, Plane, Sparkles } from 'lucide-react';
 import { handleImageError, safeImageSrc, safePublicHref } from '../lib/utils';
 import { usePublicPageLoading } from '../components/PublicPageLoader';
-import PageReadyPlaceholder from '../components/PageReadyPlaceholder';
 import { useCmsPage } from '../hooks/useCmsPage';
 import SafeVideoEmbed, { detectMediaType } from '../components/SafeVideoEmbed';
+import OptimizedImage from '../components/OptimizedImage';
 
 const statIcons = [Film, Camera, Plane, Clock];
 
@@ -64,8 +64,6 @@ const About = () => {
   const heroVideoUrl = hero.video_url || hero.data?.video_url || (videoMediaTypes.has(hero.media_type) ? hero.media_url : '') || (videoMediaTypes.has(hero.data?.media_type) ? hero.data?.media_url : '') || (videoMediaTypes.has(detectMediaType(hero.media_url)) ? hero.media_url : '') || (videoMediaTypes.has(detectMediaType(hero.data?.media_url)) ? hero.data?.media_url : '');
   const heroPosterUrl = hero.poster_url || hero.thumbnail_url || hero.image_url || hero.data?.poster_url || hero.data?.thumbnail_url || hero.data?.image_url;
 
-  if (loading) return <PageReadyPlaceholder />;
-
   return (
     <main className="page bg-[#070314] text-white">
       <Header />
@@ -89,9 +87,12 @@ const About = () => {
                         aspectRatio="aspect-[4/5]"
                       />
                     ) : hero.media_url ? (
-                      <img
+                      <OptimizedImage
                         src={safeImageSrc(hero.media_url)}
                         alt="PranvithDOP profile"
+                        priority
+                        width={560}
+                        height={700}
                         className="h-full w-full object-cover"
                         onError={(event) => {
                           handleImageError(event, '');

@@ -18,8 +18,8 @@ import { fetchProductBySlug } from '../lib/api';
 import { dedupeFaqs, handleImageError, safeImageSrc, shareProduct } from '../lib/utils';
 import CheckoutModal from '../components/CheckoutModal';
 import { usePublicPageLoading } from '../components/PublicPageLoader';
-import PageReadyPlaceholder from '../components/PageReadyPlaceholder';
 import SafeVideoEmbed, { getSafeVideoEmbedUrl, isDirectVideoUrl } from '../components/SafeVideoEmbed';
+import OptimizedImage from '../components/OptimizedImage';
 
 const AssetLanding = () => {
   const { slug } = useParams();
@@ -43,7 +43,26 @@ const AssetLanding = () => {
       .finally(() => setLoading(false));
   }, [slug]);
 
-  if (loading) return <PageReadyPlaceholder />;
+  if (loading) {
+    return (
+      <main className="page min-h-screen bg-[#070314] text-white">
+        <Header />
+        <section className="px-6 pb-16 pt-8">
+          <div className="mx-auto max-w-7xl rounded-[2rem] border border-white/10 bg-white/[0.04] p-8 lg:p-12">
+            <div className="grid gap-10 lg:grid-cols-[1fr_440px]">
+              <div>
+                <div className="h-8 w-44 animate-pulse rounded-full bg-white/8" />
+                <div className="mt-8 h-16 max-w-xl animate-pulse rounded-2xl bg-white/8" />
+                <div className="mt-6 h-24 max-w-2xl animate-pulse rounded-2xl bg-white/[0.05]" />
+              </div>
+              <div className="aspect-[4/5] animate-pulse rounded-[2rem] bg-white/[0.05]" />
+            </div>
+          </div>
+        </section>
+        <Footer />
+      </main>
+    );
+  }
 
   if (notFound || !product) {
     return (
@@ -141,7 +160,7 @@ const AssetLanding = () => {
 
               <div className="rounded-[2rem] border border-white/10 bg-[#090712] overflow-hidden shadow-[0_30px_80px_rgba(0,0,0,0.35)]">
                 {heroImage ? (
-                  <img src={heroImage} alt={product.name} className="w-full max-h-[420px] aspect-[4/3] object-cover sm:max-h-none sm:aspect-[4/5]" data-testid="asset-hero-image" onError={handleImageError} />
+                  <OptimizedImage src={heroImage} alt={product.name} priority width={440} height={550} className="w-full max-h-[420px] aspect-[4/3] object-cover sm:max-h-none sm:aspect-[4/5]" data-testid="asset-hero-image" onError={handleImageError} />
                 ) : (
                   <div className="w-full max-h-[420px] aspect-[4/3] bg-gradient-to-br from-violet-700 to-fuchsia-900 flex items-center justify-center text-2xl font-black text-white px-6 text-center sm:max-h-none sm:aspect-[4/5]">
                     {product.name}
@@ -353,10 +372,12 @@ const ProductMediaSection = ({ product, galleryImages }) => {
             <h2 className="text-3xl font-bold tracking-tight mb-8">Product Gallery</h2>
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {galleryImages.map((image, index) => (
-                <img
+                <OptimizedImage
                   key={`${image}-${index}`}
                   src={safeImageSrc(image)}
                   alt={`${product.name} preview ${index + 1}`}
+                  width={420}
+                  height={236}
                   className="aspect-video w-full rounded-3xl border border-white/10 bg-[#090712] object-cover"
                   onError={handleImageError}
                 />
@@ -418,9 +439,9 @@ const BeforeAfterSlider = ({ beforeImage, afterImage }) => {
       onMouseDown={startDrag}
       onTouchStart={startDrag}
     >
-      <img src={afterImage} alt="After LUT" className="absolute inset-0 h-full w-full object-cover" draggable={false} />
+      <OptimizedImage src={afterImage} alt="After LUT" width={960} height={540} className="absolute inset-0 h-full w-full object-cover" draggable={false} />
       <div className="absolute inset-0" style={{ clipPath: `inset(0 ${100 - position}% 0 0)` }}>
-        <img src={beforeImage} alt="Before LUT" className="h-full w-full object-cover" draggable={false} />
+        <OptimizedImage src={beforeImage} alt="Before LUT" width={960} height={540} className="h-full w-full object-cover" draggable={false} />
       </div>
       <div className="absolute left-4 top-4 rounded-full bg-black/70 px-3 py-1 text-xs font-bold tracking-[0.22em] text-white">BEFORE</div>
       <div className="absolute right-4 top-4 rounded-full bg-black/70 px-3 py-1 text-xs font-bold tracking-[0.22em] text-white">AFTER</div>

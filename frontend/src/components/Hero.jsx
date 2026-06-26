@@ -3,6 +3,7 @@ import { ArrowRight, Sparkles } from 'lucide-react';
 import { handleImageError, safeImageSrc, safePublicHref } from '../lib/utils';
 import { fetchPublicSettings } from '../lib/api';
 import SafeVideoEmbed, { detectMediaType, getYouTubeThumbnail } from './SafeVideoEmbed';
+import OptimizedImage from './OptimizedImage';
 
 const fallbackHero = {
   badge_text: 'Learn premium editing, LUTs, transitions, and storytelling workflows that get results.',
@@ -92,9 +93,12 @@ const Hero = ({ pageData }) => {
       );
     }
     return (
-      <img
+      <OptimizedImage
         src={safeImageSrc(imageUrl, '')}
         alt="video editor"
+        priority
+        width={1280}
+        height={640}
         className="absolute inset-0 w-full h-full object-cover opacity-30"
         onError={handleImageError}
       />

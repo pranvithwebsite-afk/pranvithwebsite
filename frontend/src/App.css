@@ -113,3 +113,28 @@
 .radial-purple-bottom {
   background: radial-gradient(ellipse at bottom, rgba(139, 92, 246, 0.18), transparent 60%);
 }
+
+@media (max-width: 767px) {
+  .backdrop-blur,
+  .backdrop-blur-xl,
+  .backdrop-blur-2xl,
+  .backdrop-blur-3xl {
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+  }
+
+  .purple-glow {
+    box-shadow: 0 0 34px 8px rgba(139, 92, 246, 0.12);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}

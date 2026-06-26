@@ -9,6 +9,7 @@ import ServiceCTA from '../components/ServiceCTA';
 import SafeVideoEmbed, { detectMediaType } from '../components/SafeVideoEmbed';
 import { FALLBACK_IMAGE, handleImageError, safeImageSrc } from '../lib/utils';
 import { fetchServiceBySlug } from '../lib/api';
+import OptimizedImage from '../components/OptimizedImage';
 
 const ServiceDetail = () => {
   const { slug } = useParams();
@@ -90,9 +91,12 @@ const ServiceDetail = () => {
             {mediaType === 'video_file' || mediaType === 'video_url' ? (
               <SafeVideoEmbed videoType={mediaType} videoUrl={service.banner_url} title={service.title} className="rounded-2xl" />
             ) : (
-              <img
+              <OptimizedImage
                 src={safeImageSrc(service.banner_url || service.thumbnail_url, FALLBACK_IMAGE)}
                 alt={service.title}
+                priority
+                width={960}
+                height={660}
                 className="aspect-[16/11] h-full w-full object-cover"
                 onError={handleImageError}
               />

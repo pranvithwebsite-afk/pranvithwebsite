@@ -2,6 +2,7 @@ import React from 'react';
 import { ArrowRight } from 'lucide-react';
 import SafeVideoEmbed, { detectMediaType } from '../SafeVideoEmbed';
 import { handleImageError, safeImageSrc } from '../../lib/utils';
+import OptimizedImage from '../OptimizedImage';
 
 const enabledItems = (items = []) =>
   [...items].filter((item) => item?.enabled !== false).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
@@ -58,7 +59,7 @@ const MediaBlock = ({ section }) => {
       />
     );
   }
-  return <img src={safeImageSrc(url)} alt={section.title || 'CMS media'} className="aspect-video w-full rounded-2xl object-cover" onError={handleImageError} />;
+  return <OptimizedImage src={safeImageSrc(url)} alt={section.title || 'CMS media'} width={960} height={540} className="aspect-video w-full rounded-2xl object-cover" onError={handleImageError} />;
 };
 
 const CmsSectionRenderer = ({ section, children }) => {
@@ -133,7 +134,7 @@ const CmsSectionRenderer = ({ section, children }) => {
                     className="mb-5 w-full rounded-xl"
                   />
                 ) : (item.thumbnail_url || item.thumbnail_image_url || item.image_url) && (
-                  <img src={safeImageSrc(item.thumbnail_url || item.thumbnail_image_url || item.image_url)} alt={item.title || 'Item'} className="mb-5 aspect-video w-full rounded-xl object-cover" onError={handleImageError} />
+                  <OptimizedImage src={safeImageSrc(item.thumbnail_url || item.thumbnail_image_url || item.image_url)} alt={item.title || 'Item'} width={420} height={236} className="mb-5 aspect-video w-full rounded-xl object-cover" onError={handleImageError} />
                 )}
                 <h3 className="text-xl font-semibold text-white">{item.title || item.question || item.student_name}</h3>
                 <p className="mt-3 text-sm leading-7 text-white/62">{item.description || item.answer || item.review_text || item.comment_text}</p>

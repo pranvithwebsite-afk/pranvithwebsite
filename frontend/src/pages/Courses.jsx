@@ -5,7 +5,6 @@ import CoursesSection from '../components/Courses';
 import CoursePageContent, { CourseComingSoon, defaultCourseVisibility } from '../components/CoursePageContent';
 import { detectMediaType } from '../components/SafeVideoEmbed';
 import { usePublicPageLoading } from '../components/PublicPageLoader';
-import PageReadyPlaceholder from '../components/PageReadyPlaceholder';
 import { useCmsPage } from '../hooks/useCmsPage';
 
 const enabledSorted = (items = []) =>
@@ -70,7 +69,7 @@ const Courses = () => {
   const sections = (page?.sections || []).filter((item) => item.enabled !== false);
   const settings = { ...defaultCourseVisibility, ...(page?.settings || {}) };
   const comingSoon = sections.find(isComingSoonSection) || null;
-  const showComingSoon = !!comingSoon;
+  const showComingSoon = loading || !!comingSoon;
   const hero = section(sections, 'hero') || {};
   const rightForYou = section(sections, 'right-for-you') || {};
   const learn = section(sections, 'what-youll-learn') || section(sections, 'course_showcase') || {};
@@ -79,7 +78,15 @@ const Courses = () => {
   const reviews = sectionByAny(sections, ['student-reviews', 'testimonials', 'reviews']) || {};
   const faq = section(sections, 'faq') || {};
 
-  if (loading || pageHidden) return <PageReadyPlaceholder />;
+  if (!loading && pageHidden) {
+    return (
+      <main className="page bg-[#070314] text-white">
+        <Header />
+        <CourseComingSoon visibility={settings} />
+        <Footer />
+      </main>
+    );
+  }
 
   const courseContent = {
     hero: {

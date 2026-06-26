@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Play } from 'lucide-react';
 
 const YOUTUBE_HOSTS = new Set(['youtube.com', 'www.youtube.com', 'm.youtube.com', 'music.youtube.com', 'youtu.be', 'www.youtu.be', 'youtube-nocookie.com', 'www.youtube-nocookie.com']);
@@ -134,8 +134,11 @@ const SafeVideoEmbed = ({
   aspectRatio = 'aspect-video',
   autoplayOnClick = true,
   showPlayOverlay = true,
+  loadWhenVisible = true,
 }) => {
   const [activated, setActivated] = useState(!showPlayOverlay);
+  const [nearViewport, setNearViewport] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
   const [posterFailed, setPosterFailed] = useState(false);
   const [youtubeMaxFailed, setYoutubeMaxFailed] = useState(false);
   const [thumbnailUnavailable, setThumbnailUnavailable] = useState(false);
@@ -147,29 +150,51 @@ const SafeVideoEmbed = ({
   const youtubeThumbnail = !safePosterUrl || posterFailed ? getYouTubeThumbnail(videoUrl, youtubeMaxFailed ? 'hqdefault' : 'maxresdefault') : '';
   const thumbnailUrl = thumbnailUnavailable ? '' : (safePosterUrl && !posterFailed ? safePosterUrl : youtubeThumbnail);
   const wrapperClass = `group relative ${aspectRatio || 'aspect-video'} overflow-hidden rounded-[inherit] border border-violet-500/15 bg-black ${className}`.trim();
+  const frameRef = useRef(null);
+  const shouldLoadPlayer = activated || (loadWhenVisible && nearViewport);
+  const allowAutoplay = autoplayOnClick && !isMobile;
 
-  if (activated && directVideo && externalUrl) {
+  useEffect(() => {
+    setIsMobile(window.matchMedia?.('(max-width: 767px)').matches || false);
+  }, []);
+
+  useEffect(() => {
+    if (!loadWhenVisible || nearViewport || !frameRef.current) return undefined;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setNearViewport(true);
+          observer.disconnect();
+        }
+      },
+      { rootMargin: '360px 0px' }
+    );
+    observer.observe(frameRef.current);
+    return () => observer.disconnect();
+  }, [loadWhenVisible, nearViewport]);
+
+  if (shouldLoadPlayer && directVideo && externalUrl) {
     return (
-      <div className={wrapperClass}>
+      <div ref={frameRef} className={wrapperClass}>
         <video
           src={externalUrl}
           poster={safePosterUrl || undefined}
           controls
-          autoPlay={autoplayOnClick}
+          autoPlay={allowAutoplay}
           playsInline
-          preload="metadata"
+          preload={activated ? 'metadata' : 'none'}
           className="absolute inset-0 h-full w-full object-contain"
         />
       </div>
     );
   }
 
-  if (activated && embedUrl) {
+  if (shouldLoadPlayer && embedUrl) {
     return (
-      <div className={wrapperClass}>
+      <div ref={frameRef} className={wrapperClass}>
         <iframe
           title={title}
-          src={autoplayOnClick ? withAutoplay(embedUrl) : embedUrl}
+          src={allowAutoplay && activated ? withAutoplay(embedUrl) : embedUrl}
           className="absolute inset-0 h-full w-full"
           loading="lazy"
           referrerPolicy="strict-origin-when-cross-origin"
@@ -183,6 +208,7 @@ const SafeVideoEmbed = ({
   if ((embedUrl || (directVideo && externalUrl)) && showPlayOverlay) {
     return (
       <button
+        ref={frameRef}
         type="button"
         onClick={() => setActivated(true)}
         className={`${wrapperClass} block w-full text-left`}
@@ -215,7 +241,7 @@ const SafeVideoEmbed = ({
   }
 
   return (
-    <div className={`${wrapperClass} flex min-h-[220px] items-center justify-center border border-white/10 text-center text-sm text-white/60`}>
+    <div ref={frameRef} className={`${wrapperClass} flex min-h-[220px] items-center justify-center border border-white/10 text-center text-sm text-white/60`}>
       <div className="px-6">
         <p>Video unavailable</p>
         {externalUrl && (

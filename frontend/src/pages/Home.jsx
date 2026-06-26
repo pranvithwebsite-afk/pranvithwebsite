@@ -1,17 +1,17 @@
-import React from 'react';
+import React, { Suspense, lazy } from 'react';
 import { ArrowRight } from 'lucide-react';
 import Header from '../components/Header';
 import Hero from '../components/Hero';
-import ShowreelSection from '../components/ShowreelSection';
 import ServicesSection from '../components/ServicesSection';
-import TransformVision from '../components/TransformVision';
-import OurWorks from '../components/OurWorks';
-import FAQ from '../components/FAQ';
 import Footer from '../components/Footer';
 import { usePublicPageLoading } from '../components/PublicPageLoader';
-import PageReadyPlaceholder from '../components/PageReadyPlaceholder';
 import { useCmsPage } from '../hooks/useCmsPage';
 import { safePublicHref } from '../lib/utils';
+
+const ShowreelSection = lazy(() => import('../components/ShowreelSection'));
+const TransformVision = lazy(() => import('../components/TransformVision'));
+const OurWorks = lazy(() => import('../components/OurWorks'));
+const FAQ = lazy(() => import('../components/FAQ'));
 
 const sectionToHomeKey = {
   hero: 'hero',
@@ -74,20 +74,34 @@ const Home = () => {
     secondaryButtonUrl: firstText(heroSection.data?.secondary_button_link),
   } : null;
 
-  if (loading) return <PageReadyPlaceholder />;
-
   return (
     <main className="page relative overflow-hidden bg-[#070314] text-white">
       <Header />
       {order.map((sectionKey) => {
         const sections = {
           hero: <Hero key="hero" pageData={heroData} />,
-          featuredAssets: <OurWorks key="featuredAssets" section={worksSection} />,
-          instagramProfile: instagramSection ? <TransformVision key="instagramProfile" section={instagramSection} /> : null,
+          featuredAssets: (
+            <Suspense key="featuredAssets" fallback={<SectionSkeleton />}>
+              <OurWorks section={worksSection} />
+            </Suspense>
+          ),
+          instagramProfile: instagramSection ? (
+            <Suspense key="instagramProfile" fallback={<SectionSkeleton />}>
+              <TransformVision section={instagramSection} />
+            </Suspense>
+          ) : null,
           services: servicesSection ? <ServicesSection key="services" section={servicesSection} /> : null,
-          showreel: showreelSection ? <ShowreelSection key="showreel" section={showreelSection} /> : null,
+          showreel: showreelSection ? (
+            <Suspense key="showreel" fallback={<SectionSkeleton />}>
+              <ShowreelSection section={showreelSection} />
+            </Suspense>
+          ) : null,
           cta: <HomeCta key="cta" section={ctaSection} />,
-          footerCta: faqSection ? <FAQ key="footerCta" section={faqSection} /> : null,
+          footerCta: faqSection ? (
+            <Suspense key="footerCta" fallback={<SectionSkeleton />}>
+              <FAQ section={faqSection} />
+            </Suspense>
+          ) : null,
         };
         return sections[sectionKey] || null;
       })}
@@ -113,6 +127,19 @@ const HomeCta = ({ section }) => (
             </span>
           </a>
         )}
+      </div>
+    </div>
+  </section>
+);
+
+const SectionSkeleton = () => (
+  <section className="px-6 py-16" aria-hidden="true">
+    <div className="mx-auto max-w-7xl">
+      <div className="h-8 w-56 animate-pulse rounded-full bg-white/8" />
+      <div className="mt-6 grid gap-5 md:grid-cols-3">
+        {[0, 1, 2].map((item) => (
+          <div key={item} className="h-56 animate-pulse rounded-2xl border border-white/10 bg-white/[0.04]" />
+        ))}
       </div>
     </div>
   </section>

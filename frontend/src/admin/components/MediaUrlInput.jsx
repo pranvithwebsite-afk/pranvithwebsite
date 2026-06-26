@@ -98,7 +98,9 @@ const MediaUrlInput = ({
           Remove
         </button>
       </div>
-      {helperText && <p className="mt-2 text-xs text-slate-500">{helperText}</p>}
+      <p className="mt-2 text-xs text-slate-500">
+        {helperText || 'For fast public pages, use compressed JPG/WebP thumbnails under 300KB when possible.'}
+      </p>
       {showPreview && <MediaPreview value={value} type={currentType} />}
       {pickerOpen && (
         <MediaPickerModal

@@ -2,6 +2,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowUpRight, Camera, Clapperboard, Globe, Heart, Music, Palette, Plane, PlaySquare, Scissors } from 'lucide-react';
 import { FALLBACK_IMAGE, handleImageError, safeImageSrc } from '../lib/utils';
+import OptimizedImage from './OptimizedImage';
 
 export const serviceIcons = {
   Camera,
@@ -26,9 +27,11 @@ const ServiceCard = ({ service, index = 0 }) => {
       data-testid={`service-card-${service.slug}`}
     >
       {image ? (
-        <img
+        <OptimizedImage
           src={safeImageSrc(image, FALLBACK_IMAGE)}
           alt={service.title}
+          width={420}
+          height={360}
           className="absolute inset-0 h-full w-full object-cover opacity-58 transition duration-500 group-hover:scale-105 group-hover:opacity-72"
           onError={handleImageError}
         />

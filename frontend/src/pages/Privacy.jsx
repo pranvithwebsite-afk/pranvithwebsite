@@ -2,7 +2,6 @@ import React from 'react';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
 import { usePublicPageLoading } from '../components/PublicPageLoader';
-import PageReadyPlaceholder from '../components/PageReadyPlaceholder';
 import { useCmsPage } from '../hooks/useCmsPage';
 
 const termsSections = [
@@ -118,8 +117,6 @@ const Privacy = () => {
   const { page: termsPage, loading: termsLoading } = useCmsPage('terms');
   const loading = privacyLoading || termsLoading;
   usePublicPageLoading(loading);
-
-  if (loading) return <PageReadyPlaceholder />;
 
   const termsSection = findLegalSection(termsPage);
   const privacySection = findLegalSection(privacyPage);

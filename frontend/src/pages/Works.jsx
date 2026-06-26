@@ -7,7 +7,7 @@ import SafeVideoEmbed, { detectMediaType, getYouTubeThumbnail } from '../compone
 import { useCmsPage } from '../hooks/useCmsPage';
 import ClientTestimonialsSection from '../components/ClientTestimonialsSection';
 import { usePublicPageLoading } from '../components/PublicPageLoader';
-import PageReadyPlaceholder from '../components/PageReadyPlaceholder';
+import OptimizedImage from '../components/OptimizedImage';
 
 const filters = ['All', 'Commercial', 'Wedding', 'Drone', 'Editing', 'Product', 'Film'];
 
@@ -55,8 +55,6 @@ const Works = () => {
   }, [allProjects]);
   const showHero = hero.section_id || !page;
 
-  if (loading) return <PageReadyPlaceholder />;
-
   return (
     <main className="page bg-[#070314] text-white">
       <Header />
@@ -96,7 +94,7 @@ const Works = () => {
               ) : (
                 <>
                   {showreel.poster_url && (
-                    <img src={safeImageSrc(showreel.poster_url)} alt={showreel.title} className="h-full w-full object-cover opacity-75 transition group-hover:scale-105 group-hover:opacity-95" onError={handleImageError} />
+                    <OptimizedImage src={safeImageSrc(showreel.poster_url)} alt={showreel.title} priority width={760} height={428} className="h-full w-full object-cover opacity-75 transition group-hover:scale-105 group-hover:opacity-95" onError={handleImageError} />
                   )}
                   <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/15 to-transparent" />
                   <div className="absolute inset-0 flex items-center justify-center">
@@ -179,7 +177,7 @@ const ProjectCard = ({ project }) => {
             aspectRatio="aspect-[16/11]"
           />
         ) : thumbnail ? (
-          <img src={safeImageSrc(thumbnail)} alt={project.title} loading="lazy" className="h-full w-full object-cover opacity-75 transition duration-500 group-hover:scale-105 group-hover:opacity-95" onError={handleImageError} />
+          <OptimizedImage src={safeImageSrc(thumbnail)} alt={project.title} width={420} height={289} className="h-full w-full object-cover opacity-75 transition duration-500 group-hover:scale-105 group-hover:opacity-95" onError={handleImageError} />
         ) : (
           <div className="flex h-full w-full items-center justify-center px-6 text-center text-sm font-semibold uppercase tracking-[0.24em] text-violet-200/70">PranvithDOP</div>
         )}

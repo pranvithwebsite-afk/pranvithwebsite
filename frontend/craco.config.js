@@ -39,6 +39,45 @@ let webpackConfig = {
         }),
       ];
 
+      webpackConfig.optimization = {
+        ...webpackConfig.optimization,
+        runtimeChunk: 'single',
+        splitChunks: {
+          chunks: 'all',
+          cacheGroups: {
+            react: {
+              test: /[\\/]node_modules[\\/](react|react-dom)[\\/]/,
+              name: 'vendor-react',
+              priority: 40,
+              enforce: true,
+            },
+            router: {
+              test: /[\\/]node_modules[\\/](react-router|react-router-dom|@remix-run)[\\/]/,
+              name: 'vendor-router',
+              priority: 35,
+              enforce: true,
+            },
+            icons: {
+              test: /[\\/]node_modules[\\/]lucide-react[\\/]/,
+              name: 'vendor-icons',
+              priority: 30,
+              enforce: true,
+            },
+            admin: {
+              test: /[\\/]src[\\/]admin[\\/]/,
+              name: 'admin',
+              priority: 25,
+              enforce: true,
+            },
+            vendors: {
+              test: /[\\/]node_modules[\\/]/,
+              name: 'vendor',
+              priority: 10,
+            },
+          },
+        },
+      };
+
       return webpackConfig;
     },
   },
