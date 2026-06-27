@@ -1,8 +1,8 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
-import { Search, Share2 } from 'lucide-react';
+import { ChevronDown, Filter, Search, Share2 } from 'lucide-react';
 import { fetchProducts } from '../lib/api';
 import { FALLBACK_IMAGE, dedupeCatalogItems, getCatalogItemKey, handleImageError, safeImageSrc, shareProduct } from '../lib/utils';
 import CheckoutModal from '../components/CheckoutModal';
@@ -71,6 +71,8 @@ const Assets = () => {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [checkoutProduct, setCheckoutProduct] = useState(null);
+  const [isMobileFilterOpen, setIsMobileFilterOpen] = useState(false);
+  const mobileFilterRef = useRef(null);
   usePublicPageLoading(cmsLoading || loading);
 
   useEffect(() => {
@@ -116,6 +118,34 @@ const Assets = () => {
   const showProductListing = !pageHidden && settings.show_product_listing !== false;
   const showFilters = settings.show_filters !== false;
   const heroSection = findSection(cmsPage?.sections || [], 'hero');
+  const activeFilterCount = (query.trim() ? 1 : 0) + (sort !== 'newest' ? 1 : 0) + (priceFilter !== 'all' ? 1 : 0);
+  const mobileFilterPanelId = 'assets-mobile-filters';
+
+  const closeMobileFilters = () => setIsMobileFilterOpen(false);
+
+  const closeMobileFiltersIfNeeded = () => {
+    if (window.matchMedia?.('(max-width: 1023px)').matches) closeMobileFilters();
+  };
+
+  useEffect(() => {
+    if (!isMobileFilterOpen) return undefined;
+    const closeOnScroll = () => closeMobileFilters();
+    window.addEventListener('scroll', closeOnScroll, { passive: true });
+    return () => window.removeEventListener('scroll', closeOnScroll);
+  }, [isMobileFilterOpen]);
+
+  useEffect(() => {
+    if (!isMobileFilterOpen) return undefined;
+    const closeOnOutside = (event) => {
+      if (!mobileFilterRef.current?.contains(event.target)) closeMobileFilters();
+    };
+    document.addEventListener('mousedown', closeOnOutside);
+    document.addEventListener('touchstart', closeOnOutside, { passive: true });
+    return () => {
+      document.removeEventListener('mousedown', closeOnOutside);
+      document.removeEventListener('touchstart', closeOnOutside);
+    };
+  }, [isMobileFilterOpen]);
 
   return (
     <main className="page bg-[var(--bg-main)] text-white min-h-screen">
@@ -136,35 +166,63 @@ const Assets = () => {
 
 
       {showProductListing && <section className="pb-24">
-        <div className="max-w-7xl mx-auto px-6 grid grid-cols-1 lg:grid-cols-[260px_1fr] gap-8">
-          {showFilters && <aside className="cinematic-card h-fit p-6 lg:sticky lg:top-28">
-            <h3 className="section-eyebrow mb-5 text-xs">FILTERS</h3>
+        <div className="max-w-7xl mx-auto px-6 grid grid-cols-1 lg:grid-cols-[260px_1fr] gap-5 lg:gap-8">
+          {showFilters && (
+            <div ref={mobileFilterRef} className="lg:hidden">
+              <button
+                type="button"
+                aria-expanded={isMobileFilterOpen}
+                aria-controls={mobileFilterPanelId}
+                onClick={() => setIsMobileFilterOpen((open) => !open)}
+                className="flex w-full items-center justify-between rounded-[18px] border border-purple-300/20 bg-[linear-gradient(145deg,rgba(23,16,37,0.96),rgba(13,8,24,0.98))] px-5 py-4 text-left shadow-[0_0_45px_rgba(124,58,237,0.12)] transition hover:border-purple-300/35"
+              >
+                <span className="inline-flex items-center gap-3 text-sm font-semibold text-white">
+                  <span className="flex h-9 w-9 items-center justify-center rounded-2xl border border-purple-300/20 bg-purple-500/15 text-[#c4b5fd]">
+                    <Filter size={17} />
+                  </span>
+                  Filters{activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}
+                </span>
+                <ChevronDown size={18} className={`text-[#c4b5fd] transition-transform duration-300 ${isMobileFilterOpen ? 'rotate-180' : ''}`} />
+              </button>
+              <div
+                id={mobileFilterPanelId}
+                className={`grid overflow-hidden transition-[grid-template-rows,opacity,margin] duration-300 ease-out ${
+                  isMobileFilterOpen ? 'mt-3 grid-rows-[1fr] opacity-100' : 'mt-0 grid-rows-[0fr] opacity-0'
+                }`}
+              >
+                <div className="min-h-0 overflow-hidden">
+                  <div className="cinematic-card p-5">
+                    <FilterContent
+                      query={query}
+                      setQuery={setQuery}
+                      sort={sort}
+                      setSort={setSort}
+                      priceFilter={priceFilter}
+                      setPriceFilter={setPriceFilter}
+                      onOptionSelect={closeMobileFiltersIfNeeded}
+                      inputTestId="assets-search-input-mobile"
+                      radioNameSuffix="mobile"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
-            <div className="relative mb-7">
-              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40" />
-              <input
-                type="text"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search assets..."
-                data-testid="assets-search-input"
-                className="w-full rounded-lg border border-purple-300/20 bg-purple-500/10 py-2.5 pl-9 pr-3 text-sm text-white placeholder:text-white/35 focus:border-purple-300/35 focus:outline-none"
+          {showFilters && (
+            <aside className="cinematic-card hidden h-fit p-6 lg:sticky lg:top-28 lg:block">
+              <FilterContent
+                query={query}
+                setQuery={setQuery}
+                sort={sort}
+                setSort={setSort}
+                priceFilter={priceFilter}
+                setPriceFilter={setPriceFilter}
+                inputTestId="assets-search-input"
+                radioNameSuffix="desktop"
               />
-            </div>
-
-            <div className="mb-7">
-              <p className="text-sm font-semibold text-white mb-3">Sort By</p>
-              <RadioRow name="sort" value="newest" checked={sort === 'newest'} onChange={() => setSort('newest')} label="Newest First" />
-              <RadioRow name="sort" value="oldest" checked={sort === 'oldest'} onChange={() => setSort('oldest')} label="Oldest First" />
-            </div>
-
-            <div>
-              <p className="text-sm font-semibold text-white mb-3">Price</p>
-              <RadioRow name="price" value="all" checked={priceFilter === 'all'} onChange={() => setPriceFilter('all')} label="All" />
-              <RadioRow name="price" value="free" checked={priceFilter === 'free'} onChange={() => setPriceFilter('free')} label="Free" />
-              <RadioRow name="price" value="paid" checked={priceFilter === 'paid'} onChange={() => setPriceFilter('paid')} label="Paid" />
-            </div>
-          </aside>}
+            </aside>
+          )}
 
           <div>
             {loading ? (
@@ -227,8 +285,61 @@ const Assets = () => {
   );
 };
 
+const FilterContent = ({
+  query,
+  setQuery,
+  sort,
+  setSort,
+  priceFilter,
+  setPriceFilter,
+  onOptionSelect,
+  inputTestId,
+  radioNameSuffix,
+}) => {
+  const setSortAndClose = (value) => {
+    setSort(value);
+    onOptionSelect?.();
+  };
+
+  const setPriceAndClose = (value) => {
+    setPriceFilter(value);
+    onOptionSelect?.();
+  };
+
+  return (
+    <>
+      <h3 className="section-eyebrow mb-5 text-xs">FILTERS</h3>
+
+      <div className="relative mb-6 lg:mb-7">
+        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40" />
+        <input
+          type="text"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Search assets..."
+          data-testid={inputTestId}
+          className="w-full rounded-lg border border-purple-300/20 bg-purple-500/10 py-3 pl-9 pr-3 text-sm text-white placeholder:text-white/35 focus:border-purple-300/35 focus:outline-none lg:py-2.5"
+        />
+      </div>
+
+      <div className="mb-6 lg:mb-7">
+        <p className="text-sm font-semibold text-white mb-3">Sort By</p>
+        <RadioRow name={`sort-${radioNameSuffix}`} value="newest" checked={sort === 'newest'} onChange={() => setSortAndClose('newest')} label="Newest First" />
+        <RadioRow name={`sort-${radioNameSuffix}`} value="oldest" checked={sort === 'oldest'} onChange={() => setSortAndClose('oldest')} label="Oldest First" />
+      </div>
+
+      <div>
+        <p className="text-sm font-semibold text-white mb-3">Price</p>
+        <RadioRow name={`price-${radioNameSuffix}`} value="all" checked={priceFilter === 'all'} onChange={() => setPriceAndClose('all')} label="All" />
+        <RadioRow name={`price-${radioNameSuffix}`} value="free" checked={priceFilter === 'free'} onChange={() => setPriceAndClose('free')} label="Free" />
+        <RadioRow name={`price-${radioNameSuffix}`} value="paid" checked={priceFilter === 'paid'} onChange={() => setPriceAndClose('paid')} label="Paid" />
+      </div>
+    </>
+  );
+};
+
 const RadioRow = ({ name, value, checked, onChange, label }) => (
-  <label className="flex items-center gap-3 py-1.5 cursor-pointer group">
+  <label className="flex cursor-pointer items-center gap-3 rounded-xl py-2.5 transition hover:bg-purple-500/10 lg:py-1.5 group">
     <span className="relative inline-flex">
       <input type="radio" name={name} value={value} checked={checked} onChange={onChange} className="sr-only" />
       <span className={`w-4 h-4 rounded-full border-2 transition ${checked ? 'border-purple-300' : 'border-purple-300/30 group-hover:border-purple-300/50'}`} />
