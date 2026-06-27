@@ -82,7 +82,7 @@ const ServiceDetail = () => {
               <ArrowLeft size={16} />
               Services
             </Link>
-            <p className="mt-8 text-xs font-bold uppercase tracking-[0.38em] text-cyan-300">{service.category || 'PranvithDOP Service'}</p>
+            <p className="mt-8 text-xs font-bold uppercase tracking-[0.38em] text-purple-200">{service.category || 'PranvithDOP Service'}</p>
             <h1 className="mt-4 text-5xl font-black tracking-tight text-white md:text-7xl">{service.title}</h1>
             <p className="mt-5 text-2xl font-semibold leading-snug text-white/86">{service.subtitle}</p>
             <p className="mt-5 max-w-2xl text-base leading-8 text-white/66">{service.short_description}</p>
@@ -117,13 +117,13 @@ const ServiceDetail = () => {
         <section className="px-6 py-16">
           <div className="mx-auto grid max-w-7xl gap-10 lg:grid-cols-[0.8fr_1.2fr]">
             <div>
-              <p className="text-xs font-bold uppercase tracking-[0.38em] text-cyan-300">Why Choose Us</p>
+              <p className="text-xs font-bold uppercase tracking-[0.38em] text-purple-200">Why Choose Us</p>
               <h2 className="mt-5 text-4xl font-bold tracking-tight text-white">Practical craft with a cinematic finish.</h2>
             </div>
             <div className="grid gap-4 md:grid-cols-2">
               {service.why_choose.map((item, index) => (
                 <article key={`${item.title}-${index}`} className="rounded-2xl border border-white/10 bg-white/[0.04] p-6">
-                  <CheckCircle2 size={20} className="text-cyan-300" />
+                  <CheckCircle2 size={20} className="text-purple-200" />
                   <h3 className="mt-4 text-lg font-semibold text-white">{item.title}</h3>
                   <p className="mt-3 text-sm leading-6 text-white/62">{item.description}</p>
                 </article>

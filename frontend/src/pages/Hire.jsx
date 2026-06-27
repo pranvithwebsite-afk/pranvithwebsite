@@ -118,7 +118,7 @@ const Hire = () => {
                   const Icon = index % 2 === 0 ? CalendarDays : MapPin;
                   return (
                     <div key={`${card.title}-${index}`} className="rounded-2xl border border-white/10 bg-black/20 p-5">
-                      <Icon className={index % 2 === 0 ? 'text-violet-300' : 'text-sky-300'} size={22} />
+                      <Icon className={index % 2 === 0 ? 'text-violet-300' : 'text-purple-200'} size={22} />
                       <p className="mt-3 text-sm font-semibold text-white">{card.title}</p>
                       <p className="mt-1 text-xs leading-5 text-white/55">{card.description}</p>
                     </div>
