@@ -21,10 +21,10 @@ const ServiceCard = ({ service, index = 0 }) => {
   return (
     <Link
       to={linkTarget}
-      className="group rounded-[22px] border border-[var(--border-soft)] bg-[linear-gradient(145deg,rgba(23,16,37,0.96),rgba(13,8,24,0.98))] p-6 backdrop-blur transition duration-300 hover:-translate-y-1 hover:border-[var(--border-strong)] hover:shadow-[var(--shadow-purple)]"
+      className="cinematic-card group p-6 backdrop-blur transition duration-300 hover:-translate-y-1"
       data-testid={`service-card-${service.slug}`}
     >
-      <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-2xl border border-[var(--border-strong)] bg-[rgba(124,58,237,0.22)] text-purple-200">
+      <div className="cinematic-icon mb-5 flex h-12 w-12 items-center justify-center rounded-2xl">
         <Icon size={22} />
       </div>
       <h3 className="text-xl font-semibold text-white">{service.title}</h3>
@@ -38,4 +38,3 @@ const ServiceCard = ({ service, index = 0 }) => {
 };
 
 export default ServiceCard;
-

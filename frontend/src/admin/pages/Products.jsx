@@ -104,7 +104,7 @@ const Products = () => {
     loadProducts();
   }, []);
 
-  const loadProducts = async () => {
+  const loadProducts = async ({ showToast = true } = {}) => {
     try {
       setLoading(true);
       const data = await fetchAdminProducts();
@@ -112,7 +112,7 @@ const Products = () => {
       setError('');
     } catch (error) {
       console.error('[admin/products] Failed to load products', error?.response?.data?.detail || error?.message || error);
-      toast.error('Failed to load products');
+      if (showToast) toast.error('Failed to load products');
       setProducts([]);
       setError('Products could not be loaded.');
     } finally {
@@ -144,6 +144,7 @@ const Products = () => {
   };
 
   const handleSave = async () => {
+    if (saving) return;
     const slug = normalizeSlug(formData.slug || formData.name);
     const payload = {
       ...formData,
@@ -173,8 +174,13 @@ const Products = () => {
         toast[result?.warning ? 'warning' : 'success'](result?.warning || 'Product saved successfully');
       }
       closeForm();
-      await loadProducts();
+      try {
+        await loadProducts({ showToast: false });
+      } catch (refreshError) {
+        console.warn('[admin/products] Product saved but refresh failed', refreshError?.response?.data?.detail || refreshError?.message || refreshError);
+      }
     } catch (error) {
+      console.error('[admin/products] Failed to save product', error?.response?.data?.detail || error?.message || error);
       toast.error(error?.response?.data?.detail || 'Failed to save product');
     } finally {
       setSaving(false);
@@ -330,7 +336,7 @@ const Products = () => {
               <div className="mt-4 flex gap-2">
                 <button
                   onClick={() => openEditForm(product)}
-                  className="flex-1 flex items-center justify-center gap-1 px-3 py-2 rounded bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold transition"
+                  className="flex-1 flex items-center justify-center gap-1 px-3 py-2 rounded bg-purple-600 hover:bg-purple-500 text-white text-sm font-semibold transition"
                 >
                   <Edit2 size={14} />
                   Edit

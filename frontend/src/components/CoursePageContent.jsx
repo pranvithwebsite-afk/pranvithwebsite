@@ -98,9 +98,9 @@ export const CourseComingSoon = ({ visibility = defaultCourseVisibility }) => {
   return (
     <section className="relative flex min-h-[70vh] items-center justify-center overflow-hidden px-6 py-24">
       <div className="absolute left-1/2 top-1/2 h-[32rem] w-[32rem] -translate-x-1/2 -translate-y-1/2 rounded-full bg-violet-600/20 blur-3xl" />
-      <div className="absolute bottom-0 right-0 h-72 w-72 rounded-full bg-blue-500/10 blur-3xl" />
-      <div className="relative mx-auto max-w-3xl rounded-[2rem] border border-white/10 bg-white/[0.05] p-8 text-center shadow-2xl shadow-violet-950/30 backdrop-blur md:p-12">
-        <p className="text-sm font-bold uppercase tracking-[0.35em] text-violet-300">PranvithDOP Courses</p>
+      <div className="absolute bottom-0 right-0 h-72 w-72 rounded-full bg-purple-500/10 blur-3xl" />
+      <div className="cinematic-card relative mx-auto max-w-3xl p-8 text-center backdrop-blur md:p-12">
+        <p className="section-eyebrow text-sm">PranvithDOP Courses</p>
         <h1 className="mt-5 text-5xl font-bold tracking-tight text-white md:text-7xl">
           {data.coming_soon_title}
         </h1>
@@ -185,7 +185,7 @@ const CoursePageContent = ({ children, contentOverride }) => {
         <div className="absolute left-1/2 top-0 h-96 w-96 -translate-x-1/2 rounded-full bg-violet-600/20 blur-3xl" />
         <div className="relative mx-auto grid max-w-7xl gap-10 lg:grid-cols-[0.95fr_1.05fr] lg:items-center">
           <div className="text-center lg:text-left">
-            <p className="text-sm font-semibold uppercase tracking-[0.35em] text-violet-300">{content.hero.badge}</p>
+            <p className="section-eyebrow text-sm">{content.hero.badge}</p>
             <h1 className="mt-4 text-5xl font-bold leading-tight tracking-tight md:text-7xl">{content.hero.heading}</h1>
             <p className="mx-auto mt-5 max-w-2xl text-lg leading-8 text-white/68 lg:mx-0">{content.hero.subtitle}</p>
             {content.hero.button_text && (
@@ -197,7 +197,7 @@ const CoursePageContent = ({ children, contentOverride }) => {
               </a>
             )}
           </div>
-          <div className="overflow-hidden rounded-[2rem] border border-white/10 bg-white/[0.04] shadow-2xl shadow-violet-950/30">
+          <div className="cinematic-card overflow-hidden">
             {content.hero.video_url ? (
               <SafeVideoEmbed
                 videoType={content.hero.media_type || 'video_url'}
@@ -226,14 +226,14 @@ const CoursePageContent = ({ children, contentOverride }) => {
         <section className="px-6 py-16">
           <div className="mx-auto max-w-7xl">
             <div className="mb-10 text-center">
-              <p className="text-sm font-semibold uppercase tracking-[0.35em] text-violet-300">{learnSection.title || "What You'll Learn"}</p>
+              <p className="section-eyebrow text-sm">{learnSection.title || "What You'll Learn"}</p>
               <h2 className="mt-3 text-4xl font-bold tracking-tight md:text-5xl">{learnSection.subtitle || 'Skills that turn timelines into stories.'}</h2>
               {learnSection.description && <p className="mx-auto mt-4 max-w-2xl text-white/62">{learnSection.description}</p>}
             </div>
             <div className="grid gap-5 md:grid-cols-3">
               {learnItems.map((item) => (
-                <article key={`${item.title}-${item.sort_order}`} className="rounded-3xl border border-white/10 bg-white/[0.04] p-6 transition hover:-translate-y-1 hover:border-violet-300/30">
-                  <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-2xl bg-violet-600/20 text-sm font-bold text-violet-100">
+                <article key={`${item.title}-${item.sort_order}`} className="cinematic-card p-6 transition hover:-translate-y-1">
+                  <div className="cinematic-icon mb-5 flex h-12 w-12 items-center justify-center rounded-2xl text-sm font-bold">
                     {item.icon || '✓'}
                   </div>
                   <h3 className="text-xl font-semibold text-white">{item.title}</h3>
@@ -252,15 +252,15 @@ const CoursePageContent = ({ children, contentOverride }) => {
           <div className="mx-auto max-w-7xl">
             <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
               <div>
-                <p className="text-sm font-bold uppercase tracking-[0.35em] text-violet-300">{videosSection.title || 'Student Testimonials'}</p>
+                <p className="section-eyebrow text-sm">{videosSection.title || 'Student Testimonials'}</p>
                 <h2 className="mt-3 max-w-3xl text-4xl font-bold tracking-tight md:text-5xl">
                   {videosSection.subtitle || 'Real people. Real transformations.'}
                 </h2>
                 <p className="mt-4 max-w-2xl text-white/62">{videosSection.description || 'Hear from our students who mastered video editing.'}</p>
               </div>
               <div className="hidden gap-2 md:flex">
-                <button type="button" onClick={() => scrollCarousel(-1)} className="rounded-full border border-white/10 bg-white/5 p-3 text-white hover:bg-violet-600"><ArrowLeft size={18} /></button>
-                <button type="button" onClick={() => scrollCarousel(1)} className="rounded-full border border-white/10 bg-white/5 p-3 text-white hover:bg-violet-600"><ArrowRight size={18} /></button>
+                <button type="button" onClick={() => scrollCarousel(-1)} className="rounded-full border border-purple-300/20 bg-purple-500/10 p-3 text-white hover:bg-purple-500/15"><ArrowLeft size={18} /></button>
+                <button type="button" onClick={() => scrollCarousel(1)} className="rounded-full border border-purple-300/20 bg-purple-500/10 p-3 text-white hover:bg-purple-500/15"><ArrowRight size={18} /></button>
               </div>
             </div>
 
@@ -270,7 +270,7 @@ const CoursePageContent = ({ children, contentOverride }) => {
                   key={`${item.student_name}-${index}`}
                   type="button"
                   onClick={() => getVideoUrl(item) && setActiveVideo(item)}
-                  className="group relative h-[440px] w-[280px] shrink-0 snap-start overflow-hidden rounded-[2rem] border border-white/10 bg-white/[0.04] text-left shadow-xl shadow-black/25 transition hover:-translate-y-1 hover:border-violet-300/40"
+                  className="cinematic-card group relative h-[440px] w-[280px] shrink-0 snap-start overflow-hidden text-left transition hover:-translate-y-1"
                 >
                   <img
                     src={safeImageSrc(getPosterUrl(item) || getYouTubeThumbnail(getVideoUrl(item), 'hqdefault') || studentVideos[index % studentVideos.length]?.thumb || fallbackThumbnail)}
@@ -311,7 +311,7 @@ const CoursePageContent = ({ children, contentOverride }) => {
             {reviewsSection.description && <p className="mx-auto mt-4 max-w-2xl text-center text-white/62">{reviewsSection.description}</p>}
             <div className="mt-10 grid gap-5 md:grid-cols-2">
               {reviews.map((review) => (
-                <article key={`${review.student_name}-${review.sort_order}`} className="rounded-3xl border border-white/10 bg-white/[0.04] p-6">
+                <article key={`${review.student_name}-${review.sort_order}`} className="cinematic-card p-6">
                   <div className="flex items-center gap-1 text-amber-300">
                     {Array.from({ length: review.rating || 5 }).map((_, index) => <Star key={index} size={15} fill="currentColor" />)}
                   </div>
@@ -336,7 +336,7 @@ const CoursePageContent = ({ children, contentOverride }) => {
             <h2 className="text-center text-4xl font-bold tracking-tight">Student Comments</h2>
             <div className="mt-8 space-y-4">
               {comments.map((comment) => (
-                <article key={`${comment.student_name}-${comment.sort_order}`} className="rounded-2xl border border-white/10 bg-black/20 p-5">
+                <article key={`${comment.student_name}-${comment.sort_order}`} className="cinematic-card p-5">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <p className="font-semibold text-white">{comment.student_name}</p>
                     {comment.date && <p className="text-xs text-white/40">{comment.date}</p>}
@@ -354,7 +354,7 @@ const CoursePageContent = ({ children, contentOverride }) => {
           <div className="mx-auto max-w-5xl">
             <h2 className="text-center text-4xl font-bold tracking-tight">{faqSection.title || 'Course FAQ'}</h2>
             {faqSection.description && <p className="mx-auto mt-4 max-w-2xl text-center text-white/62">{faqSection.description}</p>}
-            <div className="mt-8 divide-y divide-white/10 rounded-3xl border border-white/10 bg-white/[0.04]">
+            <div className="cinematic-card mt-8 divide-y divide-purple-300/15">
               {faqItems.map((item) => (
                 <details key={`${item.question}-${item.sort_order}`} className="group p-6">
                   <summary className="cursor-pointer list-none text-lg font-semibold text-white">{item.question}</summary>
@@ -376,7 +376,7 @@ const CoursePageContent = ({ children, contentOverride }) => {
 const VideoModal = ({ video, onClose }) => {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 px-4 py-8 backdrop-blur">
-      <div className="relative w-full max-w-5xl overflow-hidden rounded-3xl border border-white/10 bg-[#090316]">
+      <div className="relative w-full max-w-5xl overflow-hidden rounded-3xl border border-purple-300/20 bg-[#090316]">
         <button type="button" onClick={onClose} className="absolute right-4 top-4 z-10 rounded-full bg-black/70 p-2 text-white hover:bg-violet-600" aria-label="Close video">
           <X size={18} />
         </button>

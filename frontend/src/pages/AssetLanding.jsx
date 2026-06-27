@@ -48,7 +48,7 @@ const AssetLanding = () => {
       <main className="page min-h-screen bg-[var(--bg-main)] text-white">
         <Header />
         <section className="px-6 pb-16 pt-8">
-          <div className="mx-auto max-w-7xl rounded-[2rem] border border-white/10 bg-white/[0.04] p-8 lg:p-12">
+          <div className="cinematic-card mx-auto max-w-7xl p-8 lg:p-12">
             <div className="grid gap-10 lg:grid-cols-[1fr_440px]">
               <div>
                 <div className="h-8 w-44 animate-pulse rounded-full bg-white/8" />
@@ -115,10 +115,10 @@ const AssetLanding = () => {
             <span className="text-white/85">{product.name}</span>
           </nav>
 
-          <div className="rounded-[2rem] overflow-hidden border border-white/10 bg-gradient-to-br from-[#090712] via-[#0d0820] to-[#0a0518] p-8 lg:p-12">
+          <div className="cinematic-card overflow-hidden p-8 lg:p-12">
             <div className="grid gap-10 lg:grid-cols-[1fr_440px] items-center">
               <div>
-                <div className="inline-flex items-center gap-2 rounded-full border border-violet-500/15 bg-violet-500/10 px-4 py-2 text-xs uppercase tracking-[0.3em] text-violet-300 mb-6">
+                <div className="inline-flex items-center gap-2 rounded-full border border-purple-300/20 bg-purple-500/15 px-4 py-2 text-xs uppercase tracking-[0.3em] text-purple-200 mb-6">
                   <Sparkles size={16} /> {product.category}
                 </div>
                 <h1 className="text-4xl md:text-5xl font-black tracking-tight text-white" data-testid="asset-title">
@@ -128,7 +128,7 @@ const AssetLanding = () => {
                   {landing.hero?.subhead || product.description}
                 </p>
                 <div className="mt-8 flex flex-col gap-4 sm:flex-row sm:items-center">
-                  <div className="rounded-3xl bg-white/5 border border-white/10 px-6 py-5 text-white">
+                  <div className="rounded-3xl bg-purple-500/10 border border-purple-300/20 px-6 py-5 text-white">
                     <p className="text-sm uppercase tracking-[0.3em] text-white/50">{isFree ? 'Price' : 'One-time price'}</p>
                     <p className="mt-3 text-4xl font-extrabold text-violet-300" data-testid="asset-price">
                       {isFree ? 'Free' : `₹${price.toLocaleString('en-IN')}`}
@@ -150,7 +150,7 @@ const AssetLanding = () => {
                     <button
                       type="button"
                       onClick={onShare}
-                      className="inline-flex items-center justify-center gap-2 rounded-3xl border border-violet-400/25 bg-white/5 px-8 py-4 text-sm font-semibold uppercase tracking-[0.12em] text-white transition hover:border-violet-300/60 hover:bg-violet-500/15"
+                      className="inline-flex items-center justify-center gap-2 rounded-3xl border border-purple-300/20 bg-purple-500/10 px-8 py-4 text-sm font-semibold uppercase tracking-[0.12em] text-white transition hover:border-purple-300/35 hover:bg-purple-500/15"
                     >
                       <Share2 size={17} /> Share
                     </button>
@@ -158,7 +158,7 @@ const AssetLanding = () => {
                 </div>
               </div>
 
-              <div className="rounded-[2rem] border border-white/10 bg-[#090712] overflow-hidden shadow-[0_30px_80px_rgba(0,0,0,0.35)]">
+              <div className="overflow-hidden rounded-[22px] border border-purple-300/20 bg-[#090712] shadow-[0_0_45px_rgba(124,58,237,0.14)]">
                 {heroImage ? (
                   <OptimizedImage src={heroImage} alt={product.name} priority width={440} height={550} className="w-full max-h-[420px] aspect-[4/3] object-cover sm:max-h-none sm:aspect-[4/5]" data-testid="asset-hero-image" onError={handleImageError} />
                 ) : (
@@ -181,8 +181,8 @@ const AssetLanding = () => {
             <h2 className="text-3xl font-bold tracking-tight mb-8">What you get</h2>
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {features.map((item) => (
-                <div key={item} className="rounded-3xl border border-white/10 bg-[#0d0820]/90 p-6 text-sm text-white/75 transition hover:border-violet-500/30">
-                  <div className="mb-4 inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-violet-500/10 text-violet-300">
+                <div key={item} className="cinematic-card p-6 text-sm text-white/75">
+                  <div className="cinematic-icon mb-4 inline-flex h-10 w-10 items-center justify-center rounded-2xl">
                     <CheckCircle size={18} />
                   </div>
                   <p className="font-semibold text-white">{item}</p>
@@ -217,13 +217,13 @@ const AssetLanding = () => {
       {benefits.length > 0 && (
         <section className="pb-16">
           <div className="max-w-7xl mx-auto px-6">
-            <div className="rounded-[2rem] border border-white/10 bg-[#090712] p-8">
-              <div className="inline-flex items-center gap-3 text-sm uppercase tracking-[0.35em] text-white/40 mb-6">
+            <div className="cinematic-card p-8">
+              <div className="section-eyebrow mb-6 inline-flex items-center gap-3 text-sm">
                 <ShieldCheck size={16} /> Why creators love it
               </div>
               <div className="grid gap-4 md:grid-cols-3">
                 {benefits.map((b) => (
-                  <div key={b} className="rounded-2xl border border-white/10 bg-white/5 p-5 text-white/80">
+                  <div key={b} className="rounded-2xl border border-purple-300/20 bg-purple-500/10 p-5 text-white/80">
                     {b}
                   </div>
                 ))}
@@ -237,15 +237,15 @@ const AssetLanding = () => {
       {compatibility.length > 0 && (
         <section className="pb-16">
           <div className="max-w-7xl mx-auto px-6">
-            <div className="rounded-[2rem] border border-white/10 bg-[#0b0920] p-8">
+            <div className="cinematic-card p-8">
               <div className="flex flex-col gap-8 lg:flex-row lg:items-center lg:justify-between">
                 <div>
-                  <p className="text-sm uppercase tracking-[0.35em] text-white/40">Compatibility</p>
+                  <p className="section-eyebrow text-sm">Compatibility</p>
                   <h2 className="mt-3 text-3xl font-bold tracking-tight">Works with your editor</h2>
                 </div>
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                   {compatibility.map((item) => (
-                    <div key={item} className="rounded-3xl border border-white/10 bg-[#090712]/80 px-4 py-4 text-center text-sm text-white/75">
+                    <div key={item} className="rounded-3xl border border-purple-300/20 bg-purple-500/10 px-4 py-4 text-center text-sm text-white/75">
                       <span className="block font-semibold text-white mb-1">{item}</span>
                     </div>
                   ))}
@@ -261,9 +261,9 @@ const AssetLanding = () => {
         <section className="pb-16">
           <div className="max-w-7xl mx-auto px-6">
             <h2 className="text-3xl font-bold tracking-tight mb-8">Market Comparison</h2>
-            <div className="overflow-hidden rounded-[2rem] border border-white/10 bg-[#0d0820]/90">
+            <div className="cinematic-card overflow-hidden">
               <table className="min-w-full text-left text-sm text-white/75">
-                <thead className="border-b border-white/10 bg-[#090712]/95 text-white/85">
+                <thead className="border-b border-purple-300/15 bg-[#090712]/95 text-white/85">
                   <tr>
                     <th className="px-6 py-4">Feature</th>
                     <th className="px-6 py-4">PranvithDOP</th>
@@ -272,7 +272,7 @@ const AssetLanding = () => {
                 </thead>
                 <tbody>
                   {marketTable.map((row, idx) => (
-                    <tr key={`${row[0]}-${idx}`} className="border-b border-white/10 last:border-b-0">
+                    <tr key={`${row[0]}-${idx}`} className="border-b border-purple-300/15 last:border-b-0">
                       <td className="px-6 py-4 text-white/85 font-medium">{row[0]}</td>
                       <td className="px-6 py-4">{row[1]}</td>
                       <td className="px-6 py-4">{row[2]}</td>
@@ -292,7 +292,7 @@ const AssetLanding = () => {
             <h2 className="text-3xl font-bold tracking-tight mb-8">Frequently Asked Questions</h2>
             <div className="grid gap-4">
               {faqs.map((item, idx) => (
-                <div key={item.q || idx} className="rounded-3xl border border-white/10 bg-[#0a0518]/90 p-6">
+                <div key={item.q || idx} className="cinematic-card p-6">
                   <p className="font-semibold text-white">{item.q}</p>
                   <p className="mt-3 text-white/70 leading-relaxed text-sm">{item.a}</p>
                 </div>
@@ -305,8 +305,8 @@ const AssetLanding = () => {
       {/* Final CTA */}
       <section className="pb-24">
         <div className="max-w-7xl mx-auto px-6">
-          <div className="rounded-[2rem] border border-violet-500/20 bg-gradient-to-br from-[#110d24] via-[#090712] to-[#0a0418] p-10 text-center">
-            <span className="inline-flex items-center justify-center rounded-full bg-violet-500/10 px-4 py-2 text-xs uppercase tracking-[0.35em] text-violet-300 mb-6">
+          <div className="cinematic-card p-10 text-center">
+            <span className="inline-flex items-center justify-center rounded-full border border-purple-300/20 bg-purple-500/15 px-4 py-2 text-xs uppercase tracking-[0.35em] text-purple-200 mb-6">
               Get Instant Access
             </span>
             <h2 className="text-4xl font-bold tracking-tight text-white">{isFree ? `Claim ${product.name}` : `Get ${product.name} today`}</h2>
@@ -378,7 +378,7 @@ const ProductMediaSection = ({ product, galleryImages }) => {
                   alt={`${product.name} preview ${index + 1}`}
                   width={420}
                   height={236}
-                  className="aspect-video w-full rounded-3xl border border-white/10 bg-[#090712] object-cover"
+                  className="aspect-video w-full rounded-3xl border border-purple-300/20 bg-[#090712] object-cover"
                   onError={handleImageError}
                 />
               ))}
@@ -389,7 +389,7 @@ const ProductMediaSection = ({ product, galleryImages }) => {
         {hasVideo && (
           <div>
             <h2 className="text-3xl font-bold tracking-tight mb-8">Product Video</h2>
-            <div className="overflow-hidden rounded-[2rem] border border-white/10 bg-black shadow-[0_30px_80px_rgba(0,0,0,0.35)]">
+            <div className="overflow-hidden rounded-[22px] border border-purple-300/20 bg-black shadow-[0_0_45px_rgba(124,58,237,0.14)]">
               <SafeVideoEmbed
                 videoType={product.video_type === 'direct' ? 'video_file' : product.video_type}
                 videoUrl={productVideoUrl}
@@ -435,7 +435,7 @@ const BeforeAfterSlider = ({ beforeImage, afterImage }) => {
   return (
     <div
       ref={frameRef}
-      className="relative mx-auto aspect-video max-w-5xl overflow-hidden rounded-[2rem] border border-white/10 bg-black shadow-[0_30px_90px_rgba(0,0,0,0.45)]"
+      className="relative mx-auto aspect-video max-w-5xl overflow-hidden rounded-[22px] border border-purple-300/20 bg-black shadow-[0_0_45px_rgba(124,58,237,0.14)]"
       onMouseDown={startDrag}
       onTouchStart={startDrag}
     >
@@ -461,9 +461,9 @@ const BeforeAfterSlider = ({ beforeImage, afterImage }) => {
 };
 
 const ComparisonCard = ({ title, description, accent }) => (
-  <div className={`rounded-[2rem] border ${accent ? 'border-violet-500/20 bg-[#18102c]' : 'border-white/10 bg-[#0d0820]'} p-8`}>
+  <div className="cinematic-card p-8">
     <div className="text-xs uppercase tracking-[0.35em] text-white/40 mb-4">{title}</div>
-    <div className="h-[260px] rounded-3xl border border-white/10 bg-white/5 p-6 text-white/70 flex flex-col justify-between">
+    <div className="flex h-[260px] flex-col justify-between rounded-3xl border border-purple-300/20 bg-purple-500/10 p-6 text-white/70">
       <div>
         <div className="mb-3 h-28 rounded-3xl bg-white/5" />
         <p className="text-sm leading-relaxed">{description}</p>

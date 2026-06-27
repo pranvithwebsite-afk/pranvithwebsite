@@ -23,10 +23,10 @@ const OurWorks = ({ section }) => {
   if (!section) return null;
 
   return (
-    <section className="relative overflow-hidden bg-gradient-to-b from-[var(--bg-main)] via-[#0a0420] to-[var(--bg-main)] px-6 py-24">
+    <section className="relative overflow-hidden bg-gradient-to-b from-[var(--bg-main)] via-[var(--bg-soft)] to-[var(--bg-main)] px-6 py-24">
       <div className="relative mx-auto max-w-7xl">
         <div className="mb-12 text-center">
-          <p className="text-xs font-semibold uppercase tracking-[0.35em] text-violet-300">Our Works</p>
+          <p className="section-eyebrow text-xs">Our Works</p>
           <h2 className="mt-4 text-4xl font-bold tracking-tight md:text-6xl">{section.title || 'Cinematic work, cleanly presented.'}</h2>
           <p className="mx-auto mt-5 max-w-xl leading-relaxed text-white/70">
             {section.description || section.subtitle || 'Selected films, commercial visuals, drone sequences, and edits from the PranvithDOP portfolio.'}
@@ -41,9 +41,9 @@ const OurWorks = ({ section }) => {
             return (
               <article
                 key={`${project.title}-${index}`}
-                className="group overflow-hidden rounded-3xl border border-white/10 bg-white/[0.04] transition hover:-translate-y-1 hover:border-violet-400/50"
+                className="cinematic-card group overflow-hidden transition hover:-translate-y-1"
               >
-                <div className="relative aspect-[16/11] overflow-hidden bg-gradient-to-br from-violet-950 via-slate-950 to-black">
+                <div className="relative aspect-[16/11] overflow-hidden bg-gradient-to-br from-[#1a102d] via-[#0b0318] to-black">
                   {hasVideo ? (
                     <SafeVideoEmbed
                       videoType={project.video_type || 'video_url'}

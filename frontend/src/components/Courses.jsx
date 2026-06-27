@@ -52,7 +52,7 @@ const Courses = ({ section }) => {
       <div className="relative max-w-7xl mx-auto px-6">
         <div className="text-center mb-4">
           <h2 className="text-4xl md:text-6xl font-bold tracking-tight">{section?.title || 'MASTER VIDEO EDITING'}</h2>
-          <p className="mt-4 text-violet-400 text-base md:text-lg font-medium">{section?.subtitle || 'Expand Your Career Opportunity'}</p>
+          <p className="mt-4 text-[#c4b5fd] text-base md:text-lg font-medium">{section?.subtitle || 'Expand Your Career Opportunity'}</p>
           <p className="mt-3 text-white/65 max-w-2xl mx-auto">
             {section?.description || 'Learn professional video editing techniques from industry experts. From beginner to advanced level courses.'}
           </p>
@@ -62,7 +62,7 @@ const Courses = ({ section }) => {
           {courses.map((c, index) => (
             <div
               key={getCatalogItemKey(c, index)}
-              className="group relative rounded-2xl overflow-hidden bg-[#0f0830]/50 border border-violet-500/15 hover:border-violet-500/40 transition-all duration-300 hover:-translate-y-1"
+              className="cinematic-card group relative overflow-hidden transition-all duration-300 hover:-translate-y-1"
             >
               <div className="relative aspect-[16/10] overflow-hidden">
                 <img
@@ -87,7 +87,7 @@ const Courses = ({ section }) => {
                 </h3>
                 <p className="text-sm text-white/60 leading-relaxed line-clamp-3 mb-4">{c.description}</p>
                 <div className="flex items-center gap-2 text-xs text-white/70 mb-5">
-                  <CheckCircle2 size={14} className="text-violet-400" />
+                  <CheckCircle2 size={14} className="text-purple-200" />
                   No Prior Experience Needed
                 </div>
                 <div className="h-px bg-white/10 mb-5" />

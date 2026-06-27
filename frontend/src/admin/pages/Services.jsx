@@ -55,13 +55,13 @@ const Services = () => {
 
   const sortedServices = useMemo(() => [...services].sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0)), [services]);
 
-  const loadServices = async () => {
+  const loadServices = async ({ showToast = true } = {}) => {
     try {
       setLoading(true);
       const data = await fetchAdminServices();
       setServices(Array.isArray(data) ? data : []);
     } catch (error) {
-      toast.error(error?.response?.data?.detail || 'Services could not be loaded');
+      if (showToast) toast.error(error?.response?.data?.detail || 'Services could not be loaded');
       setServices([]);
     } finally {
       setLoading(false);
@@ -106,6 +106,7 @@ const Services = () => {
   };
 
   const saveService = async () => {
+    if (saving) return;
     const payload = {
       ...form,
       slug: normalizeSlug(form.slug || form.title),
@@ -128,8 +129,13 @@ const Services = () => {
         toast.success('Service created');
       }
       closeModal();
-      await loadServices();
+      try {
+        await loadServices({ showToast: false });
+      } catch (refreshError) {
+        console.warn('[admin/services] Service saved but refresh failed', refreshError?.response?.data?.detail || refreshError?.message || refreshError);
+      }
     } catch (error) {
+      console.error('[admin/services] Failed to save service', error?.response?.data?.detail || error?.message || error);
       toast.error(error?.response?.data?.detail || 'Service could not be saved');
     } finally {
       setSaving(false);

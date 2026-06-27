@@ -116,6 +116,7 @@ const Settings = () => {
 
   const handleSave = async (event) => {
     event.preventDefault();
+    if (saving) return;
     const nextErrors = validateSettings(settings);
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) return;
@@ -142,6 +143,14 @@ const Settings = () => {
       setRawSettings(saved);
       setSettings({ ...defaultSettings, ...saved, footer: { ...defaultSettings.footer, ...(saved.footer || {}) } });
       toast.success('Settings saved successfully');
+      try {
+        const refreshed = await fetchAdminSettings();
+        const nextSettings = refreshed || saved;
+        setRawSettings(nextSettings);
+        setSettings({ ...defaultSettings, ...nextSettings, footer: { ...defaultSettings.footer, ...(nextSettings.footer || {}) } });
+      } catch (refreshError) {
+        console.warn('[admin/settings] Settings saved but refresh failed', refreshError?.response?.data?.detail || refreshError?.message || refreshError);
+      }
     } catch (error) {
       console.error('[admin/settings] Failed to save settings', error?.response?.data?.detail || error?.message || error);
       toast.error(error?.response?.data?.detail || 'Unable to save settings');

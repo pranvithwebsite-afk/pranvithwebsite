@@ -22,7 +22,7 @@ const ShowreelSection = ({ section }) => {
     <div className="relative mx-auto max-w-7xl">
       <div className="grid gap-8 lg:grid-cols-[1.2fr_0.8fr] lg:items-end">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.35em] text-violet-300">{section?.subtitle || 'Featured Showreel'}</p>
+          <p className="section-eyebrow text-xs">{section?.subtitle || 'Featured Showreel'}</p>
           <h2 className="mt-4 text-4xl font-bold tracking-tight text-white md:text-6xl">
             {section?.title || 'A cinematic portfolio of light, movement, and emotion.'}
           </h2>
@@ -32,7 +32,7 @@ const ShowreelSection = ({ section }) => {
         </p>
       </div>
 
-      <div className="mt-10 overflow-hidden rounded-3xl border border-violet-500/20 bg-[#100830]/70 shadow-[0_30px_120px_rgba(124,58,237,0.22)]">
+      <div className="cinematic-card mt-10 overflow-hidden">
         <SafeVideoEmbed
           videoType={section?.media_type || 'video_url'}
           videoUrl={mainVideoUrl}
@@ -46,7 +46,7 @@ const ShowreelSection = ({ section }) => {
         {previewItems.slice(0, 3).map((project, index) => (
           <div
             key={project.id || `${project.title}-${index}`}
-            className="group overflow-hidden rounded-2xl border border-white/10 bg-white/[0.04] transition hover:-translate-y-1 hover:border-violet-400/50"
+            className="cinematic-card group overflow-hidden transition hover:-translate-y-1"
           >
             <div className="relative aspect-[16/10] overflow-hidden">
               {project.video_url || project.videoLink ? (
@@ -73,7 +73,7 @@ const ShowreelSection = ({ section }) => {
 
       {(section?.button_text || section?.button_link) && (
         <div className="mt-10 text-center">
-          <Link to={safePublicHref(section?.button_link, '/works')} className="inline-flex rounded-full border border-violet-400/40 px-6 py-3 text-sm font-semibold text-white transition hover:bg-violet-600">
+          <Link to={safePublicHref(section?.button_link, '/works')} className="inline-flex rounded-full border border-purple-300/20 px-6 py-3 text-sm font-semibold text-white transition hover:border-purple-300/35 hover:bg-purple-500/15">
             {section?.button_text || 'View all works'}
           </Link>
         </div>

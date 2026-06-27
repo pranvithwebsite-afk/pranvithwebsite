@@ -30,7 +30,7 @@ const ClientTestimonialsSection = ({ section = null }) => {
     <section className="relative px-6 py-20">
       <div className="mx-auto max-w-6xl">
         <div className="mb-10 max-w-2xl">
-          <p className="text-sm uppercase tracking-[0.32em] text-violet-300/80">{section?.subtitle || 'Client words'}</p>
+          <p className="section-eyebrow text-sm">{section?.subtitle || 'Client words'}</p>
           <h2 className="mt-3 text-4xl font-bold tracking-tight text-white md:text-5xl">
             {section?.title || 'Trusted for films, brands, weddings, and launch visuals.'}
           </h2>
@@ -41,7 +41,7 @@ const ClientTestimonialsSection = ({ section = null }) => {
           {items.map((item) => (
             <article
               key={`${item.name}-${item.projectType}-${item.sort_order ?? ''}`}
-              className="rounded-3xl border border-white/10 bg-white/[0.04] p-6 shadow-xl shadow-black/20 backdrop-blur transition hover:-translate-y-1 hover:border-violet-300/30"
+              className="cinematic-card p-6 backdrop-blur transition hover:-translate-y-1"
             >
               <div className="flex gap-1 text-amber-300">
                 {Array.from({ length: item.rating || 5 }).map((_, index) => (
@@ -49,7 +49,7 @@ const ClientTestimonialsSection = ({ section = null }) => {
                 ))}
               </div>
               <p className="mt-5 text-sm leading-7 text-white/75">"{item.text}"</p>
-              <div className="mt-6 flex items-center gap-3 border-t border-white/10 pt-5">
+              <div className="mt-6 flex items-center gap-3 border-t border-purple-300/15 pt-5">
                 {item.image_url && (
                   <img src={safeImageSrc(item.image_url)} alt={item.name} className="h-10 w-10 rounded-full object-cover" onError={handleImageError} />
                 )}

@@ -76,7 +76,7 @@ const CmsSectionRenderer = ({ section, children }) => {
       <section className="relative overflow-hidden px-6 py-16 text-center">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(124,58,237,0.22),transparent_45%)]" />
         <div className="relative mx-auto max-w-5xl">
-          {section.subtitle && <p className="text-xs font-semibold uppercase tracking-[0.35em] text-violet-300">{section.subtitle}</p>}
+          {section.subtitle && <p className="section-eyebrow text-xs">{section.subtitle}</p>}
           <h1 className="mt-5 text-4xl font-bold tracking-tight md:text-6xl">{section.title}</h1>
           {section.description && <p className="mx-auto mt-6 max-w-3xl text-white/68">{section.description}</p>}
           <div className="mt-8 flex flex-wrap justify-center gap-3">
@@ -86,7 +86,7 @@ const CmsSectionRenderer = ({ section, children }) => {
               </a>
             )}
             {data.secondary_button_text && data.secondary_button_link && (
-              <a href={data.secondary_button_link} className="rounded-full border border-white/15 px-6 py-3 text-sm font-semibold text-white hover:bg-white/10">
+              <a href={data.secondary_button_link} className="rounded-full border border-purple-300/20 px-6 py-3 text-sm font-semibold text-white hover:border-purple-300/35 hover:bg-purple-500/15">
                 {data.secondary_button_text}
               </a>
             )}
@@ -103,7 +103,7 @@ const CmsSectionRenderer = ({ section, children }) => {
         <div className="mx-auto grid max-w-7xl gap-10 lg:grid-cols-2 lg:items-center">
           <MediaBlock section={section} />
           <div>
-            {section.subtitle && <p className="text-xs font-semibold uppercase tracking-[0.35em] text-violet-300">{section.subtitle}</p>}
+            {section.subtitle && <p className="section-eyebrow text-xs">{section.subtitle}</p>}
             <h2 className="mt-3 text-4xl font-bold tracking-tight md:text-5xl">{section.title}</h2>
             {section.description && <p className="mt-5 text-lg leading-8 text-white/68">{section.description}</p>}
             {section.button_text && section.button_link && <a href={section.button_link} className="mt-7 inline-flex rounded-full bg-violet-600 px-6 py-3 text-sm font-semibold text-white hover:bg-violet-500">{section.button_text}</a>}
@@ -118,13 +118,13 @@ const CmsSectionRenderer = ({ section, children }) => {
       <section className="px-6 py-16">
         <div className="mx-auto max-w-7xl">
           <div className="mb-8 text-center">
-            {section.subtitle && <p className="text-xs font-semibold uppercase tracking-[0.35em] text-violet-300">{section.subtitle}</p>}
+            {section.subtitle && <p className="section-eyebrow text-xs">{section.subtitle}</p>}
             <h2 className="mt-3 text-3xl font-bold tracking-tight md:text-5xl">{section.title}</h2>
             {section.description && <p className="mx-auto mt-4 max-w-3xl text-white/62">{section.description}</p>}
           </div>
           <div className="grid gap-5 md:grid-cols-3">
             {items.map((item, index) => (
-              <article key={`${item.title || item.question || index}`} className="rounded-2xl border border-white/10 bg-white/[0.04] p-6">
+              <article key={`${item.title || item.question || index}`} className="cinematic-card p-6">
                 {getVideoUrl(item) ? (
                   <SafeVideoEmbed
                     videoType={mediaTypeFor(item)}
@@ -149,9 +149,9 @@ const CmsSectionRenderer = ({ section, children }) => {
   if (['video', 'showreel'].includes(section.type)) {
     return (
       <section className="px-6 py-16">
-        <div className="mx-auto grid max-w-7xl gap-8 rounded-2xl border border-white/10 bg-white/[0.04] p-6 lg:grid-cols-2 lg:items-center">
+        <div className="cinematic-card mx-auto grid max-w-7xl gap-8 p-6 lg:grid-cols-2 lg:items-center">
           <div>
-            {section.subtitle && <p className="text-xs font-semibold uppercase tracking-[0.35em] text-violet-300">{section.subtitle}</p>}
+            {section.subtitle && <p className="section-eyebrow text-xs">{section.subtitle}</p>}
             <h2 className="mt-3 text-3xl font-bold tracking-tight md:text-5xl">{section.title}</h2>
             {section.description && <p className="mt-4 text-white/65">{section.description}</p>}
           </div>

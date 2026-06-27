@@ -39,7 +39,7 @@ const FAQ = ({ section }) => {
     <section id="faq" className="relative py-24">
       <div className="max-w-4xl mx-auto px-6">
         <div className="text-center mb-14">
-          <span className="inline-block px-4 py-1.5 rounded-full bg-white/5 border border-white/10 text-xs text-white/80">
+          <span className="inline-block px-4 py-1.5 rounded-full bg-purple-500/15 border border-purple-300/20 text-xs text-purple-200">
             F.A.Q.
           </span>
           <h2 className="mt-6 text-4xl md:text-6xl font-bold tracking-tight leading-[1.1]">
@@ -60,7 +60,7 @@ const FAQ = ({ section }) => {
               <div
                 key={f.id || f.q || i}
                 className={`rounded-2xl border transition-all ${
-                  isOpen ? 'border-violet-500/40 bg-[#100830]/70' : 'border-white/10 bg-[#0f0830]/40 hover:border-violet-500/25'
+                  isOpen ? 'border-purple-300/35 bg-purple-500/15' : 'border-purple-300/20 bg-[rgba(23,16,37,0.72)] hover:border-purple-300/35'
                 }`}
               >
                 <button
@@ -68,7 +68,7 @@ const FAQ = ({ section }) => {
                   className="w-full flex items-center justify-between gap-4 px-6 py-5 text-left"
                 >
                   <span className="text-base md:text-lg font-medium text-white">{f.q}</span>
-                  <span className={`shrink-0 w-8 h-8 rounded-full flex items-center justify-center transition-colors ${isOpen ? 'bg-violet-600 text-white' : 'bg-white/5 text-white/70'}`}>
+                  <span className={`shrink-0 w-8 h-8 rounded-full flex items-center justify-center transition-colors ${isOpen ? 'bg-purple-600 text-white' : 'bg-purple-500/15 text-white/70'}`}>
                     {isOpen ? <Minus size={16} /> : <Plus size={16} />}
                   </span>
                 </button>

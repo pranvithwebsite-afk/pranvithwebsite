@@ -120,6 +120,9 @@ const getSafeExternalUrl = (videoUrl) => {
 const getSafePosterUrl = (value) => {
   const raw = String(value || '').trim();
   if (!raw) return '';
+  const youtubeId = getYouTubeId(raw);
+  if (youtubeId) return getYouTubeThumbnail(raw);
+  if (getVimeoId(raw)) return '';
   if (raw.startsWith('/') && !raw.startsWith('//')) return raw;
   return getSafeExternalUrl(raw);
 };

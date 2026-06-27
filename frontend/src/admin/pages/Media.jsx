@@ -229,7 +229,7 @@ const MediaCard = ({ item, onDelete, onCopyUrl }) => {
         <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition flex items-center justify-center gap-2">
           <button
             onClick={onCopyUrl}
-            className="w-10 h-10 rounded-full bg-blue-600 hover:bg-blue-500 text-white flex items-center justify-center transition"
+            className="w-10 h-10 rounded-full bg-purple-600 hover:bg-purple-500 text-white flex items-center justify-center transition"
             title="Copy URL"
           >
             <Copy size={16} />

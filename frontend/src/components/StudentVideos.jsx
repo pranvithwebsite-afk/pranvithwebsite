@@ -11,7 +11,7 @@ const StudentVideos = () => {
     <section className="relative py-20 overflow-hidden">
       <div className="max-w-7xl mx-auto px-6 mb-10">
         <div className="text-center">
-          <span className="inline-block px-4 py-1.5 rounded-full bg-white/5 border border-white/10 text-xs text-white/80 tracking-wider">
+          <span className="inline-block px-4 py-1.5 rounded-full bg-purple-500/15 border border-purple-300/20 text-xs text-purple-200 tracking-wider">
             SUCCESS STORIES
           </span>
           <h2 className="mt-6 text-4xl md:text-6xl font-bold tracking-tight">STUDENT TESTIMONIALS</h2>
@@ -30,7 +30,7 @@ const StudentVideos = () => {
           {items.map((s, idx) => (
             <div
               key={`${s.id}-${idx}`}
-              className="relative w-[280px] h-[420px] rounded-2xl overflow-hidden border border-violet-500/20 bg-[#0f0830] shrink-0 group cursor-pointer"
+              className="cinematic-card relative w-[280px] h-[420px] overflow-hidden shrink-0 group cursor-pointer"
             >
               {s.video_url ? (
                 <SafeVideoEmbed

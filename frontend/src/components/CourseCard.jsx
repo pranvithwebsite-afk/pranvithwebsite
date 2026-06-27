@@ -11,7 +11,7 @@ const formatPrice = (price) =>
   }).format(price);
 
 const CourseCard = ({ course }) => (
-  <article className="group relative overflow-hidden rounded-2xl border border-violet-500/15 bg-[#0f0830]/50 transition-all duration-300 hover:-translate-y-1 hover:border-violet-500/40">
+  <article className="cinematic-card group relative overflow-hidden transition-all duration-300 hover:-translate-y-1">
     <div className="relative aspect-[16/10] overflow-hidden">
       <img
         src={safeImageSrc(course.image)}
@@ -30,11 +30,11 @@ const CourseCard = ({ course }) => (
     </div>
 
     <div className="p-6">
-      <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-violet-400">{course.tag}</p>
+      <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-[#c4b5fd]">{course.tag}</p>
       <h3 className="mb-2 line-clamp-2 text-lg font-semibold leading-snug text-white">{course.title}</h3>
       <p className="mb-4 line-clamp-3 text-sm leading-relaxed text-white/60">{course.description}</p>
       <div className="mb-5 flex items-center gap-2 text-xs text-white/70">
-        <CheckCircle2 size={14} className="text-violet-400" />
+        <CheckCircle2 size={14} className="text-purple-200" />
         No Prior Experience Needed
       </div>
       <div className="mb-5 h-px bg-white/10" />

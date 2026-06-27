@@ -63,7 +63,7 @@ const About = () => {
   if (loading) return <PageReadyPlaceholder />;
 
   return (
-    <main className="page bg-[#070314] text-white">
+    <main className="page bg-[var(--bg-main)] text-white">
       <Header />
 
       <div className="flex flex-col">
@@ -73,8 +73,8 @@ const About = () => {
 
             <div className="relative mx-auto grid max-w-7xl gap-12 lg:grid-cols-[0.9fr_1.1fr] lg:items-center">
               {hero.enabled !== false && (
-                <div className="overflow-hidden rounded-3xl border border-violet-500/20 bg-white/[0.04] p-3 shadow-[0_30px_120px_rgba(124,58,237,0.18)]">
-                  <div className="relative flex aspect-[4/5] items-center justify-center overflow-hidden rounded-2xl bg-[radial-gradient(circle_at_30%_20%,rgba(236,72,153,0.35),transparent_35%),linear-gradient(145deg,#1e0a45,#070314)]">
+                <div className="cinematic-card overflow-hidden p-3">
+                  <div className="relative flex aspect-[4/5] items-center justify-center overflow-hidden rounded-2xl bg-[radial-gradient(circle_at_30%_20%,rgba(167,139,250,0.22),transparent_35%),linear-gradient(145deg,#1a102d,#05000d)]">
                     {hero.media_url ? (
                       <img
                         src={safeImageSrc(hero.media_url)}
@@ -89,13 +89,13 @@ const About = () => {
                       <div className="h-full w-full" />
                     )}
 
-                    <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#070314]/30 via-transparent to-white/5" />
+                    <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[var(--bg-main)]/30 via-transparent to-white/5" />
                   </div>
                 </div>
               )}
 
               <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.4em] text-violet-300">
+                <p className="section-eyebrow text-xs">
                   {hero.subtitle || page?.subtitle || 'About Pranvith Dop'}
                 </p>
 
@@ -110,14 +110,14 @@ const About = () => {
                 <div className="mt-8 flex flex-wrap gap-4">
                   <Link
                     to={safePublicHref(hero.button_link, '/hire')}
-                    className="rounded-full bg-violet-600 px-7 py-3 text-sm font-semibold text-white hover:bg-violet-500"
+                    className="rounded-full bg-accent-purple-strong px-7 py-3 text-sm font-semibold text-white hover:bg-accent-purple"
                   >
                     {hero.button_text || 'Book a project'}
                   </Link>
 
                   <Link
                     to={safePublicHref(hero.data?.secondary_button_link, '/works')}
-                    className="rounded-full border border-white/15 px-7 py-3 text-sm font-semibold text-white hover:bg-white/10"
+                    className="rounded-full border border-purple-300/20 px-7 py-3 text-sm font-semibold text-white hover:border-purple-300/35 hover:bg-purple-500/15"
                   >
                     {hero.data?.secondary_button_text || 'View portfolio'}
                   </Link>
@@ -136,9 +136,9 @@ const About = () => {
                 return (
                   <div
                     key={`${stat.label}-${index}`}
-                    className="rounded-3xl border border-violet-500/15 bg-[#100830]/60 p-6 text-center"
+                    className="cinematic-card p-6 text-center"
                   >
-                    <Icon size={28} className="mx-auto mb-4 text-violet-300" />
+                    <Icon size={28} className="mx-auto mb-4 text-purple-200" />
                     <p className="text-3xl font-bold text-white">{stat.value}</p>
                     <p className="mt-2 text-xs uppercase tracking-wider text-white/50">
                       {stat.label}
@@ -154,8 +154,8 @@ const About = () => {
           <section style={{ order: creativeGearOrder }} className="px-6 pb-24">
             <div className="mx-auto grid max-w-7xl gap-8 lg:grid-cols-2">
               {creativeSection.section_id && (
-                <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-8">
-                  <Sparkles className="mb-5 text-violet-300" />
+                <div className="cinematic-card p-8">
+                  <Sparkles className="mb-5 text-purple-200" />
                   <h2 className="text-3xl font-bold text-white">
                     {creativeSection.title || 'Creative positioning'}
                   </h2>
@@ -166,8 +166,8 @@ const About = () => {
               )}
 
               {gearSection.section_id && (
-                <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-8">
-                  <Award className="mb-5 text-violet-300" />
+                <div className="cinematic-card p-8">
+                  <Award className="mb-5 text-purple-200" />
                   <h2 className="text-3xl font-bold text-white">
                     {gearSection.title || 'Gear & workflow'}
                   </h2>
@@ -176,7 +176,7 @@ const About = () => {
                     {gearItems.map((item) => (
                       <div
                         key={item.title}
-                        className="rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white/75"
+                        className="rounded-2xl border border-purple-300/20 bg-purple-500/10 px-4 py-3 text-sm text-white/75"
                       >
                         {item.title}
                       </div>

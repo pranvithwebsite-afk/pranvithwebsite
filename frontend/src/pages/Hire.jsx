@@ -89,11 +89,11 @@ const Hire = () => {
       <Header />
       {showMainSection && <section className="relative overflow-hidden px-6 pb-24 pt-12">
         <div className="absolute left-1/2 top-0 h-96 w-96 -translate-x-1/2 rounded-full bg-violet-600/20 blur-3xl" />
-        <div className="absolute bottom-16 right-0 h-72 w-72 rounded-full bg-blue-500/10 blur-3xl" />
+        <div className="absolute bottom-16 right-0 h-72 w-72 rounded-full bg-purple-500/10 blur-3xl" />
 
         <div className={`relative mx-auto grid max-w-6xl grid-cols-1 items-start gap-12 ${showForm ? 'lg:grid-cols-[0.9fr_1.1fr]' : ''}`}>
           <div>
-            <div className="inline-flex items-center gap-2 rounded-full border border-violet-400/25 bg-white/5 px-4 py-2 text-xs font-medium uppercase tracking-[0.28em] text-violet-100">
+            <div className="inline-flex items-center gap-2 rounded-full border border-purple-300/20 bg-purple-500/15 px-4 py-2 text-xs font-medium uppercase tracking-[0.28em] text-purple-200">
               <Sparkles size={14} /> {hero.subtitle || 'Book PranvithDOP'}
             </div>
             <h1 className="mt-6 text-5xl font-bold leading-tight tracking-tight md:text-6xl">
@@ -105,8 +105,8 @@ const Hire = () => {
 
             <div className="mt-8 grid gap-3">
               {benefits.map((benefit) => (
-                <div key={benefit} className="flex items-start gap-3 rounded-2xl border border-white/10 bg-white/[0.04] p-4 text-sm text-white/78">
-                  <CheckCircle2 size={18} className="mt-0.5 shrink-0 text-violet-300" />
+                <div key={benefit} className="cinematic-card flex items-start gap-3 p-4 text-sm text-white/78">
+                  <CheckCircle2 size={18} className="mt-0.5 shrink-0 text-purple-200" />
                   {benefit}
                 </div>
               ))}
@@ -117,8 +117,8 @@ const Hire = () => {
                 {infoCards.map((card, index) => {
                   const Icon = index % 2 === 0 ? CalendarDays : MapPin;
                   return (
-                    <div key={`${card.title}-${index}`} className="rounded-2xl border border-white/10 bg-black/20 p-5">
-                      <Icon className={index % 2 === 0 ? 'text-violet-300' : 'text-purple-200'} size={22} />
+                    <div key={`${card.title}-${index}`} className="cinematic-card p-5">
+                      <Icon className="text-purple-200" size={22} />
                       <p className="mt-3 text-sm font-semibold text-white">{card.title}</p>
                       <p className="mt-1 text-xs leading-5 text-white/55">{card.description}</p>
                     </div>
@@ -131,7 +131,7 @@ const Hire = () => {
           {showForm && (
             <form
               onSubmit={submit}
-              className="rounded-3xl border border-violet-500/20 bg-gradient-to-br from-[#13092f]/90 via-[#0b061b]/95 to-[var(--bg-main)]/95 p-6 shadow-2xl shadow-violet-950/30 backdrop-blur md:p-8"
+              className="cinematic-card p-6 backdrop-blur md:p-8"
             >
               <h2 className="text-2xl font-semibold text-white">{formSection.title || 'Start a project enquiry'}</h2>
               <p className="mt-2 text-sm text-white/55">{formSection.description || 'A few details are enough. We will follow up with the right next step.'}</p>
@@ -142,7 +142,7 @@ const Hire = () => {
                 <FormInput label={formContent.phone_label} value={form.phone} onChange={(value) => updateField('phone', value)} placeholder={formContent.phone_placeholder} />
                 <label className="block">
                   <span className="mb-1.5 block text-xs text-white/65">{formContent.project_type_label}</span>
-                  <select value={form.project_type} onChange={(event) => updateField('project_type', event.target.value)} className="w-full rounded-xl border border-white/10 bg-[#120824] px-4 py-3 text-sm text-white outline-none transition focus:border-violet-400">
+                  <select value={form.project_type} onChange={(event) => updateField('project_type', event.target.value)} className="w-full rounded-xl border border-purple-300/20 bg-[#120824] px-4 py-3 text-sm text-white outline-none transition focus:border-purple-300/35">
                     <option value="">{formContent.project_type_placeholder}</option>
                     {visibleProjectTypes.map((type) => <option key={type} value={type}>{type}</option>)}
                   </select>
@@ -152,7 +152,7 @@ const Hire = () => {
                 <FormInput label="Location" value={form.location} onChange={(value) => updateField('location', value)} placeholder="City, venue, or destination" className="sm:col-span-2" />
                 <label className="block sm:col-span-2">
                   <span className="mb-1.5 block text-xs text-white/65">{formContent.message_label}</span>
-                  <textarea value={form.message} onChange={(event) => updateField('message', event.target.value)} rows={5} className="w-full resize-none rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white outline-none transition focus:border-violet-400" placeholder={formContent.message_placeholder} />
+                  <textarea value={form.message} onChange={(event) => updateField('message', event.target.value)} rows={5} className="w-full resize-none rounded-xl border border-purple-300/20 bg-purple-500/10 px-4 py-3 text-sm text-white outline-none transition focus:border-purple-300/35" placeholder={formContent.message_placeholder} />
                 </label>
               </div>
 
@@ -171,7 +171,7 @@ const Hire = () => {
 const FormInput = ({ label, type = 'text', value, onChange, placeholder = '', className = '' }) => (
   <label className={`block ${className}`}>
     <span className="mb-1.5 block text-xs text-white/65">{label}</span>
-    <input type={type} value={value} onChange={(event) => onChange(event.target.value)} className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white outline-none transition focus:border-violet-400" placeholder={placeholder} />
+    <input type={type} value={value} onChange={(event) => onChange(event.target.value)} className="w-full rounded-xl border border-purple-300/20 bg-purple-500/10 px-4 py-3 text-sm text-white outline-none transition focus:border-purple-300/35" placeholder={placeholder} />
   </label>
 );
 

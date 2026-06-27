@@ -50,6 +50,7 @@ const CmsPageEditor = ({ pageKey, title, path, mediaItems, onBack }) => {
   const [saving, setSaving] = useState(false);
   const [reordering, setReordering] = useState(false);
   const [sectionDirty, setSectionDirty] = useState(false);
+  const [sectionEditorOpen, setSectionEditorOpen] = useState(false);
 
   const currentPageKey = page?.page_key || pageKey;
   const sections = useMemo(
@@ -57,16 +58,16 @@ const CmsPageEditor = ({ pageKey, title, path, mediaItems, onBack }) => {
     [currentPageKey, page]
   );
 
-  const load = useCallback(async () => {
+  const load = useCallback(async ({ showToast = true } = {}) => {
     setLoading(true);
     try {
       const data = await fetchAdminCmsPage(pageKey);
       const normalizedPage = normalizePageSections(data);
       setPage(normalizedPage);
-      setSelected((current) => current ? normalizedPage.sections?.find((section) => section.id === current.id) || null : normalizedPage.sections?.[0] || null);
+      setSelected((current) => current ? normalizedPage.sections?.find((section) => section.id === current.id) || null : current);
       setSectionDirty(false);
     } catch (error) {
-      toast.error(error?.response?.data?.detail || 'Could not load CMS page');
+      if (showToast) toast.error(error?.response?.data?.detail || 'Could not load CMS page');
     } finally {
       setLoading(false);
     }
@@ -79,6 +80,7 @@ const CmsPageEditor = ({ pageKey, title, path, mediaItems, onBack }) => {
   const updatePageField = (field, value) => setPage((current) => ({ ...current, [field]: value }));
 
   const savePage = async (status) => {
+    if (saving) return;
     if (status === 'published' && sectionDirty) {
       toast.warning('Save section before publishing.');
       return;
@@ -96,9 +98,16 @@ const CmsPageEditor = ({ pageKey, title, path, mediaItems, onBack }) => {
         settings: page.settings || {},
       });
       setPage(normalizePageSections(data));
-      await load();
       toast.success(status === 'published' ? 'Page published' : 'Page saved');
+      setSectionEditorOpen(false);
+      setSelected(null);
+      try {
+        await load({ showToast: false });
+      } catch (refreshError) {
+        console.warn('[admin/cms] Page saved but refresh failed', refreshError?.response?.data?.detail || refreshError?.message || refreshError);
+      }
     } catch (error) {
+      console.error('[admin/cms] Failed to save page', error?.response?.data?.detail || error?.message || error);
       toast.error(error?.response?.data?.detail || 'Could not save page');
     } finally {
       setSaving(false);
@@ -106,13 +115,22 @@ const CmsPageEditor = ({ pageKey, title, path, mediaItems, onBack }) => {
   };
 
   const saveSection = async (payload) => {
+    if (saving) return;
     try {
       setSaving(true);
       if (payload.id) await updateAdminCmsSection(payload.id, payload);
       else await createAdminCmsSection(pageKey, payload);
-      await load();
       toast.success('Section saved');
+      setSectionDirty(false);
+      setSectionEditorOpen(false);
+      setSelected(null);
+      try {
+        await load({ showToast: false });
+      } catch (refreshError) {
+        console.warn('[admin/cms] Section saved but refresh failed', refreshError?.response?.data?.detail || refreshError?.message || refreshError);
+      }
     } catch (error) {
+      console.error('[admin/cms] Failed to save section', error?.response?.data?.detail || error?.message || error);
       toast.error(error?.response?.data?.detail || 'Could not save section');
     } finally {
       setSaving(false);
@@ -192,7 +210,7 @@ const CmsPageEditor = ({ pageKey, title, path, mediaItems, onBack }) => {
       <div className="rounded-2xl border border-slate-800 bg-slate-950 p-5">
         <h2 className="text-xl font-semibold text-white">Page Settings</h2>
         {PAGE_HELPERS[pageKey] && (
-          <p className="mt-2 rounded-xl border border-sky-500/20 bg-sky-500/10 px-4 py-3 text-sm text-sky-100">{PAGE_HELPERS[pageKey]}</p>
+          <p className="mt-2 rounded-xl border border-purple-300/20 bg-purple-500/10 px-4 py-3 text-sm text-purple-100">{PAGE_HELPERS[pageKey]}</p>
         )}
         <div className="mt-5 grid gap-4 lg:grid-cols-2">
           <Field label="Page title"><input value={page.title || ''} onChange={(event) => updatePageField('title', event.target.value)} className={fieldClass} /></Field>
@@ -213,13 +231,31 @@ const CmsPageEditor = ({ pageKey, title, path, mediaItems, onBack }) => {
         <div className="rounded-2xl border border-slate-800 bg-slate-950 p-5">
           <div className="mb-4 flex items-center justify-between">
             <h2 className="text-xl font-semibold text-white">Sections</h2>
-            <button type="button" onClick={() => setSelected(null)} className="inline-flex items-center gap-2 rounded-lg border border-slate-700 px-3 py-2 text-sm text-white">
+            <button type="button" onClick={() => { setSelected(null); setSectionEditorOpen(true); }} className="inline-flex items-center gap-2 rounded-lg border border-slate-700 px-3 py-2 text-sm text-white">
               <Plus size={14} /> Add
             </button>
           </div>
-          <SectionOrderList sections={sections} selectedId={selected?.id} onSelect={setSelected} onMove={moveSection} onDelete={deleteSection} onVisibilityChange={setVisibility} disabled={reordering} />
+          <SectionOrderList
+            sections={sections}
+            selectedId={selected?.id}
+            onSelect={(section) => {
+              setSelected(section);
+              setSectionEditorOpen(true);
+            }}
+            onMove={moveSection}
+            onDelete={deleteSection}
+            onVisibilityChange={setVisibility}
+            disabled={reordering}
+          />
         </div>
-        <CmsSectionEditor pageKey={pageKey} section={selected} mediaItems={mediaItems} saving={saving} onSave={saveSection} onDirtyChange={setSectionDirty} />
+        {sectionEditorOpen ? (
+          <CmsSectionEditor pageKey={pageKey} section={selected} mediaItems={mediaItems} saving={saving} onSave={saveSection} onDirtyChange={setSectionDirty} />
+        ) : (
+          <div className="rounded-2xl border border-slate-800 bg-slate-950 p-8 text-center">
+            <h2 className="text-xl font-semibold text-white">Section overview</h2>
+            <p className="mx-auto mt-3 max-w-md text-sm text-slate-400">Select a section to edit it, or add a new section from the list.</p>
+          </div>
+        )}
       </div>
     </section>
   );

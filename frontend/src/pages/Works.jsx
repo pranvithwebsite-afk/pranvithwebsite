@@ -62,7 +62,7 @@ const Works = () => {
         <section className="relative overflow-hidden px-6 pb-12 pt-16 text-center">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(124,58,237,0.22),transparent_45%)]" />
           <div className="relative mx-auto max-w-5xl">
-            <p className="text-xs font-semibold uppercase tracking-[0.4em] text-violet-300">{hero.subtitle || 'PORTFOLIO'}</p>
+            <p className="section-eyebrow text-xs">{hero.subtitle || 'PORTFOLIO'}</p>
             <h1 className="mt-5 text-5xl font-bold tracking-tight md:text-7xl">{hero.title || page?.title || 'Films, commercials, aerials, and edits crafted for impact.'}</h1>
             <p className="mx-auto mt-6 max-w-3xl text-white/65">{hero.description || page?.subtitle}</p>
           </div>
@@ -71,9 +71,9 @@ const Works = () => {
 
       {showreel.section_id && (
         <section className="px-6 pb-16 pt-8">
-          <div className="mx-auto grid max-w-7xl gap-8 rounded-3xl border border-white/10 bg-white/[0.04] p-6 md:p-8 lg:grid-cols-[1.05fr_0.95fr] lg:items-center">
+          <div className="cinematic-card mx-auto grid max-w-7xl gap-8 p-6 md:p-8 lg:grid-cols-[1.05fr_0.95fr] lg:items-center">
             <div>
-              <p className="text-xs font-bold uppercase tracking-[0.35em] text-violet-300">{showreel.subtitle || 'FEATURED SHOWREEL'}</p>
+              <p className="section-eyebrow text-xs">{showreel.subtitle || 'FEATURED SHOWREEL'}</p>
               <h2 className="mt-4 text-3xl font-bold tracking-tight text-white md:text-5xl">{showreel.title || 'A cinematic portfolio of light, movement, and emotion.'}</h2>
               <p className="mt-4 text-sm leading-7 text-white/65 md:text-base">{showreel.description}</p>
               {showreel.button_text && showreel.button_link && (
@@ -82,7 +82,7 @@ const Works = () => {
                 </a>
               )}
             </div>
-            <div className="group relative aspect-video overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br from-violet-950 via-slate-950 to-black">
+            <div className="group relative aspect-video overflow-hidden rounded-[22px] border border-purple-300/20 bg-gradient-to-br from-[#1a102d] via-[#0b0318] to-black">
               {showreelVideoUrl ? (
                 <SafeVideoEmbed
                   videoType={showreel.media_type || showreel.data?.media_type || detectMediaType(showreelVideoUrl)}
@@ -118,8 +118,8 @@ const Works = () => {
                 onClick={() => setActive(filter)}
                 className={`rounded-full border px-4 py-2 text-sm font-semibold transition ${
                   active === filter
-                    ? 'border-violet-400 bg-violet-600 text-white'
-                    : 'border-white/10 bg-white/5 text-white/70 hover:border-violet-400/60 hover:text-white'
+                    ? 'border-purple-300/35 bg-purple-500/20 text-white'
+                    : 'border-purple-300/20 bg-purple-500/10 text-white/70 hover:border-purple-300/35 hover:text-white'
                 }`}
               >
                 {filter}
@@ -134,7 +134,7 @@ const Works = () => {
               ))}
             </div>
           ) : (
-            <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-12 text-center text-white/60">
+            <div className="cinematic-card p-12 text-center text-white/60">
               Portfolio projects are not published yet.
             </div>
           )}
@@ -143,7 +143,7 @@ const Works = () => {
       {clientTestimonialsSection.section_id && <ClientTestimonialsSection section={clientTestimonialsSection} />}
       {ctaSection.section_id && (
         <section className="px-6 pb-24">
-          <div className="mx-auto max-w-5xl rounded-3xl border border-violet-500/20 bg-gradient-to-r from-[#1a124a]/70 to-[#0f0830]/60 px-6 py-8 text-center shadow-2xl shadow-violet-950/20 md:px-10">
+          <div className="cinematic-card mx-auto max-w-5xl px-6 py-8 text-center md:px-10">
             <h2 className="text-3xl font-bold text-white md:text-5xl">{ctaSection.title}</h2>
             {ctaSection.description && <p className="mx-auto mt-4 max-w-2xl text-sm leading-7 text-white/65">{ctaSection.description}</p>}
             {(ctaSection.button_text || ctaSection.button_link) && (
@@ -165,8 +165,8 @@ const ProjectCard = ({ project }) => {
   const hasVideo = !!videoUrl;
 
   return (
-    <div className="group block h-full overflow-hidden rounded-3xl border border-white/10 bg-white/[0.04] transition duration-300 hover:-translate-y-1 hover:border-violet-400/50">
-      <div className="relative aspect-[16/11] overflow-hidden bg-gradient-to-br from-violet-950 via-slate-950 to-black">
+    <div className="cinematic-card group block h-full overflow-hidden transition duration-300 hover:-translate-y-1">
+      <div className="relative aspect-[16/11] overflow-hidden bg-gradient-to-br from-[#1a102d] via-[#0b0318] to-black">
         {hasVideo ? (
           <SafeVideoEmbed
             videoType={project.video_type || 'video_url'}

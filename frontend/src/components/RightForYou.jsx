@@ -34,7 +34,7 @@ const RightForYou = ({ section, buttonLink = '/courses', buttonText = 'Start Now
           {cards.map((card) => (
             <div
               key={card.num}
-              className="group relative p-7 rounded-2xl bg-gradient-to-br from-[#1a124a]/60 to-[#0f0830]/40 border border-violet-500/15 hover:border-violet-500/40 transition-all duration-300 hover:-translate-y-1 cursor-pointer"
+              className="cinematic-card group relative cursor-pointer p-7 transition-all duration-300 hover:-translate-y-1"
             >
               <div className="absolute inset-0 bg-gradient-to-br from-violet-600/0 to-violet-600/0 group-hover:from-violet-600/10 group-hover:to-fuchsia-600/5 rounded-2xl transition-all" />
               <div className="relative">
@@ -47,7 +47,7 @@ const RightForYou = ({ section, buttonLink = '/courses', buttonText = 'Start Now
         </div>
 
         {/* Upgrade CTA bar */}
-        <div className="mt-12 rounded-2xl bg-gradient-to-r from-[#1a124a]/60 to-[#0f0830]/40 border border-violet-500/20 px-6 md:px-8 py-5 flex items-center justify-between gap-4 flex-wrap">
+        <div className="cinematic-card mt-12 flex items-center justify-between gap-4 px-6 py-5 md:px-8 flex-wrap">
           <p className="text-base md:text-lg font-medium text-white">{ctaText}</p>
           <a href={ctaButtonLink} className="group inline-flex items-center gap-3 bg-violet-600 hover:bg-violet-500 transition-colors text-white px-6 py-2.5 rounded-full text-sm font-semibold">
             {ctaButtonText}

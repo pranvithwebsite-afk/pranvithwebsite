@@ -11,14 +11,14 @@ import { useCmsPage } from '../hooks/useCmsPage';
 import OptimizedImage from '../components/OptimizedImage';
 
 const defaultBackgrounds = [
-  'linear-gradient(135deg, #1e3a8a 0%, #0c1e4d 60%, #050b1f 100%)',
-  'linear-gradient(135deg, #1f2937 0%, #0b1220 100%)',
-  'linear-gradient(135deg, #6d28d9 0%, #ec4899 60%, #1e1b4b 100%)',
-  'linear-gradient(135deg, #111827 0%, #1f2937 60%, #312e81 100%)',
-  'linear-gradient(135deg, #b91c1c 0%, #7f1d1d 60%, #0a0418 100%)',
-  'linear-gradient(135deg, #047857 0%, #134e4a 60%, #0a0418 100%)',
-  'linear-gradient(135deg, #be185d 0%, #4c1d95 100%)',
-  'linear-gradient(135deg, #0ea5e9 0%, #1e3a8a 100%)',
+  'linear-gradient(135deg, #2e1065 0%, #1a102d 60%, #05000d 100%)',
+  'linear-gradient(135deg, #171025 0%, #0b0318 100%)',
+  'linear-gradient(135deg, #6d28d9 0%, #a78bfa 60%, #1a102d 100%)',
+  'linear-gradient(135deg, #120d1d 0%, #2e1065 60%, #05000d 100%)',
+  'linear-gradient(135deg, #4c1d95 0%, #2e1065 60%, #0a0418 100%)',
+  'linear-gradient(135deg, #7c3aed 0%, #1a102d 60%, #05000d 100%)',
+  'linear-gradient(135deg, #581c87 0%, #4c1d95 100%)',
+  'linear-gradient(135deg, #a78bfa 0%, #4c1d95 100%)',
 ];
 
 const findSection = (sections = [], idOrType) =>
@@ -124,7 +124,7 @@ const Assets = () => {
       {!pageHidden && heroSection?.section_id && (
         <section className="pt-8 pb-10">
           <div className="max-w-7xl mx-auto px-6">
-            <div className="rounded-2xl bg-gradient-to-r from-violet-900/40 via-indigo-900/30 to-violet-900/40 border border-violet-500/20 px-8 py-7">
+            <div className="cinematic-card px-8 py-7">
               <h1 className="text-2xl md:text-4xl font-bold tracking-tight" data-testid="assets-page-title">{heroSection?.title || cmsPage?.title || 'Creative Assets Store'}</h1>
               <p className="mt-2 text-sm text-white/65">
                 {heroSection?.subtitle || heroSection?.description || cmsPage?.subtitle || 'Premium LUTs, sound packs, motion templates and more - built for editors.'}
@@ -137,8 +137,8 @@ const Assets = () => {
 
       {showProductListing && <section className="pb-24">
         <div className="max-w-7xl mx-auto px-6 grid grid-cols-1 lg:grid-cols-[260px_1fr] gap-8">
-          {showFilters && <aside className="lg:sticky lg:top-28 h-fit rounded-2xl bg-[#0d0820]/60 border border-violet-500/15 p-6">
-            <h3 className="text-violet-400 text-xs font-bold tracking-[0.3em] mb-5">FILTERS</h3>
+          {showFilters && <aside className="cinematic-card h-fit p-6 lg:sticky lg:top-28">
+            <h3 className="section-eyebrow mb-5 text-xs">FILTERS</h3>
 
             <div className="relative mb-7">
               <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40" />
@@ -148,7 +148,7 @@ const Assets = () => {
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Search assets..."
                 data-testid="assets-search-input"
-                className="w-full pl-9 pr-3 py-2.5 rounded-lg bg-white/5 border border-white/10 text-sm text-white placeholder:text-white/35 focus:outline-none focus:border-violet-500/60"
+                className="w-full rounded-lg border border-purple-300/20 bg-purple-500/10 py-2.5 pl-9 pr-3 text-sm text-white placeholder:text-white/35 focus:border-purple-300/35 focus:outline-none"
               />
             </div>
 
@@ -170,7 +170,7 @@ const Assets = () => {
             {loading ? (
               <div className="grid grid-cols-2 gap-3 md:grid-cols-3 md:gap-5 xl:grid-cols-4" aria-hidden="true">
                 {Array.from({ length: 8 }).map((_, index) => (
-                  <div key={index} className="h-[320px] animate-pulse rounded-2xl border border-violet-500/15 bg-white/[0.04]" />
+                  <div key={index} className="cinematic-card h-[320px] animate-pulse" />
                 ))}
               </div>
             ) : loadError ? (
@@ -178,7 +178,7 @@ const Assets = () => {
                 Assets could not be loaded. Please refresh and try again.
               </div>
             ) : filtered.length === 0 ? (
-              <div className="rounded-2xl border border-white/10 bg-white/5 p-12 text-center text-white/60" data-testid="assets-empty">
+              <div className="cinematic-card p-12 text-center text-white/60" data-testid="assets-empty">
                 No assets match your filters.
               </div>
             ) : (
@@ -231,8 +231,8 @@ const RadioRow = ({ name, value, checked, onChange, label }) => (
   <label className="flex items-center gap-3 py-1.5 cursor-pointer group">
     <span className="relative inline-flex">
       <input type="radio" name={name} value={value} checked={checked} onChange={onChange} className="sr-only" />
-      <span className={`w-4 h-4 rounded-full border-2 transition ${checked ? 'border-violet-500' : 'border-white/30 group-hover:border-white/50'}`} />
-      {checked && <span className="absolute inset-0 m-auto w-2 h-2 rounded-full bg-violet-500" />}
+      <span className={`w-4 h-4 rounded-full border-2 transition ${checked ? 'border-purple-300' : 'border-purple-300/30 group-hover:border-purple-300/50'}`} />
+      {checked && <span className="absolute inset-0 m-auto w-2 h-2 rounded-full bg-accent-purple" />}
     </span>
     <span className={`text-sm ${checked ? 'text-white' : 'text-white/75'}`}>{label}</span>
   </label>
@@ -242,7 +242,7 @@ const ProductCard = ({ p, onView, onBuy }) => (
   <div
     onClick={onView}
     data-testid={`asset-card-${p.slug}`}
-    className="group rounded-2xl bg-[#0a0518]/80 border border-violet-500/15 hover:border-violet-500/40 transition-all duration-300 hover:-translate-y-1 overflow-hidden flex flex-col cursor-pointer"
+    className="cinematic-card group flex cursor-pointer flex-col overflow-hidden transition-all duration-300 hover:-translate-y-1"
   >
     <div className="relative aspect-[4/5] overflow-hidden">
       {p.image ? (
@@ -277,7 +277,7 @@ const ProductCard = ({ p, onView, onBuy }) => (
           e.stopPropagation();
           shareProduct(p);
         }}
-        className="absolute right-3 top-3 inline-flex h-8 w-8 items-center justify-center rounded-full border border-white/15 bg-black/55 text-white/90 backdrop-blur transition hover:border-violet-400/60 hover:bg-violet-600/80"
+        className="absolute right-3 top-3 inline-flex h-8 w-8 items-center justify-center rounded-full border border-purple-300/20 bg-black/55 text-white/90 backdrop-blur transition hover:border-purple-300/35 hover:bg-purple-500/30"
       >
         <Share2 size={15} />
       </button>

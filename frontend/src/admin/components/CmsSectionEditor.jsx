@@ -301,6 +301,7 @@ const CmsSectionEditor = ({ pageKey, section, mediaItems, onSave, saving, onDirt
     updateItems(next.map((item, itemIndex) => ({ ...item, sort_order: itemIndex })));
   };
   const save = () => {
+    if (saving) return;
     const mergedData = {
       ...(section?.data || {}),
       ...(draft.data || {}),
