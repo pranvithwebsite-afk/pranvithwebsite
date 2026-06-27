@@ -134,3 +134,38 @@ export async function shareProduct(product, fallbackUrl) {
     toast.error('Could not copy product link');
   }
 }
+
+export const normalizeWorkItem = (project) => {
+  if (!project) return null;
+  const workVideoMediaTypes = new Set(['video_file', 'video_url', 'youtube', 'vimeo']);
+
+  const getYouTubeThumbnail = (url, quality = 'hqdefault') => {
+      if (!url || !url.includes('youtube.com') && !url.includes('youtu.be')) return null;
+      const videoIdMatch = url.match(/(?:v=|\/|embed\/|watch\?v=)([a-zA-Z0-9_-]{11})/);
+      const videoId = videoIdMatch ? videoIdMatch[1] : null;
+      if (!videoId) return null;
+      return `https://i.ytimg.com/vi/${videoId}/${quality}.jpg`;
+  };
+
+  const mediaType = project.media_type || (project.video_url ? 'video_url' : 'image');
+
+  const videoUrl = project.video_url || (workVideoMediaTypes.has(mediaType) ? project.media_url : null);
+  
+  const thumbnail = project.thumbnail_url || project.image_url || project.poster_url || project.thumbnail_image_url || getYouTubeThumbnail(videoUrl);
+
+  return {
+      title: project.title,
+      category: project.category,
+      description: project.description,
+      thumbnail_url: thumbnail,
+      video_url: videoUrl,
+      link_url: project.link_url || project.button_link,
+      featured: project.featured,
+      enabled: project.enabled !== false,
+      sort_order: project.sort_order || 0,
+      equipment: project.equipment,
+      client: project.client,
+      date: project.date,
+      id: project.id || project._id,
+  };
+};

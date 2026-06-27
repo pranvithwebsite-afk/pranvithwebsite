@@ -25,6 +25,30 @@ const SIMPLE_DEFAULT_SCHEMA = {
   itemFields: ['title', 'description', 'sort_order', 'enabled'],
 };
 
+const worksPortfolioProjectsSchema = {
+  sectionFields: ['section_id', 'type', 'title', 'subtitle', 'description', 'enabled'],
+  dataFields: ['eyebrow'],
+  itemFields: [
+    'title',
+    'category',
+    'description',
+    'thumbnail_url',
+    'video_url',
+    'link_url',
+    'featured',
+    'enabled',
+    'sort_order',
+  ],
+  itemLabels: {
+    title: 'Project Title',
+    thumbnail_url: 'Thumbnail / Image URL',
+    video_url: 'Video URL (optional)',
+    link_url: 'Project Link (optional)',
+    enabled: 'Visible',
+    featured: 'Featured Project',
+  },
+};
+
 const SECTION_EDITOR_SCHEMAS = {
   'home:hero': { sectionFields: ['section_id', 'type', 'title', 'subtitle', 'description', 'button_text', 'button_link', 'media_type', 'media_url', 'video_url', 'poster_url', 'image_url', 'thumbnail_url', 'enabled'] },
   'home:featured-assets': { sectionFields: ['section_id', 'type', 'title', 'subtitle', 'description', 'button_text', 'button_link', 'enabled'], itemFields: ['title', 'category', 'description', 'media_type', 'media_url', 'video_url', 'poster_url', 'thumbnail_image_url', 'image_url', 'sort_order', 'enabled'] },
@@ -91,7 +115,10 @@ const SECTION_EDITOR_SCHEMAS = {
 
   'works:hero': { sectionFields: ['section_id', 'type', 'title', 'subtitle', 'description', 'enabled'] },
   'works:showreel': { sectionFields: ['section_id', 'type', 'title', 'subtitle', 'description', 'button_text', 'button_link', 'media_type', 'media_url', 'video_url', 'poster_url', 'thumbnail_url', 'image_url', 'enabled'] },
-  'works:projects': { sectionFields: ['section_id', 'type', 'title', 'enabled'], itemFields: ['title', 'category', 'description', 'media_type', 'media_url', 'poster_url', 'thumbnail_image_url', 'thumbnail_url', 'image_url', 'video_url', 'equipment', 'client', 'date', 'sort_order', 'enabled'] },
+  'works:portfolio-projects': worksPortfolioProjectsSchema,
+  'works:portfolio_grid': worksPortfolioProjectsSchema,
+  'works:projects': worksPortfolioProjectsSchema,
+  'works:works': worksPortfolioProjectsSchema,
   'works:client-testimonials': {
     sectionFields: ['section_id', 'type', 'title', 'subtitle', 'description', 'enabled'],
     itemFields: ['title', 'subtitle', 'description', 'rating', 'image_url', 'sort_order', 'enabled'],
@@ -133,7 +160,8 @@ const FIELD_LABELS = {
   question: 'Question',
   answer: 'Answer',
   thumbnail_image_url: 'Thumbnail Image',
-  link_url: 'Link URL',
+  link_url: 'Project Link (optional)',
+  featured: 'Featured Project',
   coverText: 'Cover Text',
   sort_order: 'Sort Order',
   equipment: 'Equipment',
@@ -179,12 +207,28 @@ const FIELD_LABELS = {
 const mediaFields = new Set(['media_url', 'poster_url', 'thumbnail_image_url', 'image_url', 'thumbnail_url']);
 const videoFields = new Set(['video_url']);
 const longTextFields = new Set(['description', 'answer', 'review_text', 'paragraphs', 'bullets', 'after']);
-const booleanFields = new Set(['enabled', 'show_course_list']);
+const booleanFields = new Set(['enabled', 'show_course_list', 'featured']);
 const numberFields = new Set(['sort_order', 'rating']);
 
 const getSchema = (pageKey, section) => {
   const sectionId = section?.section_id || '';
-  return SECTION_EDITOR_SCHEMAS[`${pageKey}:${sectionId}`] || SIMPLE_DEFAULT_SCHEMA;
+  const sectionType = section?.type || '';
+
+  if (pageKey === 'works') {
+    if (sectionId === 'portfolio-projects' || sectionId === 'projects' || sectionType === 'portfolio_grid') {
+      return worksPortfolioProjectsSchema;
+    }
+  }
+
+  const schema = SECTION_EDITOR_SCHEMAS[`${pageKey}:${sectionId}`];
+  if (schema) return schema;
+
+  if (sectionType) {
+    const typeSchema = SECTION_EDITOR_SCHEMAS[`${pageKey}:${sectionType}`];
+    if (typeSchema) return typeSchema;
+  }
+
+  return SIMPLE_DEFAULT_SCHEMA;
 };
 
 const getFieldLabel = (field, labels = {}) => labels[field] || FIELD_LABELS[field] || field.replaceAll('_', ' ');

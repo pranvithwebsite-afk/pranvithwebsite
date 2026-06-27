@@ -75,38 +75,40 @@ const Home = () => {
   } : null;
 
   return (
-    <main className="page relative overflow-hidden bg-[var(--bg-main)] text-white">
+    <>
       <Header />
-      {order.map((sectionKey) => {
-        const sections = {
-          hero: <Hero key="hero" pageData={heroData} />,
-          featuredAssets: (
-            <Suspense key="featuredAssets" fallback={<SectionSkeleton />}>
-              <OurWorks section={worksSection} />
-            </Suspense>
-          ),
-          instagramProfile: instagramSection ? (
-            <Suspense key="instagramProfile" fallback={<SectionSkeleton />}>
-              <TransformVision section={instagramSection} />
-            </Suspense>
-          ) : null,
-          services: servicesSection ? <ServicesSection key="services" section={servicesSection} /> : null,
-          showreel: showreelSection ? (
-            <Suspense key="showreel" fallback={<SectionSkeleton />}>
-              <ShowreelSection section={showreelSection} />
-            </Suspense>
-          ) : null,
-          cta: <HomeCta key="cta" section={ctaSection} />,
-          footerCta: faqSection ? (
-            <Suspense key="footerCta" fallback={<SectionSkeleton />}>
-              <FAQ section={faqSection} />
-            </Suspense>
-          ) : null,
-        };
-        return sections[sectionKey] || null;
-      })}
+      <main className="page relative overflow-hidden bg-[var(--bg-main)] text-white">
+        {order.map((sectionKey) => {
+          const sections = {
+            hero: <Hero key="hero" pageData={heroData} />,
+            featuredAssets: (
+              <Suspense key="featuredAssets" fallback={<SectionSkeleton />}>
+                <OurWorks section={worksSection} />
+              </Suspense>
+            ),
+            instagramProfile: instagramSection ? (
+              <Suspense key="instagramProfile" fallback={<SectionSkeleton />}>
+                <TransformVision section={instagramSection} />
+              </Suspense>
+            ) : null,
+            services: servicesSection ? <ServicesSection key="services" section={servicesSection} /> : null,
+            showreel: showreelSection ? (
+              <Suspense key="showreel" fallback={<SectionSkeleton />}>
+                <ShowreelSection section={showreelSection} />
+              </Suspense>
+            ) : null,
+            cta: <HomeCta key="cta" section={ctaSection} />,
+            footerCta: faqSection ? (
+              <Suspense key="footerCta" fallback={<SectionSkeleton />}>
+                <FAQ section={faqSection} />
+              </Suspense>
+            ) : null,
+          };
+          return sections[sectionKey] || null;
+        })}
+      </main>
       <Footer />
-    </main>
+    </>
   );
 };
 

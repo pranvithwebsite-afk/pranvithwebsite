@@ -85,86 +85,88 @@ const Hire = () => {
   };
 
   return (
-    <main className="page bg-[var(--bg-main)] text-white">
+    <>
       <Header />
-      {showMainSection && <section className="relative overflow-hidden px-6 pb-24 pt-12">
-        <div className="absolute left-1/2 top-0 h-96 w-96 -translate-x-1/2 rounded-full bg-violet-600/20 blur-3xl" />
-        <div className="absolute bottom-16 right-0 h-72 w-72 rounded-full bg-purple-500/10 blur-3xl" />
+      <main className="page bg-[var(--bg-main)] text-white">
+        {showMainSection && <section className="relative overflow-hidden px-6 pb-24 pt-12">
+          <div className="absolute left-1/2 top-0 h-96 w-96 -translate-x-1/2 rounded-full bg-violet-600/20 blur-3xl" />
+          <div className="absolute bottom-16 right-0 h-72 w-72 rounded-full bg-purple-500/10 blur-3xl" />
 
-        <div className={`relative mx-auto grid max-w-6xl grid-cols-1 items-start gap-12 ${showForm ? 'lg:grid-cols-[0.9fr_1.1fr]' : ''}`}>
-          <div>
-            <div className="inline-flex items-center gap-2 rounded-full border border-purple-300/20 bg-purple-500/15 px-4 py-2 text-xs font-medium uppercase tracking-[0.28em] text-purple-200">
-              <Sparkles size={14} /> {hero.subtitle || 'Book PranvithDOP'}
-            </div>
-            <h1 className="mt-6 text-5xl font-bold leading-tight tracking-tight md:text-6xl">
-              {hero.title || 'Build a film, campaign, or visual story with cinematic intent.'}
-            </h1>
-            <p className="mt-6 text-lg leading-8 text-white/68">
-              {hero.description || 'Tell us about your shoot, brand film, wedding, reel, product campaign, or edit. We will shape the look, schedule, and creative plan around the story you want people to feel.'}
-            </p>
-
-            <div className="mt-8 grid gap-3">
-              {benefits.map((benefit) => (
-                <div key={benefit} className="cinematic-card flex items-start gap-3 p-4 text-sm text-white/78">
-                  <CheckCircle2 size={18} className="mt-0.5 shrink-0 text-purple-200" />
-                  {benefit}
-                </div>
-              ))}
-            </div>
-
-            {infoCards.length > 0 && (
-              <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2">
-                {infoCards.map((card, index) => {
-                  const Icon = index % 2 === 0 ? CalendarDays : MapPin;
-                  return (
-                    <div key={`${card.title}-${index}`} className="cinematic-card p-5">
-                      <Icon className="text-purple-200" size={22} />
-                      <p className="mt-3 text-sm font-semibold text-white">{card.title}</p>
-                      <p className="mt-1 text-xs leading-5 text-white/55">{card.description}</p>
-                    </div>
-                  );
-                })}
+          <div className={`relative mx-auto grid max-w-6xl grid-cols-1 items-start gap-12 ${showForm ? 'lg:grid-cols-[0.9fr_1.1fr]' : ''}`}>
+            <div>
+              <div className="inline-flex items-center gap-2 rounded-full border border-purple-300/20 bg-purple-500/15 px-4 py-2 text-xs font-medium uppercase tracking-[0.28em] text-purple-200">
+                <Sparkles size={14} /> {hero.subtitle || 'Book PranvithDOP'}
               </div>
+              <h1 className="mt-6 text-5xl font-bold leading-tight tracking-tight md:text-6xl">
+                {hero.title || 'Build a film, campaign, or visual story with cinematic intent.'}
+              </h1>
+              <p className="mt-6 text-lg leading-8 text-white/68">
+                {hero.description || 'Tell us about your shoot, brand film, wedding, reel, product campaign, or edit. We will shape the look, schedule, and creative plan around the story you want people to feel.'}
+              </p>
+
+              <div className="mt-8 grid gap-3">
+                {benefits.map((benefit) => (
+                  <div key={benefit} className="cinematic-card flex items-start gap-3 p-4 text-sm text-white/78">
+                    <CheckCircle2 size={18} className="mt-0.5 shrink-0 text-purple-200" />
+                    {benefit}
+                  </div>
+                ))}
+              </div>
+
+              {infoCards.length > 0 && (
+                <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  {infoCards.map((card, index) => {
+                    const Icon = index % 2 === 0 ? CalendarDays : MapPin;
+                    return (
+                      <div key={`${card.title}-${index}`} className="cinematic-card p-5">
+                        <Icon className="text-purple-200" size={22} />
+                        <p className="mt-3 text-sm font-semibold text-white">{card.title}</p>
+                        <p className="mt-1 text-xs leading-5 text-white/55">{card.description}</p>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {showForm && (
+              <form
+                onSubmit={submit}
+                className="cinematic-card p-6 backdrop-blur md:p-8"
+              >
+                <h2 className="text-2xl font-semibold text-white">{formSection.title || 'Start a project enquiry'}</h2>
+                <p className="mt-2 text-sm text-white/55">{formSection.description || 'A few details are enough. We will follow up with the right next step.'}</p>
+
+                <div className="mt-7 grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <FormInput label={formContent.name_label} value={form.name} onChange={(value) => updateField('name', value)} placeholder={formContent.name_placeholder} />
+                  <FormInput label={formContent.email_label} type="email" value={form.email} onChange={(value) => updateField('email', value)} placeholder={formContent.email_placeholder} />
+                  <FormInput label={formContent.phone_label} value={form.phone} onChange={(value) => updateField('phone', value)} placeholder={formContent.phone_placeholder} />
+                  <label className="block">
+                    <span className="mb-1.5 block text-xs text-white/65">{formContent.project_type_label}</span>
+                    <select value={form.project_type} onChange={(event) => updateField('project_type', event.target.value)} className="w-full rounded-xl border border-purple-300/20 bg-[#120824] px-4 py-3 text-sm text-white outline-none transition focus:border-purple-300/35">
+                      <option value="">{formContent.project_type_placeholder}</option>
+                      {visibleProjectTypes.map((type) => <option key={type} value={type}>{type}</option>)}
+                    </select>
+                  </label>
+                  <FormInput label="Budget" value={form.budget} onChange={(value) => updateField('budget', value)} placeholder="Approx budget" />
+                  <FormInput label="Shoot / project date" type="date" value={form.project_date} onChange={(value) => updateField('project_date', value)} />
+                  <FormInput label="Location" value={form.location} onChange={(value) => updateField('location', value)} placeholder="City, venue, or destination" className="sm:col-span-2" />
+                  <label className="block sm:col-span-2">
+                    <span className="mb-1.5 block text-xs text-white/65">{formContent.message_label}</span>
+                    <textarea value={form.message} onChange={(event) => updateField('message', event.target.value)} rows={5} className="w-full resize-none rounded-xl border border-purple-300/20 bg-purple-500/10 px-4 py-3 text-sm text-white outline-none transition focus:border-purple-300/35" placeholder={formContent.message_placeholder} />
+                  </label>
+                </div>
+
+                <button type="submit" disabled={busy} className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-violet-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-violet-500 disabled:cursor-not-allowed disabled:opacity-60">
+                  {busy ? 'Sending...' : formSection.button_text || formContent.submit_button_text} <Send size={15} />
+                </button>
+              </form>
             )}
           </div>
-
-          {showForm && (
-            <form
-              onSubmit={submit}
-              className="cinematic-card p-6 backdrop-blur md:p-8"
-            >
-              <h2 className="text-2xl font-semibold text-white">{formSection.title || 'Start a project enquiry'}</h2>
-              <p className="mt-2 text-sm text-white/55">{formSection.description || 'A few details are enough. We will follow up with the right next step.'}</p>
-
-              <div className="mt-7 grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <FormInput label={formContent.name_label} value={form.name} onChange={(value) => updateField('name', value)} placeholder={formContent.name_placeholder} />
-                <FormInput label={formContent.email_label} type="email" value={form.email} onChange={(value) => updateField('email', value)} placeholder={formContent.email_placeholder} />
-                <FormInput label={formContent.phone_label} value={form.phone} onChange={(value) => updateField('phone', value)} placeholder={formContent.phone_placeholder} />
-                <label className="block">
-                  <span className="mb-1.5 block text-xs text-white/65">{formContent.project_type_label}</span>
-                  <select value={form.project_type} onChange={(event) => updateField('project_type', event.target.value)} className="w-full rounded-xl border border-purple-300/20 bg-[#120824] px-4 py-3 text-sm text-white outline-none transition focus:border-purple-300/35">
-                    <option value="">{formContent.project_type_placeholder}</option>
-                    {visibleProjectTypes.map((type) => <option key={type} value={type}>{type}</option>)}
-                  </select>
-                </label>
-                <FormInput label="Budget" value={form.budget} onChange={(value) => updateField('budget', value)} placeholder="Approx budget" />
-                <FormInput label="Shoot / project date" type="date" value={form.project_date} onChange={(value) => updateField('project_date', value)} />
-                <FormInput label="Location" value={form.location} onChange={(value) => updateField('location', value)} placeholder="City, venue, or destination" className="sm:col-span-2" />
-                <label className="block sm:col-span-2">
-                  <span className="mb-1.5 block text-xs text-white/65">{formContent.message_label}</span>
-                  <textarea value={form.message} onChange={(event) => updateField('message', event.target.value)} rows={5} className="w-full resize-none rounded-xl border border-purple-300/20 bg-purple-500/10 px-4 py-3 text-sm text-white outline-none transition focus:border-purple-300/35" placeholder={formContent.message_placeholder} />
-                </label>
-              </div>
-
-              <button type="submit" disabled={busy} className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-violet-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-violet-500 disabled:cursor-not-allowed disabled:opacity-60">
-                {busy ? 'Sending...' : formSection.button_text || formContent.submit_button_text} <Send size={15} />
-              </button>
-            </form>
-          )}
-        </div>
-      </section>}
+        </section>}
+      </main>
       <Footer />
-    </main>
+    </>
   );
 };
 

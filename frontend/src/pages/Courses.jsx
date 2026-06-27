@@ -78,16 +78,6 @@ const Courses = () => {
   const reviews = sectionByAny(sections, ['student-reviews', 'testimonials', 'reviews']) || {};
   const faq = section(sections, 'faq') || {};
 
-  if (!loading && pageHidden) {
-    return (
-      <main className="page bg-[var(--bg-main)] text-white">
-        <Header />
-        <CourseComingSoon visibility={settings} />
-        <Footer />
-      </main>
-    );
-  }
-
   const courseContent = {
     hero: {
       badge: firstText(hero.subtitle, hero.data?.subtitle, hero.data?.badge, hero.data?.badge_text),
@@ -121,25 +111,29 @@ const Courses = () => {
   };
 
   return (
-    <main className="page bg-[var(--bg-main)] text-white">
+    <>
       <Header />
-      {showComingSoon ? (
-        <CourseComingSoon
-          visibility={{
-            ...settings,
-            coming_soon_title: comingSoon?.title || settings.coming_soon_title,
-            coming_soon_subtitle: comingSoon?.subtitle || settings.coming_soon_subtitle,
-            coming_soon_button_text: comingSoon?.button_text || settings.coming_soon_button_text,
-            coming_soon_button_link: comingSoon?.button_link || settings.coming_soon_button_link,
-          }}
-        />
-      ) : (
-        <CoursePageContent contentOverride={courseContent}>
-          {courseContent.show_course_list && <CoursesSection section={courseContent.course_list_section} />}
-        </CoursePageContent>
-      )}
+      <main className="page bg-[var(--bg-main)] text-white">
+        {!loading && pageHidden ? (
+          <CourseComingSoon visibility={settings} />
+        ) : showComingSoon ? (
+          <CourseComingSoon
+            visibility={{
+              ...settings,
+              coming_soon_title: comingSoon?.title || settings.coming_soon_title,
+              coming_soon_subtitle: comingSoon?.subtitle || settings.coming_soon_subtitle,
+              coming_soon_button_text: comingSoon?.button_text || settings.coming_soon_button_text,
+              coming_soon_button_link: comingSoon?.button_link || settings.coming_soon_button_link,
+            }}
+          />
+        ) : (
+          <CoursePageContent contentOverride={courseContent}>
+            {courseContent.show_course_list && <CoursesSection section={courseContent.course_list_section} />}
+          </CoursePageContent>
+        )}
+      </main>
       <Footer />
-    </main>
+    </>
   );
 };
 

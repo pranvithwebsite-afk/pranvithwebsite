@@ -129,13 +129,6 @@ const Assets = () => {
 
   useEffect(() => {
     if (!isMobileFilterOpen) return undefined;
-    const closeOnScroll = () => closeMobileFilters();
-    window.addEventListener('scroll', closeOnScroll, { passive: true });
-    return () => window.removeEventListener('scroll', closeOnScroll);
-  }, [isMobileFilterOpen]);
-
-  useEffect(() => {
-    if (!isMobileFilterOpen) return undefined;
     const closeOnOutside = (event) => {
       if (!mobileFilterRef.current?.contains(event.target)) closeMobileFilters();
     };
@@ -148,113 +141,113 @@ const Assets = () => {
   }, [isMobileFilterOpen]);
 
   return (
-    <main className="page bg-[var(--bg-main)] text-white min-h-screen">
+    <>
       <Header />
-
-      {!pageHidden && heroSection?.section_id && (
-        <section className="pt-8 pb-10">
-          <div className="max-w-7xl mx-auto px-6">
-            <div className="cinematic-card px-8 py-7">
-              <h1 className="text-2xl md:text-4xl font-bold tracking-tight" data-testid="assets-page-title">{heroSection?.title || cmsPage?.title || 'Creative Assets Store'}</h1>
-              <p className="mt-2 text-sm text-white/65">
-                {heroSection?.subtitle || heroSection?.description || cmsPage?.subtitle || 'Premium LUTs, sound packs, motion templates and more - built for editors.'}
-              </p>
+      <main className="page bg-[var(--bg-main)] text-white min-h-screen">
+        {!pageHidden && heroSection?.section_id && (
+          <section className="pt-8 pb-10">
+            <div className="max-w-7xl mx-auto px-6">
+              <div className="cinematic-card px-8 py-7">
+                <h1 className="text-2xl md:text-4xl font-bold tracking-tight" data-testid="assets-page-title">{heroSection?.title || cmsPage?.title || 'Creative Assets Store'}</h1>
+                <p className="mt-2 text-sm text-white/65">
+                  {heroSection?.subtitle || heroSection?.description || cmsPage?.subtitle || 'Premium LUTs, sound packs, motion templates and more - built for editors.'}
+                </p>
+              </div>
             </div>
-          </div>
-        </section>
-      )}
+          </section>
+        )}
 
 
-      {showProductListing && <section className="pb-24">
-        <div className="max-w-7xl mx-auto px-6 grid grid-cols-1 lg:grid-cols-[260px_1fr] gap-5 lg:gap-8">
-          {showFilters && (
-            <div ref={mobileFilterRef} className="lg:hidden">
-              <button
-                type="button"
-                aria-expanded={isMobileFilterOpen}
-                aria-controls={mobileFilterPanelId}
-                onClick={() => setIsMobileFilterOpen((open) => !open)}
-                className="flex w-full items-center justify-between rounded-[18px] border border-purple-300/20 bg-[linear-gradient(145deg,rgba(23,16,37,0.96),rgba(13,8,24,0.98))] px-5 py-4 text-left shadow-[0_0_45px_rgba(124,58,237,0.12)] transition hover:border-purple-300/35"
-              >
-                <span className="inline-flex items-center gap-3 text-sm font-semibold text-white">
-                  <span className="flex h-9 w-9 items-center justify-center rounded-2xl border border-purple-300/20 bg-purple-500/15 text-[#c4b5fd]">
-                    <Filter size={17} />
+        {showProductListing && <section className="pb-24">
+          <div className="max-w-7xl mx-auto px-6 grid grid-cols-1 lg:grid-cols-[260px_1fr] gap-5 lg:gap-8">
+            {showFilters && (
+              <div ref={mobileFilterRef} className="lg:hidden">
+                <button
+                  type="button"
+                  aria-expanded={isMobileFilterOpen}
+                  aria-controls={mobileFilterPanelId}
+                  onClick={() => setIsMobileFilterOpen((open) => !open)}
+                  className="flex w-full items-center justify-between rounded-[18px] border border-purple-300/20 bg-[linear-gradient(145deg,rgba(23,16,37,0.96),rgba(13,8,24,0.98))] px-5 py-4 text-left shadow-[0_0_45px_rgba(124,58,237,0.12)] transition hover:border-purple-300/35"
+                >
+                  <span className="inline-flex items-center gap-3 text-sm font-semibold text-white">
+                    <span className="flex h-9 w-9 items-center justify-center rounded-2xl border border-purple-300/20 bg-purple-500/15 text-[#c4b5fd]">
+                      <Filter size={17} />
+                    </span>
+                    Filters{activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}
                   </span>
-                  Filters{activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}
-                </span>
-                <ChevronDown size={18} className={`text-[#c4b5fd] transition-transform duration-300 ${isMobileFilterOpen ? 'rotate-180' : ''}`} />
-              </button>
-              <div
-                id={mobileFilterPanelId}
-                className={`grid overflow-hidden transition-[grid-template-rows,opacity,margin] duration-300 ease-out ${
-                  isMobileFilterOpen ? 'mt-3 grid-rows-[1fr] opacity-100' : 'mt-0 grid-rows-[0fr] opacity-0'
-                }`}
-              >
-                <div className="min-h-0 overflow-hidden">
-                  <div className="cinematic-card p-5">
-                    <FilterContent
-                      query={query}
-                      setQuery={setQuery}
-                      sort={sort}
-                      setSort={setSort}
-                      priceFilter={priceFilter}
-                      setPriceFilter={setPriceFilter}
-                      onOptionSelect={closeMobileFiltersIfNeeded}
-                      inputTestId="assets-search-input-mobile"
-                      radioNameSuffix="mobile"
-                    />
+                  <ChevronDown size={18} className={`text-[#c4b5fd] transition-transform duration-300 ${isMobileFilterOpen ? 'rotate-180' : ''}`} />
+                </button>
+                <div
+                  id={mobileFilterPanelId}
+                  className={`grid overflow-hidden transition-[grid-template-rows,opacity,margin] duration-300 ease-out ${
+                    isMobileFilterOpen ? 'mt-3 grid-rows-[1fr] opacity-100' : 'mt-0 grid-rows-[0fr] opacity-0'
+                  }`}
+                >
+                  <div className="min-h-0 overflow-hidden">
+                    <div className="cinematic-card p-5">
+                      <FilterContent
+                        query={query}
+                        setQuery={setQuery}
+                        sort={sort}
+                        setSort={setSort}
+                        priceFilter={priceFilter}
+                        setPriceFilter={setPriceFilter}
+                        onOptionSelect={closeMobileFiltersIfNeeded}
+                        inputTestId="assets-search-input-mobile"
+                        radioNameSuffix="mobile"
+                      />
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-          )}
-
-          {showFilters && (
-            <aside className="cinematic-card hidden h-fit p-6 lg:sticky lg:top-28 lg:block">
-              <FilterContent
-                query={query}
-                setQuery={setQuery}
-                sort={sort}
-                setSort={setSort}
-                priceFilter={priceFilter}
-                setPriceFilter={setPriceFilter}
-                inputTestId="assets-search-input"
-                radioNameSuffix="desktop"
-              />
-            </aside>
-          )}
-
-          <div>
-            {loading ? (
-              <div className="grid grid-cols-2 gap-3 md:grid-cols-3 md:gap-5 xl:grid-cols-4" aria-hidden="true">
-                {Array.from({ length: 8 }).map((_, index) => (
-                  <div key={index} className="cinematic-card h-[320px] animate-pulse" />
-                ))}
-              </div>
-            ) : loadError ? (
-              <div className="rounded-2xl border border-rose-500/20 bg-rose-500/5 p-12 text-center text-white/70" data-testid="assets-error">
-                Assets could not be loaded. Please refresh and try again.
-              </div>
-            ) : filtered.length === 0 ? (
-              <div className="cinematic-card p-12 text-center text-white/60" data-testid="assets-empty">
-                No assets match your filters.
-              </div>
-            ) : (
-              <div className="grid grid-cols-2 gap-3 md:grid-cols-3 md:gap-5 xl:grid-cols-4" data-testid="assets-grid">
-                {filtered.map((p, index) => (
-                  <ProductCard
-                    key={getCatalogItemKey(p, index)}
-                    p={p}
-                    onView={() => navigate(`/assets/${p.slug}`)}
-                    onBuy={() => setCheckoutProduct(p)}
-                  />
-                ))}
-              </div>
             )}
-          </div>
-        </div>
-      </section>}
 
+            {showFilters && (
+              <aside className="cinematic-card hidden h-fit p-6 lg:sticky lg:top-28 lg:block">
+                <FilterContent
+                  query={query}
+                  setQuery={setQuery}
+                  sort={sort}
+                  setSort={setSort}
+                  priceFilter={priceFilter}
+                  setPriceFilter={setPriceFilter}
+                  inputTestId="assets-search-input"
+                  radioNameSuffix="desktop"
+                />
+              </aside>
+            )}
+
+            <div>
+              {loading || cmsLoading ? (
+                <div className="grid grid-cols-2 gap-3 md:grid-cols-3 md:gap-5 xl:grid-cols-4" aria-hidden="true">
+                  {Array.from({ length: 8 }).map((_, index) => (
+                    <div key={index} className="cinematic-card h-[320px] animate-pulse" />
+                  ))}
+                </div>
+              ) : loadError ? (
+                <div className="rounded-2xl border border-rose-500/20 bg-rose-500/5 p-12 text-center text-white/70" data-testid="assets-error">
+                  Assets could not be loaded. Please refresh and try again.
+                </div>
+              ) : filtered.length === 0 ? (
+                <div className="cinematic-card p-12 text-center text-white/60" data-testid="assets-empty">
+                  No assets match your filters.
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-3 md:grid-cols-3 md:gap-5 xl:grid-cols-4" data-testid="assets-grid">
+                  {filtered.map((p, index) => (
+                    <ProductCard
+                      key={getCatalogItemKey(p, index)}
+                      p={p}
+                      onView={() => navigate(`/assets/${p.slug}`)}
+                      onBuy={() => setCheckoutProduct(p)}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </section>}
+      </main>
       <Footer />
       <CheckoutModal
         product={checkoutProduct}
@@ -281,7 +274,7 @@ const Assets = () => {
           }
         }}
       />
-    </main>
+    </>
   );
 };
 

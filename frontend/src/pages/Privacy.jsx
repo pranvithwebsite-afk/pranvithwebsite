@@ -124,46 +124,48 @@ const Privacy = () => {
   const visiblePrivacySections = cmsItemsOrFallback(privacySection, privacySections);
 
   return (
-    <main className="page bg-[var(--bg-main)] text-white">
+    <>
       <Header />
-      <section className="px-6 py-16">
-        <div className="mx-auto max-w-5xl">
-          <p className="text-xs font-semibold uppercase tracking-[0.35em] text-violet-300">{termsPage?.subtitle || 'Legal'}</p>
-          <h1 className="mt-4 text-4xl font-bold tracking-tight md:text-6xl">{termsPage?.title || 'Terms & Conditions'}</h1>
-          <p className="mt-6 max-w-3xl text-sm leading-7 text-white/68">
-            {termsSection?.description || <>These Terms & Conditions are a legal agreement between you and <strong className="text-white">Pranvith DOP</strong>. By using our website, products, digital assets, courses, services, or any related content, you agree to follow these terms.</>}
-          </p>
-          <p className="mt-3 max-w-3xl text-sm leading-7 text-white/68">
-            {termsSection?.data?.intro_after || 'Please read these terms carefully. If you do not agree, please do not use our website or services.'}
-          </p>
-        </div>
-      </section>
+      <main className="page bg-[var(--bg-main)] text-white">
+        <section className="px-6 py-16">
+          <div className="mx-auto max-w-5xl">
+            <p className="text-xs font-semibold uppercase tracking-[0.35em] text-violet-300">{termsPage?.subtitle || 'Legal'}</p>
+            <h1 className="mt-4 text-4xl font-bold tracking-tight md:text-6xl">{termsPage?.title || 'Terms & Conditions'}</h1>
+            <p className="mt-6 max-w-3xl text-sm leading-7 text-white/68">
+              {termsSection?.description || <>These Terms & Conditions are a legal agreement between you and <strong className="text-white">Pranvith DOP</strong>. By using our website, products, digital assets, courses, services, or any related content, you agree to follow these terms.</>}
+            </p>
+            <p className="mt-3 max-w-3xl text-sm leading-7 text-white/68">
+              {termsSection?.data?.intro_after || 'Please read these terms carefully. If you do not agree, please do not use our website or services.'}
+            </p>
+          </div>
+        </section>
 
-      <div id="terms" className="mx-auto max-w-5xl px-6 pb-12">
-        <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-6 md:p-8">
-          {visibleTermsSections.map((section) => <LegalSection key={section.title} section={section} />)}
+        <div id="terms" className="mx-auto max-w-5xl px-6 pb-12">
+          <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-6 md:p-8">
+            {visibleTermsSections.map((section) => <LegalSection key={section.title} section={section} />)}
+          </div>
         </div>
-      </div>
 
-      <section id="privacy" className="px-6 py-16">
-        <div className="mx-auto max-w-5xl">
-          <p className="text-xs font-semibold uppercase tracking-[0.35em] text-violet-300">{privacyPage?.title || 'Privacy Policy'}</p>
-          <h2 className="mt-4 text-4xl font-bold tracking-tight md:text-6xl">{privacyPage?.subtitle || 'Privacy Policy - Pranvith DOP'}</h2>
-          <p className="mt-4 text-sm text-white/55">{privacySection?.subtitle || 'Last Updated: 23 June 2026'}</p>
-          <p className="mt-6 max-w-3xl text-sm leading-7 text-white/68">
-            {privacySection?.description || 'This Privacy Policy explains how Pranvith DOP collects, uses, stores, and protects your information when you use our website, products, digital downloads, courses, and services.'}
-          </p>
-          <p className="mt-3 max-w-3xl text-sm leading-7 text-white/68">{privacySection?.data?.intro_after || 'By using our website or services, you agree to this Privacy Policy.'}</p>
-        </div>
-      </section>
+        <section id="privacy" className="px-6 py-16">
+          <div className="mx-auto max-w-5xl">
+            <p className="text-xs font-semibold uppercase tracking-[0.35em] text-violet-300">{privacyPage?.title || 'Privacy Policy'}</p>
+            <h2 className="mt-4 text-4xl font-bold tracking-tight md:text-6xl">{privacyPage?.subtitle || 'Privacy Policy - Pranvith DOP'}</h2>
+            <p className="mt-4 text-sm text-white/55">{privacySection?.subtitle || 'Last Updated: 23 June 2026'}</p>
+            <p className="mt-6 max-w-3xl text-sm leading-7 text-white/68">
+              {privacySection?.description || 'This Privacy Policy explains how Pranvith DOP collects, uses, stores, and protects your information when you use our website, products, digital downloads, courses, and services.'}
+            </p>
+            <p className="mt-3 max-w-3xl text-sm leading-7 text-white/68">{privacySection?.data?.intro_after || 'By using our website or services, you agree to this Privacy Policy.'}</p>
+          </div>
+        </section>
 
-      <div className="mx-auto max-w-5xl px-6 pb-20">
-        <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-6 md:p-8">
-          {visiblePrivacySections.map((section) => <LegalSection key={section.title} section={section} />)}
+        <div className="mx-auto max-w-5xl px-6 pb-20">
+          <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-6 md:p-8">
+            {visiblePrivacySections.map((section) => <LegalSection key={section.title} section={section} />)}
+          </div>
         </div>
-      </div>
+      </main>
       <Footer />
-    </main>
+    </>
   );
 };
 
