@@ -222,9 +222,6 @@ const getSchema = (pageKey, section) => {
     if (typeSchema) return typeSchema;
   }
 
-  const genericTypeSchema = SECTION_EDITOR_SCHEMAS[`${pageKey}:${sectionType}`];
-  if (genericTypeSchema) return genericTypeSchema;
-
   return SIMPLE_DEFAULT_SCHEMA;
 };
 
