@@ -214,12 +214,6 @@ const getSchema = (pageKey, section) => {
   const sectionId = section?.section_id || '';
   const sectionType = section?.type || '';
 
-  if (pageKey === 'works') {
-    if (sectionId === 'portfolio-projects' || sectionId === 'projects' || sectionType === 'portfolio_grid') {
-      return worksPortfolioProjectsSchema;
-    }
-  }
-
   const schema = SECTION_EDITOR_SCHEMAS[`${pageKey}:${sectionId}`];
   if (schema) return schema;
 
@@ -227,6 +221,9 @@ const getSchema = (pageKey, section) => {
     const typeSchema = SECTION_EDITOR_SCHEMAS[`${pageKey}:${sectionType}`];
     if (typeSchema) return typeSchema;
   }
+
+  const genericTypeSchema = SECTION_EDITOR_SCHEMAS[`${pageKey}:${sectionType}`];
+  if (genericTypeSchema) return genericTypeSchema;
 
   return SIMPLE_DEFAULT_SCHEMA;
 };
