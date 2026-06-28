@@ -10,6 +10,7 @@ import { usePublicPageLoading } from '../components/PublicPageLoader';
 import OptimizedImage from '../components/OptimizedImage';
 
 const filters = ['All', 'Commercial', 'Wedding', 'Drone', 'Editing', 'Product', 'Film'];
+const EMPTY_SECTIONS = [];
 
 const enabledSorted = (items = []) =>
   [...items].filter((item) => item.enabled !== false).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
@@ -26,13 +27,16 @@ const Works = () => {
   const { page, loading } = useCmsPage('works');
   usePublicPageLoading(loading);
   const [active, setActive] = useState('All');
-  const sections = page?.sections || [];
+  const sections = page?.sections || page?.page?.sections || page?.data?.sections || EMPTY_SECTIONS;
   const hero = section(sections, 'hero') || {};
   const showreel = section(sections, 'showreel') || {};
   const videoMediaTypes = new Set(['video_file', 'video_url', 'youtube', 'vimeo']);
   const showreelVideoUrl = showreel.video_url || showreel.data?.video_url || (videoMediaTypes.has(showreel.media_type) ? showreel.media_url : '') || (videoMediaTypes.has(showreel.data?.media_type) ? showreel.data?.media_url : '') || (videoMediaTypes.has(detectMediaType(showreel.media_url)) ? showreel.media_url : '') || (videoMediaTypes.has(detectMediaType(showreel.data?.media_url)) ? showreel.data?.media_url : '');
   const showreelPosterUrl = showreel.poster_url || showreel.thumbnail_url || showreel.image_url || showreel.data?.poster_url || showreel.data?.thumbnail_url || showreel.data?.image_url;
-  const projectsSection = section(sections, 'portfolio-projects', 'projects', 'portfolio_grid', 'works') || {};
+  const projectsSection = useMemo(
+    () => section(sections, 'portfolio-projects', 'projects', 'portfolio_grid', 'works') || {},
+    [sections]
+  );
   const clientTestimonialsSection = section(sections, 'client-testimonials', 'testimonials') || {};
   const ctaSection = section(sections, 'cta') || {};
   
