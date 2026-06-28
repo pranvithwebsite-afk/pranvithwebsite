@@ -25,8 +25,26 @@ const SIMPLE_DEFAULT_SCHEMA = {
   itemFields: ['title', 'description', 'sort_order', 'enabled'],
 };
 
-const worksPortfolioProjectsSchema = {
-  sectionFields: ['section_id', 'type', 'title', 'subtitle', 'description', 'enabled'],
+const mixedMediaFields = ['media_type', 'media_url', 'poster_url'];
+const videoMediaFields = ['video_url', 'poster_url'];
+const createSchema = ({
+  sectionFields = SIMPLE_DEFAULT_SCHEMA.sectionFields,
+  dataFields = [],
+  itemFields = [],
+  sectionLabels = {},
+  dataLabels = {},
+  itemLabels = {},
+} = {}) => ({
+  sectionFields,
+  dataFields,
+  itemFields,
+  sectionLabels,
+  dataLabels,
+  itemLabels,
+});
+
+const worksPortfolioProjectsSchema = createSchema({
+  sectionFields: ['section_id', 'type', 'title', 'subtitle', 'description', 'button_text', 'button_link', 'enabled'],
   dataFields: ['eyebrow'],
   itemFields: [
     'title',
@@ -34,6 +52,9 @@ const worksPortfolioProjectsSchema = {
     'description',
     'thumbnail_url',
     'video_url',
+    'equipment',
+    'client',
+    'date',
     'link_url',
     'featured',
     'enabled',
@@ -47,95 +68,224 @@ const worksPortfolioProjectsSchema = {
     enabled: 'Visible',
     featured: 'Featured Project',
   },
-};
+});
 
 const SECTION_EDITOR_SCHEMAS = {
-  'home:hero': { sectionFields: ['section_id', 'type', 'title', 'subtitle', 'description', 'button_text', 'button_link', 'media_type', 'media_url', 'video_url', 'poster_url', 'image_url', 'thumbnail_url', 'enabled'] },
-  'home:featured-assets': { sectionFields: ['section_id', 'type', 'title', 'subtitle', 'description', 'button_text', 'button_link', 'enabled'], itemFields: ['title', 'category', 'description', 'media_type', 'media_url', 'video_url', 'poster_url', 'thumbnail_image_url', 'image_url', 'sort_order', 'enabled'] },
-  'home:instagram-profile': {
+  'home:hero': createSchema({
+    sectionFields: ['section_id', 'type', 'title', 'subtitle', 'description', 'button_text', 'button_link', ...mixedMediaFields, 'enabled'],
+    sectionLabels: {
+      media_url: 'Media URL',
+      poster_url: 'Poster / Thumbnail URL (optional)',
+    },
+  }),
+  'home:featured-assets': createSchema({
+    sectionFields: ['section_id', 'type', 'title', 'subtitle', 'description', 'button_text', 'button_link', 'enabled'],
+    itemFields: ['title', 'category', 'description', 'thumbnail_image_url', 'video_url', 'sort_order', 'enabled'],
+    itemLabels: {
+      thumbnail_image_url: 'Thumbnail / Image URL',
+      video_url: 'Video URL (optional)',
+    },
+  }),
+  'home:featured_assets_preview': createSchema({
+    sectionFields: ['section_id', 'type', 'title', 'subtitle', 'description', 'button_text', 'button_link', 'enabled'],
+    itemFields: ['title', 'category', 'description', 'thumbnail_image_url', 'video_url', 'sort_order', 'enabled'],
+    itemLabels: {
+      thumbnail_image_url: 'Thumbnail / Image URL',
+      video_url: 'Video URL (optional)',
+    },
+  }),
+  'home:portfolio_grid': createSchema({
+    sectionFields: ['section_id', 'type', 'title', 'subtitle', 'description', 'button_text', 'button_link', 'enabled'],
+    itemFields: ['title', 'category', 'description', 'thumbnail_image_url', 'video_url', 'sort_order', 'enabled'],
+    itemLabels: {
+      thumbnail_image_url: 'Thumbnail / Image URL',
+      video_url: 'Video URL (optional)',
+    },
+  }),
+  'home:instagram-profile': createSchema({
     sectionFields: ['section_id', 'type', 'title', 'description', 'button_text', 'button_link', 'media_url', 'enabled'],
+    sectionLabels: {
+      media_url: 'Profile Image URL',
+    },
     dataFields: ['username', 'display_name', 'followers_count', 'following_count', 'bio_line_1', 'bio_line_2', 'bio_line_3', 'bio_line_4', 'link_text', 'link_url', 'follow_button_url'],
     itemFields: ['title', 'type', 'coverText', 'thumbnail_image_url', 'link_url', 'sort_order', 'enabled'],
-  },
-  'home:services': {
+    itemLabels: {
+      thumbnail_image_url: 'Card Image URL',
+    },
+  }),
+  'home:instagram': createSchema({
+    sectionFields: ['section_id', 'type', 'title', 'description', 'button_text', 'button_link', 'media_url', 'enabled'],
+    sectionLabels: {
+      media_url: 'Profile Image URL',
+    },
+    dataFields: ['username', 'display_name', 'followers_count', 'following_count', 'bio_line_1', 'bio_line_2', 'bio_line_3', 'bio_line_4', 'link_text', 'link_url', 'follow_button_url'],
+    itemFields: ['title', 'type', 'coverText', 'thumbnail_image_url', 'link_url', 'sort_order', 'enabled'],
+    itemLabels: {
+      thumbnail_image_url: 'Card Image URL',
+    },
+  }),
+  'home:gallery': createSchema({
+    sectionFields: ['section_id', 'type', 'title', 'description', 'button_text', 'button_link', 'media_url', 'enabled'],
+    sectionLabels: {
+      media_url: 'Profile Image URL',
+    },
+    dataFields: ['username', 'display_name', 'followers_count', 'following_count', 'bio_line_1', 'bio_line_2', 'bio_line_3', 'bio_line_4', 'link_text', 'link_url', 'follow_button_url'],
+    itemFields: ['title', 'type', 'coverText', 'thumbnail_image_url', 'link_url', 'sort_order', 'enabled'],
+    itemLabels: {
+      thumbnail_image_url: 'Card Image URL',
+    },
+  }),
+  'home:services': createSchema({
     sectionFields: ['section_id', 'type', 'title', 'subtitle', 'enabled'],
     dataFields: ['eyebrow'],
     itemFields: ['title', 'description', 'category', 'icon', 'link_label', 'link_url', 'sort_order', 'enabled'],
     itemLabels: { link_url: 'Link URL', link_label: 'Link Label' },
-  },
-  'home:services_cards': {
+  }),
+  'home:services_cards': createSchema({
     sectionFields: ['section_id', 'type', 'title', 'subtitle', 'enabled'],
     dataFields: ['eyebrow'],
     itemFields: ['title', 'description', 'category', 'icon', 'link_label', 'link_url', 'sort_order', 'enabled'],
     itemLabels: { link_url: 'Link URL', link_label: 'Link Label' },
-  },
-  'home:home_services': {
+  }),
+  'home:home_services': createSchema({
     sectionFields: ['section_id', 'type', 'title', 'subtitle', 'enabled'],
     dataFields: ['eyebrow'],
     itemFields: ['title', 'description', 'category', 'icon', 'link_label', 'link_url', 'sort_order', 'enabled'],
     itemLabels: { link_url: 'Link URL', link_label: 'Link Label' },
-  },
-  'home:showreel': { sectionFields: ['section_id', 'type', 'title', 'subtitle', 'description', 'button_text', 'button_link', 'media_type', 'media_url', 'video_url', 'poster_url', 'thumbnail_url', 'image_url', 'enabled'], itemFields: ['title', 'category', 'description', 'media_type', 'media_url', 'video_url', 'poster_url', 'thumbnail_image_url', 'thumbnail_url', 'image_url', 'sort_order', 'enabled'] },
-  'home:cta': { sectionFields: ['section_id', 'type', 'title', 'description', 'button_text', 'button_link', 'enabled'] },
-  'home:faq': { sectionFields: ['section_id', 'type', 'title', 'subtitle', 'description', 'button_text', 'button_link', 'enabled'], itemFields: ['question', 'answer', 'sort_order', 'enabled'] },
+  }),
+  'home:showreel': createSchema({
+    sectionFields: ['section_id', 'type', 'title', 'subtitle', 'description', 'button_text', 'button_link', ...videoMediaFields, 'enabled'],
+    sectionLabels: {
+      video_url: 'Video URL',
+      poster_url: 'Poster / Thumbnail URL (optional)',
+    },
+    itemFields: ['title', 'category', 'description', 'thumbnail_image_url', 'video_url', 'sort_order', 'enabled'],
+    itemLabels: {
+      thumbnail_image_url: 'Thumbnail / Image URL',
+      video_url: 'Video URL (optional)',
+    },
+  }),
+  'home:cta': createSchema({ sectionFields: ['section_id', 'type', 'title', 'description', 'button_text', 'button_link', 'enabled'] }),
+  'home:faq': createSchema({ sectionFields: ['section_id', 'type', 'title', 'subtitle', 'description', 'button_text', 'button_link', 'enabled'], itemFields: ['question', 'answer', 'sort_order', 'enabled'] }),
 
-  'courses:coming-soon': { sectionFields: ['section_id', 'type', 'title', 'subtitle', 'button_text', 'button_link', 'enabled'] },
-  'courses:hero': { sectionFields: ['section_id', 'type', 'title', 'subtitle', 'description', 'button_text', 'button_link', 'media_type', 'media_url', 'video_url', 'poster_url', 'image_url', 'thumbnail_url', 'enabled'] },
-  'courses:right-for-you': { sectionFields: ['section_id', 'type', 'title', 'button_text', 'button_link', 'enabled'], dataFields: ['cta_text'], itemFields: ['title', 'description', 'sort_order', 'enabled'] },
-  'courses:what-youll-learn': { sectionFields: ['section_id', 'type', 'title', 'subtitle', 'enabled'], itemFields: ['title', 'description', 'sort_order', 'enabled'] },
-  'courses:course-list': { sectionFields: ['section_id', 'type', 'title', 'subtitle', 'description', 'enabled'], dataFields: ['show_course_list'] },
-  'courses:student-videos': {
+  'courses:coming-soon': createSchema({ sectionFields: ['section_id', 'type', 'title', 'subtitle', 'button_text', 'button_link', 'image_url', 'enabled'], sectionLabels: { image_url: 'Image URL (optional)' } }),
+  'courses:hero': createSchema({
+    sectionFields: ['section_id', 'type', 'title', 'subtitle', 'description', 'button_text', 'button_link', ...mixedMediaFields, 'enabled'],
+    sectionLabels: {
+      media_url: 'Media URL',
+      poster_url: 'Poster / Thumbnail URL (optional)',
+    },
+  }),
+  'courses:right-for-you': createSchema({ sectionFields: ['section_id', 'type', 'title', 'button_text', 'button_link', 'enabled'], dataFields: ['cta_text'], itemFields: ['title', 'description', 'sort_order', 'enabled'] }),
+  'courses:what-youll-learn': createSchema({ sectionFields: ['section_id', 'type', 'title', 'subtitle', 'enabled'], itemFields: ['title', 'description', 'icon', 'sort_order', 'enabled'] }),
+  'courses:course-list': createSchema({ sectionFields: ['section_id', 'type', 'title', 'subtitle', 'description', 'enabled'], dataFields: ['show_course_list'] }),
+  'courses:student-videos': createSchema({
     sectionFields: ['section_id', 'type', 'title', 'subtitle', 'description', 'enabled'],
-    itemFields: ['title', 'subtitle', 'description', 'media_type', 'media_url', 'image_url', 'poster_url', 'thumbnail_url', 'video_url', 'sort_order', 'enabled'],
-    itemLabels: { title: 'Video Title / Student Name', subtitle: 'Course / Role', description: 'Review Text', image_url: 'Thumbnail Image' },
-  },
-  'courses:student-reviews': {
+    itemFields: ['title', 'subtitle', 'description', 'video_url', 'poster_url', 'sort_order', 'enabled'],
+    itemLabels: { title: 'Video Title / Student Name', subtitle: 'Course / Role', description: 'Review Text', poster_url: 'Poster / Thumbnail URL (optional)' },
+  }),
+  'courses:video_reviews': createSchema({
+    sectionFields: ['section_id', 'type', 'title', 'subtitle', 'description', 'enabled'],
+    itemFields: ['title', 'subtitle', 'description', 'video_url', 'poster_url', 'sort_order', 'enabled'],
+    itemLabels: { title: 'Video Title / Student Name', subtitle: 'Course / Role', description: 'Review Text', poster_url: 'Poster / Thumbnail URL (optional)' },
+  }),
+  'courses:student-reviews': createSchema({
     sectionFields: ['section_id', 'type', 'title', 'subtitle', 'description', 'enabled'],
     itemFields: ['title', 'subtitle', 'description', 'rating', 'image_url', 'sort_order', 'enabled'],
     itemLabels: { title: 'Student Name', subtitle: 'Course / Role', description: 'Review Text', image_url: 'Student Photo' },
-  },
-  'courses:testimonial_videos': {
+  }),
+  'courses:testimonial_videos': createSchema({
     sectionFields: ['section_id', 'type', 'title', 'enabled'],
-    itemFields: ['student_name', 'course_name', 'review_text', 'media_type', 'media_url', 'poster_url', 'thumbnail_image_url', 'thumbnail_url', 'image_url', 'video_url', 'sort_order', 'enabled'],
-    itemLabels: { student_name: 'Video Title / Student Name', course_name: 'Course / Role', review_text: 'Review Text', thumbnail_image_url: 'Thumbnail Image' },
-  },
-  'courses:reviews': {
+    itemFields: ['student_name', 'course_name', 'review_text', 'video_url', 'poster_url', 'sort_order', 'enabled'],
+    itemLabels: { student_name: 'Video Title / Student Name', course_name: 'Course / Role', review_text: 'Review Text', poster_url: 'Poster / Thumbnail URL (optional)' },
+  }),
+  'courses:reviews': createSchema({
     sectionFields: ['section_id', 'type', 'title', 'enabled'],
     itemFields: ['student_name', 'course_name', 'review_text', 'rating', 'student_image_url', 'sort_order', 'enabled'],
     itemLabels: { student_name: 'Student Name', course_name: 'Course / Role', review_text: 'Review Text', student_image_url: 'Student Photo' },
-  },
-  'courses:faq': { sectionFields: ['section_id', 'type', 'title', 'subtitle', 'description', 'enabled'], itemFields: ['question', 'answer', 'sort_order', 'enabled'] },
+  }),
+  'courses:testimonials': createSchema({
+    sectionFields: ['section_id', 'type', 'title', 'enabled'],
+    itemFields: ['student_name', 'course_name', 'review_text', 'rating', 'student_image_url', 'sort_order', 'enabled'],
+    itemLabels: { student_name: 'Student Name', course_name: 'Course / Role', review_text: 'Review Text', student_image_url: 'Student Photo' },
+  }),
+  'courses:faq': createSchema({ sectionFields: ['section_id', 'type', 'title', 'subtitle', 'description', 'enabled'], itemFields: ['question', 'answer', 'sort_order', 'enabled'] }),
 
-  'about:hero': { sectionFields: ['section_id', 'type', 'title', 'subtitle', 'description', 'button_text', 'button_link', 'media_type', 'media_url', 'video_url', 'poster_url', 'image_url', 'thumbnail_url', 'enabled'], dataFields: ['secondary_button_text', 'secondary_button_link'] },
-  'about:stats': { sectionFields: ['section_id', 'type', 'title', 'enabled'], itemFields: ['title', 'description', 'sort_order', 'enabled'], itemLabels: { title: 'Stat Number', description: 'Stat Label' } },
-  'about:creative-positioning': { sectionFields: ['section_id', 'type', 'title', 'description', 'enabled'] },
-  'about:gear-workflow': { sectionFields: ['section_id', 'type', 'title', 'enabled'], itemFields: ['title', 'sort_order', 'enabled'], itemLabels: { title: 'Gear Item' } },
+  'about:hero': createSchema({
+    sectionFields: ['section_id', 'type', 'title', 'subtitle', 'description', 'button_text', 'button_link', ...mixedMediaFields, 'enabled'],
+    dataFields: ['secondary_button_text', 'secondary_button_link'],
+    sectionLabels: {
+      media_url: 'Media URL',
+      poster_url: 'Poster / Thumbnail URL (optional)',
+    },
+  }),
+  'about:stats': createSchema({ sectionFields: ['section_id', 'type', 'title', 'enabled'], itemFields: ['title', 'description', 'sort_order', 'enabled'], itemLabels: { title: 'Stat Number', description: 'Stat Label' } }),
+  'about:creative-positioning': createSchema({ sectionFields: ['section_id', 'type', 'title', 'description', 'enabled'] }),
+  'about:gear-workflow': createSchema({
+    sectionFields: ['section_id', 'type', 'title', 'enabled'],
+    itemFields: ['title', 'description', 'icon', 'image_url', 'sort_order', 'enabled'],
+    itemLabels: { title: 'Gear Item', image_url: 'Image URL (optional)' },
+  }),
+  'about:gear': createSchema({
+    sectionFields: ['section_id', 'type', 'title', 'enabled'],
+    itemFields: ['title', 'description', 'icon', 'image_url', 'sort_order', 'enabled'],
+    itemLabels: { title: 'Gear Item', image_url: 'Image URL (optional)' },
+  }),
 
-  'assets:hero': { sectionFields: ['section_id', 'type', 'title', 'subtitle', 'description', 'enabled'] },
+  'assets:hero': createSchema({ sectionFields: ['section_id', 'type', 'title', 'subtitle', 'description', 'enabled'] }),
 
-  'works:hero': { sectionFields: ['section_id', 'type', 'title', 'subtitle', 'description', 'enabled'] },
-  'works:showreel': { sectionFields: ['section_id', 'type', 'title', 'subtitle', 'description', 'button_text', 'button_link', 'media_type', 'media_url', 'video_url', 'poster_url', 'thumbnail_url', 'image_url', 'enabled'] },
+  'works:hero': createSchema({
+    sectionFields: ['section_id', 'type', 'title', 'subtitle', 'description', ...mixedMediaFields, 'enabled'],
+    sectionLabels: {
+      media_url: 'Media URL',
+      poster_url: 'Poster / Thumbnail URL (optional)',
+    },
+  }),
+  'works:showreel': createSchema({
+    sectionFields: ['section_id', 'type', 'title', 'subtitle', 'description', 'button_text', 'button_link', ...videoMediaFields, 'enabled'],
+    sectionLabels: {
+      video_url: 'Video URL',
+      poster_url: 'Poster / Thumbnail URL (optional)',
+    },
+  }),
   'works:portfolio-projects': worksPortfolioProjectsSchema,
   'works:portfolio_grid': worksPortfolioProjectsSchema,
   'works:projects': worksPortfolioProjectsSchema,
   'works:works': worksPortfolioProjectsSchema,
-  'works:client-testimonials': {
+  'works:client-testimonials': createSchema({
     sectionFields: ['section_id', 'type', 'title', 'subtitle', 'description', 'enabled'],
     itemFields: ['title', 'subtitle', 'description', 'rating', 'image_url', 'sort_order', 'enabled'],
     itemLabels: { title: 'Client Name', subtitle: 'Client Role / Company', description: 'Testimonial Text', image_url: 'Client Photo / Logo' },
-  },
-  'works:cta': { sectionFields: ['section_id', 'type', 'title', 'description', 'button_text', 'button_link', 'enabled'] },
+  }),
+  'works:testimonials': createSchema({
+    sectionFields: ['section_id', 'type', 'title', 'subtitle', 'description', 'enabled'],
+    itemFields: ['title', 'subtitle', 'description', 'rating', 'image_url', 'sort_order', 'enabled'],
+    itemLabels: { title: 'Client Name', subtitle: 'Client Role / Company', description: 'Testimonial Text', image_url: 'Client Photo / Logo' },
+  }),
+  'works:cta': createSchema({ sectionFields: ['section_id', 'type', 'title', 'description', 'button_text', 'button_link', 'enabled'] }),
 
-  'hire:hero': { sectionFields: ['section_id', 'type', 'title', 'subtitle', 'description', 'enabled'] },
-  'hire:services': { sectionFields: ['section_id', 'type', 'title', 'enabled'], itemFields: ['title', 'sort_order', 'enabled'], itemLabels: { title: 'Benefit Text' } },
-  'hire:info-cards': { sectionFields: ['section_id', 'type', 'title', 'enabled'], itemFields: ['title', 'description', 'sort_order', 'enabled'] },
-  'hire:enquiry-form': {
+  'hire:hero': createSchema({
+    sectionFields: ['section_id', 'type', 'title', 'subtitle', 'description', 'media_url', 'enabled'],
+    sectionLabels: {
+      media_url: 'Image URL (optional)',
+    },
+  }),
+  'hire:services': createSchema({ sectionFields: ['section_id', 'type', 'title', 'enabled'], itemFields: ['title', 'sort_order', 'enabled'], itemLabels: { title: 'Benefit Text' } }),
+  'hire:info-cards': createSchema({ sectionFields: ['section_id', 'type', 'title', 'enabled'], itemFields: ['title', 'description', 'sort_order', 'enabled'] }),
+  'hire:contact_info': createSchema({ sectionFields: ['section_id', 'type', 'title', 'enabled'], itemFields: ['title', 'description', 'sort_order', 'enabled'] }),
+  'hire:enquiry-form': createSchema({
     sectionFields: ['section_id', 'type', 'title', 'description', 'button_text', 'enabled'],
     dataFields: ['name_label', 'name_placeholder', 'email_label', 'email_placeholder', 'phone_label', 'phone_placeholder', 'project_type_label', 'project_type_placeholder', 'project_types', 'message_label', 'message_placeholder', 'submit_button_text', 'success_message', 'validation_message'],
-  },
+  }),
+  'hire:contact_form': createSchema({
+    sectionFields: ['section_id', 'type', 'title', 'description', 'button_text', 'enabled'],
+    dataFields: ['name_label', 'name_placeholder', 'email_label', 'email_placeholder', 'phone_label', 'phone_placeholder', 'project_type_label', 'project_type_placeholder', 'project_types', 'message_label', 'message_placeholder', 'submit_button_text', 'success_message', 'validation_message'],
+  }),
 
-  'privacy:legal-sections': { sectionFields: ['section_id', 'type', 'title', 'subtitle', 'description', 'enabled'], itemFields: ['title', 'paragraphs', 'bullets', 'after', 'sort_order', 'enabled'] },
-  'terms:legal-sections': { sectionFields: ['section_id', 'type', 'title', 'subtitle', 'description', 'enabled'], itemFields: ['title', 'paragraphs', 'bullets', 'after', 'sort_order', 'enabled'] },
+  'privacy:hero': createSchema({ sectionFields: ['section_id', 'type', 'title', 'subtitle', 'description', 'image_url', 'enabled'], sectionLabels: { image_url: 'Image URL (optional)' } }),
+  'privacy:legal-sections': createSchema({ sectionFields: ['section_id', 'type', 'title', 'subtitle', 'description', 'enabled'], itemFields: ['title', 'paragraphs', 'bullets', 'after', 'sort_order', 'enabled'] }),
+  'terms:hero': createSchema({ sectionFields: ['section_id', 'type', 'title', 'subtitle', 'description', 'image_url', 'enabled'], sectionLabels: { image_url: 'Image URL (optional)' } }),
+  'terms:legal-sections': createSchema({ sectionFields: ['section_id', 'type', 'title', 'subtitle', 'description', 'enabled'], itemFields: ['title', 'paragraphs', 'bullets', 'after', 'sort_order', 'enabled'] }),
 };
 
 const FIELD_LABELS = {
@@ -147,11 +297,11 @@ const FIELD_LABELS = {
   button_text: 'Button Text',
   button_link: 'Button Link',
   media_type: 'Media Type',
-  media_url: 'Image / Video URL',
+  media_url: 'Media URL',
   video_url: 'Video URL',
   image_url: 'Image URL',
-  thumbnail_url: 'Thumbnail URL',
-  poster_url: 'Poster / Thumbnail URL',
+  thumbnail_url: 'Thumbnail / Image URL',
+  poster_url: 'Poster / Thumbnail URL (optional)',
   enabled: 'Section Enabled',
   eyebrow: 'Eyebrow Text',
   icon: 'Icon Name',
@@ -171,6 +321,7 @@ const FIELD_LABELS = {
   course_name: 'Course Name',
   review_text: 'Review Text',
   rating: 'Rating',
+  student_image_url: 'Student Photo',
   cta_text: 'CTA Text',
   show_course_list: 'Show Course List',
   project_types: 'Project Type Options',
@@ -204,22 +355,20 @@ const FIELD_LABELS = {
   secondary_button_link: 'Secondary Button Link',
 };
 
-const mediaFields = new Set(['media_url', 'poster_url', 'thumbnail_image_url', 'image_url', 'thumbnail_url']);
+const mediaFields = new Set(['media_url', 'poster_url', 'thumbnail_image_url', 'image_url', 'thumbnail_url', 'student_image_url']);
 const videoFields = new Set(['video_url']);
 const longTextFields = new Set(['description', 'answer', 'review_text', 'paragraphs', 'bullets', 'after']);
 const booleanFields = new Set(['enabled', 'show_course_list', 'featured']);
 const numberFields = new Set(['sort_order', 'rating']);
 
 const getSchema = (pageKey, section) => {
-  const sectionId = section?.section_id || '';
-  const sectionType = section?.type || '';
+  const sectionKeys = [section?.section_key, section?.section_id, section?.type]
+    .map((value) => String(value || '').trim())
+    .filter(Boolean);
 
-  const schema = SECTION_EDITOR_SCHEMAS[`${pageKey}:${sectionId}`];
-  if (schema) return schema;
-
-  if (sectionType) {
-    const typeSchema = SECTION_EDITOR_SCHEMAS[`${pageKey}:${sectionType}`];
-    if (typeSchema) return typeSchema;
+  for (const sectionKey of sectionKeys) {
+    const schema = SECTION_EDITOR_SCHEMAS[`${pageKey}:${sectionKey}`];
+    if (schema) return schema;
   }
 
   return SIMPLE_DEFAULT_SCHEMA;
@@ -367,6 +516,7 @@ const CmsSectionEditor = ({ pageKey, section, mediaItems, onSave, saving, onDirt
             value={draft[field]}
             onChange={(value) => update(field, value)}
             mediaItems={mediaItems}
+            labels={schema.sectionLabels}
           />
         ))}
       </div>
@@ -381,6 +531,7 @@ const CmsSectionEditor = ({ pageKey, section, mediaItems, onSave, saving, onDirt
                 field={field}
                 value={normalizeDataValue(field, data[field])}
                 onChange={(value) => updateData(field, value)}
+                labels={schema.dataLabels}
               />
             ))}
           </div>
@@ -436,7 +587,7 @@ const CmsSectionEditor = ({ pageKey, section, mediaItems, onSave, saving, onDirt
   );
 };
 
-const SectionField = ({ field, value, onChange, mediaItems }) => {
+const SectionField = ({ field, value, onChange, mediaItems, labels }) => {
   if (field === 'type') {
     return (
       <Field label="Section Type">
@@ -448,18 +599,18 @@ const SectionField = ({ field, value, onChange, mediaItems }) => {
   }
   if (field === 'media_type') {
     return (
-      <Field label={FIELD_LABELS[field]}>
+      <Field label={getFieldLabel(field, labels)}>
         <select value={value || 'auto'} onChange={(event) => onChange(event.target.value)} className={fieldClass}>
           {mediaTypes.map((type) => <option key={type} value={type}>{type}</option>)}
         </select>
       </Field>
     );
   }
-  return <EditableField field={field} value={value} onChange={onChange} mediaItems={mediaItems} label={FIELD_LABELS[field]} />;
+  return <EditableField field={field} value={value} onChange={onChange} mediaItems={mediaItems} label={getFieldLabel(field, labels)} />;
 };
 
-const DataField = ({ field, value, onChange }) => (
-  <EditableField field={field} value={value} onChange={onChange} label={FIELD_LABELS[field]} />
+const DataField = ({ field, value, onChange, labels }) => (
+  <EditableField field={field} value={value} onChange={onChange} label={getFieldLabel(field, labels)} />
 );
 
 const ItemField = ({ field, labels, value, onChange, mediaItems }) => (
