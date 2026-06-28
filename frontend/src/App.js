@@ -3,7 +3,7 @@ import './App.css';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import ScrollToTop from './components/ScrollToTop';
 import PublicPageLoaderProvider from './components/PublicPageLoader';
-import { toast } from 'sonner';
+import { Toaster } from 'sonner';
 import { AdminAuthProvider } from './admin/AdminAuthContext';
 import AdminRoute from './admin/AdminRoute';
 import AdminLayout from './admin/AdminLayout';
