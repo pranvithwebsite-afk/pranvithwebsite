@@ -21,6 +21,88 @@ import { usePublicPageLoading } from '../components/PublicPageLoader';
 import SafeVideoEmbed, { getSafeVideoEmbedUrl, isDirectVideoUrl } from '../components/SafeVideoEmbed';
 import OptimizedImage from '../components/OptimizedImage';
 
+const toStringList = (value) => (
+  Array.isArray(value)
+    ? value.map((item) => String(item ?? '').trim()).filter(Boolean)
+    : []
+);
+
+const toFaqList = (value) => (
+  Array.isArray(value)
+    ? value
+      .filter((item) => item && typeof item === 'object')
+      .map((item) => ({
+        q: String(item.q || item.question || '').trim(),
+        a: String(item.a || item.answer || '').trim(),
+      }))
+      .filter((item) => item.q || item.a)
+    : []
+);
+
+const toMarketTable = (value) => (
+  Array.isArray(value)
+    ? value
+      .filter(Array.isArray)
+      .map((row) => row.slice(0, 3).map((cell) => String(cell ?? '').trim()))
+      .filter((row) => row.some(Boolean))
+    : []
+);
+
+const normalizeProduct = (value) => {
+  const product = value && typeof value === 'object' ? value : {};
+  const landing = product.landing_content && typeof product.landing_content === 'object'
+    ? product.landing_content
+    : {};
+  const numericPrice = Number(product.price);
+  const numericSalePrice = Number(product.sale_price);
+  const hasSalePrice = Number.isFinite(numericSalePrice) && numericSalePrice >= 0;
+  const hasPrice = Number.isFinite(numericPrice) && numericPrice >= 0;
+  const resolvedPrice = hasSalePrice ? numericSalePrice : (hasPrice ? numericPrice : null);
+  const images = [
+    ...toStringList(product.images),
+    ...toStringList(product.product_images),
+  ];
+  const heroImage = safeImageSrc(
+    product.hero_image
+    || product.thumbnail_url
+    || product.image_url
+    || images[0]
+    || '',
+    ''
+  );
+  const galleryImages = images
+    .map((image) => safeImageSrc(image, ''))
+    .filter(Boolean)
+    .filter((image, index, list) => list.indexOf(image) === index);
+  const faqs = dedupeFaqs([
+    ...toFaqList(landing.faqs),
+    ...toFaqList(product.faqs),
+  ]).slice(0, 10);
+
+  return {
+    raw: product,
+    landing,
+    name: String(product.name || product.title || 'Asset').trim() || 'Asset',
+    slug: String(product.slug || '').trim(),
+    description: String(product.description || '').trim(),
+    category: String(product.category || '').trim() || 'Asset',
+    price: resolvedPrice,
+    isFree: product.is_free === true || resolvedPrice === 0,
+    heroImage,
+    galleryImages,
+    features: toStringList(product.features),
+    benefits: toStringList(product.benefits),
+    compatibility: toStringList(landing.compatibility),
+    marketTable: toMarketTable(landing.market_table),
+    faqs,
+    beforeImageUrl: safeImageSrc(product.before_image_url || '', ''),
+    afterImageUrl: safeImageSrc(product.after_image_url || '', ''),
+    videoType: String(product.video_type || '').trim().toLowerCase(),
+    videoUrl: String(product.video_url || '').trim(),
+    youtubeUrl: String(product.youtube_url || '').trim(),
+  };
+};
+
 const AssetLanding = () => {
   const { slug } = useParams();
   const navigate = useNavigate();
@@ -28,29 +110,95 @@ const AssetLanding = () => {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [notFound, setNotFound] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   usePublicPageLoading(loading);
 
   useEffect(() => {
+    let active = true;
     setLoading(true);
+    setProduct(null);
     setNotFound(false);
+    setErrorMessage('');
+
     fetchProductBySlug(slug)
-      .then((p) => {
-        setProduct(p);
-        if (p?.seo_title) document.title = p.seo_title;
+      .then((response) => {
+        if (!active) return;
+        setProduct(response && typeof response === 'object' ? response : {});
+        if (response?.seo_title) {
+          document.title = response.seo_title;
+        }
       })
-      .catch(() => setNotFound(true))
-      .finally(() => setLoading(false));
+      .catch((error) => {
+        if (!active) return;
+        const status = error?.response?.status;
+        if (status === 404) {
+          setNotFound(true);
+          return;
+        }
+        console.error('[asset-detail] Failed to load asset', {
+          slug,
+          status,
+          detail: error?.response?.data?.detail || error?.message || error,
+        });
+        setErrorMessage('This asset could not be loaded right now. Please try again.');
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
   }, [slug]);
 
-  const faqs = dedupeFaqs(landing.faqs || product.faqs || []).slice(0, 10);
-  const compatibility = landing.compatibility || [];
-  const marketTable = landing.market_table || [];
+  const asset = normalizeProduct(product);
+  const {
+    landing,
+    name,
+    category,
+    description,
+    price,
+    isFree,
+    heroImage,
+    galleryImages,
+    features,
+    benefits,
+    compatibility,
+    marketTable,
+    faqs,
+    beforeImageUrl,
+    afterImageUrl,
+  } = asset;
+
+  const heroHeadline = String(landing.hero?.headline || landing.headline || name || 'Asset').trim() || 'Asset';
+  const heroSubhead = String(landing.hero?.subhead || landing.subhead || description || 'Product details will be available soon.').trim();
+  const beforeAfterDescription = String(landing.before_after || '').trim();
+
+  const onShare = async () => {
+    await shareProduct(product || { slug, name, description });
+  };
+
+  const onPrimaryCta = () => {
+    if (!product) return;
+    setBusy(true);
+    setCheckoutOpen(true);
+    window.setTimeout(() => setBusy(false), 0);
+  };
+
+  const goToPaymentFailed = (message, result) => {
+    const params = new URLSearchParams({
+      product: asset.slug || slug || '',
+      message,
+      orderId: result?.orderId || '',
+    });
+    navigate(`/payment-failed?${params.toString()}`);
+  };
 
   return (
     <>
       <Header />
-      <main className="page bg-[var(--bg-main)] text-white min-h-screen">
+      <main className="page min-h-screen bg-[var(--bg-main)] text-white">
         {loading ? (
           <section className="px-6 pb-16 pt-8">
             <div className="cinematic-card mx-auto max-w-7xl p-8 lg:p-12">
@@ -64,50 +212,53 @@ const AssetLanding = () => {
               </div>
             </div>
           </section>
-        ) : notFound || !product ? (
-          <div className="pt-16 pb-24 max-w-3xl mx-auto px-6 text-center">
-            <h1 className="text-3xl font-bold">Asset not found</h1>
-            <p className="mt-3 text-white/60">The asset you're looking for is no longer available.</p>
-            <Link to="/assets" className="inline-flex mt-6 bg-violet-600 hover:bg-violet-500 px-5 py-2.5 rounded-full text-sm font-semibold">
-              Browse all assets
-            </Link>
-          </div>
+        ) : notFound ? (
+          <StatusState
+            title="Asset not found"
+            description="The asset you're looking for is no longer available."
+          />
+        ) : errorMessage ? (
+          <StatusState
+            title="Unable to load asset"
+            description={errorMessage}
+          />
         ) : (
           <>
-            {/* Hero */}
-            <section className="pt-8 pb-16">
-              <div className="max-w-7xl mx-auto px-6">
-                <nav className="flex flex-wrap items-center gap-2 text-sm text-white/55 mb-8" data-testid="asset-breadcrumb">
+            <section className="pb-16 pt-8">
+              <div className="mx-auto max-w-7xl px-6">
+                <nav className="mb-8 flex flex-wrap items-center gap-2 text-sm text-white/55" data-testid="asset-breadcrumb">
                   <Link to="/" className="hover:text-white">Home</Link>
                   <ChevronRight size={14} />
                   <Link to="/assets" className="hover:text-white">Assets</Link>
                   <ChevronRight size={14} />
-                  <span className="text-white/85">{product.name}</span>
+                  <span className="text-white/85">{name}</span>
                 </nav>
 
                 <div className="cinematic-card overflow-hidden p-8 lg:p-12">
-                  <div className="grid gap-10 lg:grid-cols-[1fr_440px] items-center">
+                  <div className="grid items-center gap-10 lg:grid-cols-[1fr_440px]">
                     <div>
-                      <div className="inline-flex items-center gap-2 rounded-full border border-purple-300/20 bg-purple-500/15 px-4 py-2 text-xs uppercase tracking-[0.3em] text-purple-200 mb-6">
-                        <Sparkles size={16} /> {product.category}
+                      <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-purple-300/20 bg-purple-500/15 px-4 py-2 text-xs uppercase tracking-[0.3em] text-purple-200">
+                        <Sparkles size={16} /> {category}
                       </div>
-                      <h1 className="text-4xl md:text-5xl font-black tracking-tight text-white" data-testid="asset-title">
-                        {landing.hero?.headline || product.name}
+                      <h1 className="text-4xl font-black tracking-tight text-white md:text-5xl" data-testid="asset-title">
+                        {heroHeadline}
                       </h1>
-                      <p className="mt-6 max-w-2xl text-white/70 leading-relaxed text-sm md:text-base">
-                        {landing.hero?.subhead || product.description}
+                      <p className="mt-6 max-w-2xl text-sm leading-relaxed text-white/70 md:text-base">
+                        {heroSubhead}
                       </p>
                       <div className="mt-8 flex flex-col gap-4 sm:flex-row sm:items-center">
-                        <div className="rounded-3xl bg-purple-500/10 border border-purple-300/20 px-6 py-5 text-white">
-                          <p className="text-sm uppercase tracking-[0.3em] text-white/50">{isFree ? 'Price' : 'One-time price'}</p>
+                        <div className="rounded-3xl border border-purple-300/20 bg-purple-500/10 px-6 py-5 text-white">
+                          <p className="text-sm uppercase tracking-[0.3em] text-white/50">
+                            {price == null ? 'Price status' : isFree ? 'Price' : 'One-time price'}
+                          </p>
                           <p className="mt-3 text-4xl font-extrabold text-violet-300" data-testid="asset-price">
-                            {isFree ? 'Free' : `₹${price.toLocaleString('en-IN')}`}
+                            {price == null ? 'Price unavailable' : isFree ? 'Free' : `Rs ${price.toLocaleString('en-IN')}`}
                           </p>
                         </div>
                         <div className="flex flex-col gap-3 sm:min-w-[220px]">
                           <button
                             onClick={onPrimaryCta}
-                            disabled={busy}
+                            disabled={busy || !product}
                             data-testid="asset-buy-now"
                             className="inline-flex items-center justify-center gap-2 rounded-3xl bg-violet-600 px-8 py-4 text-sm font-semibold uppercase tracking-[0.12em] text-white transition hover:bg-violet-500 disabled:opacity-60"
                           >
@@ -130,10 +281,19 @@ const AssetLanding = () => {
 
                     <div className="overflow-hidden rounded-[22px] border border-purple-300/20 bg-[#090712] shadow-[0_0_45px_rgba(124,58,237,0.14)]">
                       {heroImage ? (
-                        <OptimizedImage src={heroImage} alt={product.name} priority width={440} height={550} className="w-full max-h-[420px] aspect-[4/3] object-cover sm:max-h-none sm:aspect-[4/5]" data-testid="asset-hero-image" onError={handleImageError} />
+                        <OptimizedImage
+                          src={heroImage}
+                          alt={name}
+                          priority
+                          width={440}
+                          height={550}
+                          className="aspect-[4/3] max-h-[420px] w-full object-cover sm:aspect-[4/5] sm:max-h-none"
+                          data-testid="asset-hero-image"
+                          onError={handleImageError}
+                        />
                       ) : (
-                        <div className="w-full max-h-[420px] aspect-[4/3] bg-gradient-to-br from-violet-700 to-fuchsia-900 flex items-center justify-center text-2xl font-black text-white px-6 text-center sm:max-h-none sm:aspect-[4/5]">
-                          {product.name}
+                        <div className="flex aspect-[4/3] max-h-[420px] w-full items-center justify-center bg-gradient-to-br from-violet-700 to-fuchsia-900 px-6 text-center text-2xl font-black text-white sm:aspect-[4/5] sm:max-h-none">
+                          {name}
                         </div>
                       )}
                     </div>
@@ -142,13 +302,12 @@ const AssetLanding = () => {
               </div>
             </section>
 
-            <ProductMediaSection product={product} galleryImages={galleryImages} />
+            <ProductMediaSection product={asset} galleryImages={galleryImages} />
 
-            {/* What you get */}
             {features.length > 0 && (
               <section className="pb-16">
-                <div className="max-w-7xl mx-auto px-6">
-                  <h2 className="text-3xl font-bold tracking-tight mb-8">What you get</h2>
+                <div className="mx-auto max-w-7xl px-6">
+                  <h2 className="mb-8 text-3xl font-bold tracking-tight">What you get</h2>
                   <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                     {features.map((item) => (
                       <div key={item} className="cinematic-card p-6 text-sm text-white/75">
@@ -163,38 +322,36 @@ const AssetLanding = () => {
               </section>
             )}
 
-            {/* Before & After */}
-            {product.before_image_url && product.after_image_url ? (
+            {beforeImageUrl && afterImageUrl ? (
               <section className="pb-16">
-                <div className="max-w-7xl mx-auto px-6">
-                  <h2 className="text-3xl font-bold tracking-tight mb-8">LUT Before / After</h2>
-                  <BeforeAfterSlider beforeImage={product.before_image_url} afterImage={product.after_image_url} />
+                <div className="mx-auto max-w-7xl px-6">
+                  <h2 className="mb-8 text-3xl font-bold tracking-tight">LUT Before / After</h2>
+                  <BeforeAfterSlider beforeImage={beforeImageUrl} afterImage={afterImageUrl} />
                 </div>
               </section>
-            ) : landing.before_after && (
+            ) : beforeAfterDescription ? (
               <section className="pb-16">
-                <div className="max-w-7xl mx-auto px-6">
-                  <h2 className="text-3xl font-bold tracking-tight mb-8">Before & After</h2>
+                <div className="mx-auto max-w-7xl px-6">
+                  <h2 className="mb-8 text-3xl font-bold tracking-tight">Before & After</h2>
                   <div className="grid gap-6 lg:grid-cols-2">
-                    <ComparisonCard title="Before" description={landing.before_after} />
+                    <ComparisonCard title="Before" description={beforeAfterDescription} />
                     <ComparisonCard title="After" description="Premium, polished output with PranvithDOP quality." accent />
                   </div>
                 </div>
               </section>
-            )}
+            ) : null}
 
-            {/* Benefits */}
             {benefits.length > 0 && (
               <section className="pb-16">
-                <div className="max-w-7xl mx-auto px-6">
+                <div className="mx-auto max-w-7xl px-6">
                   <div className="cinematic-card p-8">
                     <div className="section-eyebrow mb-6 inline-flex items-center gap-3 text-sm">
                       <ShieldCheck size={16} /> Why creators love it
                     </div>
                     <div className="grid gap-4 md:grid-cols-3">
-                      {benefits.map((b) => (
-                        <div key={b} className="rounded-2xl border border-purple-300/20 bg-purple-500/10 p-5 text-white/80">
-                          {b}
+                      {benefits.map((item) => (
+                        <div key={item} className="rounded-2xl border border-purple-300/20 bg-purple-500/10 p-5 text-white/80">
+                          {item}
                         </div>
                       ))}
                     </div>
@@ -203,10 +360,9 @@ const AssetLanding = () => {
               </section>
             )}
 
-            {/* Compatibility */}
             {compatibility.length > 0 && (
               <section className="pb-16">
-                <div className="max-w-7xl mx-auto px-6">
+                <div className="mx-auto max-w-7xl px-6">
                   <div className="cinematic-card p-8">
                     <div className="flex flex-col gap-8 lg:flex-row lg:items-center lg:justify-between">
                       <div>
@@ -216,7 +372,7 @@ const AssetLanding = () => {
                       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                         {compatibility.map((item) => (
                           <div key={item} className="rounded-3xl border border-purple-300/20 bg-purple-500/10 px-4 py-4 text-center text-sm text-white/75">
-                            <span className="block font-semibold text-white mb-1">{item}</span>
+                            <span className="mb-1 block font-semibold text-white">{item}</span>
                           </div>
                         ))}
                       </div>
@@ -226,11 +382,10 @@ const AssetLanding = () => {
               </section>
             )}
 
-            {/* Market comparison */}
             {marketTable.length > 0 && (
               <section className="pb-16">
-                <div className="max-w-7xl mx-auto px-6">
-                  <h2 className="text-3xl font-bold tracking-tight mb-8">Market Comparison</h2>
+                <div className="mx-auto max-w-7xl px-6">
+                  <h2 className="mb-8 text-3xl font-bold tracking-tight">Market Comparison</h2>
                   <div className="cinematic-card overflow-hidden">
                     <table className="min-w-full text-left text-sm text-white/75">
                       <thead className="border-b border-purple-300/15 bg-[#090712]/95 text-white/85">
@@ -241,11 +396,11 @@ const AssetLanding = () => {
                         </tr>
                       </thead>
                       <tbody>
-                        {marketTable.map((row, idx) => (
-                          <tr key={`${row[0]}-${idx}`} className="border-b border-purple-300/15 last:border-b-0">
-                            <td className="px-6 py-4 text-white/85 font-medium">{row[0]}</td>
-                            <td className="px-6 py-4">{row[1]}</td>
-                            <td className="px-6 py-4">{row[2]}</td>
+                        {marketTable.map((row, index) => (
+                          <tr key={`${row[0] || 'row'}-${index}`} className="border-b border-purple-300/15 last:border-b-0">
+                            <td className="px-6 py-4 font-medium text-white/85">{row[0] || 'Feature'}</td>
+                            <td className="px-6 py-4">{row[1] || '-'}</td>
+                            <td className="px-6 py-4">{row[2] || '-'}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -255,16 +410,15 @@ const AssetLanding = () => {
               </section>
             )}
 
-            {/* FAQs */}
             {faqs.length > 0 && (
               <section className="pb-16">
-                <div className="max-w-7xl mx-auto px-6">
-                  <h2 className="text-3xl font-bold tracking-tight mb-8">Frequently Asked Questions</h2>
+                <div className="mx-auto max-w-7xl px-6">
+                  <h2 className="mb-8 text-3xl font-bold tracking-tight">Frequently Asked Questions</h2>
                   <div className="grid gap-4">
-                    {faqs.map((item, idx) => (
-                      <div key={item.q || idx} className="cinematic-card p-6">
-                        <p className="font-semibold text-white">{item.q}</p>
-                        <p className="mt-3 text-white/70 leading-relaxed text-sm">{item.a}</p>
+                    {faqs.map((item, index) => (
+                      <div key={item.q || `${item.a}-${index}`} className="cinematic-card p-6">
+                        <p className="font-semibold text-white">{item.q || 'Question'}</p>
+                        <p className="mt-3 text-sm leading-relaxed text-white/70">{item.a || 'Answer coming soon.'}</p>
                       </div>
                     ))}
                   </div>
@@ -272,20 +426,21 @@ const AssetLanding = () => {
               </section>
             )}
 
-            {/* Final CTA */}
             <section className="pb-24">
-              <div className="max-w-7xl mx-auto px-6">
+              <div className="mx-auto max-w-7xl px-6">
                 <div className="cinematic-card p-10 text-center">
-                  <span className="inline-flex items-center justify-center rounded-full border border-purple-300/20 bg-purple-500/15 px-4 py-2 text-xs uppercase tracking-[0.35em] text-purple-200 mb-6">
+                  <span className="mb-6 inline-flex items-center justify-center rounded-full border border-purple-300/20 bg-purple-500/15 px-4 py-2 text-xs uppercase tracking-[0.35em] text-purple-200">
                     Get Instant Access
                   </span>
-                  <h2 className="text-4xl font-bold tracking-tight text-white">{isFree ? `Claim ${product.name}` : `Get ${product.name} today`}</h2>
-                  <p className="mx-auto mt-5 max-w-2xl text-white/70 leading-relaxed">
-                    {product.description}
+                  <h2 className="text-4xl font-bold tracking-tight text-white">
+                    {isFree ? `Claim ${name}` : `Get ${name} today`}
+                  </h2>
+                  <p className="mx-auto mt-5 max-w-2xl leading-relaxed text-white/70">
+                    {description || 'Instant access after checkout.'}
                   </p>
                   <button
                     onClick={onPrimaryCta}
-                    disabled={busy}
+                    disabled={busy || !product}
                     data-testid="asset-buy-now-bottom"
                     className="mt-8 inline-flex items-center justify-center gap-2 rounded-full bg-violet-600 px-10 py-4 text-sm font-semibold uppercase tracking-[0.12em] text-white transition hover:bg-violet-500 disabled:opacity-60"
                   >
@@ -301,53 +456,83 @@ const AssetLanding = () => {
       <CheckoutModal
         product={product}
         open={checkoutOpen}
-        onClose={() => setCheckoutOpen(false)}
+        onClose={() => {
+          setBusy(false);
+          setCheckoutOpen(false);
+        }}
         onSuccess={(result) => {
+          setBusy(false);
           setCheckoutOpen(false);
           const params = new URLSearchParams({
             orderId: result.orderId || '',
             paymentId: result.paymentId || '',
             token: result.downloadToken || '',
-            product: result.productSlug || product.slug,
+            product: result.productSlug || asset.slug || slug || '',
           });
           navigate(`/payment-success?${params.toString()}`);
         }}
         onFailure={(message, result) => {
+          setBusy(false);
           toast.error(message);
-          if (result?.failed) {
-            const params = new URLSearchParams({
-              product: product.slug,
-              message,
-              orderId: result.orderId || '',
-            });
-            navigate(`/payment-failed?${params.toString()}`);
-          }
+          if (result?.failed) goToPaymentFailed(message, result);
         }}
       />
     </>
   );
 };
 
+const StatusState = ({ title, description }) => (
+  <section className="px-6 pb-24 pt-16">
+    <div className="mx-auto max-w-3xl text-center">
+      <div className="cinematic-card p-10">
+        <h1 className="text-3xl font-bold">{title}</h1>
+        <p className="mt-3 text-white/60">{description}</p>
+        <Link
+          to="/assets"
+          className="mt-6 inline-flex rounded-full bg-violet-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-violet-500"
+        >
+          Back to Assets
+        </Link>
+      </div>
+    </div>
+  </section>
+);
+
 const ProductMediaSection = ({ product, galleryImages }) => {
   const hasGallery = Array.isArray(galleryImages) && galleryImages.length > 0;
-  const productVideoUrl = product.video_type === 'youtube' ? product.youtube_url : product.video_url;
-  const hasVideo = product.video_type === 'youtube'
-    ? !!getSafeVideoEmbedUrl('youtube', product.youtube_url)
-    : !!productVideoUrl && (product.video_type === 'direct' || isDirectVideoUrl(productVideoUrl) || !!getSafeVideoEmbedUrl(product.video_type, productVideoUrl));
-  if (!hasGallery && !hasVideo) return null;
+  const productVideoUrl = product?.videoType === 'youtube' ? product?.youtubeUrl : product?.videoUrl;
+  const hasVideo = product?.videoType === 'youtube'
+    ? !!getSafeVideoEmbedUrl('youtube', product?.youtubeUrl)
+    : !!productVideoUrl && (
+      product?.videoType === 'direct'
+      || isDirectVideoUrl(productVideoUrl)
+      || !!getSafeVideoEmbedUrl(product?.videoType, productVideoUrl)
+    );
+
+  if (!hasGallery && !hasVideo) {
+    return (
+      <section className="pb-16">
+        <div className="mx-auto max-w-7xl px-6">
+          <div className="cinematic-card p-8 text-sm text-white/65">
+            Preview images and media are not available for this asset yet.
+          </div>
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section className="pb-16">
-      <div className="max-w-7xl mx-auto px-6 space-y-10">
+      <div className="mx-auto max-w-7xl space-y-10 px-6">
         {hasGallery && (
           <div>
-            <h2 className="text-3xl font-bold tracking-tight mb-8">Product Gallery</h2>
+            <h2 className="mb-8 text-3xl font-bold tracking-tight">Product Gallery</h2>
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {galleryImages.map((image, index) => (
                 <OptimizedImage
                   key={`${image}-${index}`}
                   src={safeImageSrc(image)}
-                  alt={`${product.name} preview ${index + 1}`}
+                  alt={`${product?.name || 'Asset'} preview ${index + 1}`}
                   width={420}
                   height={236}
                   className="aspect-video w-full rounded-3xl border border-purple-300/20 bg-[#090712] object-cover"
@@ -360,13 +545,13 @@ const ProductMediaSection = ({ product, galleryImages }) => {
 
         {hasVideo && (
           <div>
-            <h2 className="text-3xl font-bold tracking-tight mb-8">Product Video</h2>
+            <h2 className="mb-8 text-3xl font-bold tracking-tight">Product Video</h2>
             <div className="overflow-hidden rounded-[22px] border border-purple-300/20 bg-black shadow-[0_0_45px_rgba(124,58,237,0.14)]">
               <SafeVideoEmbed
-                videoType={product.video_type === 'direct' ? 'video_file' : product.video_type}
+                videoType={product?.videoType === 'direct' ? 'video_file' : product?.videoType}
                 videoUrl={productVideoUrl}
-                title={`${product.name} video`}
-                poster={product.hero_image || galleryImages[0]}
+                title={`${product?.name || 'Asset'} video`}
+                poster={product?.heroImage || galleryImages?.[0] || ''}
                 className="w-full rounded-none"
               />
             </div>
@@ -434,8 +619,13 @@ const BeforeAfterSlider = ({ beforeImage, afterImage }) => {
 
 const ComparisonCard = ({ title, description, accent }) => (
   <div className="cinematic-card p-8">
-    <div className="text-xs uppercase tracking-[0.35em] text-white/40 mb-4">{title}</div>
-    <div className="flex h-[260px] flex-col justify-between rounded-3xl border border-purple-300/20 bg-purple-500/10 p-6 text-white/70">
+    <div className="mb-4 text-xs uppercase tracking-[0.35em] text-white/40">{title}</div>
+    <div className={`flex h-[260px] flex-col justify-between rounded-3xl border p-6 text-white/70 ${
+      accent
+        ? 'border-fuchsia-300/30 bg-fuchsia-500/10'
+        : 'border-purple-300/20 bg-purple-500/10'
+    }`}
+    >
       <div>
         <div className="mb-3 h-28 rounded-3xl bg-white/5" />
         <p className="text-sm leading-relaxed">{description}</p>
