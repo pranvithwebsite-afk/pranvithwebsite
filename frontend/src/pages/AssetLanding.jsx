@@ -237,6 +237,10 @@ const AssetLanding = () => {
 
                 <div className="cinematic-card overflow-hidden p-5 sm:p-7 lg:p-9">
                   <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_22rem] xl:items-start">
+                    <div className="order-1 xl:hidden">
+                      <ProductHeroImage heroImage={heroImage} name={name} />
+                    </div>
+
                     <div className="order-2 xl:order-1 xl:col-start-1 xl:row-start-1">
                       <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-purple-300/20 bg-purple-500/15 px-4 py-2 text-[11px] uppercase tracking-[0.28em] text-purple-200 sm:text-xs">
                         <Sparkles size={16} /> {category}
@@ -250,61 +254,31 @@ const AssetLanding = () => {
                       />
                     </div>
 
-                    <div className="order-1 space-y-5 xl:order-2 xl:col-start-2 xl:row-span-2 xl:sticky xl:top-[7.5rem]">
-                      <div className="overflow-hidden rounded-[22px] border border-purple-300/20 bg-[#090712] shadow-[0_0_45px_rgba(124,58,237,0.14)]">
-                        {heroImage ? (
-                          <OptimizedImage
-                            src={heroImage}
-                            alt={name}
-                            priority
-                            width={440}
-                            height={550}
-                            className="aspect-[4/3] max-h-[24rem] w-full object-cover xl:max-h-none xl:aspect-[4/5]"
-                            data-testid="asset-hero-image"
-                            onError={handleImageError}
-                          />
-                        ) : (
-                          <div className="flex aspect-[4/3] max-h-[24rem] w-full items-center justify-center bg-gradient-to-br from-violet-700 to-fuchsia-900 px-6 text-center text-2xl font-black text-white xl:max-h-none xl:aspect-[4/5]">
-                            {name}
-                          </div>
-                        )}
-                      </div>
-                      <div className="rounded-[22px] border border-purple-300/20 bg-[#0b0716] p-4 sm:p-5">
-                        <p className="text-[11px] uppercase tracking-[0.3em] text-white/45">
-                          {price == null ? 'Price status' : isFree ? 'Price' : 'One-time price'}
-                        </p>
-                        <p className="mt-3 text-3xl font-extrabold text-violet-300 sm:text-4xl" data-testid="asset-price">
-                          {price == null ? 'Price unavailable' : isFree ? 'Free' : `Rs ${price.toLocaleString('en-IN')}`}
-                        </p>
-                        <div className="mt-4 grid gap-3">
-                          <button
-                            onClick={onPrimaryCta}
-                            disabled={busy || !product}
-                            data-testid="asset-buy-now"
-                            className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-violet-600 px-6 py-3.5 text-sm font-semibold uppercase tracking-[0.12em] text-white transition hover:bg-violet-500 disabled:opacity-60"
-                          >
-                            {busy ? (
-                              <><Loader2 size={16} className="animate-spin" /> Please wait...</>
-                            ) : (
-                              <>{isFree ? 'Get for Free' : 'Buy Now'} <ArrowRight size={18} /></>
-                            )}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={onShare}
-                            className="inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-purple-300/20 bg-purple-500/10 px-6 py-3.5 text-sm font-semibold uppercase tracking-[0.12em] text-white transition hover:border-purple-300/35 hover:bg-purple-500/15"
-                          >
-                            <Share2 size={17} /> Share
-                          </button>
-                        </div>
-                        <div className="mt-4 space-y-2 text-sm text-white/62">
-                          <p>Clean mobile-first checkout flow.</p>
-                          <p>Files delivered immediately after access confirmation.</p>
-                        </div>
-                      </div>
+                    <div className="order-4 hidden space-y-5 xl:order-2 xl:col-start-2 xl:row-span-2 xl:block xl:sticky xl:top-[7.5rem]">
+                      <ProductHeroImage heroImage={heroImage} name={name} />
+                      <PriceCard
+                        price={price}
+                        isFree={isFree}
+                        busy={busy}
+                        product={product}
+                        onPrimaryCta={onPrimaryCta}
+                        onShare={onShare}
+                      />
                     </div>
 
-                    <div className="order-4 xl:order-3 xl:col-start-1 xl:row-start-2">
+                    <div className="order-3 xl:order-3 xl:col-start-1 xl:row-start-2">
+                      <PriceCard
+                        price={price}
+                        isFree={isFree}
+                        busy={busy}
+                        product={product}
+                        onPrimaryCta={onPrimaryCta}
+                        onShare={onShare}
+                        className="xl:hidden"
+                      />
+                    </div>
+
+                    <div className="order-4 xl:order-4 xl:col-start-1 xl:row-start-3">
                       <div className="grid gap-3 sm:grid-cols-3">
                         <ValuePill label="Format" value={category} />
                         <ValuePill label="Access" value={isFree ? 'Instant free access' : 'Instant delivery'} />
@@ -518,6 +492,63 @@ const ValuePill = ({ label, value }) => (
   <div className="rounded-2xl border border-purple-300/15 bg-white/[0.03] px-4 py-4">
     <p className="text-[11px] uppercase tracking-[0.24em] text-white/40">{label}</p>
     <p className="mt-2 text-sm font-semibold text-white/88">{value}</p>
+  </div>
+);
+
+const ProductHeroImage = ({ heroImage, name }) => (
+  <div className="overflow-hidden rounded-[22px] border border-purple-300/20 bg-[#090712] shadow-[0_0_45px_rgba(124,58,237,0.14)]">
+    {heroImage ? (
+      <OptimizedImage
+        src={heroImage}
+        alt={name}
+        priority
+        width={440}
+        height={550}
+        className="aspect-[4/3] max-h-[24rem] w-full object-cover xl:max-h-none xl:aspect-[4/5]"
+        data-testid="asset-hero-image"
+        onError={handleImageError}
+      />
+    ) : (
+      <div className="flex aspect-[4/3] max-h-[24rem] w-full items-center justify-center bg-gradient-to-br from-violet-700 to-fuchsia-900 px-6 text-center text-2xl font-black text-white xl:max-h-none xl:aspect-[4/5]">
+        {name}
+      </div>
+    )}
+  </div>
+);
+
+const PriceCard = ({ price, isFree, busy, product, onPrimaryCta, onShare, className = '' }) => (
+  <div className={`rounded-[22px] border border-purple-300/20 bg-[#0b0716] p-4 sm:p-5 ${className}`.trim()}>
+    <p className="text-[11px] uppercase tracking-[0.3em] text-white/45">
+      {price == null ? 'Price status' : isFree ? 'Price' : 'One-time price'}
+    </p>
+    <p className="mt-3 text-3xl font-extrabold text-violet-300 sm:text-4xl" data-testid="asset-price">
+      {price == null ? 'Price unavailable' : isFree ? 'Free' : `Rs ${price.toLocaleString('en-IN')}`}
+    </p>
+    <div className="mt-4 grid gap-3">
+      <button
+        onClick={onPrimaryCta}
+        disabled={busy || !product}
+        data-testid="asset-buy-now"
+        className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-violet-600 px-6 py-3.5 text-sm font-semibold uppercase tracking-[0.12em] text-white transition hover:bg-violet-500 disabled:opacity-60"
+      >
+        {busy ? (
+          <><Loader2 size={16} className="animate-spin" /> Please wait...</>
+        ) : (
+          <>{isFree ? 'Get for Free' : 'Buy Now'} <ArrowRight size={18} /></>
+        )}
+      </button>
+      <button
+        type="button"
+        onClick={onShare}
+        className="inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-purple-300/20 bg-purple-500/10 px-6 py-3.5 text-sm font-semibold uppercase tracking-[0.12em] text-white transition hover:border-purple-300/35 hover:bg-purple-500/15"
+      >
+        <Share2 size={17} /> Share
+      </button>
+    </div>
+    <div className="mt-4 space-y-2 text-sm text-white/62">
+      <p>Clean mobile-first checkout flow.</p>
+      <p>Files delivered immediately after access confirmation.</p>
+    </div>
   </div>
 );
 
