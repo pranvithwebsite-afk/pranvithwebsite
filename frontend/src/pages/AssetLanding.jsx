@@ -250,7 +250,7 @@ const AssetLanding = () => {
                       />
                     </div>
 
-                    <div className="order-1 xl:order-2 xl:col-start-2 xl:row-start-1">
+                    <div className="order-1 space-y-5 xl:order-2 xl:col-start-2 xl:row-span-2 xl:sticky xl:top-[7.5rem]">
                       <div className="overflow-hidden rounded-[22px] border border-purple-300/20 bg-[#090712] shadow-[0_0_45px_rgba(124,58,237,0.14)]">
                         {heroImage ? (
                           <OptimizedImage
@@ -259,7 +259,7 @@ const AssetLanding = () => {
                             priority
                             width={440}
                             height={550}
-                            className="max-h-[24rem] w-full object-cover aspect-[4/3] xl:max-h-none xl:aspect-[4/5]"
+                            className="aspect-[4/3] max-h-[24rem] w-full object-cover xl:max-h-none xl:aspect-[4/5]"
                             data-testid="asset-hero-image"
                             onError={handleImageError}
                           />
@@ -269,9 +269,6 @@ const AssetLanding = () => {
                           </div>
                         )}
                       </div>
-                    </div>
-
-                    <div className="order-3 xl:order-4 xl:col-start-2 xl:row-start-2 xl:sticky xl:top-[7.5rem]">
                       <div className="rounded-[22px] border border-purple-300/20 bg-[#0b0716] p-4 sm:p-5">
                         <p className="text-[11px] uppercase tracking-[0.3em] text-white/45">
                           {price == null ? 'Price status' : isFree ? 'Price' : 'One-time price'}
