@@ -406,6 +406,11 @@ export const fetchAdminRazorpayHealth = async () => {
   return data;
 };
 
+export const fetchAdminR2Health = async () => {
+  const { data } = await adminApi.get('/admin/debug/r2-health');
+  return data;
+};
+
 export const saveAdminSettings = async (payload) => {
   const { data } = await adminApi.post('/admin/settings', payload);
   return data;
@@ -527,8 +532,17 @@ export const createAdminDirectVideoUpload = async ({ filename, contentType, file
     purpose,
   };
   if (slug) payload.slug = slug;
-  const { data } = await adminApi.post('/admin/uploads/video/presign', payload);
-  return data;
+  try {
+    const { data } = await adminApi.post('/admin/uploads/video/presign', payload);
+    return data;
+  } catch (error) {
+    const wrapped = new Error(error?.message || 'Could not create upload URL');
+    wrapped.stage = 'presign';
+    wrapped.originalError = error;
+    wrapped.response = error?.response;
+    wrapped.request = error?.request;
+    throw wrapped;
+  }
 };
 
 export const finalizeAdminDirectVideoUpload = async ({ key, url, filename, contentType, size, purpose, title }) => {
@@ -545,12 +559,23 @@ export const finalizeAdminDirectVideoUpload = async ({ key, url, filename, conte
 };
 
 export const uploadFileToSignedUrl = async ({ uploadUrl, file, headers = {}, onUploadProgress }) => {
-  const { data } = await axios.put(uploadUrl, file, {
-    headers,
-    timeout: 30 * 60 * 1000,
-    onUploadProgress,
-  });
-  return data;
+  try {
+    const { data } = await axios.put(uploadUrl, file, {
+      headers,
+      timeout: 30 * 60 * 1000,
+      onUploadProgress,
+      withCredentials: false,
+      transformRequest: [(value) => value],
+    });
+    return data;
+  } catch (error) {
+    const wrapped = new Error(error?.message || 'R2 upload failed');
+    wrapped.stage = 'r2_put';
+    wrapped.originalError = error;
+    wrapped.response = error?.response;
+    wrapped.request = error?.request;
+    throw wrapped;
+  }
 };
 
 export const deleteAdminMedia = async (mediaId) => {

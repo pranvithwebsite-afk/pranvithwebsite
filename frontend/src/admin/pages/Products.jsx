@@ -467,7 +467,7 @@ const ProductForm = ({
         await uploadFileToSignedUrl({
           uploadUrl: signed.upload_url,
           file,
-          headers: signed.headers,
+          headers: signed.required_headers || signed.headers || {},
           onUploadProgress,
         });
         result = await finalizeAdminDirectVideoUpload({
@@ -496,6 +496,11 @@ const ProductForm = ({
       }
       toast.success('Upload complete');
     } catch (error) {
+      console.warn('[admin/products] upload failed', {
+        stage: error?.stage || 'unknown',
+        status: error?.response?.status || error?.originalError?.response?.status || null,
+        detail: error?.response?.data?.detail || error?.originalError?.response?.data?.detail || error?.message || error,
+      });
       toast.error(formatUploadError(error));
     } finally {
       setUploading((prev) => ({ ...prev, [uploadKey]: false }));
@@ -945,6 +950,9 @@ const ProductVideoSection = ({
         <p className="text-xs text-slate-500">
           Max video size: {formatMegabytes(ADMIN_VIDEO_UPLOAD_MAX_BYTES)}
           {selectedVideoSize ? ` • Selected video: ${selectedVideoSize}` : ''}
+        </p>
+        <p className="text-xs text-slate-500">
+          If upload fails with Network Error, check Cloudflare R2 CORS. Your bucket must allow PUT from your admin domain and localhost during development.
         </p>
         {formData.video_url && (
           <SafeVideoEmbed

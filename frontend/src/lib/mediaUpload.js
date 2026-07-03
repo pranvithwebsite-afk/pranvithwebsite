@@ -65,6 +65,15 @@ export const validateVideoUploadFile = (file) => {
 export const formatUploadError = (error, fallback = 'Upload failed') => {
   const status = error?.response?.status;
   const detail = error?.response?.data?.detail || error?.message || fallback;
+  if (error?.stage === 'presign') {
+    if (status === 500 && /Cloudflare R2 is not configured/i.test(String(detail))) {
+      return 'Cloudflare R2 is not configured.';
+    }
+    return 'Could not create R2 upload URL. Check backend R2 configuration.';
+  }
+  if (error?.stage === 'r2_put') {
+    return 'Video upload to R2 failed. Check Cloudflare R2 CORS settings.';
+  }
   if (status === 413) {
     return 'This video is too large for normal upload. Upload directly to Cloudflare R2 or paste a YouTube/Vimeo/R2 URL.';
   }

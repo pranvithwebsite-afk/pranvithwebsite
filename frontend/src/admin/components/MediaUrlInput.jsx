@@ -119,7 +119,7 @@ const MediaUrlInput = ({
       await uploadFileToSignedUrl({
         uploadUrl: signed.upload_url,
         file,
-        headers: signed.headers,
+        headers: signed.required_headers || signed.headers || {},
         onUploadProgress: (progressEvent) => {
           const total = progressEvent.total || file.size || 1;
           setVideoProgress(Math.min(100, Math.round((progressEvent.loaded / total) * 100)));
@@ -139,6 +139,11 @@ const MediaUrlInput = ({
       onUploaded?.(completed?.media || { url, type: file.type, title: file.name });
       toast.success('Video uploaded directly to Cloudflare R2');
     } catch (error) {
+      console.warn('[admin/media] direct video upload failed', {
+        stage: error?.stage || 'unknown',
+        status: error?.response?.status || error?.originalError?.response?.status || null,
+        detail: error?.response?.data?.detail || error?.originalError?.response?.data?.detail || error?.message || error,
+      });
       toast.error(formatUploadError(error, 'Video upload failed'));
     } finally {
       setUploadingVideo(false);
@@ -220,6 +225,11 @@ const MediaUrlInput = ({
         <p className="mt-1 text-xs text-slate-500">
           Max video size: {formatMegabytes(ADMIN_VIDEO_UPLOAD_MAX_BYTES)}
           {selectedVideoSize ? ` • Selected video: ${selectedVideoSize}` : ''}
+        </p>
+      )}
+      {supportsVideoUpload && (
+        <p className="mt-1 text-xs text-slate-500">
+          If upload fails with Network Error, check Cloudflare R2 CORS. Your bucket must allow PUT from your admin domain and localhost during development.
         </p>
       )}
       {showPreview && <MediaPreview value={value} type={currentType} />}

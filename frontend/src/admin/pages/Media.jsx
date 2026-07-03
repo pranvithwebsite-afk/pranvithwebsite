@@ -100,7 +100,7 @@ const Media = () => {
         await uploadFileToSignedUrl({
           uploadUrl: signed.upload_url,
           file,
-          headers: signed.headers,
+          headers: signed.required_headers || signed.headers || {},
           onUploadProgress: (event) => {
             const total = event.total || file.size || 1;
             setUploadProgress(Math.min(100, Math.round((event.loaded / total) * 100)));
@@ -126,6 +126,11 @@ const Media = () => {
         loadMedia();
       }
     } catch (error) {
+      console.warn('[admin/media-library] upload failed', {
+        stage: error?.stage || 'unknown',
+        status: error?.response?.status || error?.originalError?.response?.status || null,
+        detail: error?.response?.data?.detail || error?.originalError?.response?.data?.detail || error?.message || error,
+      });
       toast.error(formatUploadError(error));
     } finally {
       setUploading(false);

@@ -2520,6 +2520,23 @@ async def admin_razorpay_health(current_admin: AdminBase = Depends(get_current_a
     }
 
 
+@admin_router.get("/debug/r2-health")
+async def admin_r2_health(current_admin: AdminBase = Depends(get_current_active_admin)):
+    config = _r2_config_status()
+    return {
+        "success": True,
+        "configured": all(value == "SET" for value in config.values()),
+        "fields": config,
+        "cors_required_origins": [
+            "https://pranvithdop.com",
+            "http://localhost:3000",
+            "http://localhost:5173",
+        ],
+        "cors_required_methods": ["PUT", "GET"],
+        "cors_required_headers": ["Content-Type", "Authorization"],
+    }
+
+
 @admin_router.get("/pages")
 async def admin_pages(current_admin: AdminBase = Depends(get_current_active_admin)):
     try:
@@ -3142,10 +3159,7 @@ async def admin_upload_media_library(file: UploadFile = File(...), current_admin
         limit_mb = max_bytes // (1024 * 1024)
         raise HTTPException(status_code=413, detail=f"File exceeds the {limit_mb} MB upload limit")
 
-    bucket = os.environ.get("CLOUDFLARE_R2_BUCKET", "pranvith-assets-public").strip()
-    public_base = os.environ.get("CLOUDFLARE_R2_PUBLIC_BASE_URL", "").strip().rstrip("/")
-    if not bucket or not public_base:
-        raise HTTPException(status_code=500, detail="Cloudflare public R2 bucket is not configured")
+    bucket, public_base = _require_r2_public_upload_config()
 
     key = _r2_media_library_key(file_ext, media_type)
     try:
@@ -3504,6 +3518,19 @@ def _r2_client():
     )
 
 
+def _r2_config_status() -> dict:
+    account_id = os.environ.get("CLOUDFLARE_R2_ACCOUNT_ID", "").strip()
+    endpoint = os.environ.get("CLOUDFLARE_R2_ENDPOINT", "").strip()
+    return {
+        "CLOUDFLARE_R2_ACCOUNT_ID": "SET" if account_id else "MISSING",
+        "CLOUDFLARE_R2_ACCESS_KEY_ID": "SET" if os.environ.get("CLOUDFLARE_R2_ACCESS_KEY_ID") else "MISSING",
+        "CLOUDFLARE_R2_SECRET_ACCESS_KEY": "SET" if os.environ.get("CLOUDFLARE_R2_SECRET_ACCESS_KEY") else "MISSING",
+        "CLOUDFLARE_R2_BUCKET": "SET" if os.environ.get("CLOUDFLARE_R2_BUCKET", "").strip() else "MISSING",
+        "CLOUDFLARE_R2_PUBLIC_BASE_URL": "SET" if os.environ.get("CLOUDFLARE_R2_PUBLIC_BASE_URL", "").strip() else "MISSING",
+        "CLOUDFLARE_R2_ENDPOINT": "SET" if endpoint else "MISSING",
+    }
+
+
 def _safe_filename(filename: str) -> str:
     name = Path(filename or "download").name.strip()
     safe = re.sub(r"[^A-Za-z0-9._-]+", "-", name).strip(".-")
@@ -3601,6 +3628,14 @@ def _validate_direct_video_upload_request(payload: DirectVideoUploadSignIn) -> t
             detail=f"Video is {payload.file_size / (1024 * 1024):.1f} MB. Maximum allowed video size is {limit_mb} MB. Please compress the video or upload it manually to Cloudflare R2/YouTube and paste the URL.",
         )
     return file_ext, safe_filename, R2_MAX_VIDEO_BYTES
+
+
+def _require_r2_public_upload_config() -> tuple[str, str]:
+    bucket = os.environ.get("CLOUDFLARE_R2_BUCKET", "").strip()
+    public_base = os.environ.get("CLOUDFLARE_R2_PUBLIC_BASE_URL", "").strip().rstrip("/")
+    if not bucket or not public_base:
+        raise HTTPException(status_code=500, detail="Cloudflare R2 is not configured.")
+    return bucket, public_base
 
 
 def _r2_direct_video_object_key(purpose: str, file_ext: str, slug: Optional[str] = None) -> str:
@@ -3770,10 +3805,7 @@ async def admin_presign_direct_video_upload(
     current_admin: AdminBase = Depends(get_current_active_admin),
 ):
     file_ext, _safe_filename_value, max_bytes = _validate_direct_video_upload_request(payload)
-    bucket = os.environ.get("CLOUDFLARE_R2_BUCKET", "pranvith-assets-public").strip()
-    public_base = os.environ.get("CLOUDFLARE_R2_PUBLIC_BASE_URL", "").strip().rstrip("/")
-    if not bucket or not public_base:
-        raise HTTPException(status_code=500, detail="Cloudflare public R2 bucket is not configured")
+    bucket, public_base = _require_r2_public_upload_config()
 
     key = _r2_direct_video_object_key(payload.purpose, file_ext, payload.slug)
     try:
@@ -3783,7 +3815,6 @@ async def admin_presign_direct_video_upload(
                 "Bucket": bucket,
                 "Key": key,
                 "ContentType": payload.content_type,
-                "CacheControl": "public, max-age=31536000, immutable",
             },
             ExpiresIn=900,
             HttpMethod="PUT",
@@ -3799,9 +3830,11 @@ async def admin_presign_direct_video_upload(
         "public_url": f"{public_base}/{key}",
         "key": key,
         "method": "PUT",
+        "required_headers": {
+            "Content-Type": payload.content_type,
+        },
         "headers": {
             "Content-Type": payload.content_type,
-            "Cache-Control": "public, max-age=31536000, immutable",
         },
         "max_bytes": max_bytes,
     }
@@ -3824,9 +3857,7 @@ async def admin_complete_direct_video_upload(
     if not allowed_types or payload.content_type not in allowed_types:
         raise HTTPException(status_code=415, detail="Unsupported video type. Allowed: MP4, WEBM, MOV.")
 
-    public_base = os.environ.get("CLOUDFLARE_R2_PUBLIC_BASE_URL", "").strip().rstrip("/")
-    if not public_base:
-        raise HTTPException(status_code=500, detail="Cloudflare public R2 bucket is not configured")
+    _bucket, public_base = _require_r2_public_upload_config()
     if _r2_public_key_from_url(payload.url) != payload.key:
         raise HTTPException(status_code=400, detail="Uploaded video URL does not match the signed key")
 
