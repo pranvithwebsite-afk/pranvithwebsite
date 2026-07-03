@@ -105,6 +105,82 @@ export function handleImageError(event, fallback = FALLBACK_IMAGE) {
   img.src = fallback;
 }
 
+const isBulletLine = (line) => /^\*\s+/.test(line);
+
+export function parseProductDescription(value) {
+  const text = String(value || '').replace(/\r\n/g, '\n').trim();
+  if (!text) return [];
+
+  const lines = text.split('\n');
+  const blocks = [];
+  let paragraphLines = [];
+  let listItems = [];
+
+  const flushParagraph = () => {
+    if (!paragraphLines.length) return;
+    const textValue = paragraphLines.join(' ').trim();
+    if (!textValue) {
+      paragraphLines = [];
+      return;
+    }
+    blocks.push({ type: 'paragraph', text: textValue });
+    paragraphLines = [];
+  };
+
+  const flushList = () => {
+    if (!listItems.length) return;
+    blocks.push({ type: 'list', items: [...listItems] });
+    listItems = [];
+  };
+
+  lines.forEach((rawLine, index) => {
+    const line = rawLine.trim();
+    const nextLine = String(lines[index + 1] || '').trim();
+
+    if (!line) {
+      flushParagraph();
+      flushList();
+      return;
+    }
+
+    if (isBulletLine(line)) {
+      flushParagraph();
+      listItems.push(line.replace(/^\*\s+/, '').trim());
+      return;
+    }
+
+    if (listItems.length) flushList();
+
+    const nextIsBullet = isBulletLine(nextLine);
+    const isHeadingLine = /[:：]\s*$/.test(line) && nextIsBullet;
+    if (isHeadingLine) {
+      flushParagraph();
+      blocks.push({ type: 'paragraph', text: line, heading: true });
+      return;
+    }
+
+    paragraphLines.push(line);
+  });
+
+  flushParagraph();
+  flushList();
+
+  return blocks;
+}
+
+export function toProductDescriptionPreview(value) {
+  const blocks = parseProductDescription(value);
+  if (!blocks.length) return '';
+  return blocks
+    .map((block) => (
+      block.type === 'list'
+        ? block.items.join(' • ')
+        : block.text
+    ))
+    .filter(Boolean)
+    .join(' ');
+}
+
 export async function shareProduct(product, fallbackUrl) {
   const slug = product?.slug;
   const productUrl = fallbackUrl || (slug && typeof window !== 'undefined'

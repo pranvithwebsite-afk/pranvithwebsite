@@ -20,6 +20,7 @@ import CheckoutModal from '../components/CheckoutModal';
 import { usePublicPageLoading } from '../components/PublicPageLoader';
 import SafeVideoEmbed, { getSafeVideoEmbedUrl, isDirectVideoUrl } from '../components/SafeVideoEmbed';
 import OptimizedImage from '../components/OptimizedImage';
+import ProductDescription from '../components/ProductDescription';
 
 const toStringList = (value) => (
   Array.isArray(value)
@@ -243,9 +244,10 @@ const AssetLanding = () => {
                       <h1 className="max-w-3xl text-3xl font-black tracking-tight text-white sm:text-4xl lg:text-5xl" data-testid="asset-title">
                         {heroHeadline}
                       </h1>
-                      <p className="mt-4 max-w-2xl text-sm leading-relaxed text-white/70 sm:text-base">
-                        {heroSubhead}
-                      </p>
+                      <ProductDescription
+                        value={heroSubhead}
+                        className="mt-4 max-w-2xl space-y-4"
+                      />
                     </div>
 
                     <div className="order-1 xl:order-2 xl:col-start-2 xl:row-start-1">
@@ -450,9 +452,11 @@ const AssetLanding = () => {
                   <h2 className="text-3xl font-bold tracking-tight text-white sm:text-4xl">
                     {isFree ? `Claim ${name}` : `Get ${name} today`}
                   </h2>
-                  <p className="mx-auto mt-5 max-w-2xl leading-relaxed text-white/70">
-                    {description || 'Instant access after checkout.'}
-                  </p>
+                  <ProductDescription
+                    value={description || 'Instant access after checkout.'}
+                    className="mx-auto mt-5 max-w-2xl space-y-4 text-left sm:text-center"
+                    listClassName="text-left sm:text-left"
+                  />
                   <button
                     onClick={onPrimaryCta}
                     disabled={busy || !product}

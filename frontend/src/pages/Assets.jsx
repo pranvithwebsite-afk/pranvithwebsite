@@ -4,7 +4,7 @@ import Header from '../components/Header';
 import Footer from '../components/Footer';
 import { ChevronDown, Filter, Search, Share2 } from 'lucide-react';
 import { fetchProducts } from '../lib/api';
-import { FALLBACK_IMAGE, dedupeCatalogItems, getCatalogItemKey, handleImageError, safeImageSrc, shareProduct } from '../lib/utils';
+import { FALLBACK_IMAGE, dedupeCatalogItems, getCatalogItemKey, handleImageError, safeImageSrc, shareProduct, toProductDescriptionPreview } from '../lib/utils';
 import CheckoutModal from '../components/CheckoutModal';
 import { usePublicPageLoading } from '../components/PublicPageLoader';
 import { useCmsPage } from '../hooks/useCmsPage';
@@ -57,7 +57,7 @@ const normalize = (item = {}, index) => {
     headline,
     subhead,
     badge: price === 0 || item.is_free ? 'FREE' : 'SALE!',
-    description: item.short_description || item.description || '',
+    description: toProductDescriptionPreview(item.short_description || item.description || ''),
   };
 };
 
