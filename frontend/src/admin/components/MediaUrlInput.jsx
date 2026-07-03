@@ -1,7 +1,25 @@
 import React, { useMemo, useState } from 'react';
-import { Image as ImageIcon, Upload, X } from 'lucide-react';
+import { Image as ImageIcon, Upload, Video, X } from 'lucide-react';
 import { toast } from 'sonner';
-import { fetchAdminMedia, uploadAdminFile } from '../../lib/api';
+import {
+  createAdminDirectVideoUpload,
+  fetchAdminMedia,
+  finalizeAdminDirectVideoUpload,
+  uploadAdminFile,
+  uploadFileToSignedUrl,
+} from '../../lib/api';
+import {
+  ADMIN_IMAGE_RECOMMENDED_BYTES,
+  ADMIN_IMAGE_UPLOAD_ACCEPT,
+  ADMIN_IMAGE_UPLOAD_MAX_BYTES,
+  ADMIN_VIDEO_UPLOAD_ACCEPT,
+  ADMIN_VIDEO_UPLOAD_MAX_BYTES,
+  formatBytes,
+  formatMegabytes,
+  formatUploadError,
+  validateImageUploadFile,
+  validateVideoUploadFile,
+} from '../../lib/mediaUpload';
 import { detectMediaType, isDirectVideoUrl, isImageUrl } from '../../components/SafeVideoEmbed';
 import { handleImageError, safeImageSrc } from '../../lib/utils';
 
@@ -10,23 +28,33 @@ const buttonClass = 'inline-flex items-center justify-center gap-2 rounded-lg bo
 const itemUrl = (item = {}) => item.public_url || item.url || '';
 const itemMime = (item = {}) => item.type || item.mime_type || '';
 
+const videoMediaTypes = new Set(['video_file', 'video_url', 'youtube', 'vimeo', 'direct']);
+
 const MediaUrlInput = ({
   label,
   value,
   onChange,
-  accept = 'image/*,video/*',
+  accept = 'image/*',
   placeholder = 'Paste media URL',
   helperText = '',
   showPreview = true,
   mediaType,
   mediaItems = [],
   onUploaded,
+  videoUploadPurpose = 'cms-video',
+  videoUploadSlug = '',
 }) => {
-  const [uploading, setUploading] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [uploadingVideo, setUploadingVideo] = useState(false);
+  const [videoProgress, setVideoProgress] = useState(0);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pickerItems, setPickerItems] = useState(mediaItems);
   const [pickerLoading, setPickerLoading] = useState(false);
+  const [selectedVideoSize, setSelectedVideoSize] = useState('');
   const currentType = mediaType || detectMediaType(value);
+  const supportsImageUpload = accept.includes('image');
+  const supportsVideoUpload = accept.includes('video');
+  const videoMode = supportsVideoUpload && (videoMediaTypes.has(String(mediaType || '').trim().toLowerCase()) || videoMediaTypes.has(currentType));
 
   const filteredItems = useMemo(() => {
     if (!accept) return pickerItems;
@@ -39,22 +67,82 @@ const MediaUrlInput = ({
     return pickerItems;
   }, [accept, pickerItems]);
 
-  const handleUpload = async (event) => {
+  const handleImageUpload = async (event) => {
     const file = event.target.files?.[0];
     event.target.value = '';
     if (!file) return;
+    setSelectedVideoSize('');
+
+    const validationError = validateImageUploadFile(file);
+    if (validationError) {
+      toast.error(validationError);
+      return;
+    }
+
     try {
-      setUploading(true);
+      setUploadingImage(true);
       const result = await uploadAdminFile(file);
       const url = result?.media?.public_url || result?.media?.url || result?.url;
       if (!url) throw new Error('Upload did not return a media URL');
       onChange(url);
       onUploaded?.(result.media || { url, type: file.type, title: file.name });
-      toast.success('Media uploaded');
+      toast.success('Image uploaded');
     } catch (error) {
-      toast.error(error?.response?.data?.detail || error?.message || 'Upload failed');
+      toast.error(formatUploadError(error));
     } finally {
-      setUploading(false);
+      setUploadingImage(false);
+    }
+  };
+
+  const handleVideoUpload = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+
+    setSelectedVideoSize(formatMegabytes(file.size));
+    const validationError = validateVideoUploadFile(file);
+    if (validationError) {
+      toast.error(validationError);
+      return;
+    }
+
+    try {
+      setUploadingVideo(true);
+      setVideoProgress(0);
+      const signed = await createAdminDirectVideoUpload({
+        filename: file.name,
+        contentType: file.type,
+        fileSize: file.size,
+        purpose: videoUploadPurpose,
+        slug: videoUploadSlug,
+      });
+      await uploadFileToSignedUrl({
+        uploadUrl: signed.upload_url,
+        file,
+        headers: signed.headers,
+        onUploadProgress: (progressEvent) => {
+          const total = progressEvent.total || file.size || 1;
+          setVideoProgress(Math.min(100, Math.round((progressEvent.loaded / total) * 100)));
+        },
+      });
+      const completed = await finalizeAdminDirectVideoUpload({
+        key: signed.key,
+        url: signed.public_url,
+        filename: file.name,
+        contentType: file.type,
+        size: file.size,
+        purpose: videoUploadPurpose,
+        title: file.name,
+      });
+      const url = completed?.media?.public_url || completed?.media?.url || completed?.url || signed.public_url;
+      onChange(url);
+      onUploaded?.(completed?.media || { url, type: file.type, title: file.name });
+      toast.success('Video uploaded directly to Cloudflare R2');
+    } catch (error) {
+      toast.error(formatUploadError(error, 'Video upload failed'));
+    } finally {
+      setUploadingVideo(false);
+      setVideoProgress(0);
     }
   };
 
@@ -68,17 +156,23 @@ const MediaUrlInput = ({
       setPickerLoading(true);
       const data = await fetchAdminMedia();
       setPickerItems(Array.isArray(data) ? data : []);
-    } catch (error) {
+    } catch (_error) {
       toast.error('Media library could not be loaded');
     } finally {
       setPickerLoading(false);
     }
   };
 
+  const resolvedHelperText = helperText || (
+    videoMode
+      ? 'Paste YouTube/Vimeo/R2 video URL, or upload video directly to Cloudflare R2.'
+      : `Use JPG/PNG/WebP images. Recommended compressed JPG/WebP under ${formatBytes(ADMIN_IMAGE_RECOMMENDED_BYTES)}. Hard image limit: ${formatMegabytes(ADMIN_IMAGE_UPLOAD_MAX_BYTES)}.`
+  );
+
   return (
     <div>
       {label && <label className="mb-2 block text-sm font-semibold text-white">{label}</label>}
-      <div className="flex flex-col gap-2 sm:flex-row">
+      <div className="flex flex-col gap-2">
         <input
           type="text"
           value={value || ''}
@@ -86,21 +180,48 @@ const MediaUrlInput = ({
           placeholder={placeholder}
           className="min-w-0 flex-1 rounded-2xl border border-slate-800 bg-slate-900 px-4 py-3 text-white outline-none focus:border-violet-500"
         />
-        <label className={buttonClass}>
-          <Upload size={14} />
-          {uploading ? 'Uploading...' : 'Upload'}
-          <input type="file" accept={accept} disabled={uploading} onChange={handleUpload} className="hidden" />
-        </label>
-        <button type="button" onClick={openPicker} className={buttonClass}>
-          Select
-        </button>
-        <button type="button" onClick={() => onChange('')} disabled={!value} className={`${buttonClass} border-rose-500/30 text-rose-100 hover:border-rose-400`}>
-          Remove
-        </button>
+        <div className="flex flex-wrap gap-2">
+          {supportsImageUpload && (
+            <label className={buttonClass}>
+              <Upload size={14} />
+              {uploadingImage ? 'Uploading image...' : 'Upload Image/Thumbnail'}
+              <input
+                type="file"
+                accept={ADMIN_IMAGE_UPLOAD_ACCEPT}
+                disabled={uploadingImage || uploadingVideo}
+                onChange={handleImageUpload}
+                className="hidden"
+              />
+            </label>
+          )}
+          {supportsVideoUpload && (
+            <label className={buttonClass}>
+              <Video size={14} />
+              {uploadingVideo ? `Uploading video ${videoProgress || 0}%` : 'Upload Video to R2'}
+              <input
+                type="file"
+                accept={ADMIN_VIDEO_UPLOAD_ACCEPT}
+                disabled={uploadingImage || uploadingVideo}
+                onChange={handleVideoUpload}
+                className="hidden"
+              />
+            </label>
+          )}
+          <button type="button" onClick={openPicker} className={buttonClass}>
+            Select
+          </button>
+          <button type="button" onClick={() => onChange('')} disabled={!value} className={`${buttonClass} border-rose-500/30 text-rose-100 hover:border-rose-400`}>
+            Remove
+          </button>
+        </div>
       </div>
-      <p className="mt-2 text-xs text-slate-500">
-        {helperText || 'For fast public pages, use compressed JPG/WebP thumbnails under 300KB when possible.'}
-      </p>
+      <p className="mt-2 text-xs text-slate-500">{resolvedHelperText}</p>
+      {supportsVideoUpload && (
+        <p className="mt-1 text-xs text-slate-500">
+          Max video size: {formatMegabytes(ADMIN_VIDEO_UPLOAD_MAX_BYTES)}
+          {selectedVideoSize ? ` • Selected video: ${selectedVideoSize}` : ''}
+        </p>
+      )}
       {showPreview && <MediaPreview value={value} type={currentType} />}
       {pickerOpen && (
         <MediaPickerModal
@@ -130,10 +251,10 @@ const MediaPreview = ({ value, type }) => {
     );
   }
   if (type === 'video_file' || isDirectVideoUrl(value)) {
-    return <video src={value} controls className="mt-3 aspect-video w-full rounded-xl border border-slate-800 bg-black object-contain" />;
+    return <video src={value} controls playsInline className="mt-3 aspect-video w-full rounded-xl border border-slate-800 bg-black object-contain" />;
   }
   if (type === 'video_url') {
-    return <p className="mt-2 rounded-xl border border-violet-500/20 bg-violet-500/10 px-3 py-2 text-xs text-violet-100">Video URL detected. Public page will render the video player.</p>;
+    return <p className="mt-2 rounded-xl border border-violet-500/20 bg-violet-500/10 px-3 py-2 text-xs text-violet-100">Video URL detected. Public page will render the correct player for YouTube, Vimeo, or direct video URLs.</p>;
   }
   return <p className="mt-2 rounded-xl border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-xs text-amber-100">Unsupported or unsafe media URL.</p>;
 };

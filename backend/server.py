@@ -591,6 +591,24 @@ class MediaIn(BaseModel):
     tags: List[str] = []
 
 
+class DirectVideoUploadSignIn(BaseModel):
+    filename: str = Field(min_length=1, max_length=255)
+    content_type: str = Field(min_length=1, max_length=120)
+    file_size: int = Field(gt=0)
+    purpose: str = Field(min_length=1, max_length=80)
+    slug: Optional[str] = Field(default=None, max_length=180)
+
+
+class DirectVideoUploadCompleteIn(BaseModel):
+    key: str = Field(min_length=1, max_length=1024)
+    url: str = Field(min_length=1, max_length=2048)
+    filename: str = Field(min_length=1, max_length=255)
+    content_type: str = Field(min_length=1, max_length=120)
+    size: int = Field(gt=0)
+    purpose: str = Field(min_length=1, max_length=80)
+    title: Optional[str] = Field(default=None, max_length=255)
+
+
 class Coupon(BaseModel):
     model_config = ConfigDict(extra="ignore")
     id: str
@@ -3114,6 +3132,11 @@ async def admin_media(current_admin: AdminBase = Depends(get_current_active_admi
 @admin_router.post("/media/upload")
 async def admin_upload_media_library(file: UploadFile = File(...), current_admin: AdminBase = Depends(get_current_active_admin)):
     file_ext, max_bytes, media_type = _validate_media_library_upload(file)
+    if media_type == "video":
+        raise HTTPException(
+            status_code=413,
+            detail="This video is too large for normal upload. Upload directly to Cloudflare R2 or paste a YouTube/Vimeo/R2 URL.",
+        )
     content = await file.read(max_bytes + 1)
     if len(content) > max_bytes:
         limit_mb = max_bytes // (1024 * 1024)
@@ -3452,8 +3475,9 @@ R2_PRIVATE_TYPES = {
 }
 R2_PUBLIC_PURPOSES = {"product-image", "product-video", "before-image", "after-image", "banner", "thumbnail"}
 R2_PRIVATE_PURPOSES = {"paid-download", "zip-file", "project-file", "lut-pack", "template-pack", "course-material"}
+R2_DIRECT_VIDEO_PURPOSES = {"product-video", "cms-video", "service-video", "media-library-video"}
 R2_MAX_IMAGE_BYTES = 10 * 1024 * 1024
-R2_MAX_VIDEO_BYTES = 100 * 1024 * 1024
+R2_MAX_VIDEO_BYTES = 200 * 1024 * 1024
 R2_MAX_PRIVATE_BYTES = 500 * 1024 * 1024
 
 
@@ -3560,6 +3584,40 @@ def _validate_media_library_upload(file: UploadFile) -> tuple[str, int, str]:
     if not allowed_types or file.content_type not in allowed_types:
         raise HTTPException(status_code=415, detail="Unsupported file type")
     return file_ext, max_bytes, media_type
+
+
+def _validate_direct_video_upload_request(payload: DirectVideoUploadSignIn) -> tuple[str, str, int]:
+    safe_filename = _safe_filename(payload.filename)
+    file_ext = Path(safe_filename).suffix.lower()
+    allowed_types = R2_VIDEO_TYPES.get(file_ext)
+    if payload.purpose not in R2_DIRECT_VIDEO_PURPOSES:
+        raise HTTPException(status_code=422, detail="Unsupported video upload purpose")
+    if not allowed_types or payload.content_type not in allowed_types:
+        raise HTTPException(status_code=415, detail="Unsupported video type. Allowed: MP4, WEBM, MOV.")
+    if payload.file_size > R2_MAX_VIDEO_BYTES:
+        limit_mb = R2_MAX_VIDEO_BYTES // (1024 * 1024)
+        raise HTTPException(
+            status_code=413,
+            detail=f"Video is {payload.file_size / (1024 * 1024):.1f} MB. Maximum allowed video size is {limit_mb} MB. Please compress the video or upload it manually to Cloudflare R2/YouTube and paste the URL.",
+        )
+    return file_ext, safe_filename, R2_MAX_VIDEO_BYTES
+
+
+def _r2_direct_video_object_key(purpose: str, file_ext: str, slug: Optional[str] = None) -> str:
+    safe_slug = normalize_slug(slug or "")
+    object_id = str(uuid.uuid4())
+    if purpose == "product-video":
+        if not safe_slug:
+            raise HTTPException(status_code=422, detail="Product slug is required for product video upload")
+        return f"products/{safe_slug}/videos/{object_id}{file_ext}"
+    if purpose == "service-video":
+        return f"services/{safe_slug or 'shared'}/videos/{object_id}{file_ext}"
+    if purpose == "cms-video":
+        return f"cms/{safe_slug or 'shared'}/videos/{object_id}{file_ext}"
+    if purpose == "media-library-video":
+        today = datetime.now(timezone.utc).strftime("%Y/%m")
+        return f"media-library/video/{today}/{object_id}{file_ext}"
+    raise HTTPException(status_code=422, detail="Unsupported video upload purpose")
 
 
 def _r2_media_library_key(file_ext: str, media_type: str) -> str:
@@ -3706,6 +3764,97 @@ async def admin_upload_public_media(
     }
 
 
+@admin_router.post("/uploads/video/presign")
+async def admin_presign_direct_video_upload(
+    payload: DirectVideoUploadSignIn,
+    current_admin: AdminBase = Depends(get_current_active_admin),
+):
+    file_ext, _safe_filename_value, max_bytes = _validate_direct_video_upload_request(payload)
+    bucket = os.environ.get("CLOUDFLARE_R2_BUCKET", "pranvith-assets-public").strip()
+    public_base = os.environ.get("CLOUDFLARE_R2_PUBLIC_BASE_URL", "").strip().rstrip("/")
+    if not bucket or not public_base:
+        raise HTTPException(status_code=500, detail="Cloudflare public R2 bucket is not configured")
+
+    key = _r2_direct_video_object_key(payload.purpose, file_ext, payload.slug)
+    try:
+        upload_url = _r2_client().generate_presigned_url(
+            "put_object",
+            Params={
+                "Bucket": bucket,
+                "Key": key,
+                "ContentType": payload.content_type,
+                "CacheControl": "public, max-age=31536000, immutable",
+            },
+            ExpiresIn=900,
+            HttpMethod="PUT",
+        )
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Direct video presign failed purpose=%s key=%s", payload.purpose, key)
+        raise HTTPException(status_code=502, detail="Cloudflare R2 upload could not be prepared")
+
+    return {
+        "upload_url": upload_url,
+        "public_url": f"{public_base}/{key}",
+        "key": key,
+        "method": "PUT",
+        "headers": {
+            "Content-Type": payload.content_type,
+            "Cache-Control": "public, max-age=31536000, immutable",
+        },
+        "max_bytes": max_bytes,
+    }
+
+
+@admin_router.post("/uploads/video/complete")
+async def admin_complete_direct_video_upload(
+    payload: DirectVideoUploadCompleteIn,
+    current_admin: AdminBase = Depends(get_current_active_admin),
+):
+    if db is None:
+        raise HTTPException(status_code=500, detail="Database is not configured")
+    if payload.purpose not in R2_DIRECT_VIDEO_PURPOSES:
+        raise HTTPException(status_code=422, detail="Unsupported video upload purpose")
+    if payload.size > R2_MAX_VIDEO_BYTES:
+        raise HTTPException(status_code=413, detail="Video exceeds the maximum allowed upload size")
+
+    file_ext = Path(_safe_filename(payload.filename)).suffix.lower()
+    allowed_types = R2_VIDEO_TYPES.get(file_ext)
+    if not allowed_types or payload.content_type not in allowed_types:
+        raise HTTPException(status_code=415, detail="Unsupported video type. Allowed: MP4, WEBM, MOV.")
+
+    public_base = os.environ.get("CLOUDFLARE_R2_PUBLIC_BASE_URL", "").strip().rstrip("/")
+    if not public_base:
+        raise HTTPException(status_code=500, detail="Cloudflare public R2 bucket is not configured")
+    if _r2_public_key_from_url(payload.url) != payload.key:
+        raise HTTPException(status_code=400, detail="Uploaded video URL does not match the signed key")
+
+    media_record = {
+        "id": str(uuid.uuid4()),
+        "title": (payload.title or Path(payload.filename).name or "Video").strip(),
+        "type": payload.content_type,
+        "url": payload.url,
+        "public_url": payload.url,
+        "thumbnail": None,
+        "description": "",
+        "size": payload.size,
+        "filename": Path(payload.filename).name,
+        "uploaded_at": datetime.now(timezone.utc).isoformat(),
+        "tags": ["direct-r2-video", payload.purpose],
+        "media_type": "video",
+        "key": payload.key,
+        "bucket": os.environ.get("CLOUDFLARE_R2_BUCKET", "pranvith-assets-public").strip(),
+    }
+    await db.media.insert_one(media_record)
+    return {
+        "success": True,
+        "media": media_record,
+        "url": payload.url,
+        "key": payload.key,
+    }
+
+
 @admin_router.post("/uploads/private")
 async def admin_upload_private_download(
     file: UploadFile = File(...),
@@ -3759,6 +3908,11 @@ async def admin_upload_file(file: UploadFile = File(...), current_admin: AdminBa
     try:
         original_name = Path(file.filename or "").name
         file_ext = Path(original_name).suffix.lower()
+        if file_ext in R2_VIDEO_TYPES:
+            raise HTTPException(
+                status_code=413,
+                detail="This video is too large for normal upload. Upload directly to Cloudflare R2 or paste a YouTube/Vimeo/R2 URL.",
+            )
         allowed_types = ALLOWED_UPLOAD_TYPES.get(file_ext)
         if not allowed_types or file.content_type not in allowed_types:
             raise HTTPException(status_code=415, detail="Unsupported file type")

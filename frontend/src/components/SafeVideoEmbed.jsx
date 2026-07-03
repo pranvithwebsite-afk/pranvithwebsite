@@ -82,10 +82,10 @@ export const getSafeVideoEmbedUrl = (videoType, videoUrl) => {
   const type = String(videoType || '').trim().toLowerCase();
   const url = String(videoUrl || '').trim();
   const youtubeId = (type === 'youtube' || type === 'video_url' || type === 'auto' || !type) ? getYouTubeId(url) : '';
-  if (youtubeId) return `https://www.youtube.com/embed/${youtubeId}?rel=0&modestbranding=1`;
+  if (youtubeId) return `https://www.youtube.com/embed/${youtubeId}?rel=0&modestbranding=1&playsinline=1`;
 
   const vimeoId = (type === 'vimeo' || type === 'video_url' || type === 'auto' || !type) ? getVimeoId(url) : '';
-  if (vimeoId) return `https://player.vimeo.com/video/${vimeoId}`;
+  if (vimeoId) return `https://player.vimeo.com/video/${vimeoId}?playsinline=1`;
 
   return '';
 };
@@ -102,7 +102,7 @@ export const getYouTubeThumbnail = (url, quality = 'maxresdefault') => {
 const withAutoplay = (url) => {
   if (!url) return '';
   const separator = url.includes('?') ? '&' : '?';
-  return `${url}${separator}autoplay=1`;
+  return `${url}${separator}autoplay=1&mute=1&playsinline=1`;
 };
 
 const externalVideoLabel = (videoType, videoUrl) => {
@@ -184,6 +184,7 @@ const SafeVideoEmbed = ({
           poster={safePosterUrl || undefined}
           controls
           autoPlay={allowAutoplay}
+          muted={allowAutoplay}
           playsInline
           preload={activated ? 'metadata' : 'none'}
           className="absolute inset-0 h-full w-full object-contain"

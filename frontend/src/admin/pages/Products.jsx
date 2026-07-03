@@ -8,11 +8,23 @@ import {
   deleteAdminProduct,
   createProductPaymentLink,
   refreshProductPaymentLink,
+  createAdminDirectVideoUpload,
+  finalizeAdminDirectVideoUpload,
+  uploadFileToSignedUrl,
   uploadAdminProductMedia,
   uploadAdminPrivateDownload,
 } from '../../lib/api';
 import { toast } from 'sonner';
 import SafeVideoEmbed from '../../components/SafeVideoEmbed';
+import {
+  ADMIN_IMAGE_UPLOAD_ACCEPT,
+  ADMIN_VIDEO_UPLOAD_ACCEPT,
+  ADMIN_VIDEO_UPLOAD_MAX_BYTES,
+  formatMegabytes,
+  formatUploadError,
+  validateImageUploadFile,
+  validateVideoUploadFile,
+} from '../../lib/mediaUpload';
 
 const defaultProductForm = {
   slug: '',
@@ -406,6 +418,7 @@ const ProductForm = ({
   });
   const [uploading, setUploading] = useState({});
   const [uploadProgress, setUploadProgress] = useState({});
+  const [selectedVideoSize, setSelectedVideoSize] = useState('');
 
   const currentSlug = normalizeSlug(formData.slug || formData.name);
 
@@ -417,29 +430,73 @@ const ProductForm = ({
     }
     const uploadKey = `${purpose}-${targetField}`;
     try {
+      if (type === 'image') {
+        setSelectedVideoSize('');
+        const imageError = validateImageUploadFile(file);
+        if (imageError) {
+          toast.error(imageError);
+          return;
+        }
+      }
+      if (type === 'video') {
+        setSelectedVideoSize(formatMegabytes(file.size));
+        const videoError = validateVideoUploadFile(file);
+        if (videoError) {
+          toast.error(videoError);
+          return;
+        }
+      }
       setUploading((prev) => ({ ...prev, [uploadKey]: true }));
       setUploadProgress((prev) => ({ ...prev, [uploadKey]: 0 }));
-      const result = await uploadAdminProductMedia({
-        file,
-        type,
-        purpose,
-        productSlug: currentSlug,
-        onUploadProgress: (event) => {
-          if (!event.total) return;
-          setUploadProgress((prev) => ({
-            ...prev,
-            [uploadKey]: Math.round((event.loaded * 100) / event.total),
-          }));
-        },
-      });
-      if (append) {
-        onFieldChange(targetField, [...(formData[targetField] || []), result.url]);
+      const onUploadProgress = (event) => {
+        if (!event.total) return;
+        setUploadProgress((prev) => ({
+          ...prev,
+          [uploadKey]: Math.round((event.loaded * 100) / event.total),
+        }));
+      };
+      let result;
+      if (type === 'video') {
+        const signed = await createAdminDirectVideoUpload({
+          filename: file.name,
+          contentType: file.type,
+          fileSize: file.size,
+          purpose: 'product-video',
+          slug: currentSlug,
+        });
+        await uploadFileToSignedUrl({
+          uploadUrl: signed.upload_url,
+          file,
+          headers: signed.headers,
+          onUploadProgress,
+        });
+        result = await finalizeAdminDirectVideoUpload({
+          key: signed.key,
+          url: signed.public_url,
+          filename: file.name,
+          contentType: file.type,
+          size: file.size,
+          purpose: 'product-video',
+          title: file.name,
+        });
       } else {
-        onFieldChange(targetField, result.url);
+        result = await uploadAdminProductMedia({
+          file,
+          type,
+          purpose,
+          productSlug: currentSlug,
+          onUploadProgress,
+        });
+      }
+      const nextUrl = result?.media?.public_url || result?.media?.url || result?.url;
+      if (append) {
+        onFieldChange(targetField, [...(formData[targetField] || []), nextUrl]);
+      } else {
+        onFieldChange(targetField, nextUrl);
       }
       toast.success('Upload complete');
     } catch (error) {
-      toast.error(error?.response?.data?.detail || 'Upload failed');
+      toast.error(formatUploadError(error));
     } finally {
       setUploading((prev) => ({ ...prev, [uploadKey]: false }));
     }
@@ -627,7 +684,7 @@ const ProductForm = ({
           uploadControl={
             <UploadButton
               label="Upload Image"
-              accept=".jpg,.jpeg,.png,.webp,.gif,image/jpeg,image/png,image/webp,image/gif"
+              accept={ADMIN_IMAGE_UPLOAD_ACCEPT}
               disabled={!!uploading['product-image-product_images']}
               progress={uploadProgress['product-image-product_images']}
               onFile={(file) => uploadMedia({
@@ -647,6 +704,7 @@ const ProductForm = ({
           onFieldChange={onFieldChange}
           uploading={!!uploading['product-video-video_url']}
           progress={uploadProgress['product-video-video_url']}
+          selectedVideoSize={selectedVideoSize}
           onUpload={(file) => uploadMedia({
             file,
             type: 'video',
@@ -817,6 +875,7 @@ const ProductVideoSection = ({
   onFieldChange,
   uploading,
   progress,
+  selectedVideoSize,
   onUpload,
 }) => (
   <div className="space-y-4 rounded-2xl border border-slate-800 bg-slate-900/70 p-4">
@@ -875,13 +934,18 @@ const ProductVideoSection = ({
             className="w-full rounded-lg border border-slate-700 bg-slate-950 px-4 py-2 text-white placeholder:text-slate-600 focus:border-violet-500 focus:outline-none"
           />
         </div>
+        <p className="text-xs text-slate-500">Paste YouTube/Vimeo/R2 video URL, or upload video directly to Cloudflare R2.</p>
         <UploadButton
-          label="Upload Video"
-          accept=".mp4,.webm,.mov,video/mp4,video/webm,video/quicktime"
+          label="Upload Video to R2"
+          accept={ADMIN_VIDEO_UPLOAD_ACCEPT}
           disabled={uploading}
           progress={progress}
           onFile={onUpload}
         />
+        <p className="text-xs text-slate-500">
+          Max video size: {formatMegabytes(ADMIN_VIDEO_UPLOAD_MAX_BYTES)}
+          {selectedVideoSize ? ` • Selected video: ${selectedVideoSize}` : ''}
+        </p>
         {formData.video_url && (
           <SafeVideoEmbed
             videoType="video_file"
@@ -957,7 +1021,7 @@ const SingleImageField = ({ label, name, value, onInputChange, onFieldChange, up
     <div className="mt-3">
       <UploadButton
         label="Upload Image"
-        accept=".jpg,.jpeg,.png,.webp,.gif,image/jpeg,image/png,image/webp,image/gif"
+        accept={ADMIN_IMAGE_UPLOAD_ACCEPT}
         disabled={uploading}
         progress={progress}
         onFile={onUpload}

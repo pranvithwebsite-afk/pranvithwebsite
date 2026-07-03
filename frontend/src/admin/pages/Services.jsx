@@ -291,8 +291,20 @@ const ServiceModal = ({ form, setForm, setField, saving, editing, onClose, onSav
         <TextArea label="Full Description" value={form.description} onChange={(value) => setField('description', value)} rows={5} />
 
         <div className="grid gap-5 lg:grid-cols-2">
-          <MediaUrlInput label="Thumbnail Upload" value={form.thumbnail_url} onChange={(value) => setField('thumbnail_url', value)} accept="image/*" />
-          <MediaUrlInput label="Banner Upload" value={form.banner_url} onChange={(value) => setField('banner_url', value)} accept="image/*,video/*" />
+          <MediaUrlInput
+            label="Thumbnail Upload"
+            value={form.thumbnail_url}
+            onChange={(value) => setField('thumbnail_url', value)}
+            accept="image/*"
+          />
+          <MediaUrlInput
+            label="Banner Upload"
+            value={form.banner_url}
+            onChange={(value) => setField('banner_url', value)}
+            accept="image/*,video/*"
+            videoUploadPurpose="service-video"
+            videoUploadSlug={form.slug || form.title}
+          />
         </div>
 
         <ArrayEditor title="What We Offer" items={form.offers} itemTemplate={emptyItem} onChange={(items) => setForm((current) => ({ ...current, offers: items }))} />

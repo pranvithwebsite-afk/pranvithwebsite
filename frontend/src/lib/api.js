@@ -519,6 +519,40 @@ export const uploadAdminFile = async (file, onUploadProgress) => {
   return data;
 };
 
+export const createAdminDirectVideoUpload = async ({ filename, contentType, fileSize, purpose, slug }) => {
+  const payload = {
+    filename,
+    content_type: contentType,
+    file_size: fileSize,
+    purpose,
+  };
+  if (slug) payload.slug = slug;
+  const { data } = await adminApi.post('/admin/uploads/video/presign', payload);
+  return data;
+};
+
+export const finalizeAdminDirectVideoUpload = async ({ key, url, filename, contentType, size, purpose, title }) => {
+  const { data } = await adminApi.post('/admin/uploads/video/complete', {
+    key,
+    url,
+    filename,
+    content_type: contentType,
+    size,
+    purpose,
+    title,
+  });
+  return data;
+};
+
+export const uploadFileToSignedUrl = async ({ uploadUrl, file, headers = {}, onUploadProgress }) => {
+  const { data } = await axios.put(uploadUrl, file, {
+    headers,
+    timeout: 30 * 60 * 1000,
+    onUploadProgress,
+  });
+  return data;
+};
+
 export const deleteAdminMedia = async (mediaId) => {
   const { data } = await adminApi.delete(`/admin/media/${mediaId}`);
   return data;

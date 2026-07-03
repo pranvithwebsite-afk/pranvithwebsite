@@ -517,6 +517,8 @@ const CmsSectionEditor = ({ pageKey, section, mediaItems, onSave, saving, onDirt
             onChange={(value) => update(field, value)}
             mediaItems={mediaItems}
             labels={schema.sectionLabels}
+            pageKey={pageKey}
+            sectionMediaType={draft.media_type}
           />
         ))}
       </div>
@@ -570,6 +572,8 @@ const CmsSectionEditor = ({ pageKey, section, mediaItems, onSave, saving, onDirt
                         value={field === 'sort_order' ? item.sort_order ?? index : normalizeDataValue(field, item[field])}
                         onChange={(value) => updateNormalizedItem(index, field, value)}
                         mediaItems={mediaItems}
+                        pageKey={pageKey}
+                        itemMediaType={item.media_type || item.video_type}
                       />
                     ))}
                   </div>
@@ -587,7 +591,7 @@ const CmsSectionEditor = ({ pageKey, section, mediaItems, onSave, saving, onDirt
   );
 };
 
-const SectionField = ({ field, value, onChange, mediaItems, labels }) => {
+const SectionField = ({ field, value, onChange, mediaItems, labels, pageKey, sectionMediaType }) => {
   if (field === 'type') {
     return (
       <Field label="Section Type">
@@ -606,18 +610,18 @@ const SectionField = ({ field, value, onChange, mediaItems, labels }) => {
       </Field>
     );
   }
-  return <EditableField field={field} value={value} onChange={onChange} mediaItems={mediaItems} label={getFieldLabel(field, labels)} />;
+  return <EditableField field={field} value={value} onChange={onChange} mediaItems={mediaItems} label={getFieldLabel(field, labels)} pageKey={pageKey} mediaTypeValue={sectionMediaType} />;
 };
 
 const DataField = ({ field, value, onChange, labels }) => (
   <EditableField field={field} value={value} onChange={onChange} label={getFieldLabel(field, labels)} />
 );
 
-const ItemField = ({ field, labels, value, onChange, mediaItems }) => (
-  <EditableField field={field} value={value} onChange={onChange} mediaItems={mediaItems} label={getFieldLabel(field, labels)} />
+const ItemField = ({ field, labels, value, onChange, mediaItems, pageKey, itemMediaType }) => (
+  <EditableField field={field} value={value} onChange={onChange} mediaItems={mediaItems} label={getFieldLabel(field, labels)} pageKey={pageKey} mediaTypeValue={itemMediaType} />
 );
 
-const EditableField = ({ field, value, onChange, mediaItems, label }) => {
+const EditableField = ({ field, value, onChange, mediaItems, label, pageKey, mediaTypeValue }) => {
   if (field === 'media_type') {
     return (
       <Field label={label}>
@@ -636,7 +640,8 @@ const EditableField = ({ field, value, onChange, mediaItems, label }) => {
     );
   }
   if (mediaFields.has(field) || videoFields.has(field)) {
-    const accept = field === 'media_url' ? 'image/*,video/*' : videoFields.has(field) ? 'video/*' : 'image/*';
+    const supportsMixedMedia = field === 'media_url' && label === 'Media URL';
+    const accept = supportsMixedMedia ? 'image/*,video/*' : videoFields.has(field) ? 'video/*' : 'image/*';
     return (
       <MediaUrlInput
         label={label}
@@ -644,6 +649,9 @@ const EditableField = ({ field, value, onChange, mediaItems, label }) => {
         onChange={onChange}
         accept={accept}
         mediaItems={mediaItems}
+        mediaType={videoFields.has(field) ? 'video_url' : mediaTypeValue}
+        videoUploadPurpose="cms-video"
+        videoUploadSlug={pageKey}
       />
     );
   }

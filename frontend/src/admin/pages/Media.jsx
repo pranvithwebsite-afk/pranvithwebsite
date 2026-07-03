@@ -1,8 +1,22 @@
 import React, { useEffect, useState } from 'react';
 import { Upload, Copy, Trash2, FileArchive, FileText, Image as ImageIcon, Video } from 'lucide-react';
-import { fetchAdminMedia, uploadAdminFile, deleteAdminMedia } from '../../lib/api';
+import {
+  createAdminDirectVideoUpload,
+  deleteAdminMedia,
+  fetchAdminMedia,
+  finalizeAdminDirectVideoUpload,
+  uploadAdminFile,
+  uploadFileToSignedUrl,
+} from '../../lib/api';
 import { toast } from 'sonner';
 import { handleImageError, safeImageSrc } from '../../lib/utils';
+import {
+  ADMIN_VIDEO_UPLOAD_MAX_BYTES,
+  formatMegabytes,
+  formatUploadError,
+  isVideoUploadFile,
+  validateVideoUploadFile,
+} from '../../lib/mediaUpload';
 
 const formatFileSize = (bytes = 0) => {
   const value = Number(bytes) || 0;
@@ -28,6 +42,7 @@ const Media = () => {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [error, setError] = useState('');
   const [dragActive, setDragActive] = useState(false);
+  const [selectedVideoSize, setSelectedVideoSize] = useState('');
 
   useEffect(() => {
     loadMedia();
@@ -50,14 +65,15 @@ const Media = () => {
   };
 
   const validateFile = (file) => {
-    const validTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'video/mp4', 'video/webm', 'application/pdf', 'application/zip', 'application/x-zip-compressed'];
-    if (!validTypes.includes(file.type)) return 'Unsupported file type. Allowed: JPEG, PNG, GIF, WebP, MP4, WebM, PDF, ZIP';
-    if (file.size > 25 * 1024 * 1024) return 'File exceeds the 25 MB upload limit';
+    const validTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'video/mp4', 'video/webm', 'video/quicktime', 'video/mov', 'application/pdf', 'application/zip', 'application/x-zip-compressed'];
+    if (!validTypes.includes(file.type)) return 'Unsupported file type. Allowed: JPEG, PNG, GIF, WebP, MP4, WEBM, MOV, PDF, ZIP';
+    if (!isVideoUploadFile(file) && file.size > 25 * 1024 * 1024) return 'File exceeds the 25 MB upload limit';
     return '';
   };
 
   const handleFileUpload = async (file) => {
     if (!file) return;
+    if (!isVideoUploadFile(file)) setSelectedVideoSize('');
     const validationError = validateFile(file);
     if (validationError) {
       toast.error(validationError);
@@ -67,16 +83,50 @@ const Media = () => {
     try {
       setUploading(true);
       setUploadProgress(0);
-      const result = await uploadAdminFile(file, (event) => {
-        const total = event.total || file.size || 1;
-        setUploadProgress(Math.min(100, Math.round((event.loaded / total) * 100)));
-      });
+      let result;
+      if (isVideoUploadFile(file)) {
+        setSelectedVideoSize(formatMegabytes(file.size));
+        const videoError = validateVideoUploadFile(file);
+        if (videoError) {
+          toast.error(videoError);
+          return;
+        }
+        const signed = await createAdminDirectVideoUpload({
+          filename: file.name,
+          contentType: file.type,
+          fileSize: file.size,
+          purpose: 'media-library-video',
+        });
+        await uploadFileToSignedUrl({
+          uploadUrl: signed.upload_url,
+          file,
+          headers: signed.headers,
+          onUploadProgress: (event) => {
+            const total = event.total || file.size || 1;
+            setUploadProgress(Math.min(100, Math.round((event.loaded / total) * 100)));
+          },
+        });
+        result = await finalizeAdminDirectVideoUpload({
+          key: signed.key,
+          url: signed.public_url,
+          filename: file.name,
+          contentType: file.type,
+          size: file.size,
+          purpose: 'media-library-video',
+          title: file.name,
+        });
+      } else {
+        result = await uploadAdminFile(file, (event) => {
+          const total = event.total || file.size || 1;
+          setUploadProgress(Math.min(100, Math.round((event.loaded / total) * 100)));
+        });
+      }
       if (result.success) {
         toast.success('File uploaded successfully');
         loadMedia();
       }
     } catch (error) {
-      toast.error(error?.response?.data?.detail || 'Upload failed');
+      toast.error(formatUploadError(error));
     } finally {
       setUploading(false);
       setUploadProgress(0);
@@ -148,7 +198,11 @@ const Media = () => {
               {uploading ? 'Uploading...' : 'Click to upload or drag & drop'}
             </p>
             <p className="text-sm text-slate-400 mt-1">
-              Images, Videos, PDFs, ZIP files (Max 25MB)
+              Images, Videos, PDFs, ZIP files. Normal uploads max 25MB. Videos go direct to R2.
+            </p>
+            <p className="text-xs text-slate-500 mt-1">
+              Max video size: {formatMegabytes(ADMIN_VIDEO_UPLOAD_MAX_BYTES)}
+              {selectedVideoSize ? ` • Selected video: ${selectedVideoSize}` : ''}
             </p>
           </div>
           {uploading && (
