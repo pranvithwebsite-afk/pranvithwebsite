@@ -57,12 +57,12 @@ const Login = () => {
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100">
-      <div className="mx-auto flex min-h-screen max-w-5xl items-center justify-center px-4 py-12">
+      <div className="mx-auto flex min-h-screen max-w-4xl items-center justify-center px-4 py-12">
         <div className="w-full rounded-3xl border border-slate-800 bg-slate-900/95 p-6 shadow-2xl shadow-slate-950/40 sm:p-10">
           <div className="mb-8 space-y-2 text-center">
             <p className="text-sm uppercase tracking-[0.3em] text-slate-500">Admin Panel</p>
-            <h1 className="text-3xl font-semibold text-white">Sign in to your CMS account</h1>
-            <p className="text-sm text-slate-400">Use the seeded admin user or your admin credentials to access the dashboard.</p>
+            <h1 className="text-3xl font-semibold text-white sm:text-4xl">Sign in to your CMS account</h1>
+            <p className="mx-auto max-w-lg text-sm leading-relaxed text-slate-400">Use the seeded admin user or your admin credentials to access the dashboard.</p>
           </div>
 
           <form className="space-y-6" onSubmit={handleSubmit}>

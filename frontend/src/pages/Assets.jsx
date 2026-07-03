@@ -143,13 +143,13 @@ const Assets = () => {
   return (
     <>
       <Header />
-      <main className="page bg-[var(--bg-main)] text-white min-h-screen">
+      <main className="page min-h-screen bg-[var(--bg-main)] text-white">
         {!pageHidden && heroSection?.section_id && (
-          <section className="pt-8 pb-10">
-            <div className="max-w-7xl mx-auto px-6">
-              <div className="cinematic-card px-8 py-7">
-                <h1 className="text-2xl md:text-4xl font-bold tracking-tight" data-testid="assets-page-title">{heroSection?.title || cmsPage?.title || 'Creative Assets Store'}</h1>
-                <p className="mt-2 text-sm text-white/65">
+          <section className="pt-8 pb-8">
+            <div className="page-shell">
+              <div className="cinematic-card px-5 py-6 sm:px-8 sm:py-7">
+                <h1 className="max-w-3xl text-2xl font-bold tracking-tight sm:text-4xl" data-testid="assets-page-title">{heroSection?.title || cmsPage?.title || 'Creative Assets Store'}</h1>
+                <p className="mt-3 max-w-2xl text-sm leading-relaxed text-white/65">
                   {heroSection?.subtitle || heroSection?.description || cmsPage?.subtitle || 'Premium LUTs, sound packs, motion templates and more - built for editors.'}
                 </p>
               </div>
@@ -157,9 +157,8 @@ const Assets = () => {
           </section>
         )}
 
-
         {showProductListing && <section className="pb-24">
-          <div className="max-w-7xl mx-auto px-6 grid grid-cols-1 lg:grid-cols-[260px_1fr] gap-5 lg:gap-8">
+          <div className="page-shell grid grid-cols-1 gap-5 lg:grid-cols-[17rem_minmax(0,1fr)] lg:gap-8">
             {showFilters && (
               <div ref={mobileFilterRef} className="lg:hidden">
                 <button
@@ -219,7 +218,7 @@ const Assets = () => {
 
             <div>
               {loading || cmsLoading ? (
-                <div className="grid grid-cols-2 gap-3 md:grid-cols-3 md:gap-5 xl:grid-cols-4" aria-hidden="true">
+                <div className="grid grid-cols-2 gap-3 md:grid-cols-3 md:gap-5 xl:grid-cols-3" aria-hidden="true">
                   {Array.from({ length: 8 }).map((_, index) => (
                     <div key={index} className="cinematic-card h-[320px] animate-pulse" />
                   ))}
@@ -233,7 +232,7 @@ const Assets = () => {
                   No assets match your filters.
                 </div>
               ) : (
-                <div className="grid grid-cols-2 gap-3 md:grid-cols-3 md:gap-5 xl:grid-cols-4" data-testid="assets-grid">
+                <div className="grid grid-cols-2 gap-3 md:grid-cols-3 md:gap-5 xl:grid-cols-3" data-testid="assets-grid">
                   {filtered.map((p, index) => (
                     <ProductCard
                       key={getCatalogItemKey(p, index)}
@@ -316,13 +315,13 @@ const FilterContent = ({
       </div>
 
       <div className="mb-6 lg:mb-7">
-        <p className="text-sm font-semibold text-white mb-3">Sort By</p>
+        <p className="mb-3 text-sm font-semibold text-white">Sort By</p>
         <RadioRow name={`sort-${radioNameSuffix}`} value="newest" checked={sort === 'newest'} onChange={() => setSortAndClose('newest')} label="Newest First" />
         <RadioRow name={`sort-${radioNameSuffix}`} value="oldest" checked={sort === 'oldest'} onChange={() => setSortAndClose('oldest')} label="Oldest First" />
       </div>
 
       <div>
-        <p className="text-sm font-semibold text-white mb-3">Price</p>
+        <p className="mb-3 text-sm font-semibold text-white">Price</p>
         <RadioRow name={`price-${radioNameSuffix}`} value="all" checked={priceFilter === 'all'} onChange={() => setPriceAndClose('all')} label="All" />
         <RadioRow name={`price-${radioNameSuffix}`} value="free" checked={priceFilter === 'free'} onChange={() => setPriceAndClose('free')} label="Free" />
         <RadioRow name={`price-${radioNameSuffix}`} value="paid" checked={priceFilter === 'paid'} onChange={() => setPriceAndClose('paid')} label="Paid" />
@@ -332,11 +331,11 @@ const FilterContent = ({
 };
 
 const RadioRow = ({ name, value, checked, onChange, label }) => (
-  <label className="flex cursor-pointer items-center gap-3 rounded-xl py-2.5 transition hover:bg-purple-500/10 lg:py-1.5 group">
+  <label className="group flex cursor-pointer items-center gap-3 rounded-xl py-2.5 transition hover:bg-purple-500/10 lg:py-1.5">
     <span className="relative inline-flex">
       <input type="radio" name={name} value={value} checked={checked} onChange={onChange} className="sr-only" />
-      <span className={`w-4 h-4 rounded-full border-2 transition ${checked ? 'border-purple-300' : 'border-purple-300/30 group-hover:border-purple-300/50'}`} />
-      {checked && <span className="absolute inset-0 m-auto w-2 h-2 rounded-full bg-accent-purple" />}
+      <span className={`h-4 w-4 rounded-full border-2 transition ${checked ? 'border-purple-300' : 'border-purple-300/30 group-hover:border-purple-300/50'}`} />
+      {checked && <span className="absolute inset-0 m-auto h-2 w-2 rounded-full bg-accent-purple" />}
     </span>
     <span className={`text-sm ${checked ? 'text-white' : 'text-white/75'}`}>{label}</span>
   </label>
@@ -354,22 +353,22 @@ const ProductCard = ({ p, onView, onBuy }) => (
       ) : (
         <div className="absolute inset-0" style={{ background: p.bg }} />
       )}
-      <div className="absolute -inset-1 opacity-30 pointer-events-none" style={{
+      <div className="pointer-events-none absolute -inset-1 opacity-30" style={{
         background: 'linear-gradient(115deg, transparent 40%, rgba(255,255,255,0.18) 50%, transparent 60%)'
       }} />
       {!p.image && (
         <div className="absolute inset-0 flex items-center justify-center px-6">
           <div className="text-center">
-            <p className="text-white/90 text-3xl md:text-4xl font-black tracking-tight leading-tight drop-shadow-[0_4px_20px_rgba(0,0,0,0.6)]">
+            <p className="text-3xl font-black leading-tight tracking-tight text-white/90 drop-shadow-[0_4px_20px_rgba(0,0,0,0.6)] md:text-4xl">
               {p.headline}
             </p>
-            <p className="mt-2 text-white/85 text-lg md:text-xl font-bold tracking-wide drop-shadow-[0_4px_20px_rgba(0,0,0,0.6)]">
+            <p className="mt-2 text-lg font-bold tracking-wide text-white/85 drop-shadow-[0_4px_20px_rgba(0,0,0,0.6)] md:text-xl">
               {p.subhead}
             </p>
           </div>
         </div>
       )}
-      <span className={`absolute top-3 left-3 px-2.5 py-1 rounded-full text-[10px] sm:text-[11px] font-bold tracking-wider ${
+      <span className={`absolute left-3 top-3 rounded-full px-2.5 py-1 text-[10px] font-bold tracking-wider sm:text-[11px] ${
         p.isFree ? 'bg-violet-500 text-white' : 'bg-rose-500 text-white'
       }`}>
         {p.badge}
@@ -386,20 +385,28 @@ const ProductCard = ({ p, onView, onBuy }) => (
         <Share2 size={15} />
       </button>
     </div>
-    <div className="p-3 sm:p-4 flex-1 flex flex-col">
-      <h3 className="text-sm sm:text-base font-semibold text-white leading-snug">{p.title}</h3>
-      <div className="mt-2 flex flex-wrap items-center gap-1.5 sm:gap-2">
+    <div className="flex flex-1 flex-col p-3 sm:p-4">
+      <div className="mb-2 inline-flex w-fit rounded-full border border-purple-300/15 bg-purple-500/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.22em] text-[#c4b5fd]">
+        {p.category}
+      </div>
+      <h3 className="text-sm font-semibold leading-snug text-white sm:text-base">{p.title}</h3>
+      {p.description ? (
+        <p className="mt-2 line-clamp-2 text-xs leading-relaxed text-white/55 sm:text-sm">{p.description}</p>
+      ) : (
+        <div className="mt-2 h-10" />
+      )}
+      <div className="mt-3 flex flex-wrap items-center gap-1.5 sm:gap-2">
         {p.original && (
-          <span className="text-sm text-white/40 line-through">₹{p.original.toLocaleString('en-IN')}.00</span>
+          <span className="text-sm text-white/40 line-through">Rs {p.original.toLocaleString('en-IN')}.00</span>
         )}
-        <span className="text-sm sm:text-base font-bold text-white">
-          {p.isFree ? 'Free' : `₹${p.price.toLocaleString('en-IN')}.00`}
+        <span className="text-sm font-bold text-white sm:text-base">
+          {p.isFree ? 'Free' : `Rs ${p.price.toLocaleString('en-IN')}.00`}
         </span>
       </div>
       <button
         onClick={(e) => { e.stopPropagation(); p.isFree ? onView() : onBuy(); }}
         data-testid={`view-asset-btn-${p.slug}`}
-        className="mt-4 w-full inline-flex items-center justify-center gap-2 bg-violet-600 hover:bg-violet-500 transition-colors text-white py-2.5 rounded-lg text-xs sm:text-sm font-semibold"
+        className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-violet-600 py-2.5 text-xs font-semibold text-white transition-colors hover:bg-violet-500 sm:text-sm"
       >
         {p.isFree ? 'Get Free' : 'Buy Now'}
       </button>

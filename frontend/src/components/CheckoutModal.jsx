@@ -97,12 +97,12 @@ const CheckoutModal = ({ product, open, onClose, onSuccess, onFailure }) => {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4 py-6">
-      <div className="w-full max-w-md rounded-2xl border border-white/10 bg-[#0d0820] p-6 text-left shadow-2xl">
+      <div className="w-full max-w-md rounded-[24px] border border-white/10 bg-[#0d0820] p-5 text-left shadow-2xl sm:p-6">
         <div className="flex items-start justify-between gap-4">
           <div>
             <p className="text-xs uppercase tracking-[0.3em] text-violet-300">Checkout</p>
             <h2 className="mt-2 text-2xl font-bold text-white">{product.name || product.title}</h2>
-            <p className="mt-1 text-sm text-white/60">Pay ₹{Number(price).toLocaleString('en-IN')} and unlock the download.</p>
+            <p className="mt-1 text-sm text-white/60">Pay Rs {Number(price).toLocaleString('en-IN')} and unlock the download.</p>
           </div>
           <button
             type="button"
@@ -120,7 +120,7 @@ const CheckoutModal = ({ product, open, onClose, onSuccess, onFailure }) => {
             <input
               value={form.name}
               onChange={(e) => update('name', e.target.value)}
-              className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-white/35 focus:border-violet-500/60 focus:outline-none"
+              className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-white/35 focus:border-violet-500/60 focus:outline-none"
               placeholder="Your name"
               autoComplete="name"
               required
@@ -130,7 +130,7 @@ const CheckoutModal = ({ product, open, onClose, onSuccess, onFailure }) => {
             <input
               value={form.email}
               onChange={(e) => update('email', e.target.value)}
-              className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-white/35 focus:border-violet-500/60 focus:outline-none"
+              className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-white/35 focus:border-violet-500/60 focus:outline-none"
               placeholder="you@example.com"
               autoComplete="email"
               type="email"
@@ -141,7 +141,7 @@ const CheckoutModal = ({ product, open, onClose, onSuccess, onFailure }) => {
             <input
               value={form.phone}
               onChange={(e) => update('phone', e.target.value)}
-              className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-white/35 focus:border-violet-500/60 focus:outline-none"
+              className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-white/35 focus:border-violet-500/60 focus:outline-none"
               placeholder="+91 98765 43210"
               autoComplete="tel"
               type="tel"
@@ -150,7 +150,7 @@ const CheckoutModal = ({ product, open, onClose, onSuccess, onFailure }) => {
           </Field>
 
           {message && (
-            <p className="rounded-lg border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-100">
+            <p className="rounded-xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-100">
               {message}
             </p>
           )}
@@ -158,7 +158,7 @@ const CheckoutModal = ({ product, open, onClose, onSuccess, onFailure }) => {
           <button
             type="submit"
             disabled={busy}
-            className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-violet-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-violet-500 disabled:opacity-60"
+            className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-violet-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-violet-500 disabled:opacity-60"
           >
             {busy ? (
               <><Loader2 size={16} className="animate-spin" /> Processing...</>

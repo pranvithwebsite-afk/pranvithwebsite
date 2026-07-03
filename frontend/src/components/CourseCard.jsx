@@ -29,7 +29,7 @@ const CourseCard = ({ course }) => (
       </div>
     </div>
 
-    <div className="p-6">
+    <div className="p-4 sm:p-6">
       <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-[#c4b5fd]">{course.tag}</p>
       <h3 className="mb-2 line-clamp-2 text-lg font-semibold leading-snug text-white">{course.title}</h3>
       <p className="mb-4 line-clamp-3 text-sm leading-relaxed text-white/60">{course.description}</p>

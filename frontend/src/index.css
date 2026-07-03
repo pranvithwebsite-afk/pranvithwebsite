@@ -61,6 +61,15 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 @layer components {
+  .page-shell {
+    width: min(100% - 2rem, 72rem);
+    margin-inline: auto;
+  }
+
+  .section-block {
+    padding-block: clamp(3rem, 6vw, 5rem);
+  }
+
   .cinematic-card {
     background: linear-gradient(145deg, rgba(23, 16, 37, 0.96), rgba(13, 8, 24, 0.98));
     border: 1px solid rgba(167, 139, 250, 0.18);
