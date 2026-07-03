@@ -235,8 +235,8 @@ const AssetLanding = () => {
                 </nav>
 
                 <div className="cinematic-card overflow-hidden p-5 sm:p-7 lg:p-9">
-                  <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_22rem] xl:items-start">
-                    <div>
+                  <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_22rem] xl:items-start">
+                    <div className="order-2 xl:order-1 xl:col-start-1 xl:row-start-1">
                       <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-purple-300/20 bg-purple-500/15 px-4 py-2 text-[11px] uppercase tracking-[0.28em] text-purple-200 sm:text-xs">
                         <Sparkles size={16} /> {category}
                       </div>
@@ -246,14 +246,9 @@ const AssetLanding = () => {
                       <p className="mt-4 max-w-2xl text-sm leading-relaxed text-white/70 sm:text-base">
                         {heroSubhead}
                       </p>
-                      <div className="mt-6 grid gap-3 sm:grid-cols-3">
-                        <ValuePill label="Format" value={category} />
-                        <ValuePill label="Access" value={isFree ? 'Instant free access' : 'Instant delivery'} />
-                        <ValuePill label="Support" value="Creator-ready files" />
-                      </div>
                     </div>
 
-                    <div className="space-y-4 xl:sticky xl:top-[7.5rem]">
+                    <div className="order-1 xl:order-2 xl:col-start-2 xl:row-start-1">
                       <div className="overflow-hidden rounded-[22px] border border-purple-300/20 bg-[#090712] shadow-[0_0_45px_rgba(124,58,237,0.14)]">
                         {heroImage ? (
                           <OptimizedImage
@@ -262,16 +257,19 @@ const AssetLanding = () => {
                             priority
                             width={440}
                             height={550}
-                            className="aspect-[4/3] w-full object-cover sm:aspect-[4/5]"
+                            className="max-h-[24rem] w-full object-cover aspect-[4/3] xl:max-h-none xl:aspect-[4/5]"
                             data-testid="asset-hero-image"
                             onError={handleImageError}
                           />
                         ) : (
-                          <div className="flex aspect-[4/3] w-full items-center justify-center bg-gradient-to-br from-violet-700 to-fuchsia-900 px-6 text-center text-2xl font-black text-white sm:aspect-[4/5]">
+                          <div className="flex aspect-[4/3] max-h-[24rem] w-full items-center justify-center bg-gradient-to-br from-violet-700 to-fuchsia-900 px-6 text-center text-2xl font-black text-white xl:max-h-none xl:aspect-[4/5]">
                             {name}
                           </div>
                         )}
                       </div>
+                    </div>
+
+                    <div className="order-3 xl:order-4 xl:col-start-2 xl:row-start-2 xl:sticky xl:top-[7.5rem]">
                       <div className="rounded-[22px] border border-purple-300/20 bg-[#0b0716] p-4 sm:p-5">
                         <p className="text-[11px] uppercase tracking-[0.3em] text-white/45">
                           {price == null ? 'Price status' : isFree ? 'Price' : 'One-time price'}
@@ -304,6 +302,14 @@ const AssetLanding = () => {
                           <p>Clean mobile-first checkout flow.</p>
                           <p>Files delivered immediately after access confirmation.</p>
                         </div>
+                      </div>
+                    </div>
+
+                    <div className="order-4 xl:order-3 xl:col-start-1 xl:row-start-2">
+                      <div className="grid gap-3 sm:grid-cols-3">
+                        <ValuePill label="Format" value={category} />
+                        <ValuePill label="Access" value={isFree ? 'Instant free access' : 'Instant delivery'} />
+                        <ValuePill label="Support" value="Creator-ready files" />
                       </div>
                     </div>
                   </div>
