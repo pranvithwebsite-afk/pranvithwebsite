@@ -71,7 +71,7 @@ const ServiceDetail = () => {
                     Services
                   </Link>
                   <p className="section-eyebrow mt-8 text-xs">{service.category || 'PranvithDOP Service'}</p>
-                  <h1 className="mt-4 max-w-[560px] text-[clamp(2.375rem,4vw,4rem)] font-black leading-[0.98] tracking-tight text-white [overflow-wrap:anywhere]">
+                  <h1 className="mt-4 max-w-[560px] text-[clamp(2.0rem,4vw,4rem)] font-black leading-[0.98] tracking-tight text-white [overflow-wrap:anywhere]">
                     {service.title}
                   </h1>
                   <p className="mt-5 max-w-[560px] text-xl font-semibold leading-snug text-white/86 md:text-2xl">{service.subtitle}</p>
