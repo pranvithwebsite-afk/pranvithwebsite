@@ -397,6 +397,16 @@ export const fetchAdminMedia = async () => {
   return data;
 };
 
+export const fetchAdminMediaUsage = async (mediaId) => {
+  const { data } = await adminApi.get(`/admin/media/${encodeURIComponent(mediaId)}/usage`);
+  return data;
+};
+
+export const removeDuplicateAdminMedia = async () => {
+  const { data } = await adminApi.post('/admin/media/remove-duplicates');
+  return data;
+};
+
 export const fetchAdminSettings = async () => {
   const { data } = await adminApi.get('/admin/settings');
   return data;

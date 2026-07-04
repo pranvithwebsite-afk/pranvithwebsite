@@ -1,10 +1,12 @@
-import React, { useEffect, useState } from 'react';
-import { Upload, Copy, Trash2, FileArchive, FileText, Image as ImageIcon, Video } from 'lucide-react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Upload, Copy, Trash2, FileArchive, FileText, Image as ImageIcon, Video, RefreshCw } from 'lucide-react';
 import {
   createAdminDirectVideoUpload,
   deleteAdminMedia,
   fetchAdminMedia,
+  fetchAdminMediaUsage,
   finalizeAdminDirectVideoUpload,
+  removeDuplicateAdminMedia,
   uploadAdminFile,
   uploadFileToSignedUrl,
 } from '../../lib/api';
@@ -34,6 +36,34 @@ const formatDate = (value) => {
 
 const mediaUrl = (item = {}) => item.public_url || item.url || '';
 const mediaMime = (item = {}) => item.type || item.mime_type || '';
+const mediaSize = (item = {}) => Number(item.size || item.size_bytes || 0);
+
+const mediaStableKey = (item = {}) => {
+  const url = String(mediaUrl(item) || '').trim().toLowerCase();
+  if (url) return `url:${url}`;
+  const filename = String(item.original_filename || item.filename || item.title || '').trim().toLowerCase();
+  if (filename) return `file:${filename}|${mediaSize(item)}`;
+  return `id:${String(item.id || '').trim()}`;
+};
+
+const dedupeMediaItems = (items = []) => {
+  const seen = new Set();
+  const unique = [];
+  let duplicatesHidden = 0;
+
+  for (const item of items) {
+    const key = mediaStableKey(item);
+    if (!key) continue;
+    if (seen.has(key)) {
+      duplicatesHidden += 1;
+      continue;
+    }
+    seen.add(key);
+    unique.push(item);
+  }
+
+  return { unique, duplicatesHidden };
+};
 
 const Media = () => {
   const [media, setMedia] = useState([]);
@@ -43,6 +73,11 @@ const Media = () => {
   const [error, setError] = useState('');
   const [dragActive, setDragActive] = useState(false);
   const [selectedVideoSize, setSelectedVideoSize] = useState('');
+  const [deduping, setDeduping] = useState(false);
+
+  const visibleMediaState = useMemo(() => dedupeMediaItems(media), [media]);
+  const visibleMedia = visibleMediaState.unique;
+  const duplicatesHidden = visibleMediaState.duplicatesHidden;
 
   useEffect(() => {
     loadMedia();
@@ -171,14 +206,37 @@ const Media = () => {
 
   const handleDelete = async (item) => {
     const name = item?.title || item?.filename || 'this media file';
-    if (!window.confirm(`Are you sure you want to delete this media file?\n\n${name}`)) return;
     try {
+      const usage = await fetchAdminMediaUsage(item.id).catch(() => ({ used: false, locations: [] }));
+      const warning = usage?.used
+        ? `This media may be used on the website. Delete anyway?\n\n${name}\n\nIf it is still referenced, deletion will be blocked to keep the website safe.`
+        : `Are you sure you want to delete this media file?\n\n${name}`;
+      if (!window.confirm(warning)) return;
       await deleteAdminMedia(item.id);
       toast.success('Media deleted');
       setMedia((items) => items.filter((mediaItem) => mediaItem.id !== item.id));
     } catch (error) {
       const detail = error?.response?.data?.detail || 'Failed to delete media';
       toast.error(error?.response?.status === 409 ? 'This media is used on the website. Remove it first.' : detail);
+    }
+  };
+
+  const handleRemoveDuplicates = async () => {
+    if (deduping) return;
+    if (!window.confirm('Remove duplicate media records and keep the newest one for each duplicate group?\n\nThis will only remove duplicate database records. It will not delete Cloudflare R2 files.')) {
+      return;
+    }
+    try {
+      setDeduping(true);
+      const result = await removeDuplicateAdminMedia();
+      await loadMedia({ notifyOnError: false });
+      toast.success(result?.deleted_records
+        ? `Removed ${result.deleted_records} duplicate media record${result.deleted_records === 1 ? '' : 's'}.`
+        : 'No duplicate media records were found.');
+    } catch (error) {
+      toast.error(error?.response?.data?.detail || 'Could not remove duplicate media records');
+    } finally {
+      setDeduping(false);
     }
   };
 
@@ -190,8 +248,26 @@ const Media = () => {
   return (
     <section className="space-y-6">
       <div className="rounded-3xl border border-slate-800 bg-slate-900/95 p-6">
-        <h1 className="text-3xl font-semibold text-white">Media Library</h1>
-        <p className="mt-3 text-slate-400">Upload and manage images, videos, and files.</p>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <h1 className="text-3xl font-semibold text-white">Media Library</h1>
+            <p className="mt-3 text-slate-400">Upload and manage images, videos, and files.</p>
+            {duplicatesHidden > 0 && (
+              <p className="mt-2 text-sm text-amber-200">
+                Showing {visibleMedia.length} unique items. {duplicatesHidden} duplicate record{duplicatesHidden === 1 ? '' : 's'} hidden.
+              </p>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={handleRemoveDuplicates}
+            disabled={deduping || loading}
+            className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-700 px-4 py-2 text-sm font-semibold text-white transition hover:border-violet-500 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            <RefreshCw size={14} className={deduping ? 'animate-spin' : ''} />
+            {deduping ? 'Removing duplicates...' : 'Remove duplicates'}
+          </button>
+        </div>
       </div>
 
       {/* Upload Zone */}
@@ -241,11 +317,11 @@ const Media = () => {
         </div>
       ) : error ? (
         <div className="rounded-3xl border border-rose-500/20 bg-rose-500/10 p-5 text-rose-100">{error}</div>
-      ) : media.length === 0 ? (
+      ) : visibleMedia.length === 0 ? (
         <div className="rounded-3xl border border-slate-800 bg-slate-950 p-6 text-slate-400">No files uploaded yet.</div>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {media.map((item) => (
+          {visibleMedia.map((item) => (
             <MediaCard
               key={item.id}
               item={item}

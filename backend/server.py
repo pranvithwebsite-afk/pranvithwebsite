@@ -3212,6 +3212,30 @@ async def admin_media(current_admin: AdminBase = Depends(get_current_active_admi
         raise HTTPException(status_code=500, detail="Could not load media")
 
 
+@admin_router.get("/media/{media_id}/usage")
+async def admin_media_usage(media_id: str, current_admin: AdminBase = Depends(get_current_active_admin)):
+    media = await db.media.find_one({"id": media_id}, {"_id": 0})
+    if not media:
+        raise HTTPException(status_code=404, detail="Media item not found")
+    usage_locations = await _media_usage_locations(media.get("url") or media.get("public_url") or "")
+    return {
+        "success": True,
+        "used": bool(usage_locations),
+        "locations": usage_locations,
+    }
+
+
+@admin_router.post("/media/remove-duplicates")
+async def admin_remove_duplicate_media_records(current_admin: AdminBase = Depends(get_current_active_admin)):
+    try:
+        return await _remove_duplicate_media_records(keep="newest")
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Admin media duplicate cleanup failed")
+        raise HTTPException(status_code=500, detail="Could not remove duplicate media records")
+
+
 @admin_router.post("/media/upload")
 async def admin_upload_media_library(file: UploadFile = File(...), current_admin: AdminBase = Depends(get_current_active_admin)):
     file_ext, max_bytes, media_type = _validate_media_library_upload(file)
@@ -4954,6 +4978,25 @@ def _serialize_media_record(record: Optional[dict]) -> dict:
     return {key: value for key, value in record.items() if key != "_id"}
 
 
+def _media_duplicate_key(record: Optional[dict]) -> str:
+    if not isinstance(record, dict):
+        return ""
+    public_url = str(record.get("public_url") or record.get("url") or "").strip().lower()
+    if public_url:
+        return f"url:{public_url}"
+    filename = str(
+        record.get("original_filename")
+        or record.get("filename")
+        or record.get("title")
+        or ""
+    ).strip().lower()
+    size = record.get("size") or record.get("size_bytes") or 0
+    if filename:
+        return f"file:{filename}|{size}"
+    media_id = str(record.get("id") or "").strip()
+    return f"id:{media_id}" if media_id else ""
+
+
 async def _upsert_media_record_by_storage(media_record: dict) -> dict:
     if db is None:
         raise HTTPException(status_code=500, detail="Database is not configured")
@@ -4980,6 +5023,53 @@ async def _upsert_media_record_by_storage(media_record: dict) -> dict:
 
     await db.media.insert_one(media_record)
     return _serialize_media_record(media_record)
+
+
+async def _remove_duplicate_media_records(keep: str = "newest") -> dict:
+    if db is None:
+        raise HTTPException(status_code=500, detail="Database is not configured")
+    rows = await db.media.find({}, {"_id": 0}).to_list(5000)
+
+    def sort_value(item: dict) -> tuple[str, str]:
+        uploaded_at = str(item.get("uploaded_at") or item.get("created_at") or "")
+        item_id = str(item.get("id") or "")
+        return uploaded_at, item_id
+
+    reverse = keep == "newest"
+    ordered = sorted(rows, key=sort_value, reverse=reverse)
+
+    seen = {}
+    duplicate_ids = []
+    groups = []
+
+    for item in ordered:
+        group_key = _media_duplicate_key(item)
+        if not group_key:
+            continue
+        if group_key not in seen:
+            seen[group_key] = item
+            continue
+        duplicate_ids.append(item.get("id"))
+        groups.append({
+            "duplicate_id": item.get("id"),
+            "kept_id": seen[group_key].get("id"),
+            "key": group_key,
+            "url": item.get("public_url") or item.get("url") or "",
+        })
+
+    deleted_count = 0
+    if duplicate_ids:
+        result = await db.media.delete_many({"id": {"$in": [item_id for item_id in duplicate_ids if item_id]}})
+        deleted_count = result.deleted_count
+
+    return {
+        "success": True,
+        "keep": keep,
+        "duplicate_groups": len(groups),
+        "deleted_records": deleted_count,
+        "kept_records": len(seen),
+        "details": groups[:100],
+    }
 
 
 async def _get_or_create_payment_link_order(
