@@ -6,12 +6,14 @@ import {
   fetchAdminEnquiries,
   updateAdminEnquiryStatus,
 } from '../../lib/api';
+import { useAdminConfirm } from '../components/AdminConfirmProvider';
 
 const statusOptions = ['new', 'contacted', 'completed'];
 
 const Enquiries = () => {
   const [enquiries, setEnquiries] = useState([]);
   const [loading, setLoading] = useState(true);
+  const confirm = useAdminConfirm();
 
   const loadEnquiries = async () => {
     try {
@@ -40,14 +42,25 @@ const Enquiries = () => {
   };
 
   const removeEnquiry = async (id) => {
-    if (!window.confirm('Delete this enquiry?')) return;
-    try {
-      await deleteAdminEnquiry(id);
-      setEnquiries((items) => items.filter((item) => item.id !== id));
-      toast.success('Enquiry deleted');
-    } catch (err) {
-      toast.error('Could not delete enquiry');
-    }
+    const enquiry = enquiries.find((item) => item.id === id);
+    await confirm({
+      title: 'Delete enquiry?',
+      itemName: enquiry?.name || enquiry?.email || 'Selected enquiry',
+      message: 'This hire request will be removed from the admin list. This action cannot be undone.',
+      confirmText: 'Delete',
+      loadingText: 'Deleting...',
+      onConfirm: async () => {
+        try {
+          await deleteAdminEnquiry(id);
+          setEnquiries((items) => items.filter((item) => item.id !== id));
+          toast.success('Enquiry deleted');
+        } catch (err) {
+          toast.error('Could not delete enquiry');
+          return false;
+        }
+        return true;
+      },
+    });
   };
 
   return (

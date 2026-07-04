@@ -11,6 +11,7 @@ import {
   updateAdminService,
 } from '../../lib/api';
 import { FALLBACK_IMAGE, handleImageError, safeImageSrc } from '../../lib/utils';
+import { useAdminConfirm } from '../components/AdminConfirmProvider';
 
 const emptyItem = { title: '', description: '' };
 const emptyStep = { step: 1, title: '', description: '' };
@@ -52,6 +53,7 @@ const Services = () => {
   const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState(defaultForm);
   const [saving, setSaving] = useState(false);
+  const confirm = useAdminConfirm();
 
   const sortedServices = useMemo(() => [...services].sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0)), [services]);
 
@@ -153,14 +155,24 @@ const Services = () => {
   };
 
   const deleteService = async (service) => {
-    if (!window.confirm(`Delete "${service.title}"? This cannot be undone.`)) return;
-    try {
-      await deleteAdminService(service.id);
-      setServices((items) => items.filter((item) => item.id !== service.id));
-      toast.success('Service deleted');
-    } catch (error) {
-      toast.error(error?.response?.data?.detail || 'Service could not be deleted');
-    }
+    await confirm({
+      title: 'Delete service?',
+      itemName: service.title,
+      message: 'This service page and its admin record will be removed. This action cannot be undone.',
+      confirmText: 'Delete',
+      loadingText: 'Deleting...',
+      onConfirm: async () => {
+        try {
+          await deleteAdminService(service.id);
+          setServices((items) => items.filter((item) => item.id !== service.id));
+          toast.success('Service deleted');
+        } catch (error) {
+          toast.error(error?.response?.data?.detail || 'Service could not be deleted');
+          return false;
+        }
+        return true;
+      },
+    });
   };
 
   const moveService = async (serviceId, direction) => {

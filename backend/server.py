@@ -3212,6 +3212,96 @@ async def admin_media(current_admin: AdminBase = Depends(get_current_active_admi
         raise HTTPException(status_code=500, detail="Could not load media")
 
 
+async def _store_public_r2_media(
+    file: UploadFile,
+    purpose: str,
+    product_slug: str = "",
+    *,
+    create_media_record: bool = True,
+) -> dict:
+    if db is None:
+        raise HTTPException(status_code=500, detail="Database is not configured")
+
+    file_ext, max_bytes = _validate_r2_public_upload(file, purpose)
+    content = await file.read(max_bytes + 1)
+    if len(content) > max_bytes:
+        limit_mb = max_bytes // (1024 * 1024)
+        raise HTTPException(status_code=413, detail=f"File exceeds the {limit_mb} MB upload limit")
+
+    bucket, public_base = _require_r2_public_upload_config()
+    key = _r2_public_object_key(product_slug, purpose, file_ext)
+
+    try:
+        _r2_client().put_object(
+            Bucket=bucket,
+            Key=key,
+            Body=content,
+            ContentType=file.content_type,
+            CacheControl="public, max-age=31536000, immutable",
+        )
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("R2 upload failed key=%s content_type=%s size=%d", key, file.content_type, len(content))
+        raise HTTPException(status_code=502, detail="Cloudflare R2 upload failed")
+
+    original_name = Path(file.filename or "").name or "upload"
+    public_url = f"{public_base}/{key}"
+    now = datetime.now(timezone.utc).isoformat()
+    record_media_type = "image" if file_ext in R2_IMAGE_TYPES else "file"
+    media_record = {
+        "id": str(uuid.uuid4()),
+        "filename": Path(key).name,
+        "original_filename": original_name,
+        "title": original_name,
+        "type": file.content_type,
+        "mime_type": file.content_type,
+        "size": len(content),
+        "size_bytes": len(content),
+        "url": public_url,
+        "public_url": public_url,
+        "r2_key": key,
+        "r2_bucket": bucket,
+        "storage_key": key,
+        "media_type": record_media_type,
+        "thumbnail": None,
+        "description": "",
+        "used_by": [],
+        "created_at": now,
+        "updated_at": now,
+        "uploaded_at": now,
+        "tags": [purpose],
+    }
+
+    saved_media = _serialize_media_record(media_record)
+    if create_media_record:
+        try:
+            saved_media = await _upsert_media_record_by_storage(media_record)
+        except Exception:
+            logger.exception(
+                "Public R2 upload saved to storage but media DB insert failed key=%s content_type=%s size=%d",
+                key,
+                file.content_type,
+                len(content),
+            )
+            try:
+                delete_r2_object(key, bucket)
+            except Exception:
+                logger.warning("Public R2 orphan cleanup failed key=%s bucket=%s", key, bucket)
+            raise HTTPException(status_code=500, detail="File uploaded to storage, but media record could not be saved")
+
+    return {
+        "success": True,
+        "media": saved_media,
+        "url": saved_media.get("public_url") or saved_media.get("url") or public_url,
+        "public_url": saved_media.get("public_url") or saved_media.get("url") or public_url,
+        "filename": saved_media.get("original_filename") or saved_media.get("filename") or original_name,
+        "mime_type": saved_media.get("mime_type") or saved_media.get("type") or file.content_type,
+        "size_bytes": saved_media.get("size_bytes") or saved_media.get("size") or len(content),
+        "storage_key": saved_media.get("storage_key") or saved_media.get("r2_key") or key,
+    }
+
+
 @admin_router.get("/media/{media_id}/usage")
 async def admin_media_usage(media_id: str, current_admin: AdminBase = Depends(get_current_active_admin)):
     media = await db.media.find_one({"id": media_id}, {"_id": 0})
@@ -3244,75 +3334,7 @@ async def admin_upload_media_library(file: UploadFile = File(...), current_admin
             status_code=413,
             detail="This video is too large for normal upload. Upload directly to Cloudflare R2 or paste a YouTube/Vimeo/R2 URL.",
         )
-    content = await file.read(max_bytes + 1)
-    if len(content) > max_bytes:
-        limit_mb = max_bytes // (1024 * 1024)
-        raise HTTPException(status_code=413, detail=f"File exceeds the {limit_mb} MB upload limit")
-
-    bucket, public_base = _require_r2_public_upload_config()
-
-    key = _r2_media_library_key(file_ext, media_type)
-    try:
-        _r2_client().put_object(
-            Bucket=bucket,
-            Key=key,
-            Body=content,
-            ContentType=file.content_type,
-            CacheControl="public, max-age=31536000, immutable",
-        )
-    except HTTPException:
-        raise
-    except Exception:
-        logger.exception("Media library R2 upload failed key=%s content_type=%s size=%d", key, file.content_type, len(content))
-        raise HTTPException(status_code=502, detail="Cloudflare R2 upload failed")
-
-    original_name = Path(file.filename or "").name
-    public_url = f"{public_base}/{key}"
-    now = datetime.now(timezone.utc).isoformat()
-    media_record = {
-        "id": str(uuid.uuid4()),
-        "filename": Path(key).name,
-        "original_filename": original_name,
-        "title": original_name,
-        "type": file.content_type,
-        "mime_type": file.content_type,
-        "size": len(content),
-        "url": public_url,
-        "public_url": public_url,
-        "r2_key": key,
-        "r2_bucket": bucket,
-        "media_type": media_type,
-        "thumbnail": None,
-        "description": "",
-        "used_by": [],
-        "created_at": now,
-        "updated_at": now,
-        "uploaded_at": now,
-        "tags": [],
-    }
-    try:
-        saved_media = await _upsert_media_record_by_storage(media_record)
-    except Exception:
-        logger.exception(
-            "Media library upload saved to R2 but media DB insert failed key=%s content_type=%s size=%d",
-            key,
-            file.content_type,
-            len(content),
-        )
-        try:
-            _r2_client().delete_object(Bucket=bucket, Key=key)
-        except Exception:
-            logger.warning("Media library orphan cleanup failed key=%s bucket=%s", key, bucket)
-        raise HTTPException(status_code=500, detail="File uploaded to storage, but media record could not be saved")
-
-    return {
-        "success": True,
-        "media": saved_media,
-        "url": saved_media.get("public_url") or saved_media.get("url") or public_url,
-        "filename": saved_media.get("original_filename") or saved_media.get("filename") or original_name,
-        "mime_type": saved_media.get("mime_type") or saved_media.get("type") or file.content_type,
-        "size_bytes": saved_media.get("size") or len(content),
-    }
+    return await _store_public_r2_media(file, "media-library-image" if media_type == "image" else "media-library-file")
 
 
 @admin_router.get("/settings")
@@ -3564,7 +3586,6 @@ UPLOAD_DIR.mkdir(exist_ok=True)
 MAX_UPLOAD_BYTES = 25 * 1024 * 1024
 ALLOWED_UPLOAD_TYPES = {
     ".pdf": {"application/pdf"},
-    ".gif": {"image/gif"},
     ".jpeg": {"image/jpeg"},
     ".jpg": {"image/jpeg"},
     ".mp3": {"audio/mpeg"},
@@ -3576,7 +3597,6 @@ ALLOWED_UPLOAD_TYPES = {
 }
 
 R2_IMAGE_TYPES = {
-    ".gif": {"image/gif"},
     ".jpeg": {"image/jpeg"},
     ".jpg": {"image/jpeg"},
     ".png": {"image/png"},
@@ -3601,9 +3621,24 @@ R2_PRIVATE_TYPES = {
 R2_PUBLIC_PURPOSES = {"product-image", "product-video", "before-image", "after-image", "banner", "thumbnail"}
 R2_PRIVATE_PURPOSES = {"paid-download", "zip-file", "project-file", "lut-pack", "template-pack", "course-material"}
 R2_DIRECT_VIDEO_PURPOSES = {"product-video", "cms-video", "service-video", "media-library-video"}
-R2_MAX_IMAGE_BYTES = 10 * 1024 * 1024
+R2_MAX_IMAGE_BYTES = 2 * 1024 * 1024
 R2_MAX_VIDEO_BYTES = 200 * 1024 * 1024
 R2_MAX_PRIVATE_BYTES = 500 * 1024 * 1024
+
+R2_PUBLIC_PURPOSES = {
+    "product-image",
+    "product-video",
+    "before-image",
+    "after-image",
+    "banner",
+    "thumbnail",
+    "media-library-image",
+    "media-library-file",
+}
+
+
+def _r2_not_configured_detail() -> str:
+    return "Cloudflare R2 is not configured. Please add R2 environment variables."
 
 
 def _r2_client():
@@ -3619,7 +3654,7 @@ def _r2_client():
         "CLOUDFLARE_R2_ENDPOINT": endpoint,
     }
     if not all(required.values()):
-        raise HTTPException(status_code=500, detail="Cloudflare R2 is not configured")
+        raise HTTPException(status_code=500, detail=_r2_not_configured_detail())
     return boto3.client(
         "s3",
         endpoint_url=endpoint,
@@ -3650,11 +3685,17 @@ def _safe_filename(filename: str) -> str:
 
 def _r2_public_object_key(product_slug: str, purpose: str, file_ext: str) -> str:
     slug = normalize_slug(product_slug)
-    if not slug:
+    if purpose != "media-library-image" and not slug:
         raise HTTPException(status_code=422, detail="product_slug is required")
     if purpose not in R2_PUBLIC_PURPOSES:
         raise HTTPException(status_code=422, detail="Unsupported upload purpose")
     file_id = str(uuid.uuid4())
+    if purpose == "media-library-image":
+        today = datetime.now(timezone.utc).strftime("%Y/%m")
+        return f"media-library/image/{today}/{file_id}{file_ext}"
+    if purpose == "media-library-file":
+        today = datetime.now(timezone.utc).strftime("%Y/%m")
+        return f"media-library/file/{today}/{file_id}{file_ext}"
     if purpose == "product-image":
         return f"products/{slug}/images/{file_id}{file_ext}"
     if purpose == "product-video":
@@ -3678,9 +3719,12 @@ def _r2_private_object_key(product_slug: str, purpose: str, safe_filename: str) 
 def _validate_r2_public_upload(file: UploadFile, purpose: str) -> tuple[str, int]:
     original_name = Path(file.filename or "").name
     file_ext = Path(original_name).suffix.lower()
-    if purpose in {"product-image", "before-image", "after-image", "banner", "thumbnail"}:
+    if purpose in {"product-image", "before-image", "after-image", "banner", "thumbnail", "media-library-image"}:
         allowed_types = R2_IMAGE_TYPES.get(file_ext)
         max_bytes = R2_MAX_IMAGE_BYTES
+    elif purpose == "media-library-file":
+        allowed_types = ALLOWED_UPLOAD_TYPES.get(file_ext)
+        max_bytes = MAX_UPLOAD_BYTES
     elif purpose == "product-video":
         allowed_types = R2_VIDEO_TYPES.get(file_ext)
         max_bytes = R2_MAX_VIDEO_BYTES
@@ -3745,7 +3789,7 @@ def _require_r2_public_upload_config() -> tuple[str, str]:
     bucket = os.environ.get("CLOUDFLARE_R2_BUCKET", "").strip()
     public_base = os.environ.get("CLOUDFLARE_R2_PUBLIC_BASE_URL", "").strip().rstrip("/")
     if not bucket or not public_base:
-        raise HTTPException(status_code=500, detail="Cloudflare R2 is not configured.")
+        raise HTTPException(status_code=500, detail=_r2_not_configured_detail())
     return bucket, public_base
 
 
@@ -3790,10 +3834,12 @@ async def _media_usage_locations(media_url: str) -> list[str]:
         ("pages", "page"),
         ("cms_pages", "CMS page"),
         ("cms_sections", "CMS section"),
+        ("services", "service"),
         ("settings", "website settings"),
         ("courses", "course"),
         ("testimonials", "testimonial"),
         ("blog_posts", "blog post"),
+        ("orders", "order"),
     ]
     locations = []
     for collection_name, label in checks:
@@ -3827,7 +3873,12 @@ def _safe_local_upload_path(media_url: str) -> Optional[Path]:
     return target
 
 
-def _r2_public_key_from_url(media_url: str) -> Optional[str]:
+def is_r2_public_url(media_url: str) -> bool:
+    public_base = os.environ.get("CLOUDFLARE_R2_PUBLIC_BASE_URL", "").strip().rstrip("/")
+    return bool(public_base and media_url and str(media_url).startswith(f"{public_base}/"))
+
+
+def r2_key_from_public_url(media_url: str) -> Optional[str]:
     public_base = os.environ.get("CLOUDFLARE_R2_PUBLIC_BASE_URL", "").strip().rstrip("/")
     if not public_base or not media_url:
         return None
@@ -3837,6 +3888,10 @@ def _r2_public_key_from_url(media_url: str) -> Optional[str]:
     if not key or ".." in Path(key).parts:
         raise HTTPException(status_code=400, detail="Unsafe media key")
     return key
+
+
+def _r2_public_key_from_url(media_url: str) -> Optional[str]:
+    return r2_key_from_public_url(media_url)
 
 
 def _media_r2_key_and_bucket(media: dict) -> tuple[Optional[str], Optional[str]]:
@@ -3851,6 +3906,23 @@ def _media_r2_key_and_bucket(media: dict) -> tuple[Optional[str], Optional[str]]
     return key, bucket
 
 
+def delete_r2_object(key: str, bucket: Optional[str] = None) -> dict:
+    safe_key = str(key or "").strip().strip("/")
+    if not safe_key or safe_key.startswith("/") or ".." in Path(safe_key).parts:
+        raise HTTPException(status_code=400, detail="Unsafe media key")
+    resolved_bucket = (bucket or os.environ.get("CLOUDFLARE_R2_BUCKET", "").strip())
+    if not resolved_bucket:
+        raise HTTPException(status_code=500, detail=_r2_not_configured_detail())
+    try:
+        _r2_client().delete_object(Bucket=resolved_bucket, Key=safe_key)
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("R2 delete failed key=%s bucket=%s", safe_key, resolved_bucket)
+        raise HTTPException(status_code=502, detail="Cloudflare R2 delete failed")
+    return {"storage": "r2", "deleted": True, "storage_key": safe_key}
+
+
 def _delete_media_storage(media: dict) -> dict:
     media_url = media.get("url") or ""
     local_path = _safe_local_upload_path(media_url)
@@ -3861,14 +3933,7 @@ def _delete_media_storage(media: dict) -> dict:
 
     key, bucket = _media_r2_key_and_bucket(media)
     if key and bucket:
-        try:
-            _r2_client().delete_object(Bucket=bucket, Key=key)
-        except HTTPException:
-            raise
-        except Exception:
-            logger.exception("R2 delete failed key=%s bucket=%s", key, bucket)
-            raise HTTPException(status_code=502, detail="Cloudflare R2 delete failed")
-        return {"storage": "r2", "deleted": True}
+        return delete_r2_object(key, bucket)
 
     return {"storage": "external_or_unknown", "deleted": False}
 
@@ -3876,38 +3941,11 @@ def _delete_media_storage(media: dict) -> dict:
 @admin_router.post("/uploads/public")
 async def admin_upload_public_media(
     file: UploadFile = File(...),
-    product_slug: str = Form(...),
+    product_slug: str = Form(""),
     purpose: str = Form(...),
     current_admin: AdminBase = Depends(get_current_active_admin),
 ):
-    file_ext, max_bytes = _validate_r2_public_upload(file, purpose)
-    content = await file.read(max_bytes + 1)
-    if len(content) > max_bytes:
-        limit_mb = max_bytes // (1024 * 1024)
-        raise HTTPException(status_code=413, detail=f"File exceeds the {limit_mb} MB upload limit")
-
-    key = _r2_public_object_key(product_slug, purpose, file_ext)
-    bucket = os.environ.get("CLOUDFLARE_R2_BUCKET", "pranvith-assets-public").strip()
-    public_base = os.environ.get("CLOUDFLARE_R2_PUBLIC_BASE_URL", "").strip().rstrip("/")
-    if not bucket or not public_base:
-        raise HTTPException(status_code=500, detail="Cloudflare public R2 bucket is not configured")
-    try:
-        _r2_client().put_object(
-            Bucket=bucket,
-            Key=key,
-            Body=content,
-            ContentType=file.content_type,
-            CacheControl="public, max-age=31536000, immutable",
-        )
-    except HTTPException:
-        raise
-    except Exception:
-        logger.exception("R2 upload failed key=%s content_type=%s size=%d", key, file.content_type, len(content))
-        raise HTTPException(status_code=502, detail="Cloudflare R2 upload failed")
-    return {
-        "url": f"{public_base}/{key}",
-        "key": key,
-    }
+    return await _store_public_r2_media(file, purpose, product_slug)
 
 
 @admin_router.post("/uploads/video/presign")
@@ -4058,58 +4096,17 @@ async def admin_upload_product_media(
 
 @admin_router.post("/upload")
 async def admin_upload_file(file: UploadFile = File(...), current_admin: AdminBase = Depends(get_current_active_admin)):
-    """Upload a file and create a media record."""
-    try:
-        original_name = Path(file.filename or "").name
-        file_ext = Path(original_name).suffix.lower()
-        if file_ext in R2_VIDEO_TYPES:
-            raise HTTPException(
-                status_code=413,
-                detail="This video is too large for normal upload. Upload directly to Cloudflare R2 or paste a YouTube/Vimeo/R2 URL.",
-            )
-        allowed_types = ALLOWED_UPLOAD_TYPES.get(file_ext)
-        if not allowed_types or file.content_type not in allowed_types:
-            raise HTTPException(status_code=415, detail="Unsupported file type")
-
-        content = await file.read(MAX_UPLOAD_BYTES + 1)
-        if len(content) > MAX_UPLOAD_BYTES:
-            raise HTTPException(status_code=413, detail="File exceeds the 25 MB upload limit")
-
-        file_id = str(uuid.uuid4())
-        saved_filename = f"{file_id}{file_ext}"
-        file_path = UPLOAD_DIR / saved_filename
-
-        with open(file_path, "wb") as f:
-            f.write(content)
-
-        media_record = {
-            "id": file_id,
-            "title": original_name,
-            "type": file.content_type,
-            "url": f"/api/uploads/{saved_filename}",
-            "thumbnail": None,
-            "description": "",
-            "size": len(content),
-            "filename": original_name,
-            "uploaded_at": datetime.now(timezone.utc).isoformat(),
-            "tags": [],
-        }
-        saved_media = await _upsert_media_record_by_storage(media_record)
-
-        return {
-            "success": True,
-            "media": saved_media,
-            "url": saved_media.get("public_url") or saved_media.get("url"),
-            "filename": saved_media.get("original_filename") or saved_media.get("filename") or original_name,
-            "mime_type": saved_media.get("mime_type") or saved_media.get("type") or file.content_type,
-            "size_bytes": saved_media.get("size") or len(content),
-            "message": "File uploaded successfully",
-        }
-    except HTTPException:
-        raise
-    except Exception:
-        logger.exception("File upload failed")
-        raise HTTPException(status_code=500, detail="Upload failed")
+    """Compatibility wrapper for legacy callers. New image uploads go to Cloudflare R2."""
+    original_name = Path(file.filename or "").name
+    file_ext = Path(original_name).suffix.lower()
+    if file_ext in R2_VIDEO_TYPES:
+        raise HTTPException(
+            status_code=413,
+            detail="This video is too large for normal upload. Upload directly to Cloudflare R2 or paste a YouTube/Vimeo/R2 URL.",
+        )
+    if file_ext not in R2_IMAGE_TYPES:
+        raise HTTPException(status_code=415, detail="Unsupported image type. Allowed: JPG, JPEG, PNG, WEBP.")
+    return await _store_public_r2_media(file, "media-library-image")
 
 
 @admin_router.post("/media")
@@ -4140,11 +4137,20 @@ async def admin_delete_media(media_id: str, current_admin: AdminBase = Depends(g
             status_code=409,
             detail="This media file is currently used on the website. Remove it from the page/product first.",
         )
-
-    storage_result = _delete_media_storage(media)
     result = await db.media.delete_one({"id": media_id})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Media item not found")
+    try:
+        storage_result = _delete_media_storage(media)
+    except HTTPException as error:
+        if error.status_code == 502:
+            return {
+                "success": True,
+                "warning": "Media record deleted, but Cloudflare R2 file deletion failed. Please check R2 manually.",
+                "storage": "r2",
+                "deleted": False,
+            }
+        raise
     return {"success": True, **storage_result}
 
 

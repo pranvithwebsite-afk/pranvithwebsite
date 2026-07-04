@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import MediaUrlInput from './MediaUrlInput';
+import { useAdminConfirm } from './AdminConfirmProvider';
 
 const fieldClass = 'w-full rounded-xl border border-slate-800 bg-slate-900 px-4 py-3 text-white outline-none focus:border-violet-500';
 const sectionTypes = ['hero', 'text', 'image_text', 'video', 'showreel', 'services_cards', 'portfolio_grid', 'product_showcase', 'course_showcase', 'testimonial_videos', 'video_reviews', 'reviews', 'testimonials', 'faq', 'cta', 'contact_form', 'gallery', 'before_after'];
@@ -433,6 +434,7 @@ const CmsSectionEditor = ({ pageKey, section, mediaItems, onSave, saving, onDirt
   const localItemCounter = useRef(0);
   const sectionIdentity = `${pageKey}:${getSectionIdentity(section)}`;
   const previousSectionIdentity = useRef(sectionIdentity);
+  const confirm = useAdminConfirm();
 
   useEffect(() => {
     const nextIdentity = `${pageKey}:${getSectionIdentity(section)}`;
@@ -476,9 +478,19 @@ const CmsSectionEditor = ({ pageKey, section, mediaItems, onSave, saving, onDirt
     localItemCounter.current += 1;
     updateItems([...items, { ...createEmptyItem(schema.itemFields || []), __cmsLocalId: localId, sort_order: items.length }]);
   };
-  const deleteItem = (index) => {
-    if (!window.confirm('Delete this item?')) return;
-    updateItems(items.filter((_, itemIndex) => itemIndex !== index).map((item, itemIndex) => ({ ...item, sort_order: itemIndex })));
+  const deleteItem = async (index) => {
+    const item = items[index] || {};
+    await confirm({
+      title: 'Delete item?',
+      itemName: item.title || item.question || item.student_name || `Item ${index + 1}`,
+      message: 'This item will be removed from the current section draft.',
+      confirmText: 'Delete',
+      loadingText: 'Deleting...',
+      onConfirm: () => {
+        updateItems(items.filter((_, itemIndex) => itemIndex !== index).map((nextItem, itemIndex) => ({ ...nextItem, sort_order: itemIndex })));
+        return true;
+      },
+    });
   };
   const moveItem = (index, direction) => {
     const nextIndex = index + direction;

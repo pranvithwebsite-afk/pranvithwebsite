@@ -8,11 +8,14 @@ import {
   finalizeAdminDirectVideoUpload,
   removeDuplicateAdminMedia,
   uploadAdminFile,
+  uploadAdminImageToR2,
   uploadFileToSignedUrl,
 } from '../../lib/api';
 import { toast } from 'sonner';
 import { handleImageError, safeImageSrc } from '../../lib/utils';
+import { useAdminConfirm } from '../components/AdminConfirmProvider';
 import {
+  validateImageUploadFile,
   ADMIN_VIDEO_UPLOAD_MAX_BYTES,
   formatMegabytes,
   formatUploadError,
@@ -74,6 +77,7 @@ const Media = () => {
   const [dragActive, setDragActive] = useState(false);
   const [selectedVideoSize, setSelectedVideoSize] = useState('');
   const [deduping, setDeduping] = useState(false);
+  const confirm = useAdminConfirm();
 
   const visibleMediaState = useMemo(() => dedupeMediaItems(media), [media]);
   const visibleMedia = visibleMediaState.unique;
@@ -102,8 +106,8 @@ const Media = () => {
   };
 
   const validateFile = (file) => {
-    const validTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'video/mp4', 'video/webm', 'video/quicktime', 'video/mov', 'application/pdf', 'application/zip', 'application/x-zip-compressed'];
-    if (!validTypes.includes(file.type)) return 'Unsupported file type. Allowed: JPEG, PNG, GIF, WebP, MP4, WEBM, MOV, PDF, ZIP';
+    const validTypes = ['image/jpeg', 'image/png', 'image/webp', 'video/mp4', 'video/webm', 'video/quicktime', 'video/mov', 'application/pdf', 'application/zip', 'application/x-zip-compressed'];
+    if (!validTypes.includes(file.type)) return 'Unsupported file type. Allowed: JPEG, PNG, WebP, MP4, WEBM, MOV, PDF, ZIP';
     if (!isVideoUploadFile(file) && file.size > 25 * 1024 * 1024) return 'File exceeds the 25 MB upload limit';
     return '';
   };
@@ -152,6 +156,20 @@ const Media = () => {
           purpose: 'media-library-video',
           title: file.name,
         });
+      } else if (String(file.type || '').startsWith('image/')) {
+        const imageError = validateImageUploadFile(file);
+        if (imageError) {
+          toast.error(imageError);
+          return;
+        }
+        result = await uploadAdminImageToR2({
+          file,
+          purpose: 'media-library-image',
+          onUploadProgress: (event) => {
+            const total = event.total || file.size || 1;
+            setUploadProgress(Math.min(100, Math.round((event.loaded / total) * 100)));
+          },
+        });
       } else {
         result = await uploadAdminFile(file, (event) => {
           const total = event.total || file.size || 1;
@@ -165,7 +183,9 @@ const Media = () => {
       toast.success('File uploaded successfully');
       const refresh = await loadMedia({ notifyOnError: false });
       if (!refresh?.ok) {
-        toast.warning('Uploaded, but media list refresh failed. Please refresh.');
+        toast.warning(String(file.type || '').startsWith('image/')
+          ? 'Image uploaded successfully, but media list refresh failed. Please refresh.'
+          : 'Upload succeeded, but media list refresh failed. Please refresh.');
       }
     } catch (error) {
       console.warn('[admin/media-library] upload failed', {
@@ -206,38 +226,58 @@ const Media = () => {
 
   const handleDelete = async (item) => {
     const name = item?.title || item?.filename || 'this media file';
-    try {
-      const usage = await fetchAdminMediaUsage(item.id).catch(() => ({ used: false, locations: [] }));
-      const warning = usage?.used
-        ? `This media may be used on the website. Delete anyway?\n\n${name}\n\nIf it is still referenced, deletion will be blocked to keep the website safe.`
-        : `Are you sure you want to delete this media file?\n\n${name}`;
-      if (!window.confirm(warning)) return;
-      await deleteAdminMedia(item.id);
-      toast.success('Media deleted');
-      setMedia((items) => items.filter((mediaItem) => mediaItem.id !== item.id));
-    } catch (error) {
-      const detail = error?.response?.data?.detail || 'Failed to delete media';
-      toast.error(error?.response?.status === 409 ? 'This media is used on the website. Remove it first.' : detail);
-    }
+    const usage = await fetchAdminMediaUsage(item.id).catch(() => ({ used: false, locations: [] }));
+    const usageLines = Array.isArray(usage?.locations) ? usage.locations.slice(0, 4) : [];
+    await confirm({
+      title: 'Delete media?',
+      itemName: name,
+      message: usage?.used
+        ? `This media may be used on the website. If it is still referenced, deletion will be blocked to keep the website safe.${usageLines.length ? `\n\nUsed in:\n${usageLines.join('\n')}` : ''}`
+        : 'Delete this media file from the library. This action cannot be undone.',
+      confirmText: 'Delete',
+      loadingText: 'Deleting...',
+      onConfirm: async () => {
+        try {
+          const result = await deleteAdminMedia(item.id);
+          toast[result?.warning ? 'warning' : 'success'](result?.warning || 'Media deleted');
+          setMedia((items) => items.filter((mediaItem) => mediaItem.id !== item.id));
+        } catch (error) {
+          const detail = error?.response?.data?.detail || 'Failed to delete media';
+          toast.error(error?.response?.status === 409
+            ? `This media is currently used on the website and cannot be deleted.${usageLines.length ? ` Used in: ${usageLines.join(', ')}` : ''}`
+            : detail);
+          return false;
+        }
+        return true;
+      },
+    });
   };
 
   const handleRemoveDuplicates = async () => {
     if (deduping) return;
-    if (!window.confirm('Remove duplicate media records and keep the newest one for each duplicate group?\n\nThis will only remove duplicate database records. It will not delete Cloudflare R2 files.')) {
-      return;
-    }
-    try {
-      setDeduping(true);
-      const result = await removeDuplicateAdminMedia();
-      await loadMedia({ notifyOnError: false });
-      toast.success(result?.deleted_records
-        ? `Removed ${result.deleted_records} duplicate media record${result.deleted_records === 1 ? '' : 's'}.`
-        : 'No duplicate media records were found.');
-    } catch (error) {
-      toast.error(error?.response?.data?.detail || 'Could not remove duplicate media records');
-    } finally {
-      setDeduping(false);
-    }
+    await confirm({
+      title: 'Remove duplicates?',
+      itemName: 'Media Library records',
+      message: 'Keep the newest record in each duplicate group and remove the extra database records only. This will not delete Cloudflare R2 files.',
+      confirmText: 'Remove duplicates',
+      loadingText: 'Removing...',
+      onConfirm: async () => {
+        try {
+          setDeduping(true);
+          const result = await removeDuplicateAdminMedia();
+          await loadMedia({ notifyOnError: false });
+          toast.success(result?.deleted_records
+            ? `Removed ${result.deleted_records} duplicate media record${result.deleted_records === 1 ? '' : 's'}.`
+            : 'No duplicate media records were found.');
+        } catch (error) {
+          toast.error(error?.response?.data?.detail || 'Could not remove duplicate media records');
+          return false;
+        } finally {
+          setDeduping(false);
+        }
+        return true;
+      },
+    });
   };
 
   const copyToClipboard = (url) => {

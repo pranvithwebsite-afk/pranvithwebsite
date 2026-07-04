@@ -5,7 +5,7 @@ import {
   createAdminDirectVideoUpload,
   fetchAdminMedia,
   finalizeAdminDirectVideoUpload,
-  uploadAdminFile,
+  uploadAdminImageToR2,
   uploadFileToSignedUrl,
 } from '../../lib/api';
 import {
@@ -91,7 +91,7 @@ const MediaUrlInput = ({
 
     try {
       setUploadingImage(true);
-      const result = await uploadAdminFile(file);
+      const result = await uploadAdminImageToR2({ file });
       const url = result?.media?.public_url || result?.media?.url || result?.url;
       if (!url) throw new Error('Upload did not return a media URL');
       onChange(url);

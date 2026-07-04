@@ -12,6 +12,7 @@ import {
 } from '../../lib/api';
 import CmsSectionEditor from './CmsSectionEditor';
 import SectionOrderList from './SectionOrderList';
+import { useAdminConfirm } from './AdminConfirmProvider';
 
 const fieldClass = 'w-full rounded-xl border border-slate-800 bg-slate-900 px-4 py-3 text-white outline-none focus:border-violet-500';
 
@@ -51,6 +52,7 @@ const CmsPageEditor = ({ pageKey, title, path, mediaItems, onBack }) => {
   const [reordering, setReordering] = useState(false);
   const [sectionDirty, setSectionDirty] = useState(false);
   const [sectionEditorOpen, setSectionEditorOpen] = useState(false);
+  const confirm = useAdminConfirm();
 
   const currentPageKey = page?.page_key || pageKey;
   const sections = useMemo(
@@ -175,10 +177,24 @@ const CmsPageEditor = ({ pageKey, title, path, mediaItems, onBack }) => {
   };
 
   const deleteSection = async (section) => {
-    if (!window.confirm(`Delete section "${section.title || section.section_id}"?`)) return;
-    await deleteAdminCmsSection(section.id);
-    toast.success('Section deleted');
-    await load();
+    await confirm({
+      title: 'Delete section?',
+      itemName: section.title || section.section_id || 'Selected section',
+      message: 'This section will be removed from the page layout. This action cannot be undone.',
+      confirmText: 'Delete',
+      loadingText: 'Deleting...',
+      onConfirm: async () => {
+        try {
+          await deleteAdminCmsSection(section.id);
+          toast.success('Section deleted');
+          await load();
+        } catch (error) {
+          toast.error(error?.response?.data?.detail || 'Could not delete section');
+          return false;
+        }
+        return true;
+      },
+    });
   };
 
   const setVisibility = async (section, enabled) => {

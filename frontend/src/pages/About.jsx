@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
 import { Award, Camera, Clock, Film, Plane, Sparkles } from 'lucide-react';
-import { handleImageError, safeImageSrc, safePublicHref } from '../lib/utils';
+import { FALLBACK_IMAGE, handleImageError, safeImageSrc, safePublicHref } from '../lib/utils';
 import { usePublicPageLoading } from '../components/PublicPageLoader';
 import PageReadyPlaceholder from '../components/PageReadyPlaceholder';
 import { useCmsPage } from '../hooks/useCmsPage';
@@ -13,6 +13,9 @@ const statIcons = [Film, Camera, Plane, Clock];
 const findSection = (sections, idOrType) =>
   (sections || []).find((section) => section.section_id === idOrType)
   || (sections || []).find((section) => section.type === idOrType);
+
+const firstText = (...values) =>
+  values.find((value) => typeof value === 'string' && value.trim()) || '';
 
 const getCmsOrder = (sections = [], keys = [], fallback = 999) => {
   const matched = (sections || []).find((section) =>
@@ -58,6 +61,17 @@ const About = () => {
         .sort((a, b) => Number(a.sort_order || 0) - Number(b.sort_order || 0))
     : [];
 
+  const heroImageUrl = safeImageSrc(firstText(
+    hero.media_url,
+    hero.image_url,
+    hero.thumbnail_url,
+    hero.poster_url,
+    hero.data?.media_url,
+    hero.data?.image_url,
+    hero.data?.thumbnail_url,
+    hero.data?.poster_url
+  ), FALLBACK_IMAGE);
+
   const showHero = hero.section_id || !page;
 
   return (
@@ -76,19 +90,12 @@ const About = () => {
                   {hero.enabled !== false && (
                     <div className="cinematic-card overflow-hidden p-3">
                       <div className="relative flex aspect-[4/5] items-center justify-center overflow-hidden rounded-2xl bg-[radial-gradient(circle_at_30%_20%,rgba(167,139,250,0.22),transparent_35%),linear-gradient(145deg,#1a102d,#05000d)]">
-                        {hero.media_url ? (
-                          <img
-                            src={safeImageSrc(hero.media_url)}
-                            alt="PranvithDOP profile"
-                            className="h-full w-full object-cover"
-                            onError={(event) => {
-                              handleImageError(event, '');
-                              event.currentTarget.style.display = 'none';
-                            }}
-                          />
-                        ) : (
-                          <div className="h-full w-full" />
-                        )}
+                        <img
+                          src={heroImageUrl}
+                          alt="PranvithDOP profile"
+                          className="h-full w-full object-cover"
+                          onError={handleImageError}
+                        />
 
                         <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[var(--bg-main)]/30 via-transparent to-white/5" />
                       </div>

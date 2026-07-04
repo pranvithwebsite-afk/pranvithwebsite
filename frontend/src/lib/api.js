@@ -483,10 +483,14 @@ export const updateAdminProduct = async (productId, payload) => {
 };
 
 export const uploadAdminProductMedia = async ({ file, type, productSlug, purpose, onUploadProgress }) => {
+  return uploadAdminImageToR2({ file, purpose, productSlug, onUploadProgress });
+};
+
+export const uploadAdminImageToR2 = async ({ file, purpose = 'media-library-image', productSlug = '', onUploadProgress }) => {
   const formData = new FormData();
   formData.append('file', file);
-  formData.append('product_slug', productSlug);
   formData.append('purpose', purpose);
+  if (productSlug) formData.append('product_slug', productSlug);
   const { data } = await adminApi.post('/admin/uploads/public', formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
     timeout: 120000,

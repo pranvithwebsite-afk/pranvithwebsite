@@ -67,7 +67,7 @@ export const formatUploadError = (error, fallback = 'Upload failed') => {
   const detail = error?.response?.data?.detail || error?.message || fallback;
   if (error?.stage === 'presign') {
     if (status === 500 && /Cloudflare R2 is not configured/i.test(String(detail))) {
-      return 'Cloudflare R2 is not configured.';
+      return 'Cloudflare R2 is not configured. Please add R2 environment variables.';
     }
     return 'Could not create R2 upload URL. Check backend R2 configuration.';
   }
@@ -76,6 +76,9 @@ export const formatUploadError = (error, fallback = 'Upload failed') => {
   }
   if (status === 413) {
     return 'This video is too large for normal upload. Upload directly to Cloudflare R2 or paste a YouTube/Vimeo/R2 URL.';
+  }
+  if (status === 500 && /Cloudflare R2 is not configured/i.test(String(detail))) {
+    return 'Cloudflare R2 is not configured. Please add R2 environment variables.';
   }
   return detail;
 };

@@ -16,6 +16,7 @@ import {
 } from '../../lib/api';
 import { toast } from 'sonner';
 import SafeVideoEmbed from '../../components/SafeVideoEmbed';
+import { useAdminConfirm } from '../components/AdminConfirmProvider';
 import {
   ADMIN_IMAGE_UPLOAD_ACCEPT,
   ADMIN_VIDEO_UPLOAD_ACCEPT,
@@ -111,6 +112,7 @@ const Products = () => {
   const [formData, setFormData] = useState(defaultProductForm);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const confirm = useAdminConfirm();
 
   useEffect(() => {
     loadProducts();
@@ -200,14 +202,25 @@ const Products = () => {
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm('Are you sure?')) return;
-    try {
-      await deleteAdminProduct(id);
-      toast.success('Product deleted');
-      loadProducts();
-    } catch (error) {
-      toast.error('Failed to delete product');
-    }
+    const product = products.find((item) => item.id === id);
+    await confirm({
+      title: 'Delete product?',
+      itemName: product?.name || product?.title || 'Selected product',
+      message: 'This will remove the product from the catalog. Payment logic is not changed, but this product entry will no longer be available in admin or on the website.',
+      confirmText: 'Delete',
+      loadingText: 'Deleting...',
+      onConfirm: async () => {
+        try {
+          await deleteAdminProduct(id);
+          toast.success('Product deleted');
+          setProducts((items) => items.filter((item) => item.id !== id));
+        } catch (error) {
+          toast.error('Failed to delete product');
+          return false;
+        }
+        return true;
+      },
+    });
   };
 
   const handleInputChange = (e) => {
