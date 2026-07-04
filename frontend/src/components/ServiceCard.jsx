@@ -17,6 +17,7 @@ export const serviceIcons = {
 
 export const getServiceImageUrl = (service = {}) =>
   service.thumbnail_url
+  || service.thumbnail_image_url
   || service.image_url
   || service.media_url
   || service.poster_url
