@@ -48,17 +48,19 @@ const Media = () => {
     loadMedia();
   }, []);
 
-  const loadMedia = async () => {
+  const loadMedia = async ({ notifyOnError = true } = {}) => {
     try {
       setLoading(true);
       const data = await fetchAdminMedia();
       setMedia(Array.isArray(data) ? data : []);
       setError('');
+      return { ok: true, items: Array.isArray(data) ? data : [] };
     } catch (error) {
       console.error('[admin/media] Failed to load media', error?.response?.data?.detail || error?.message || error);
-      toast.error('Failed to load media');
+      if (notifyOnError) toast.error('Failed to load media');
       setError('Media library could not be loaded.');
       setMedia([]);
+      return { ok: false, error };
     } finally {
       setLoading(false);
     }
@@ -121,9 +123,14 @@ const Media = () => {
           setUploadProgress(Math.min(100, Math.round((event.loaded / total) * 100)));
         });
       }
-      if (result.success) {
-        toast.success('File uploaded successfully');
-        loadMedia();
+      const uploadedUrl = result?.url || result?.media?.public_url || result?.media?.url;
+      if (!uploadedUrl) {
+        throw new Error('Upload completed but no media URL was returned');
+      }
+      toast.success('File uploaded successfully');
+      const refresh = await loadMedia({ notifyOnError: false });
+      if (!refresh?.ok) {
+        toast.warning('Uploaded, but media list refresh failed. Please refresh.');
       }
     } catch (error) {
       console.warn('[admin/media-library] upload failed', {

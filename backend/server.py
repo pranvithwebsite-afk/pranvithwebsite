@@ -3266,8 +3266,29 @@ async def admin_upload_media_library(file: UploadFile = File(...), current_admin
         "uploaded_at": now,
         "tags": [],
     }
-    await db.media.insert_one(media_record)
-    return {"success": True, "media": media_record, "url": public_url}
+    try:
+        saved_media = await _upsert_media_record_by_storage(media_record)
+    except Exception:
+        logger.exception(
+            "Media library upload saved to R2 but media DB insert failed key=%s content_type=%s size=%d",
+            key,
+            file.content_type,
+            len(content),
+        )
+        try:
+            _r2_client().delete_object(Bucket=bucket, Key=key)
+        except Exception:
+            logger.warning("Media library orphan cleanup failed key=%s bucket=%s", key, bucket)
+        raise HTTPException(status_code=500, detail="File uploaded to storage, but media record could not be saved")
+
+    return {
+        "success": True,
+        "media": saved_media,
+        "url": saved_media.get("public_url") or saved_media.get("url") or public_url,
+        "filename": saved_media.get("original_filename") or saved_media.get("filename") or original_name,
+        "mime_type": saved_media.get("mime_type") or saved_media.get("type") or file.content_type,
+        "size_bytes": saved_media.get("size") or len(content),
+    }
 
 
 @admin_router.get("/settings")
@@ -3943,12 +3964,24 @@ async def admin_complete_direct_video_upload(
         "key": payload.key,
         "bucket": os.environ.get("CLOUDFLARE_R2_BUCKET", "pranvith-assets-public").strip(),
     }
-    await db.media.insert_one(media_record)
+    try:
+        saved_media = await _upsert_media_record_by_storage(media_record)
+    except Exception:
+        logger.exception(
+            "Direct video upload completed in R2 but media DB insert failed key=%s content_type=%s size=%d",
+            payload.key,
+            payload.content_type,
+            payload.size,
+        )
+        raise HTTPException(status_code=500, detail="Video uploaded to storage, but media record could not be saved")
     return {
         "success": True,
-        "media": media_record,
-        "url": payload.url,
+        "media": saved_media,
+        "url": saved_media.get("public_url") or saved_media.get("url") or payload.url,
         "key": payload.key,
+        "filename": saved_media.get("filename") or Path(payload.filename).name,
+        "mime_type": saved_media.get("type") or payload.content_type,
+        "size_bytes": saved_media.get("size") or payload.size,
     }
 
 
@@ -4037,12 +4070,15 @@ async def admin_upload_file(file: UploadFile = File(...), current_admin: AdminBa
             "uploaded_at": datetime.now(timezone.utc).isoformat(),
             "tags": [],
         }
-        
-        await db.media.insert_one(media_record)
-        
+        saved_media = await _upsert_media_record_by_storage(media_record)
+
         return {
             "success": True,
-            "media": media_record,
+            "media": saved_media,
+            "url": saved_media.get("public_url") or saved_media.get("url"),
+            "filename": saved_media.get("original_filename") or saved_media.get("filename") or original_name,
+            "mime_type": saved_media.get("mime_type") or saved_media.get("type") or file.content_type,
+            "size_bytes": saved_media.get("size") or len(content),
             "message": "File uploaded successfully",
         }
     except HTTPException:
@@ -4910,6 +4946,40 @@ async def _find_payment_link_product(payment_entity: dict, payment_link_entity: 
         if product:
             return product
     return None
+
+
+def _serialize_media_record(record: Optional[dict]) -> dict:
+    if not isinstance(record, dict):
+        return {}
+    return {key: value for key, value in record.items() if key != "_id"}
+
+
+async def _upsert_media_record_by_storage(media_record: dict) -> dict:
+    if db is None:
+        raise HTTPException(status_code=500, detail="Database is not configured")
+    lookup = {}
+    if media_record.get("r2_bucket") and media_record.get("r2_key"):
+        lookup = {
+            "r2_bucket": media_record.get("r2_bucket"),
+            "r2_key": media_record.get("r2_key"),
+        }
+    elif media_record.get("bucket") and media_record.get("key"):
+        lookup = {
+            "bucket": media_record.get("bucket"),
+            "key": media_record.get("key"),
+        }
+    elif media_record.get("public_url"):
+        lookup = {"public_url": media_record.get("public_url")}
+    elif media_record.get("url"):
+        lookup = {"url": media_record.get("url")}
+
+    if lookup:
+        existing = await db.media.find_one(lookup, {"_id": 0})
+        if existing:
+            return existing
+
+    await db.media.insert_one(media_record)
+    return _serialize_media_record(media_record)
 
 
 async def _get_or_create_payment_link_order(
