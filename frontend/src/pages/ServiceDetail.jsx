@@ -64,18 +64,20 @@ const ServiceDetail = () => {
         ) : (
           <>
             <section className="relative overflow-hidden px-6 pb-16 pt-32 md:pt-36">
-              <div className="cinematic-card mx-auto grid max-w-6xl gap-8 px-6 py-8 md:px-10 lg:grid-cols-[0.92fr_1.08fr] lg:items-center">
-                <div className="min-w-0">
+              <div className="cinematic-card mx-auto grid max-w-6xl gap-8 px-6 py-8 md:px-10 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.05fr)] lg:items-center lg:gap-12 xl:gap-16">
+                <div className="min-w-0 lg:pr-2">
                   <Link to="/services" className="inline-flex items-center gap-2 text-sm font-semibold text-white/65 hover:text-white">
                     <ArrowLeft size={16} />
                     Services
                   </Link>
                   <p className="section-eyebrow mt-8 text-xs">{service.category || 'PranvithDOP Service'}</p>
-                  <h1 className="mt-4 text-5xl font-black tracking-tight text-white md:text-7xl">{service.title}</h1>
-                  <p className="mt-5 text-2xl font-semibold leading-snug text-white/86">{service.subtitle}</p>
+                  <h1 className="mt-4 max-w-[12ch] text-[clamp(2.625rem,4.8vw,4.5rem)] font-black leading-[0.96] tracking-tight text-white">
+                    {service.title}
+                  </h1>
+                  <p className="mt-5 max-w-2xl text-xl font-semibold leading-snug text-white/86 md:text-2xl">{service.subtitle}</p>
                   <p className="mt-5 max-w-2xl text-base leading-8 text-white/66">{service.short_description}</p>
                 </div>
-                <div className="overflow-hidden rounded-[22px] border border-purple-300/20 bg-black shadow-[0_0_45px_rgba(124,58,237,0.14)]">
+                <div className="min-w-0 overflow-hidden rounded-[22px] border border-purple-300/20 bg-black shadow-[0_0_45px_rgba(124,58,237,0.14)]">
                   {videoMediaTypes.has(detectMediaType(service.banner_url)) ? (
                     <SafeVideoEmbed videoType={detectMediaType(service.banner_url)} videoUrl={service.banner_url} title={service.title} className="rounded-2xl" />
                   ) : (
@@ -132,4 +134,3 @@ const ServiceDetail = () => {
 };
 
 export default ServiceDetail;
-ServiceDetail;
