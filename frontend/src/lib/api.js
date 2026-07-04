@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { decodeCmsText, normalizeCmsTextBeforeSave } from './utils';
 
 const normalizeBackendUrl = (value) => {
   const base = String(value || '').trim().replace(/\/$/, '');
@@ -150,10 +151,10 @@ export const fetchProducts = async () => {
   return cachedRequest('products:list', async () => {
   if (USE_DEVELOPMENT_CATALOG && !BACKEND_URL) {
     try {
-      return await fetchDevelopmentCatalog('/products');
+      return decodeCmsText(await fetchDevelopmentCatalog('/products'));
     } catch (error) {
       logApiError('development catalog products fallback', error);
-      return FALLBACK_PRODUCTS;
+      return decodeCmsText(FALLBACK_PRODUCTS);
     }
   }
 
@@ -161,23 +162,23 @@ export const fetchProducts = async () => {
     const { data } = await api.get('/products');
     if (USE_DEVELOPMENT_CATALOG && Array.isArray(data) && data.length === 0) {
       try {
-        return await fetchDevelopmentCatalog('/products');
+        return decodeCmsText(await fetchDevelopmentCatalog('/products'));
       } catch (error) {
         logApiError('development catalog products fallback', error);
-        return FALLBACK_PRODUCTS;
+        return decodeCmsText(FALLBACK_PRODUCTS);
       }
     }
-    return data;
+    return decodeCmsText(data);
   } catch (error) {
     logApiError('products request', error);
     if (USE_DEVELOPMENT_CATALOG) {
       try {
-        return await fetchDevelopmentCatalog('/products');
+        return decodeCmsText(await fetchDevelopmentCatalog('/products'));
       } catch (fallbackError) {
         logApiError('development catalog products fallback', fallbackError);
       }
     }
-    return FALLBACK_PRODUCTS;
+    return decodeCmsText(FALLBACK_PRODUCTS);
   }
   }, 3 * 60 * 1000);
 };
@@ -204,7 +205,7 @@ export const fetchServiceBySlug = async (slug) => {
 export const fetchCmsPage = async (pageKey) => {
   return cachedRequest(`cms:${pageKey}`, async () => {
     const { data } = await api.get(`/cms/pages/${encodeURIComponent(pageKey)}`);
-    return data;
+    return decodeCmsText(data);
   }, 5 * 60 * 1000);
 };
 
@@ -270,27 +271,27 @@ export const fetchAdminPages = async () => {
 
 export const fetchAdminCmsPages = async () => {
   const { data } = await adminApi.get('/admin/cms/pages');
-  return data;
+  return decodeCmsText(data);
 };
 
 export const fetchAdminCmsPage = async (pageKey) => {
   const { data } = await adminApi.get(`/admin/cms/pages/${encodeURIComponent(pageKey)}`);
-  return data;
+  return decodeCmsText(data);
 };
 
 export const updateAdminCmsPage = async (pageKey, payload) => {
-  const { data } = await adminApi.put(`/admin/cms/pages/${encodeURIComponent(pageKey)}`, payload);
-  return data;
+  const { data } = await adminApi.put(`/admin/cms/pages/${encodeURIComponent(pageKey)}`, normalizeCmsTextBeforeSave(payload));
+  return decodeCmsText(data);
 };
 
 export const createAdminCmsSection = async (pageKey, payload) => {
-  const { data } = await adminApi.post(`/admin/cms/pages/${encodeURIComponent(pageKey)}/sections`, payload);
-  return data;
+  const { data } = await adminApi.post(`/admin/cms/pages/${encodeURIComponent(pageKey)}/sections`, normalizeCmsTextBeforeSave(payload));
+  return decodeCmsText(data);
 };
 
 export const updateAdminCmsSection = async (sectionId, payload) => {
-  const { data } = await adminApi.put(`/admin/cms/sections/${encodeURIComponent(sectionId)}`, payload);
-  return data;
+  const { data } = await adminApi.put(`/admin/cms/sections/${encodeURIComponent(sectionId)}`, normalizeCmsTextBeforeSave(payload));
+  return decodeCmsText(data);
 };
 
 export const deleteAdminCmsSection = async (sectionId) => {
@@ -318,7 +319,7 @@ export const reorderAdminCmsSections = async (pageKey, sections) => {
 
 export const fetchAdminProducts = async () => {
   const { data } = await adminApi.get('/admin/products');
-  return data;
+  return decodeCmsText(data);
 };
 
 export const fetchAdminServices = async () => {
@@ -458,17 +459,17 @@ export const deleteAdminPage = async (pageId) => {
 // Admin Product Management
 export const fetchAdminProduct = async (productId) => {
   const { data } = await adminApi.get(`/admin/products/${productId}`);
-  return data;
+  return decodeCmsText(data);
 };
 
 export const createAdminProduct = async (payload) => {
-  const { data } = await adminApi.post('/admin/products', payload);
-  return data;
+  const { data } = await adminApi.post('/admin/products', normalizeCmsTextBeforeSave(payload));
+  return decodeCmsText(data);
 };
 
 export const updateAdminProduct = async (productId, payload) => {
-  const { data } = await adminApi.put(`/admin/products/${productId}`, payload);
-  return data;
+  const { data } = await adminApi.put(`/admin/products/${productId}`, normalizeCmsTextBeforeSave(payload));
+  return decodeCmsText(data);
 };
 
 export const uploadAdminProductMedia = async ({ file, type, productSlug, purpose, onUploadProgress }) => {
@@ -593,29 +594,29 @@ export const fetchProductBySlug = async (slug) => {
   const path = `/products/${encodeURIComponent(slug)}`;
   if (USE_DEVELOPMENT_CATALOG && !BACKEND_URL) {
     try {
-      return await fetchDevelopmentCatalog(path);
+      return decodeCmsText(await fetchDevelopmentCatalog(path));
     } catch (error) {
       logApiError(`development catalog product fallback slug=${slug}`, error);
       const fallbackProduct = getFallbackProductBySlug(slug);
-      if (fallbackProduct) return fallbackProduct;
+      if (fallbackProduct) return decodeCmsText(fallbackProduct);
       throw error;
     }
   }
 
   try {
     const { data } = await api.get(path);
-    return data;
+    return decodeCmsText(data);
   } catch (error) {
     logApiError(`product request slug=${slug}`, error);
     if (USE_DEVELOPMENT_CATALOG) {
       try {
-        return await fetchDevelopmentCatalog(path);
+        return decodeCmsText(await fetchDevelopmentCatalog(path));
       } catch (fallbackError) {
         logApiError(`development catalog product fallback slug=${slug}`, fallbackError);
       }
     }
     const fallbackProduct = getFallbackProductBySlug(slug);
-    if (fallbackProduct) return fallbackProduct;
+    if (fallbackProduct) return decodeCmsText(fallbackProduct);
     throw error;
   }
   }, 3 * 60 * 1000);

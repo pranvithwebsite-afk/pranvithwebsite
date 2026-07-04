@@ -1620,7 +1620,7 @@ MEDIA_URL_FIELDS = {
 def _reject_unsafe_url(value: Optional[str]) -> Optional[str]:
     if value is None:
         return value
-    cleaned = value.strip()
+    cleaned = html.unescape(str(value)).strip()
     if not cleaned:
         return cleaned
     parsed = urlparse(cleaned)
@@ -1635,13 +1635,33 @@ def _reject_unsafe_url(value: Optional[str]) -> Optional[str]:
     return cleaned
 
 
+def _decode_html_entities(value: Any) -> Any:
+    if isinstance(value, str):
+        previous = value
+        current = html.unescape(previous)
+        while current != previous:
+            previous = current
+            current = html.unescape(previous)
+        return current
+    if isinstance(value, list):
+        return [_decode_html_entities(item) for item in value]
+    if isinstance(value, dict):
+        return {key: _decode_html_entities(item) for key, item in value.items()}
+    return value
+
+
+def _normalize_text_value(value: Any, max_length: int = 10000) -> str:
+    cleaned = _decode_html_entities(value)
+    cleaned = str(cleaned if cleaned is not None else "").strip()
+    lowered = cleaned.lower()
+    if lowered.startswith(("javascript:", "vbscript:", "data:")):
+        raise ValueError("Unsafe URL/content is not allowed")
+    return cleaned[:max_length]
+
+
 def _sanitize_cms_value(value: Any) -> Any:
     if isinstance(value, str):
-        cleaned = html.escape(value.strip(), quote=False)
-        lowered = cleaned.lower()
-        if lowered.startswith(("javascript:", "vbscript:", "data:")):
-            raise ValueError("Unsafe URL/content is not allowed")
-        return cleaned[:10000]
+        return _normalize_text_value(value, 10000)
     if isinstance(value, list):
         return [_sanitize_cms_value(item) for item in value[:200]]
     if isinstance(value, dict):
@@ -1689,6 +1709,14 @@ def _cms_page_doc(page_key: str, payload: Optional[CmsPageIn] = None, existing: 
         incoming = payload.model_dump(exclude_unset=True)
         if incoming.get("slug"):
             incoming["slug"] = normalize_slug(incoming["slug"])
+        for field_name, max_length in {
+            "title": 200,
+            "subtitle": 700,
+            "seo_title": 220,
+            "seo_description": 500,
+        }.items():
+            if field_name in incoming and incoming.get(field_name) is not None:
+                incoming[field_name] = _normalize_text_value(incoming.get(field_name), max_length)
         if "settings" in incoming:
             incoming["settings"] = _sanitize_cms_value(incoming.get("settings") or {})
         base.update({k: v for k, v in incoming.items() if v is not None})
@@ -1723,6 +1751,14 @@ def _cms_section_doc(page_key: str, payload: CmsSectionIn, existing: Optional[di
     if existing:
         base.update({k: v for k, v in existing.items() if k != "_id"})
     incoming = payload.model_dump(exclude_unset=True)
+    for field_name, max_length in {
+        "title": 220,
+        "subtitle": 700,
+        "description": 4000,
+        "button_text": 120,
+    }.items():
+        if field_name in incoming and incoming.get(field_name) is not None:
+            incoming[field_name] = _normalize_text_value(incoming.get(field_name), max_length)
     incoming["data"] = _sanitize_cms_value(incoming.get("data") or {})
     if "section_id" in incoming and incoming["section_id"]:
         incoming["section_id"] = normalize_slug(incoming["section_id"])
@@ -1749,8 +1785,8 @@ async def _cms_page_response(page_key: str, public: bool = False) -> dict:
     if public and page.get("status") != "published":
         return {
             "page_key": page_key,
-            "title": page.get("title", ""),
-            "subtitle": page.get("subtitle", ""),
+            "title": _decode_html_entities(page.get("title", "")),
+            "subtitle": _decode_html_entities(page.get("subtitle", "")),
             "path": page.get("path", CMS_PAGE_PATHS.get(page_key, f"/{page_key}")),
             "status": "hidden",
             "seo_title": "",
@@ -1762,7 +1798,7 @@ async def _cms_page_response(page_key: str, public: bool = False) -> dict:
     if public:
         section_query["enabled"] = {"$ne": False}
     sections = await db.cms_sections.find(section_query, {"_id": 0}).sort("sort_order", 1).to_list(200)
-    safe_page = {k: v for k, v in page.items() if k not in {"_id"}}
+    safe_page = _decode_html_entities({k: v for k, v in page.items() if k not in {"_id"}})
     if public:
         safe_page = {
             "page_key": page_key,
@@ -1794,11 +1830,41 @@ async def _cms_page_response(page_key: str, public: bool = False) -> dict:
             })
         safe_page["sections"] = public_sections
         return safe_page
-    safe_page["sections"] = sections
+    safe_page["sections"] = _decode_html_entities(sections)
     return safe_page
 
 
 def _normalize_product_media_fields(doc: dict) -> dict:
+    for field_name in (
+        "name",
+        "category",
+        "description",
+        "seo_title",
+        "seo_description",
+        "download_file_name",
+    ):
+        if field_name in doc and doc.get(field_name) is not None:
+            doc[field_name] = _normalize_text_value(doc.get(field_name), 5000 if field_name == "description" else 220)
+    for list_field in ("features", "benefits"):
+        if list_field in doc:
+            doc[list_field] = [
+                _normalize_text_value(item, 1000)
+                for item in (doc.get(list_field) or [])[:200]
+                if str(_decode_html_entities(item or "")).strip()
+            ]
+    if "faqs" in doc:
+        safe_faqs = []
+        for item in (doc.get("faqs") or [])[:100]:
+            if not isinstance(item, dict):
+                continue
+            question = _normalize_text_value(item.get("q") or item.get("question") or "", 500)
+            answer = _normalize_text_value(item.get("a") or item.get("answer") or "", 4000)
+            if question or answer:
+                safe_faqs.append({"q": question, "a": answer})
+        doc["faqs"] = safe_faqs
+    for field_name in ("thank_you_content", "landing_content"):
+        if field_name in doc and isinstance(doc.get(field_name), (dict, list)):
+            doc[field_name] = _sanitize_cms_value(doc.get(field_name))
     if not doc.get("product_images") and doc.get("images"):
         doc["product_images"] = list(doc.get("images") or [])
     if not doc.get("images") and doc.get("product_images"):
@@ -1926,7 +1992,7 @@ async def public_cms_page(page_key: str):
 
 
 def _public_product(product: dict) -> dict:
-    safe = _normalize_product_media_fields(dict(product))
+    safe = _decode_html_entities(_normalize_product_media_fields(dict(product)))
     safe.pop("download_file", None)
     safe.pop("download_file_url", None)
     safe.pop("download_file_key", None)

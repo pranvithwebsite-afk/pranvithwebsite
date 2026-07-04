@@ -6,6 +6,84 @@ export function cn(...inputs) {
   return twMerge(clsx(inputs));
 }
 
+const htmlEntityMap = {
+  '&amp;': '&',
+  '&lt;': '<',
+  '&gt;': '>',
+  '&quot;': '"',
+  '&#39;': "'",
+  '&#x27;': "'",
+  '&#x2F;': '/',
+  '&nbsp;': ' ',
+};
+
+const decodeHtmlEntityString = (value) => {
+  let decoded = String(value ?? '');
+  let previous = '';
+
+  const decodeOnce = (input) => input.replace(
+    /&(amp|lt|gt|quot|#39|#x27|#x2F|nbsp);/gi,
+    (entity) => htmlEntityMap[entity] ?? htmlEntityMap[entity.toLowerCase()] ?? entity
+  );
+
+  while (decoded !== previous) {
+    previous = decoded;
+    decoded = decodeOnce(decoded);
+  }
+
+  return decoded;
+};
+
+export function decodeHtmlEntitiesForEdit(value) {
+  if (typeof document !== 'undefined') {
+    const textarea = document.createElement('textarea');
+    let decoded = String(value ?? '');
+    let previous = '';
+
+    while (decoded !== previous) {
+      previous = decoded;
+      textarea.innerHTML = decoded;
+      decoded = textarea.value;
+    }
+
+    return decoded;
+  }
+
+  return decodeHtmlEntityString(value);
+}
+
+export function normalizeCmsTextBeforeSave(value) {
+  if (typeof value === 'string') {
+    return decodeHtmlEntitiesForEdit(value).trim();
+  }
+  if (Array.isArray(value)) {
+    return value.map(normalizeCmsTextBeforeSave);
+  }
+  if (value && typeof value === 'object') {
+    return Object.entries(value).reduce((next, [key, item]) => ({
+      ...next,
+      [key]: normalizeCmsTextBeforeSave(item),
+    }), {});
+  }
+  return value;
+}
+
+export function decodeCmsText(value) {
+  if (typeof value === 'string') {
+    return decodeHtmlEntitiesForEdit(value);
+  }
+  if (Array.isArray(value)) {
+    return value.map(decodeCmsText);
+  }
+  if (value && typeof value === 'object') {
+    return Object.entries(value).reduce((next, [key, item]) => ({
+      ...next,
+      [key]: decodeCmsText(item),
+    }), {});
+  }
+  return value;
+}
+
 const normalizeCatalogKey = (value) => String(value ?? '').trim().toLowerCase();
 
 export function getCatalogItemKey(item, fallback = '') {
@@ -108,7 +186,7 @@ export function handleImageError(event, fallback = FALLBACK_IMAGE) {
 const isBulletLine = (line) => /^\*\s+/.test(line);
 
 export function parseProductDescription(value) {
-  const text = String(value || '').replace(/\r\n/g, '\n').trim();
+  const text = decodeHtmlEntitiesForEdit(value || '').replace(/\r\n/g, '\n').trim();
   if (!text) return [];
 
   const lines = text.split('\n');
