@@ -1,8 +1,6 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
 import { services as fallbackServices } from '../data/portfolio';
-import { safePublicHref } from '../lib/utils';
-import { serviceIcons } from './ServiceCard';
+import ServiceCard from './ServiceCard';
 
 const enabledSorted = (items = []) =>
   [...items].filter((item) => item.enabled !== false).sort((a, b) => Number(a.sort_order || 0) - Number(b.sort_order || 0));
@@ -34,27 +32,14 @@ const ServicesSection = ({ section }) => {
         </div>
 
         <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          {visibleServices.map((service) => {
-            const Icon = serviceIcons[service.icon] || fallbackServices[0].icon;
-            const linkTarget = service.path || service.button_link || service.link_url || '/hire';
-
-            return (
-              <Link
-                key={service.title}
-                to={safePublicHref(linkTarget)}
-                className="cinematic-card group p-6 backdrop-blur transition duration-300 hover:-translate-y-1"
-              >
-                <div className="cinematic-icon mb-5 flex h-12 w-12 items-center justify-center rounded-2xl">
-                  <Icon size={22} />
-                </div>
-                <h3 className="text-xl font-semibold text-white">{service.title}</h3>
-                <p className="mt-3 text-sm leading-relaxed text-white/65">{service.description}</p>
-                <span className="mt-6 inline-flex text-sm font-semibold text-accent-purple transition group-hover:text-purple-200">
-                  {service.link_label || 'Explore service'}
-                </span>
-              </Link>
-            );
-          })}
+          {visibleServices.map((service, index) => (
+            <ServiceCard
+              key={service.id || service.slug || service.title}
+              service={service}
+              index={index}
+              linkTarget={service.path || service.button_link || service.link_url || '/hire'}
+            />
+          ))}
         </div>
       </div>
     </section>
