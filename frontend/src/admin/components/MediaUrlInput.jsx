@@ -20,7 +20,7 @@ import {
   validateImageUploadFile,
   validateVideoUploadFile,
 } from '../../lib/mediaUpload';
-import { detectMediaType, isDirectVideoUrl, isImageUrl } from '../../components/SafeVideoEmbed';
+import { detectMediaType, isDirectVideoUrl, isImageUrl, isVimeoUrl, isYouTubeUrl } from '../../components/SafeVideoEmbed';
 import { handleImageError, safeImageSrc } from '../../lib/utils';
 
 const buttonClass = 'inline-flex items-center justify-center gap-2 rounded-lg border border-slate-700 px-3 py-2 text-xs font-semibold text-white transition hover:border-violet-500 disabled:cursor-not-allowed disabled:opacity-60';
@@ -29,6 +29,7 @@ const itemUrl = (item = {}) => item.public_url || item.url || '';
 const itemMime = (item = {}) => item.type || item.mime_type || '';
 
 const videoMediaTypes = new Set(['video_file', 'video_url', 'youtube', 'vimeo', 'direct']);
+const posterFieldPattern = /(poster|thumbnail)/i;
 
 const MediaUrlInput = ({
   label,
@@ -51,10 +52,19 @@ const MediaUrlInput = ({
   const [pickerItems, setPickerItems] = useState(mediaItems);
   const [pickerLoading, setPickerLoading] = useState(false);
   const [selectedVideoSize, setSelectedVideoSize] = useState('');
-  const currentType = mediaType || detectMediaType(value);
+  const normalizedMediaType = String(mediaType || '').trim().toLowerCase();
+  const currentType = normalizedMediaType || detectMediaType(value);
   const supportsImageUpload = accept.includes('image');
   const supportsVideoUpload = accept.includes('video');
-  const videoMode = supportsVideoUpload && (videoMediaTypes.has(String(mediaType || '').trim().toLowerCase()) || videoMediaTypes.has(currentType));
+  const isPosterField = posterFieldPattern.test(String(label || ''));
+  const videoMode = supportsVideoUpload && (videoMediaTypes.has(normalizedMediaType) || videoMediaTypes.has(currentType));
+  const trimmedValue = String(value || '').trim();
+  const posterValueInvalid = isPosterField && trimmedValue && !isImageUrl(trimmedValue);
+  const mediaValueIsSupportedVideo = !!trimmedValue && (
+    isDirectVideoUrl(trimmedValue)
+    || isYouTubeUrl(trimmedValue)
+    || isVimeoUrl(trimmedValue)
+  );
 
   const filteredItems = useMemo(() => {
     if (!accept) return pickerItems;
@@ -119,7 +129,10 @@ const MediaUrlInput = ({
       await uploadFileToSignedUrl({
         uploadUrl: signed.upload_url,
         file,
-        headers: signed.required_headers || signed.headers || {},
+        headers: {
+          'Content-Type': file.type,
+          ...(signed.required_headers || signed.headers || {}),
+        },
         onUploadProgress: (progressEvent) => {
           const total = progressEvent.total || file.size || 1;
           setVideoProgress(Math.min(100, Math.round((progressEvent.loaded / total) * 100)));
@@ -169,7 +182,9 @@ const MediaUrlInput = ({
   };
 
   const resolvedHelperText = helperText || (
-    videoMode
+    isPosterField
+      ? 'Poster/thumbnail must be an image URL. For YouTube videos, leave poster empty or upload a thumbnail image.'
+      : videoMode
       ? 'Paste YouTube/Vimeo/R2 video URL, or upload video directly to Cloudflare R2.'
       : `Use JPG/PNG/WebP images. Recommended compressed JPG/WebP under ${formatBytes(ADMIN_IMAGE_RECOMMENDED_BYTES)}. Hard image limit: ${formatMegabytes(ADMIN_IMAGE_UPLOAD_MAX_BYTES)}.`
   );
@@ -229,10 +244,15 @@ const MediaUrlInput = ({
       )}
       {supportsVideoUpload && (
         <p className="mt-1 text-xs text-slate-500">
-          If upload fails with Network Error, check Cloudflare R2 CORS. Your bucket must allow PUT from your admin domain and localhost during development.
+          For YouTube/Vimeo, paste link in Media URL and leave Poster empty or upload an image thumbnail.
         </p>
       )}
-      {showPreview && <MediaPreview value={value} type={currentType} />}
+      {supportsVideoUpload && (
+        <p className="mt-1 text-xs text-slate-500">
+          For R2 upload, bucket CORS must allow PUT from pranvithdop.com and localhost.
+        </p>
+      )}
+      {showPreview && <MediaPreview value={value} type={currentType} isPosterField={isPosterField} posterValueInvalid={posterValueInvalid} mediaValueIsSupportedVideo={mediaValueIsSupportedVideo} />}
       {pickerOpen && (
         <MediaPickerModal
           items={filteredItems}
@@ -248,8 +268,11 @@ const MediaUrlInput = ({
   );
 };
 
-const MediaPreview = ({ value, type }) => {
+const MediaPreview = ({ value, type, isPosterField, posterValueInvalid, mediaValueIsSupportedVideo }) => {
   if (!value) return <p className="mt-2 rounded-xl border border-slate-800 bg-slate-900/70 px-3 py-2 text-xs text-slate-500">No media selected.</p>;
+  if (posterValueInvalid) {
+    return <p className="mt-2 rounded-xl border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-xs text-amber-100">Poster/thumbnail must be an image URL. For YouTube videos, leave poster empty or upload a thumbnail image.</p>;
+  }
   if (type === 'image' || isImageUrl(value)) {
     return (
       <img
@@ -263,8 +286,11 @@ const MediaPreview = ({ value, type }) => {
   if (type === 'video_file' || isDirectVideoUrl(value)) {
     return <video src={value} controls playsInline className="mt-3 aspect-video w-full rounded-xl border border-slate-800 bg-black object-contain" />;
   }
-  if (type === 'video_url') {
+  if (type === 'video_url' || type === 'youtube' || type === 'vimeo' || mediaValueIsSupportedVideo) {
     return <p className="mt-2 rounded-xl border border-violet-500/20 bg-violet-500/10 px-3 py-2 text-xs text-violet-100">Video URL detected. Public page will render the correct player for YouTube, Vimeo, or direct video URLs.</p>;
+  }
+  if (isPosterField) {
+    return <p className="mt-2 rounded-xl border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-xs text-amber-100">Poster/thumbnail must be an image URL. For YouTube videos, leave poster empty or upload a thumbnail image.</p>;
   }
   return <p className="mt-2 rounded-xl border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-xs text-amber-100">Unsupported or unsafe media URL.</p>;
 };

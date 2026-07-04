@@ -11,6 +11,8 @@ import { FALLBACK_IMAGE, handleImageError, safeImageSrc } from '../lib/utils';
 import { fetchServiceBySlug } from '../lib/api';
 import OptimizedImage from '../components/OptimizedImage';
 
+const videoMediaTypes = new Set(['video_file', 'video_url', 'youtube', 'vimeo']);
+
 const ServiceDetail = () => {
   const { slug } = useParams();
   const [service, setService] = useState(null);
@@ -74,7 +76,7 @@ const ServiceDetail = () => {
                   <p className="mt-5 max-w-2xl text-base leading-8 text-white/66">{service.short_description}</p>
                 </div>
                 <div className="overflow-hidden rounded-[22px] border border-purple-300/20 bg-black shadow-[0_0_45px_rgba(124,58,237,0.14)]">
-                  {(detectMediaType(service.banner_url) === 'video_file' || detectMediaType(service.banner_url) === 'video_url') ? (
+                  {videoMediaTypes.has(detectMediaType(service.banner_url)) ? (
                     <SafeVideoEmbed videoType={detectMediaType(service.banner_url)} videoUrl={service.banner_url} title={service.title} className="rounded-2xl" />
                   ) : (
                     <OptimizedImage

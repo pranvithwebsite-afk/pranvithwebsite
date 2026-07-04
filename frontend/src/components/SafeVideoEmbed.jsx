@@ -58,6 +58,7 @@ export const getVimeoId = (url) => {
 };
 
 export const isYouTubeUrl = (url) => !!getYouTubeId(url);
+export const isVimeoUrl = (url) => !!getVimeoId(url);
 
 export const isDirectVideoUrl = (url) => {
   const parsed = parseSafeUrl(url);
@@ -74,7 +75,8 @@ export const detectMediaType = (url) => {
   if (!raw || !isSafeMediaUrl(raw)) return '';
   if (isImageUrl(raw)) return 'image';
   if (isDirectVideoUrl(raw)) return 'video_file';
-  if (getYouTubeId(raw) || getVimeoId(raw)) return 'video_url';
+  if (getYouTubeId(raw)) return 'youtube';
+  if (getVimeoId(raw)) return 'vimeo';
   return '';
 };
 
