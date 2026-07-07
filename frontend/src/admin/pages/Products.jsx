@@ -116,70 +116,40 @@ const toImageList = (value) => (
     : []
 );
 
-const toMediaImageList = (value) => {
-  if (Array.isArray(value)) {
-    return value.flatMap((item) => toMediaImageList(item));
-  }
-  if (typeof value === 'string') {
-    const trimmed = value.trim();
-    return trimmed ? [trimmed] : [];
-  }
-  if (value && typeof value === 'object') {
-    const mediaType = String(value.media_type || value.type || value.kind || '').trim().toLowerCase();
-    if (mediaType.includes('video')) return [];
-
-    return [
-      value.url,
-      value.public_url,
-      value.image_url,
-      value.src,
-      value.original_url,
-    ]
-      .map((item) => String(item ?? '').trim())
-      .filter(Boolean);
-  }
-  return [];
-};
-
 const dedupeImageList = (items) => items.filter((item, index, list) => item && list.indexOf(item) === index);
 
-const getMainProductImageFields = (product = {}) => ({
-  image_url: String(product.image_url || '').trim(),
-  thumbnail_url: String(product.thumbnail_url || product.hero_image || '').trim(),
-  preview_image_url: String(product.preview_image_url || '').trim(),
-  cover_image_url: String(product.cover_image_url || '').trim(),
-});
+const getMainProductImageUrl = (product = {}) => (
+  String(
+    product.image_url
+    || product.preview_image_url
+    || product.cover_image_url
+    || product.thumbnail_url
+    || product.hero_image
+    || ''
+  ).trim()
+);
 
 const getGalleryImageCandidates = (product = {}) => {
-  const mainFields = getMainProductImageFields(product);
-  const excluded = new Set(Object.values(mainFields).filter(Boolean));
+  const mainImageUrl = getMainProductImageUrl(product);
+  const excluded = new Set([mainImageUrl].filter(Boolean));
   return dedupeImageList([
     ...toImageList(product.gallery),
     ...toImageList(product.gallery_images),
-    ...toImageList(product.image_urls),
-    ...toImageList(product.images),
-    ...toMediaImageList(product.media),
-    ...toImageList(product.product_images),
   ]).filter((item) => !excluded.has(item));
 };
 
-const getLegacyProductImageCandidates = (product = {}) => (
-  dedupeImageList([
-    ...toImageList(product.product_images),
-    ...toImageList(product.images),
-  ])
-);
-
 const normalizeProductForForm = (product = {}) => {
-  const productImages = getLegacyProductImageCandidates(product);
   const galleryImages = getGalleryImageCandidates(product);
-  const mainImages = getMainProductImageFields(product);
+  const mainImageUrl = getMainProductImageUrl(product);
   return {
     ...defaultProductForm,
     ...product,
-    ...mainImages,
+    image_url: mainImageUrl,
+    thumbnail_url: String(product.thumbnail_url || '').trim(),
+    preview_image_url: String(product.preview_image_url || '').trim(),
+    cover_image_url: String(product.cover_image_url || '').trim(),
     gallery_images: galleryImages,
-    product_images: productImages,
+    product_images: galleryImages,
     images: galleryImages,
     video_type: product.video_type || '',
     youtube_url: product.youtube_url || '',
@@ -251,6 +221,7 @@ const Products = () => {
   const handleSave = async () => {
     if (saving) return;
     const slug = normalizeSlug(formData.slug || formData.name);
+    const mainImageUrl = rejectUnsafeMediaUrl(formData.image_url);
     const payload = {
       ...formData,
       slug,
@@ -258,10 +229,10 @@ const Products = () => {
       gallery_images: formData.gallery_images || [],
       images: formData.gallery_images || formData.images || [],
       product_images: formData.gallery_images || formData.images || [],
-      image_url: rejectUnsafeMediaUrl(formData.image_url),
-      thumbnail_url: rejectUnsafeMediaUrl(formData.thumbnail_url),
-      preview_image_url: rejectUnsafeMediaUrl(formData.preview_image_url),
-      cover_image_url: rejectUnsafeMediaUrl(formData.cover_image_url),
+      image_url: mainImageUrl,
+      thumbnail_url: mainImageUrl,
+      preview_image_url: mainImageUrl,
+      cover_image_url: mainImageUrl,
       youtube_url: rejectUnsafeMediaUrl(formData.youtube_url),
       video_url: rejectUnsafeMediaUrl(formData.video_url),
       before_image_url: rejectUnsafeMediaUrl(formData.before_image_url),
@@ -771,24 +742,6 @@ const ProductForm = ({
             purpose: 'product-image',
             targetField: 'image_url',
           })}
-          onUploadThumbnail={(file) => uploadMedia({
-            file,
-            type: 'image',
-            purpose: 'thumbnail',
-            targetField: 'thumbnail_url',
-          })}
-          onUploadPreview={(file) => uploadMedia({
-            file,
-            type: 'image',
-            purpose: 'product-image',
-            targetField: 'preview_image_url',
-          })}
-          onUploadCover={(file) => uploadMedia({
-            file,
-            type: 'image',
-            purpose: 'product-image',
-            targetField: 'cover_image_url',
-          })}
         />
 
         <label className="flex items-start gap-3 rounded-lg border border-slate-800 bg-slate-900 p-4 text-sm text-slate-200">
@@ -831,8 +784,8 @@ const ProductForm = ({
         />
 
         <ArrayEditor
-          label="Gallery Images"
-          helpText="Use this only for extra product gallery images shown below the product details. Main product image and thumbnail should stay in the fields above."
+          label="Product Gallery Images"
+          helpText="Extra images shown only in Product Gallery. Do not add the main product image here."
           items={formData.gallery_images || formData.images || []}
           newItem={newArrayItems.gallery_images}
           onNewItemChange={(val) => setNewArrayItems((p) => ({ ...p, gallery_images: val }))}
@@ -1038,20 +991,17 @@ const MainProductImagesSection = ({
   uploading,
   uploadProgress,
   onUploadMain,
-  onUploadThumbnail,
-  onUploadPreview,
-  onUploadCover,
 }) => (
   <div className="space-y-4 rounded-2xl border border-slate-800 bg-slate-900/70 p-4">
     <div>
-      <h2 className="text-sm font-semibold text-white">Main Product Images</h2>
+      <h2 className="text-sm font-semibold text-white">Main Product Image</h2>
       <p className="mt-2 text-xs leading-relaxed text-slate-500">
-        Product Image and Thumbnail are the main hero/top images. Gallery Images below are extra images only and will not repeat these fields.
+        Used for product card, product hero, thumbnail, and preview image.
       </p>
     </div>
-    <div className="grid gap-4 sm:grid-cols-2">
+    <div>
       <SingleImageField
-        label="Product Image"
+        label="Main Product Image"
         name="image_url"
         value={formData.image_url}
         onInputChange={onInputChange}
@@ -1059,36 +1009,6 @@ const MainProductImagesSection = ({
         uploading={!!uploading['product-image-image_url']}
         progress={uploadProgress['product-image-image_url']}
         onUpload={onUploadMain}
-      />
-      <SingleImageField
-        label="Thumbnail Image"
-        name="thumbnail_url"
-        value={formData.thumbnail_url}
-        onInputChange={onInputChange}
-        onFieldChange={onFieldChange}
-        uploading={!!uploading['thumbnail-thumbnail_url']}
-        progress={uploadProgress['thumbnail-thumbnail_url']}
-        onUpload={onUploadThumbnail}
-      />
-      <SingleImageField
-        label="Preview Image"
-        name="preview_image_url"
-        value={formData.preview_image_url}
-        onInputChange={onInputChange}
-        onFieldChange={onFieldChange}
-        uploading={!!uploading['product-image-preview_image_url']}
-        progress={uploadProgress['product-image-preview_image_url']}
-        onUpload={onUploadPreview}
-      />
-      <SingleImageField
-        label="Cover Image"
-        name="cover_image_url"
-        value={formData.cover_image_url}
-        onInputChange={onInputChange}
-        onFieldChange={onFieldChange}
-        uploading={!!uploading['product-image-cover_image_url']}
-        progress={uploadProgress['product-image-cover_image_url']}
-        onUpload={onUploadCover}
       />
     </div>
   </div>

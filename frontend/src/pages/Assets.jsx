@@ -35,7 +35,15 @@ const normalize = (item = {}, index) => {
   const name = item.name || item.title || 'Asset';
   const category = item.category || 'Asset';
   const slug = item.slug || item.id || `asset-${index}`;
-  const heroImage = safeImageSrc(item.hero_image || (Array.isArray(item.images) && item.images[0]), FALLBACK_IMAGE);
+  const heroImage = safeImageSrc(
+    item.image_url
+    || item.preview_image_url
+    || item.cover_image_url
+    || item.thumbnail_url
+    || item.hero_image
+    || FALLBACK_IMAGE,
+    FALLBACK_IMAGE
+  );
   const word = name.toUpperCase();
   const parts = word.split(' ');
   const headline = parts.slice(0, 2).join(' ') || word;

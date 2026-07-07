@@ -2115,15 +2115,28 @@ def _normalize_product_media_fields(doc: dict) -> dict:
         if field_name in doc and isinstance(doc.get(field_name), (dict, list)):
             doc[field_name] = _sanitize_cms_value(doc.get(field_name))
     if not doc.get("gallery_images"):
-        doc["gallery_images"] = list(doc.get("gallery") or doc.get("image_urls") or doc.get("images") or doc.get("product_images") or [])
+        doc["gallery_images"] = list(doc.get("gallery") or [])
+    main_image_url = (
+        doc.get("image_url")
+        or doc.get("preview_image_url")
+        or doc.get("cover_image_url")
+        or doc.get("thumbnail_url")
+        or doc.get("hero_image")
+        or ((doc.get("product_images") or doc.get("images") or [""])[0] if (doc.get("product_images") or doc.get("images")) else "")
+        or ""
+    )
+    if main_image_url:
+        doc["image_url"] = _reject_unsafe_url(main_image_url)
+    if not doc.get("thumbnail_url") and doc.get("image_url"):
+        doc["thumbnail_url"] = doc.get("image_url")
+    if not doc.get("preview_image_url") and doc.get("image_url"):
+        doc["preview_image_url"] = doc.get("image_url")
+    if not doc.get("cover_image_url") and doc.get("image_url"):
+        doc["cover_image_url"] = doc.get("image_url")
     if not doc.get("product_images") and doc.get("gallery_images"):
         doc["product_images"] = list(doc.get("gallery_images") or [])
     if not doc.get("images") and doc.get("gallery_images"):
         doc["images"] = list(doc.get("gallery_images") or [])
-    if not doc.get("product_images") and doc.get("images"):
-        doc["product_images"] = list(doc.get("images") or [])
-    if not doc.get("images") and doc.get("product_images"):
-        doc["images"] = list(doc.get("product_images") or [])
     doc.setdefault("gallery_images", [])
     doc.setdefault("product_images", [])
     doc.setdefault("images", [])

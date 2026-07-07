@@ -30,34 +30,6 @@ const toStringList = (value) => (
     : []
 );
 
-const toMediaUrlList = (value) => {
-  if (Array.isArray(value)) {
-    return value.flatMap((item) => toMediaUrlList(item));
-  }
-
-  if (typeof value === 'string') {
-    const trimmed = value.trim();
-    return trimmed ? [trimmed] : [];
-  }
-
-  if (value && typeof value === 'object') {
-    const mediaType = String(value.media_type || value.type || value.kind || '').trim().toLowerCase();
-    if (mediaType.includes('video')) return [];
-
-    return [
-      value.url,
-      value.public_url,
-      value.image_url,
-      value.src,
-      value.original_url,
-    ]
-      .map((item) => String(item ?? '').trim())
-      .filter(Boolean);
-  }
-
-  return [];
-};
-
 const sanitizeUniqueImageList = (values) => (
   values
     .map((image) => safeImageSrc(image, ''))
@@ -101,7 +73,6 @@ const normalizeProduct = (value) => {
     product.preview_image_url,
     product.cover_image_url,
     product.thumbnail_url,
-    product.hero_image,
   ]);
   const mainImageUrl = mainImageCandidates[0] || '';
   const excludedGalleryImages = new Set(mainImageCandidates);
@@ -116,11 +87,8 @@ const normalizeProduct = (value) => {
     .forEach((image) => excludedGalleryImages.add(image));
 
   const galleryImages = [
-    ...toMediaUrlList(product.gallery),
-    ...toMediaUrlList(product.gallery_images),
-    ...toMediaUrlList(product.image_urls),
-    ...toMediaUrlList(product.images),
-    ...toMediaUrlList(product.media),
+    ...toStringList(product.gallery),
+    ...toStringList(product.gallery_images),
   ]
     .map((image) => safeImageSrc(image, ''))
     .filter(Boolean)
@@ -128,8 +96,6 @@ const normalizeProduct = (value) => {
     .filter((image) => !excludedGalleryImages.has(image));
   const heroImage = safeImageSrc(
     mainImageUrl
-    || product.hero_image
-    || galleryImages[0]
     || '',
     ''
   );
@@ -555,7 +521,7 @@ const ValuePill = ({ label, value }) => (
 );
 
 const ProductHeroImage = ({ heroImage, name }) => (
-  <div className="overflow-hidden rounded-[22px] border border-purple-300/20 bg-[#090712] shadow-[0_0_45px_rgba(124,58,237,0.14)]">
+  <div className="product-hero-image-wrap shadow-[0_0_45px_rgba(124,58,237,0.14)]">
     {heroImage ? (
       <OptimizedImage
         src={heroImage}
@@ -563,12 +529,12 @@ const ProductHeroImage = ({ heroImage, name }) => (
         priority
         width={440}
         height={550}
-        className="aspect-[4/3] max-h-[24rem] w-full object-cover xl:max-h-none xl:aspect-[4/5]"
+        className="product-hero-image"
         data-testid="asset-hero-image"
         onError={handleImageError}
       />
     ) : (
-      <div className="flex aspect-[4/3] max-h-[24rem] w-full items-center justify-center bg-gradient-to-br from-violet-700 to-fuchsia-900 px-6 text-center text-2xl font-black text-white xl:max-h-none xl:aspect-[4/5]">
+      <div className="flex min-h-[16rem] w-full items-center justify-center rounded-[inherit] bg-gradient-to-br from-violet-700 to-fuchsia-900 px-6 py-10 text-center text-2xl font-black text-white sm:min-h-[22rem]">
         {name}
       </div>
     )}
@@ -709,7 +675,7 @@ const ProductMediaSection = ({ product, galleryImages }) => {
                     alt={`${titleForAlt} gallery image`}
                     width={420}
                     height={236}
-                    className="aspect-video w-full cursor-pointer object-cover transition duration-300 group-hover:scale-[1.04]"
+                    className="product-gallery-image w-full cursor-pointer transition duration-300 group-hover:scale-[1.02]"
                     fallback=""
                     onError={() => handleGalleryImageError(image)}
                   />
