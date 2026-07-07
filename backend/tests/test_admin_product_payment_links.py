@@ -8,8 +8,9 @@ from starlette.requests import Request
 
 
 class FakeProducts:
-    def __init__(self, documents=None):
+    def __init__(self, documents=None, fail_update=False):
         self.documents = [dict(document) for document in (documents or [])]
+        self.fail_update = fail_update
 
     async def find_one(self, query, projection=None):
         document = next(
@@ -29,6 +30,8 @@ class FakeProducts:
         }
 
     async def update_one(self, query, update):
+        if self.fail_update:
+            raise RuntimeError("database write failed")
         document = next(
             (
                 item
@@ -39,11 +42,13 @@ class FakeProducts:
         )
         if document is not None:
             document.update(update.get("$set", {}))
+            for key in update.get("$unset", {}).keys():
+                document.pop(key, None)
 
 
 class FakeDatabase:
-    def __init__(self, products=None):
-        self.products = FakeProducts(products)
+    def __init__(self, products=None, fail_update=False):
+        self.products = FakeProducts(products, fail_update=fail_update)
 
 
 def _body(response):
@@ -59,6 +64,60 @@ def _product():
         "published": True,
         "razorpay_payment_link_id": "plink_123",
     }
+
+
+def _creatable_product():
+    product = _product()
+    product.pop("razorpay_payment_link_id", None)
+    product.pop("razorpay_payment_link_url", None)
+    product.pop("razorpay_payment_link_status", None)
+    return product
+
+
+class FakePaymentLinkAPI:
+    def __init__(self, *, create_response=None, fetch_response=None, create_error=None, fetch_error=None):
+        self.create_response = create_response or {
+            "id": "plink_123",
+            "short_url": "https://rzp.io/i/plink_123",
+            "status": "created",
+        }
+        self.fetch_response = fetch_response or {
+            "id": "plink_123",
+            "short_url": "https://rzp.io/i/plink_123",
+            "status": "created",
+        }
+        self.create_error = create_error
+        self.fetch_error = fetch_error
+        self.created_payloads = []
+
+    def create(self, payload):
+        self.created_payloads.append(payload)
+        if self.create_error:
+            raise self.create_error
+        return dict(self.create_response)
+
+    def fetch(self, payment_link_id):
+        if self.fetch_error:
+            raise self.fetch_error
+        response = dict(self.fetch_response)
+        response.setdefault("id", payment_link_id)
+        return response
+
+
+class FakeRazorpayClient:
+    def __init__(self, payment_link_api):
+        self.payment_link = payment_link_api
+
+
+class FakeBadRequestError(Exception):
+    def __init__(self, message="bad request", *, status_code=400, code=None, description=None, field=None, source=None, step=None):
+        super().__init__(message)
+        self.status_code = status_code
+        self.code = code
+        self.description = description
+        self.field = field
+        self.source = source
+        self.step = step
 
 
 def test_create_payment_link_returns_clean_error_when_razorpay_credentials_missing(monkeypatch):
@@ -111,6 +170,78 @@ def test_create_payment_link_returns_clean_error_when_razorpay_api_throws(monkey
     assert "super-secret" not in response.body.decode("utf-8")
 
 
+def test_create_payment_link_uses_unique_reference_id_and_callback(monkeypatch):
+    payment_link_api = FakePaymentLinkAPI()
+    fake_db = FakeDatabase([_creatable_product()])
+    monkeypatch.setattr(server, "db", fake_db)
+    monkeypatch.setattr(server, "RAZORPAY_KEY_ID", "rzp_live_public")
+    monkeypatch.setattr(server, "RAZORPAY_KEY_SECRET", "super-secret")
+    monkeypatch.setattr(server, "razorpay_client", FakeRazorpayClient(payment_link_api))
+    monkeypatch.setenv("PUBLIC_SITE_URL", "https://pranvithdop.com")
+
+    response = asyncio.run(server.admin_create_product_payment_link("product-1", SimpleNamespace(role="admin")))
+
+    assert response["success"] is True
+    payload = payment_link_api.created_payloads[0]
+    assert payload["amount"] == 49900
+    assert payload["currency"] == "INR"
+    assert payload["reference_id"].startswith("cms-product:creative-lut-pack:")
+    assert payload["callback_url"] == "https://pranvithdop.com/assets/creative-lut-pack"
+    assert payload["callback_method"] == "get"
+    assert "notes" not in payload
+
+
+def test_create_payment_link_rejects_invalid_product_price(monkeypatch):
+    product = _creatable_product()
+    product["price"] = "₹0"
+    product["sale_price"] = ""
+    fake_db = FakeDatabase([product])
+    monkeypatch.setattr(server, "db", fake_db)
+    monkeypatch.setattr(server, "RAZORPAY_KEY_ID", "rzp_live_public")
+    monkeypatch.setattr(server, "RAZORPAY_KEY_SECRET", "super-secret")
+    monkeypatch.setattr(server, "razorpay_client", FakeRazorpayClient(FakePaymentLinkAPI()))
+
+    response = asyncio.run(server.admin_create_product_payment_link("product-1", SimpleNamespace(role="admin")))
+    body = _body(response)
+
+    assert response.status_code == 400
+    assert body == {
+        "success": False,
+        "message": "Invalid product price for Razorpay Payment Link",
+        "code": "INVALID_PRODUCT_PRICE",
+    }
+
+
+def test_create_payment_link_returns_clean_json_for_razorpay_bad_request(monkeypatch):
+    fake_db = FakeDatabase([_creatable_product()])
+    payment_link_api = FakePaymentLinkAPI(
+        create_error=FakeBadRequestError(
+            "reference issue",
+            code="BAD_REQUEST_ERROR",
+            description="reference_id already exists",
+            field="reference_id",
+            source="business",
+            step="payment_link_create",
+        )
+    )
+    monkeypatch.setattr(server, "db", fake_db)
+    monkeypatch.setattr(server, "RAZORPAY_KEY_ID", "rzp_live_public")
+    monkeypatch.setattr(server, "RAZORPAY_KEY_SECRET", "super-secret")
+    monkeypatch.setattr(server, "razorpay_client", FakeRazorpayClient(payment_link_api))
+    monkeypatch.setattr(server.razorpay.errors, "BadRequestError", FakeBadRequestError)
+
+    response = asyncio.run(server.admin_create_product_payment_link("product-1", SimpleNamespace(role="admin")))
+    body = _body(response)
+
+    assert response.status_code == 409
+    assert body == {
+        "success": False,
+        "message": "Razorpay rejected a duplicate payment link reference",
+        "code": "DUPLICATE_REFERENCE_ID",
+        "detail": "reference_id already exists",
+    }
+
+
 def test_refresh_payment_link_returns_clean_error_when_razorpay_api_throws(monkeypatch):
     fake_db = FakeDatabase([_product()])
     monkeypatch.setattr(server, "db", fake_db)
@@ -133,6 +264,42 @@ def test_refresh_payment_link_returns_clean_error_when_razorpay_api_throws(monke
         "detail": "Remote payment link fetch failed",
     }
     assert "super-secret" not in response.body.decode("utf-8")
+
+
+def test_refresh_payment_link_returns_clean_json_for_stale_link(monkeypatch):
+    product = _product()
+    product["razorpay_payment_link_url"] = "https://rzp.io/i/plink_123"
+    product["razorpay_payment_link_status"] = "created"
+    fake_db = FakeDatabase([product])
+    payment_link_api = FakePaymentLinkAPI(
+        fetch_error=FakeBadRequestError(
+            "stale link",
+            code="BAD_REQUEST_ERROR",
+            description="payment link does not exist",
+            field="id",
+            source="business",
+            step="payment_link_fetch",
+        )
+    )
+    monkeypatch.setattr(server, "db", fake_db)
+    monkeypatch.setattr(server, "RAZORPAY_KEY_ID", "rzp_live_public")
+    monkeypatch.setattr(server, "RAZORPAY_KEY_SECRET", "super-secret")
+    monkeypatch.setattr(server, "razorpay_client", FakeRazorpayClient(payment_link_api))
+    monkeypatch.setattr(server.razorpay.errors, "BadRequestError", FakeBadRequestError)
+
+    response = asyncio.run(server.admin_refresh_product_payment_link("product-1", SimpleNamespace(role="admin")))
+    body = _body(response)
+
+    assert response.status_code == 404
+    assert body == {
+        "success": False,
+        "message": "Stored Razorpay Payment Link is stale or no longer exists",
+        "code": "STALE_PAYMENT_LINK",
+        "detail": "payment link does not exist",
+    }
+    assert fake_db.products.documents[0]["razorpay_payment_link_status"] == "stale"
+    assert "razorpay_payment_link_id" not in fake_db.products.documents[0]
+    assert "razorpay_payment_link_url" not in fake_db.products.documents[0]
 
 
 def test_payment_link_config_debug_route_returns_only_set_or_missing(monkeypatch):

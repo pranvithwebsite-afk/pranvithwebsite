@@ -256,6 +256,67 @@ def _razorpay_error_summary(exc: Exception) -> dict:
     }
 
 
+def _razorpay_error_details(exc: Exception) -> dict:
+    details = {
+        "error_type": type(exc).__name__,
+        "status_code": getattr(exc, "status_code", None) or getattr(exc, "status", None),
+    }
+    for attr in ("code", "description", "field", "source", "step", "reason"):
+        value = getattr(exc, attr, None)
+        if value:
+            details[attr] = value
+    if hasattr(exc, "args") and exc.args:
+        message = str(exc.args[0]).strip()
+        if message:
+            details["message"] = message[:240]
+    return details
+
+
+def _razorpay_log_details(exc: Exception) -> dict:
+    details = _razorpay_error_details(exc)
+    response = getattr(exc, "response", None)
+    if isinstance(response, dict):
+        error_payload = response.get("error") if isinstance(response.get("error"), dict) else response
+        if isinstance(error_payload, dict):
+            for source_key, target_key in (
+                ("code", "code"),
+                ("description", "description"),
+                ("field", "field"),
+                ("source", "source"),
+                ("step", "step"),
+                ("reason", "reason"),
+            ):
+                value = error_payload.get(source_key)
+                if value and target_key not in details:
+                    details[target_key] = value
+    return {key: value for key, value in details.items() if value not in (None, "", [], {})}
+
+
+def _razorpay_public_error(exc: Exception) -> str:
+    details = _razorpay_log_details(exc)
+    for key in ("description", "message", "reason"):
+        value = details.get(key)
+        if value:
+            return str(value)[:240]
+    detail = str(exc).strip()
+    if not detail:
+        return "Razorpay verification failed"
+    return detail[:240]
+
+
+def _razorpay_http_status(exc: Exception, default: int = 502) -> int:
+    status_code = getattr(exc, "status_code", None) or getattr(exc, "status", None)
+    if isinstance(status_code, int) and 400 <= status_code <= 599:
+        return status_code
+    return default
+
+
+def _razorpay_not_found_error(exc: Exception) -> bool:
+    details = _razorpay_log_details(exc)
+    combined = " ".join(str(details.get(key) or "") for key in ("code", "description", "message", "reason")).lower()
+    return "does not exist" in combined or "not found" in combined or details.get("code") in {"BAD_REQUEST_ERROR", "NOT_FOUND_ERROR"}
+
+
 def _require_razorpay_client():
     if not RAZORPAY_KEY_ID or not RAZORPAY_KEY_SECRET or razorpay_client is None:
         logger.warning("Razorpay credentials unavailable or incomplete summary=%s", razorpay_config_summary())
@@ -3009,7 +3070,24 @@ async def admin_create_product_payment_link(product_id: str, current_admin: Admi
 
     try:
         link_result = await _create_razorpay_payment_link_for_product(product)
-        await db.products.update_one({"id": product_id}, {"$set": link_result["fields"]})
+        try:
+            await db.products.update_one({"id": product_id}, {"$set": link_result["fields"]})
+        except Exception as error:
+            safe_detail = mongodb_public_error(error)
+            payment_link_id = link_result.get("fields", {}).get("razorpay_payment_link_id")
+            print("ADMIN_CREATE_PAYMENT_LINK_RETURN_DB_SAVE_WARNING", product_id, payment_link_id, safe_detail)
+            logger.exception("Payment link created but local save failed product_id=%s payment_link_id=%s detail=%s", product_id, payment_link_id, safe_detail)
+            return _json_error_response(
+                503,
+                "Payment link created in Razorpay but could not be saved locally",
+                code="PAYMENT_LINK_SAVE_WARNING",
+                detail=safe_detail,
+                extra={
+                    "payment_link_id": payment_link_id,
+                    "payment_link_url": link_result.get("fields", {}).get("razorpay_payment_link_url"),
+                    "payment_link_status": link_result.get("fields", {}).get("razorpay_payment_link_status"),
+                },
+            )
         print("ADMIN_CREATE_PAYMENT_LINK_RETURN_SUCCESS", product_id, link_result.get("created"))
         return {
             "success": True,
@@ -3022,9 +3100,16 @@ async def admin_create_product_payment_link(product_id: str, current_admin: Admi
         print("ADMIN_CREATE_PAYMENT_LINK_RETURN_HTTP_ERROR", product_id, error.status_code, safe_detail)
         print("Payment link creation failed:", repr(error))
         if error.status_code in {401, 402, 403, 502, 503} and (
-            safe_detail == RAZORPAY_AUTH_ERROR_MESSAGE or safe_detail == RAZORPAY_CONFIG_ERROR_MESSAGE
+            safe_detail == RAZORPAY_AUTH_ERROR_MESSAGE
+            or safe_detail == RAZORPAY_CONFIG_ERROR_MESSAGE
+            or (isinstance(error.detail, dict) and error.detail.get("code") == "RAZORPAY_CONFIG_ERROR")
         ):
             return _payment_link_config_error_response("create")
+        if isinstance(error.detail, dict):
+            return JSONResponse(
+                status_code=error.status_code if error.status_code < 500 else 502,
+                content=error.detail,
+            )
         return _json_error_response(
             error.status_code if error.status_code < 500 else 502,
             "Payment link creation failed",
@@ -3062,7 +3147,24 @@ async def admin_refresh_product_payment_link(product_id: str, current_admin: Adm
 
     try:
         link_result = await _refresh_razorpay_payment_link_for_product(product)
-        await db.products.update_one({"id": product_id}, {"$set": link_result["fields"]})
+        try:
+            await db.products.update_one({"id": product_id}, {"$set": link_result["fields"]})
+        except Exception as error:
+            safe_detail = mongodb_public_error(error)
+            payment_link_id = link_result.get("fields", {}).get("razorpay_payment_link_id")
+            print("ADMIN_REFRESH_PAYMENT_LINK_RETURN_DB_SAVE_WARNING", product_id, payment_link_id, safe_detail)
+            logger.exception("Payment link refresh succeeded but local save failed product_id=%s payment_link_id=%s detail=%s", product_id, payment_link_id, safe_detail)
+            return _json_error_response(
+                503,
+                "Payment link status refreshed in Razorpay but could not be saved locally",
+                code="PAYMENT_LINK_SAVE_WARNING",
+                detail=safe_detail,
+                extra={
+                    "payment_link_id": payment_link_id,
+                    "payment_link_url": link_result.get("fields", {}).get("razorpay_payment_link_url"),
+                    "payment_link_status": link_result.get("fields", {}).get("razorpay_payment_link_status"),
+                },
+            )
         print("ADMIN_REFRESH_PAYMENT_LINK_RETURN_SUCCESS", product_id)
         return {
             "success": True,
@@ -3073,10 +3175,29 @@ async def admin_refresh_product_payment_link(product_id: str, current_admin: Adm
         safe_detail = error.detail if isinstance(error.detail, str) else "Payment link status refresh failed"
         print("ADMIN_REFRESH_PAYMENT_LINK_RETURN_HTTP_ERROR", product_id, error.status_code, safe_detail)
         print("Payment link status refresh failed:", repr(error))
+        if (
+            isinstance(error.detail, dict)
+            and error.detail.get("code") == "STALE_PAYMENT_LINK"
+            and product.get("razorpay_payment_link_id")
+        ):
+            try:
+                await db.products.update_one(
+                    {"id": product_id},
+                    {"$set": {"razorpay_payment_link_status": "stale"}, "$unset": {"razorpay_payment_link_id": "", "razorpay_payment_link_url": ""}},
+                )
+            except Exception as stale_update_error:
+                logger.exception("Failed to clear stale payment link metadata product_id=%s error=%s", product_id, mongodb_public_error(stale_update_error))
         if error.status_code in {401, 402, 403, 502, 503} and (
-            safe_detail == RAZORPAY_AUTH_ERROR_MESSAGE or safe_detail == RAZORPAY_CONFIG_ERROR_MESSAGE
+            safe_detail == RAZORPAY_AUTH_ERROR_MESSAGE
+            or safe_detail == RAZORPAY_CONFIG_ERROR_MESSAGE
+            or (isinstance(error.detail, dict) and error.detail.get("code") == "RAZORPAY_CONFIG_ERROR")
         ):
             return _payment_link_config_error_response("refresh")
+        if isinstance(error.detail, dict):
+            return JSONResponse(
+                status_code=error.status_code if error.status_code < 500 else 502,
+                content=error.detail,
+            )
         return _json_error_response(
             error.status_code if error.status_code < 500 else 502,
             "Payment link status refresh failed",
@@ -4715,14 +4836,34 @@ def _product_price_paise(product: dict) -> int:
 
 
 def _payment_link_amount_paise(product: dict) -> int:
-    price_rupees = product.get("sale_price")
-    if price_rupees is None:
-        price_rupees = product.get("price", 0)
-    amount = int(round(float(price_rupees or 0) * 100))
-    if amount <= 0:
-        raise HTTPException(status_code=400, detail="Payment Link requires a paid product")
-    if amount < 100:
-        raise HTTPException(status_code=400, detail="Amount must be at least 100 paise")
+    raw_price = product.get("sale_price")
+    if raw_price in (None, ""):
+        raw_price = product.get("price", 0)
+    if isinstance(raw_price, str):
+        cleaned = raw_price.strip().replace(",", "")
+        cleaned = re.sub(r"^[^\d\-+.]+", "", cleaned)
+    else:
+        cleaned = raw_price
+    try:
+        amount = int(round(float(cleaned or 0) * 100))
+    except (TypeError, ValueError):
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "success": False,
+                "message": "Invalid product price for Razorpay Payment Link",
+                "code": "INVALID_PRODUCT_PRICE",
+            },
+        )
+    if product.get("is_free") or amount <= 0 or amount < 100:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "success": False,
+                "message": "Invalid product price for Razorpay Payment Link",
+                "code": "INVALID_PRODUCT_PRICE",
+            },
+        )
     return amount
 
 
@@ -4735,7 +4876,68 @@ def _payment_link_fields(payment_link: dict) -> dict:
 
 
 def _payment_link_reference(product: dict) -> str:
-    return f"cms-product-{product.get('slug') or product.get('id')}"
+    product_key = product.get("slug") or product.get("id") or "product"
+    return f"cms-product:{product_key}:{int(datetime.now(timezone.utc).timestamp() * 1000)}"
+
+
+def _payment_link_callback_url(product: dict) -> str:
+    product_path = product.get("product_url") or (f"/assets/{product.get('slug')}" if product.get("slug") else "/assets")
+    if str(product_path).startswith("http://") or str(product_path).startswith("https://"):
+        return str(product_path)
+    return f"{_public_site_base()}{product_path if str(product_path).startswith('/') else f'/{product_path}'}"
+
+
+def _payment_link_error_http_exception(exc: Exception, *, action: str) -> HTTPException:
+    details = _razorpay_log_details(exc)
+    logger.warning("Razorpay payment link %s failed details=%s", action, details)
+    if _is_razorpay_auth_error(exc):
+        return HTTPException(
+            status_code=502,
+            detail={
+                "success": False,
+                "message": RAZORPAY_AUTH_ERROR_MESSAGE,
+                "code": "RAZORPAY_CONFIG_ERROR",
+            },
+        )
+
+    description = str(details.get("description") or details.get("message") or details.get("reason") or "Razorpay request failed")
+    code = str(details.get("code") or "").upper()
+    status_code = _razorpay_http_status(exc, default=400)
+
+    if "reference" in description.lower() and "already" in description.lower():
+        return HTTPException(
+            status_code=409,
+            detail={
+                "success": False,
+                "message": "Razorpay rejected a duplicate payment link reference",
+                "code": "DUPLICATE_REFERENCE_ID",
+                "detail": description[:240],
+            },
+        )
+    if action == "refresh" and _razorpay_not_found_error(exc):
+        return HTTPException(
+            status_code=404,
+            detail={
+                "success": False,
+                "message": "Stored Razorpay Payment Link is stale or no longer exists",
+                "code": "STALE_PAYMENT_LINK",
+                "detail": description[:240],
+            },
+        )
+    return HTTPException(
+        status_code=status_code if status_code < 500 else 502,
+        detail={
+            "success": False,
+            "message": "Payment link creation failed" if action == "create" else "Payment link status refresh failed",
+            "code": "RAZORPAY_API_ERROR",
+            "detail": description[:240],
+            "razorpay_error": {
+                key: value
+                for key, value in details.items()
+                if key in {"code", "description", "field", "source", "step", "status_code"}
+            },
+        },
+    )
 
 
 async def _create_razorpay_payment_link_for_product(product: dict, force: bool = False) -> dict:
@@ -4755,44 +4957,49 @@ async def _create_razorpay_payment_link_for_product(product: dict, force: bool =
             },
         }
     amount = _payment_link_amount_paise(product)
+    reference_id = _payment_link_reference(product)
     payload = {
         "amount": amount,
         "currency": "INR",
-        "description": f"PranvithDOP product: {product.get('name', 'Product')}",
-        "reference_id": _payment_link_reference(product),
-        "notes": {
-            "product_id": product.get("id", ""),
-            "product_slug": product.get("slug", ""),
-            "product_name": product.get("name", ""),
-        },
+        "description": str(product.get("name") or product.get("title") or "PranvithDOP Product")[:120],
+        "reference_id": reference_id,
+        "callback_url": _payment_link_callback_url(product),
+        "callback_method": "get",
     }
     try:
         payment_link = client.payment_link.create(payload)
     except HTTPException:
         raise
+    except razorpay.errors.BadRequestError as exc:
+        raise _payment_link_error_http_exception(exc, action="create")
+    except razorpay.errors.ServerError as exc:
+        raise _payment_link_error_http_exception(exc, action="create")
     except Exception as exc:
-        if _is_razorpay_auth_error(exc):
-            logger.warning("Razorpay Payment Link authentication failed product_id=%s slug=%s config=%s error=%s", product.get("id"), product.get("slug"), razorpay_config_summary(), _razorpay_error_summary(exc))
-            raise HTTPException(status_code=502, detail=RAZORPAY_AUTH_ERROR_MESSAGE)
-        logger.exception("Razorpay Payment Link creation failed product_id=%s slug=%s", product.get("id"), product.get("slug"))
-        raise HTTPException(status_code=502, detail=_razorpay_public_error(exc))
+        raise _payment_link_error_http_exception(exc, action="create")
     fields = _payment_link_fields(payment_link)
-    return {"created": True, "payment_link": payment_link, "fields": fields}
+    return {"created": True, "payment_link": payment_link, "fields": fields, "reference_id": reference_id}
 
 
 async def _refresh_razorpay_payment_link_for_product(product: dict) -> dict:
     payment_link_id = product.get("razorpay_payment_link_id")
     if not payment_link_id:
-        raise HTTPException(status_code=404, detail="Razorpay Payment Link is not configured for this product")
+        raise HTTPException(
+            status_code=404,
+            detail={
+                "success": False,
+                "message": "No Razorpay Payment Link exists for this product",
+                "code": "STALE_PAYMENT_LINK",
+            },
+        )
     client = _require_razorpay_client()
     try:
         payment_link = client.payment_link.fetch(payment_link_id)
+    except razorpay.errors.BadRequestError as exc:
+        raise _payment_link_error_http_exception(exc, action="refresh")
+    except razorpay.errors.ServerError as exc:
+        raise _payment_link_error_http_exception(exc, action="refresh")
     except Exception as exc:
-        if _is_razorpay_auth_error(exc):
-            logger.warning("Razorpay Payment Link refresh authentication failed product_id=%s payment_link_id=%s config=%s error=%s", product.get("id"), payment_link_id, razorpay_config_summary(), _razorpay_error_summary(exc))
-            raise HTTPException(status_code=502, detail=RAZORPAY_AUTH_ERROR_MESSAGE)
-        logger.exception("Razorpay Payment Link refresh failed product_id=%s payment_link_id=%s", product.get("id"), payment_link_id)
-        raise HTTPException(status_code=502, detail=_razorpay_public_error(exc))
+        raise _payment_link_error_http_exception(exc, action="refresh")
     fields = _payment_link_fields(payment_link)
     return {"payment_link": payment_link, "fields": fields}
 
@@ -5037,13 +5244,6 @@ def _send_confirmation_email(to_email: str, buyer_name: str, product_name: str, 
     return _send_download_email(to_email, buyer_name, product_name, payment_id, download_url)
 
 
-def _razorpay_public_error(exc: Exception) -> str:
-    detail = str(exc).strip()
-    if not detail:
-        return "Razorpay verification failed"
-    return detail[:240]
-
-
 def _extract_razorpay_items(response: Any) -> list:
     if isinstance(response, dict):
         items = response.get("items")
@@ -5199,6 +5399,19 @@ def _webhook_notes(*entities: dict) -> dict:
     return {}
 
 
+def _payment_link_reference_product_key(reference_id: Optional[str]) -> Optional[str]:
+    reference = str(reference_id or "").strip()
+    if not reference:
+        return None
+    if reference.startswith("cms-product:"):
+        parts = reference.split(":", 2)
+        if len(parts) >= 2:
+            return parts[1] or None
+    if reference.startswith("cms-product-"):
+        return reference.replace("cms-product-", "", 1) or None
+    return None
+
+
 async def _find_payment_link_product(payment_entity: dict, payment_link_entity: dict, order_entity: dict) -> Optional[dict]:
     notes = _webhook_notes(payment_entity, payment_link_entity, order_entity)
     product_id = notes.get("product_id")
@@ -5217,8 +5430,8 @@ async def _find_payment_link_product(payment_entity: dict, payment_link_entity: 
         query_options.append({"slug": product_slug})
     if payment_link_id:
         query_options.append({"razorpay_payment_link_id": payment_link_id})
-    if reference_id and str(reference_id).startswith("cms-product-"):
-        slug_or_id = str(reference_id).replace("cms-product-", "", 1)
+    slug_or_id = _payment_link_reference_product_key(reference_id)
+    if slug_or_id:
         query_options.extend([{"slug": slug_or_id}, {"id": slug_or_id}])
 
     for query in query_options:
