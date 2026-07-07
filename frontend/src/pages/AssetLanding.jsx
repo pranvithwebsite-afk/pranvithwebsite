@@ -645,15 +645,7 @@ const ProductMediaSection = ({ product, galleryImages }) => {
   };
 
   if (!hasGallery && !hasVideo) {
-    return (
-      <section className="pb-16">
-        <div className="mx-auto max-w-7xl px-6">
-          <div className="cinematic-card p-8 text-sm text-white/65">
-            Preview images and media are not available for this asset yet.
-          </div>
-        </div>
-      </section>
-    );
+    return null;
   }
 
   return (
