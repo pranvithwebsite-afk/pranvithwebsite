@@ -105,8 +105,51 @@ const rejectUnsafeMediaUrl = (value) => {
   return trimmed;
 };
 
+const getProductImageCandidates = (product = {}) => {
+  const fromList = (value) => (
+    Array.isArray(value)
+      ? value.map((item) => String(item ?? '').trim()).filter(Boolean)
+      : []
+  );
+  const fromMedia = (value) => {
+    if (Array.isArray(value)) {
+      return value.flatMap((item) => fromMedia(item));
+    }
+    if (typeof value === 'string') {
+      const trimmed = value.trim();
+      return trimmed ? [trimmed] : [];
+    }
+    if (value && typeof value === 'object') {
+      return [
+        value.url,
+        value.public_url,
+        value.image_url,
+        value.src,
+        value.original_url,
+        value.thumbnail_url,
+      ]
+        .map((item) => String(item ?? '').trim())
+        .filter(Boolean);
+    }
+    return [];
+  };
+
+  return [
+    ...fromList(product.product_images),
+    ...fromList(product.images),
+    ...fromList(product.gallery),
+    ...fromList(product.gallery_images),
+    ...fromList(product.image_urls),
+    ...fromMedia(product.media),
+    String(product.image_url || '').trim(),
+    String(product.thumbnail_url || '').trim(),
+    String(product.preview_image_url || '').trim(),
+    String(product.cover_image_url || '').trim(),
+  ].filter((item, index, list) => item && list.indexOf(item) === index);
+};
+
 const normalizeProductForForm = (product = {}) => {
-  const productImages = product.product_images || product.images || [];
+  const productImages = getProductImageCandidates(product);
   return {
     ...defaultProductForm,
     ...product,

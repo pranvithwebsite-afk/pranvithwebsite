@@ -3,6 +3,8 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
 import {
+  X,
+  ChevronLeft,
   ChevronRight,
   CheckCircle,
   ShieldCheck,
@@ -27,6 +29,32 @@ const toStringList = (value) => (
     ? value.map((item) => String(item ?? '').trim()).filter(Boolean)
     : []
 );
+
+const toMediaUrlList = (value) => {
+  if (Array.isArray(value)) {
+    return value.flatMap((item) => toMediaUrlList(item));
+  }
+
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    return trimmed ? [trimmed] : [];
+  }
+
+  if (value && typeof value === 'object') {
+    return [
+      value.url,
+      value.public_url,
+      value.image_url,
+      value.src,
+      value.original_url,
+      value.thumbnail_url,
+    ]
+      .map((item) => String(item ?? '').trim())
+      .filter(Boolean);
+  }
+
+  return [];
+};
 
 const toFaqList = (value) => (
   Array.isArray(value)
@@ -63,6 +91,21 @@ const normalizeProduct = (value) => {
     ...toStringList(product.images),
     ...toStringList(product.product_images),
   ];
+  const galleryImages = [
+    ...toMediaUrlList(product.images),
+    ...toMediaUrlList(product.product_images),
+    ...toMediaUrlList(product.gallery),
+    ...toMediaUrlList(product.gallery_images),
+    ...toMediaUrlList(product.image_urls),
+    ...toMediaUrlList(product.media),
+    ...toMediaUrlList(product.image_url),
+    ...toMediaUrlList(product.thumbnail_url),
+    ...toMediaUrlList(product.preview_image_url),
+    ...toMediaUrlList(product.cover_image_url),
+  ]
+    .map((image) => safeImageSrc(image, ''))
+    .filter(Boolean)
+    .filter((image, index, list) => list.indexOf(image) === index);
   const heroImage = safeImageSrc(
     product.hero_image
     || product.thumbnail_url
@@ -71,10 +114,6 @@ const normalizeProduct = (value) => {
     || '',
     ''
   );
-  const galleryImages = images
-    .map((image) => safeImageSrc(image, ''))
-    .filter(Boolean)
-    .filter((image, index, list) => list.indexOf(image) === index);
   const faqs = dedupeFaqs([
     ...toFaqList(landing.faqs),
     ...toFaqList(product.faqs),
@@ -84,6 +123,7 @@ const normalizeProduct = (value) => {
     raw: product,
     landing,
     name: String(product.name || product.title || 'Asset').trim() || 'Asset',
+    title: String(product.title || product.name || 'Asset').trim() || 'Asset',
     slug: String(product.slug || '').trim(),
     description: String(product.description || '').trim(),
     category: String(product.category || '').trim() || 'Asset',
@@ -553,7 +593,11 @@ const PriceCard = ({ price, isFree, busy, product, onPrimaryCta, onShare, classN
 );
 
 const ProductMediaSection = ({ product, galleryImages }) => {
-  const hasGallery = Array.isArray(galleryImages) && galleryImages.length > 0;
+  const [failedImages, setFailedImages] = useState([]);
+  const [lightboxIndex, setLightboxIndex] = useState(-1);
+  const visibleGalleryImages = (Array.isArray(galleryImages) ? galleryImages : [])
+    .filter((image) => !failedImages.includes(image));
+  const hasGallery = visibleGalleryImages.length > 0;
   const productVideoUrl = product?.videoType === 'youtube' ? product?.youtubeUrl : product?.videoUrl;
   const hasVideo = product?.videoType === 'youtube'
     ? !!getSafeVideoEmbedUrl('youtube', product?.youtubeUrl)
@@ -562,6 +606,58 @@ const ProductMediaSection = ({ product, galleryImages }) => {
       || isDirectVideoUrl(productVideoUrl)
       || !!getSafeVideoEmbedUrl(product?.videoType, productVideoUrl)
     );
+  const hasLightbox = lightboxIndex >= 0 && lightboxIndex < visibleGalleryImages.length;
+  const titleForAlt = String(product?.title || product?.name || 'Product').trim() || 'Product';
+
+  useEffect(() => {
+    setFailedImages([]);
+    setLightboxIndex(-1);
+  }, [galleryImages]);
+
+  useEffect(() => {
+    if (!hasLightbox) return undefined;
+
+    const previousOverflow = document.body.style.overflow;
+    const onKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        setLightboxIndex(-1);
+        return;
+      }
+      if (event.key === 'ArrowLeft' && visibleGalleryImages.length > 1) {
+        setLightboxIndex((current) => (current - 1 + visibleGalleryImages.length) % visibleGalleryImages.length);
+      }
+      if (event.key === 'ArrowRight' && visibleGalleryImages.length > 1) {
+        setLightboxIndex((current) => (current + 1) % visibleGalleryImages.length);
+      }
+    };
+
+    document.body.style.overflow = 'hidden';
+    window.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener('keydown', onKeyDown);
+    };
+  }, [hasLightbox, visibleGalleryImages.length]);
+
+  const handleGalleryImageError = (image) => {
+    setFailedImages((current) => (current.includes(image) ? current : [...current, image]));
+  };
+
+  const openLightbox = (index) => {
+    setLightboxIndex(index);
+  };
+
+  const closeLightbox = () => {
+    setLightboxIndex(-1);
+  };
+
+  const showPrevious = () => {
+    setLightboxIndex((current) => (current - 1 + visibleGalleryImages.length) % visibleGalleryImages.length);
+  };
+
+  const showNext = () => {
+    setLightboxIndex((current) => (current + 1) % visibleGalleryImages.length);
+  };
 
   if (!hasGallery && !hasVideo) {
     return (
@@ -581,17 +677,24 @@ const ProductMediaSection = ({ product, galleryImages }) => {
         {hasGallery && (
           <div>
             <h2 className="mb-8 text-3xl font-bold tracking-tight">Product Gallery</h2>
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {galleryImages.map((image, index) => (
-                <OptimizedImage
+            <div className="grid gap-4 grid-cols-1 md:grid-cols-2 xl:grid-cols-3">
+              {visibleGalleryImages.map((image, index) => (
+                <button
                   key={`${image}-${index}`}
-                  src={safeImageSrc(image)}
-                  alt={`${product?.name || 'Asset'} preview ${index + 1}`}
-                  width={420}
-                  height={236}
-                  className="aspect-video w-full rounded-3xl border border-purple-300/20 bg-[#090712] object-cover"
-                  onError={handleImageError}
-                />
+                  type="button"
+                  onClick={() => openLightbox(index)}
+                  className="group relative overflow-hidden rounded-3xl border border-white/10 bg-[#090712] text-left shadow-[0_0_28px_rgba(0,0,0,0.28)] transition hover:border-purple-300/25 focus:outline-none focus:ring-2 focus:ring-violet-400/70"
+                >
+                  <OptimizedImage
+                    src={image}
+                    alt={`${titleForAlt} gallery image`}
+                    width={420}
+                    height={236}
+                    className="aspect-video w-full cursor-pointer object-cover transition duration-300 group-hover:scale-[1.04]"
+                    fallback=""
+                    onError={() => handleGalleryImageError(image)}
+                  />
+                </button>
               ))}
             </div>
           </div>
@@ -612,6 +715,60 @@ const ProductMediaSection = ({ product, galleryImages }) => {
           </div>
         )}
       </div>
+      {hasLightbox && (
+        <div
+          className="fixed inset-0 z-[120] flex items-center justify-center bg-black/88 px-4 py-6 backdrop-blur-sm"
+          onClick={closeLightbox}
+          role="dialog"
+          aria-modal="true"
+          aria-label={`${titleForAlt} image viewer`}
+        >
+          <button
+            type="button"
+            onClick={closeLightbox}
+            className="absolute right-4 top-4 inline-flex h-11 w-11 items-center justify-center rounded-full border border-white/15 bg-black/60 text-white transition hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-violet-400/70 sm:right-6 sm:top-6"
+            aria-label="Close gallery"
+          >
+            <X size={22} />
+          </button>
+
+          {visibleGalleryImages.length > 1 && (
+            <button
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation();
+                showPrevious();
+              }}
+              className="absolute left-3 top-1/2 inline-flex h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full border border-white/15 bg-black/60 text-white transition hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-violet-400/70 sm:left-6 sm:h-14 sm:w-14"
+              aria-label="Previous image"
+            >
+              <ChevronLeft size={24} />
+            </button>
+          )}
+
+          <div className="flex max-h-full max-w-full items-center justify-center" onClick={(event) => event.stopPropagation()}>
+            <img
+              src={visibleGalleryImages[lightboxIndex]}
+              alt={`${titleForAlt} gallery image`}
+              className="max-h-[88vh] max-w-[92vw] rounded-[28px] border border-white/10 bg-[#05030b] object-contain shadow-[0_24px_100px_rgba(0,0,0,0.55)]"
+            />
+          </div>
+
+          {visibleGalleryImages.length > 1 && (
+            <button
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation();
+                showNext();
+              }}
+              className="absolute right-3 top-1/2 inline-flex h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full border border-white/15 bg-black/60 text-white transition hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-violet-400/70 sm:right-6 sm:h-14 sm:w-14"
+              aria-label="Next image"
+            >
+              <ChevronRight size={24} />
+            </button>
+          )}
+        </div>
+      )}
     </section>
   );
 };
