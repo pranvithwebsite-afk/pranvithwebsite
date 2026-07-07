@@ -190,6 +190,26 @@ def _payment_link_config_error_response(action: str) -> JSONResponse:
     )
 
 
+def _payment_link_warning_payload(error: Exception) -> dict:
+    if isinstance(error, HTTPException):
+        if isinstance(error.detail, dict):
+            return error.detail
+        detail = error.detail if isinstance(error.detail, str) else "Payment Link operation failed"
+        return {
+            "success": False,
+            "code": "RAZORPAY_API_ERROR",
+            "message": "Payment link creation failed",
+            "detail": detail,
+        }
+    detail = _razorpay_public_error(error)
+    return {
+        "success": False,
+        "code": "RAZORPAY_API_ERROR",
+        "message": "Payment link creation failed",
+        "detail": detail,
+    }
+
+
 def _payment_link_config_status() -> dict:
     return {
         "RAZORPAY_KEY_ID": "SET" if RAZORPAY_KEY_ID else "MISSING",
@@ -3801,14 +3821,14 @@ async def admin_create_product(payload: ProductIn, current_admin: AdminBase = De
         doc["slug"],
     )
     warning = None
-    if create_payment_link:
+    if create_payment_link and not doc.get("razorpay_payment_link_id"):
         try:
             link_result = await _create_razorpay_payment_link_for_product(doc)
             doc.update(link_result["fields"])
             await db.products.update_one({"id": doc["id"]}, {"$set": link_result["fields"]})
         except Exception as exc:
-            warning = "Product saved, but Razorpay Payment Link creation failed."
-            logger.warning("Product saved without Razorpay Payment Link id=%s slug=%s error=%s", doc["id"], doc["slug"], exc)
+            warning = _payment_link_warning_payload(exc)
+            logger.warning("Product saved without Razorpay Payment Link id=%s slug=%s warning=%s", doc["id"], doc["slug"], warning)
     response = {"success": True, "product": doc}
     if warning:
         response["warning"] = warning
@@ -3834,13 +3854,14 @@ async def admin_update_product(product_id: str, payload: ProductIn, current_admi
     warning = None
     if create_payment_link:
         product = await db.products.find_one({"id": product_id}, {"_id": 0})
-        try:
-            link_result = await _create_razorpay_payment_link_for_product(product)
-            await db.products.update_one({"id": product_id}, {"$set": link_result["fields"]})
-            product.update(link_result["fields"])
-        except Exception as exc:
-            warning = "Product saved, but Razorpay Payment Link creation failed."
-            logger.warning("Product updated without Razorpay Payment Link id=%s slug=%s error=%s", product_id, update_doc["slug"], exc)
+        if not product.get("razorpay_payment_link_id"):
+            try:
+                link_result = await _create_razorpay_payment_link_for_product(product)
+                await db.products.update_one({"id": product_id}, {"$set": link_result["fields"]})
+                product.update(link_result["fields"])
+            except Exception as exc:
+                warning = _payment_link_warning_payload(exc)
+                logger.warning("Product updated without Razorpay Payment Link id=%s slug=%s warning=%s", product_id, update_doc["slug"], warning)
     response = {"success": True}
     if warning:
         response["warning"] = warning

@@ -83,6 +83,15 @@ const adminRequestFailureMessage = (error, fallbackMessage) => {
   return `${status} ${requestUrl || 'request'}: ${backendMessage || fallbackMessage}`;
 };
 
+const paymentLinkWarningMessage = (warning, fallbackMessage) => {
+  if (!warning) return fallbackMessage;
+  if (typeof warning === 'string') return warning;
+  const code = warning?.code || 'UNKNOWN';
+  const message = warning?.message || fallbackMessage;
+  const detail = warning?.detail || '';
+  return `${code}: ${message}${detail ? ` (${detail})` : ''}`;
+};
+
 const rejectUnsafeMediaUrl = (value) => {
   const trimmed = String(value || '').trim();
   if (/^(javascript|data|vbscript):/i.test(trimmed)) {
@@ -195,10 +204,10 @@ const Products = () => {
       setSaving(true);
       if (editingId) {
         const result = await updateAdminProduct(editingId, payload);
-        toast[result?.warning ? 'warning' : 'success'](result?.warning || 'Product saved successfully');
+        toast[result?.warning ? 'warning' : 'success'](result?.warning ? paymentLinkWarningMessage(result.warning, 'Product saved successfully') : 'Product saved successfully');
       } else {
         const result = await createAdminProduct(payload);
-        toast[result?.warning ? 'warning' : 'success'](result?.warning || 'Product saved successfully');
+        toast[result?.warning ? 'warning' : 'success'](result?.warning ? paymentLinkWarningMessage(result.warning, 'Product saved successfully') : 'Product saved successfully');
       }
       closeForm();
       try {
@@ -681,8 +690,8 @@ const ProductForm = ({
             className="mt-1 h-4 w-4 rounded"
           />
           <span>
-            <span className="block font-semibold text-white">Create Razorpay Payment Link</span>
-            <span className="mt-1 block text-slate-500">Website checkout uses Razorpay Orders automatically. Payment Links are optional for manual sharing.</span>
+            <span className="block font-semibold text-white">Also create Razorpay Payment Link after save</span>
+            <span className="mt-1 block text-slate-500">Leave this off for normal product saves. Website checkout uses Razorpay Orders automatically, and the manual Create Payment Link button remains available separately.</span>
           </span>
         </label>
 

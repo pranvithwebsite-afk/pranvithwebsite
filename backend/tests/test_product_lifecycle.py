@@ -248,6 +248,56 @@ def test_product_save_supports_new_media_fields(monkeypatch):
     assert product["download_file_key"] == "downloads/creative-lut/paid-download/file.zip"
 
 
+def test_product_save_returns_structured_warning_when_optional_payment_link_fails(monkeypatch):
+    fake_db = FakeDatabase()
+    monkeypatch.setattr(server, "db", fake_db)
+
+    async def boom(_product, force=False):
+        raise server.HTTPException(
+            status_code=409,
+            detail={
+                "success": False,
+                "code": "DUPLICATE_REFERENCE_ID",
+                "message": "Razorpay rejected a duplicate payment link reference",
+                "detail": "reference_id already exists",
+                "razorpay_error": {
+                    "code": "BAD_REQUEST_ERROR",
+                    "description": "reference_id already exists",
+                    "field": "reference_id",
+                    "source": "business",
+                    "step": "payment_link_create",
+                },
+            },
+        )
+
+    monkeypatch.setattr(server, "_create_razorpay_payment_link_for_product", boom)
+
+    payload = server.ProductIn(
+        slug="creative-lut-warning",
+        name="Creative LUT Warning",
+        price=499,
+        create_razorpay_payment_link=True,
+    )
+
+    response = asyncio.run(server.admin_create_product(payload, None))
+
+    assert response["success"] is True
+    assert response["product"]["slug"] == "creative-lut-warning"
+    assert response["warning"] == {
+        "success": False,
+        "code": "DUPLICATE_REFERENCE_ID",
+        "message": "Razorpay rejected a duplicate payment link reference",
+        "detail": "reference_id already exists",
+        "razorpay_error": {
+            "code": "BAD_REQUEST_ERROR",
+            "description": "reference_id already exists",
+            "field": "reference_id",
+            "source": "business",
+            "step": "payment_link_create",
+        },
+    }
+
+
 def test_upload_accepts_valid_image(monkeypatch):
     calls = []
 
