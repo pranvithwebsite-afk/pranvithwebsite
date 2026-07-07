@@ -445,14 +445,9 @@ const AssetLanding = () => {
                   <span className="mb-6 inline-flex items-center justify-center rounded-full border border-purple-300/20 bg-purple-500/15 px-4 py-2 text-xs uppercase tracking-[0.35em] text-purple-200">
                     Get Instant Access
                   </span>
-                  <h2 className="text-3xl font-bold tracking-tight text-white sm:text-4xl">
+                  <h2 className="mx-auto max-w-3xl text-balance text-3xl font-bold tracking-tight text-white sm:text-4xl">
                     {isFree ? `Claim ${name}` : `Get ${name} today`}
                   </h2>
-                  <ProductDescription
-                    value={description || 'Instant access after checkout.'}
-                    className="mx-auto mt-5 max-w-2xl space-y-4 text-left sm:text-center"
-                    listClassName="text-left sm:text-left"
-                  />
                   <button
                     onClick={onPrimaryCta}
                     disabled={busy || !product}
