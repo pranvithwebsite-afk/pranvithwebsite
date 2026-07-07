@@ -185,10 +185,40 @@ def test_create_payment_link_uses_unique_reference_id_and_callback(monkeypatch):
     payload = payment_link_api.created_payloads[0]
     assert payload["amount"] == 49900
     assert payload["currency"] == "INR"
-    assert payload["reference_id"].startswith("cms-product:creative-lut-pack:")
+    assert payload["reference_id"].startswith("pl_product1_")
+    assert len(payload["reference_id"]) <= 40
     assert payload["callback_url"] == "https://pranvithdop.com/assets/creative-lut-pack"
     assert payload["callback_method"] == "get"
     assert "notes" not in payload
+    assert response["razorpay_payment_link_reference_id"] == payload["reference_id"]
+
+
+def test_make_payment_link_reference_is_always_40_chars_or_less():
+    product = {
+        "id": "cc91e97f1234567890abcdef",
+        "slug": "this-is-a-very-long-product-slug-that-should-not-appear-in-full",
+        "name": "Very Long Product Name That Should Not Be Used As The Razorpay Reference",
+    }
+
+    reference_id = server.make_payment_link_reference(product)
+
+    assert reference_id.startswith("pl_cc91e97f_")
+    assert len(reference_id) <= 40
+
+
+def test_make_payment_link_reference_ignores_long_slug_and_title():
+    product = {
+        "id": "ABCD1234EFGH5678IJKL9012MNOP3456",
+        "slug": "x" * 120,
+        "name": "y" * 200,
+    }
+
+    reference_id = server.make_payment_link_reference(product)
+
+    assert len(reference_id) <= 40
+    assert reference_id.startswith("pl_abcd1234_")
+    assert "x" * 10 not in reference_id
+    assert "y" * 10 not in reference_id
 
 
 def test_create_payment_link_rejects_invalid_product_price(monkeypatch):
@@ -340,6 +370,21 @@ def test_domain_config_debug_route_returns_safe_domain_values(monkeypatch):
         "CLOUDFLARE_R2_PUBLIC_BASE_URL": "https://assets.pranvithdop.com",
         "api_expected": "/api routes on same Vercel domain",
     }
+
+
+def test_find_payment_link_product_supports_new_short_reference_id(monkeypatch):
+    product = _creatable_product()
+    product["razorpay_payment_link_reference_id"] = "pl_cc91e97f_lx8k21"
+    fake_db = FakeDatabase([product])
+    monkeypatch.setattr(server, "db", fake_db)
+
+    found = asyncio.run(server._find_payment_link_product(
+        payment_entity={},
+        payment_link_entity={"reference_id": "pl_cc91e97f_lx8k21"},
+        order_entity={},
+    ))
+
+    assert found["id"] == product["id"]
 
 
 def test_unhandled_api_exception_handler_returns_json():

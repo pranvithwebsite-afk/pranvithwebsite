@@ -4896,9 +4896,26 @@ def _payment_link_fields(payment_link: dict) -> dict:
     }
 
 
-def _payment_link_reference(product: dict) -> str:
-    product_key = product.get("slug") or product.get("id") or "product"
-    return f"cms-product:{product_key}:{int(datetime.now(timezone.utc).timestamp() * 1000)}"
+def _base36_encode(number: int) -> str:
+    digits = "0123456789abcdefghijklmnopqrstuvwxyz"
+    value = max(int(number or 0), 0)
+    if value == 0:
+        return "0"
+    encoded = []
+    while value:
+        value, remainder = divmod(value, 36)
+        encoded.append(digits[remainder])
+    return "".join(reversed(encoded))
+
+
+def make_payment_link_reference(product: dict) -> str:
+    product_id = str(product.get("id") or product.get("slug") or "product").strip().lower()
+    short_product_id = re.sub(r"[^a-z0-9]", "", product_id)[:8] or "product"
+    short_timestamp = _base36_encode(int(datetime.now(timezone.utc).timestamp() * 1000))[-8:]
+    reference = f"pl_{short_product_id}_{short_timestamp}"[:40]
+    if len(reference) > 40:
+        reference = reference[:40]
+    return reference
 
 
 def _payment_link_callback_url(product: dict) -> str:
@@ -4978,7 +4995,7 @@ async def _create_razorpay_payment_link_for_product(product: dict, force: bool =
             },
         }
     amount = _payment_link_amount_paise(product)
-    reference_id = _payment_link_reference(product)
+    reference_id = make_payment_link_reference(product)
     payload = {
         "amount": amount,
         "currency": "INR",
@@ -4997,7 +5014,10 @@ async def _create_razorpay_payment_link_for_product(product: dict, force: bool =
         raise _payment_link_error_http_exception(exc, action="create")
     except Exception as exc:
         raise _payment_link_error_http_exception(exc, action="create")
-    fields = _payment_link_fields(payment_link)
+    fields = {
+        **_payment_link_fields(payment_link),
+        "razorpay_payment_link_reference_id": reference_id,
+    }
     return {"created": True, "payment_link": payment_link, "fields": fields, "reference_id": reference_id}
 
 
@@ -5424,6 +5444,8 @@ def _payment_link_reference_product_key(reference_id: Optional[str]) -> Optional
     reference = str(reference_id or "").strip()
     if not reference:
         return None
+    if reference.startswith("pl_"):
+        return None
     if reference.startswith("cms-product:"):
         parts = reference.split(":", 2)
         if len(parts) >= 2:
@@ -5451,6 +5473,8 @@ async def _find_payment_link_product(payment_entity: dict, payment_link_entity: 
         query_options.append({"slug": product_slug})
     if payment_link_id:
         query_options.append({"razorpay_payment_link_id": payment_link_id})
+    if reference_id and str(reference_id).startswith("pl_"):
+        query_options.append({"razorpay_payment_link_reference_id": str(reference_id)})
     slug_or_id = _payment_link_reference_product_key(reference_id)
     if slug_or_id:
         query_options.extend([{"slug": slug_or_id}, {"id": slug_or_id}])
@@ -5613,7 +5637,7 @@ async def _get_or_create_payment_link_order(
         "razorpay_payment_link_id": payment_link_id,
         "amount": amount,
         "currency": currency,
-        "receipt": payment_link_entity.get("reference_id") or _payment_link_reference(product),
+        "receipt": payment_link_entity.get("reference_id") or product.get("razorpay_payment_link_reference_id") or make_payment_link_reference(product),
         "product_id": product.get("id"),
         "product_slug": product.get("slug"),
         "product_name": product.get("name"),
