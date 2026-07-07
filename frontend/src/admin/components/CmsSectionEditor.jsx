@@ -139,20 +139,20 @@ const SECTION_EDITOR_SCHEMAS = {
   'home:services': createSchema({
     sectionFields: ['section_id', 'type', 'title', 'subtitle', 'enabled'],
     dataFields: ['eyebrow'],
-    itemFields: ['title', 'description', 'category', 'icon', 'link_label', 'link_url', 'sort_order', 'enabled'],
-    itemLabels: { link_url: 'Link URL', link_label: 'Link Label' },
+    itemFields: ['title', 'description', 'image_url', 'icon', 'link_label', 'link_url', 'sort_order', 'enabled'],
+    itemLabels: { image_url: 'Image URL', link_url: 'Link URL', link_label: 'Link Label', icon: 'Icon Name' },
   }),
   'home:services_cards': createSchema({
     sectionFields: ['section_id', 'type', 'title', 'subtitle', 'enabled'],
     dataFields: ['eyebrow'],
-    itemFields: ['title', 'description', 'category', 'icon', 'link_label', 'link_url', 'sort_order', 'enabled'],
-    itemLabels: { link_url: 'Link URL', link_label: 'Link Label' },
+    itemFields: ['title', 'description', 'image_url', 'icon', 'link_label', 'link_url', 'sort_order', 'enabled'],
+    itemLabels: { image_url: 'Image URL', link_url: 'Link URL', link_label: 'Link Label', icon: 'Icon Name' },
   }),
   'home:home_services': createSchema({
     sectionFields: ['section_id', 'type', 'title', 'subtitle', 'enabled'],
     dataFields: ['eyebrow'],
-    itemFields: ['title', 'description', 'category', 'icon', 'link_label', 'link_url', 'sort_order', 'enabled'],
-    itemLabels: { link_url: 'Link URL', link_label: 'Link Label' },
+    itemFields: ['title', 'description', 'image_url', 'icon', 'link_label', 'link_url', 'sort_order', 'enabled'],
+    itemLabels: { image_url: 'Image URL', link_url: 'Link URL', link_label: 'Link Label', icon: 'Icon Name' },
   }),
   'home:showreel': createSchema({
     sectionFields: ['section_id', 'type', 'title', 'subtitle', 'description', 'button_text', 'button_link', ...videoMediaFields, 'enabled'],

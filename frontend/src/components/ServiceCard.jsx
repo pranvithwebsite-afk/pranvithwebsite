@@ -16,9 +16,10 @@ export const serviceIcons = {
 };
 
 export const getServiceImageUrl = (service = {}) =>
-  service.thumbnail_url
+  service.image_url
+  || service.image
+  || service.thumbnail_url
   || service.thumbnail_image_url
-  || service.image_url
   || service.media_url
   || service.poster_url
   || service.banner_url
@@ -38,6 +39,7 @@ const ServiceCard = ({ service, index = 0, linkTarget: customLinkTarget }) => {
             src={safeImageSrc(imageUrl, FALLBACK_IMAGE)}
             alt={service.title}
             className="h-[170px] w-full object-cover sm:h-[180px] lg:h-[190px]"
+            loading="lazy"
             onError={handleImageError}
           />
         ) : (
