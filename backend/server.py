@@ -1,8 +1,9 @@
 from fastapi import FastAPI, APIRouter, HTTPException, Depends, status, UploadFile, File, Form, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.security import OAuth2PasswordBearer
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
-from starlette.responses import JSONResponse, RedirectResponse
+from starlette.responses import JSONResponse, RedirectResponse, PlainTextResponse
 from motor.motor_asyncio import AsyncIOMotorClient
 from pymongo.errors import DuplicateKeyError, OperationFailure, ServerSelectionTimeoutError
 from passlib.context import CryptContext
@@ -189,6 +190,34 @@ def _payment_link_config_error_response(action: str) -> JSONResponse:
     )
 
 
+def _payment_link_config_status() -> dict:
+    return {
+        "RAZORPAY_KEY_ID": "SET" if RAZORPAY_KEY_ID else "MISSING",
+        "RAZORPAY_KEY_SECRET_OR_RAZORPAY_SECRET": "SET" if RAZORPAY_KEY_SECRET else "MISSING",
+        "MONGO_URL_OR_DATABASE_URL": "SET" if mongo_url else "MISSING",
+        "DB_NAME": "SET" if db_name else "MISSING",
+        "PUBLIC_SITE_URL": "SET" if os.environ.get("PUBLIC_SITE_URL") else "MISSING",
+        "FRONTEND_URL": "SET" if os.environ.get("FRONTEND_URL") else "MISSING",
+    }
+
+
+def _is_api_request(request: Request) -> bool:
+    return request.url.path.startswith("/api")
+
+
+def _http_exception_detail(exc: HTTPException) -> tuple[str, Optional[str]]:
+    detail = exc.detail
+    if isinstance(detail, dict):
+        message = str(detail.get("message") or detail.get("detail") or "Request failed")
+        nested_detail = detail.get("detail")
+        if nested_detail == message:
+            nested_detail = None
+        return message, nested_detail if isinstance(nested_detail, str) else None
+    if isinstance(detail, str):
+        return detail, None
+    return "Request failed", str(detail) if detail is not None else None
+
+
 def successful_revenue_order_filter() -> dict:
     return {
         "$or": [
@@ -243,7 +272,13 @@ logger = logging.getLogger(__name__)
 
 @app.middleware("http")
 async def add_security_headers(request: Request, call_next):
-    response = await call_next(request)
+    try:
+        response = await call_next(request)
+    except Exception:
+        logger.exception("Unhandled middleware exception path=%s method=%s", request.url.path, request.method)
+        if _is_api_request(request):
+            return _json_error_response(500, "Internal server error", code="INTERNAL_SERVER_ERROR")
+        return PlainTextResponse("Internal server error", status_code=500)
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
@@ -261,6 +296,44 @@ async def add_security_headers(request: Request, call_next):
     elif request.method == "GET" and request.url.path.startswith("/api/uploads/"):
         response.headers.setdefault("Cache-Control", "public, max-age=31536000, immutable")
     return response
+
+
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request: Request, exc: HTTPException):
+    if _is_api_request(request):
+        message, detail = _http_exception_detail(exc)
+        logger.warning("API HTTPException path=%s status=%s message=%s", request.url.path, exc.status_code, message)
+        payload = {"success": False, "message": message}
+        if detail:
+            payload["detail"] = detail
+        if isinstance(exc.detail, dict):
+            for key, value in exc.detail.items():
+                if key not in payload:
+                    payload[key] = value
+        return JSONResponse(status_code=exc.status_code, content=payload, headers=exc.headers)
+    return PlainTextResponse(str(exc.detail), status_code=exc.status_code, headers=exc.headers)
+
+
+@app.exception_handler(RequestValidationError)
+async def request_validation_exception_handler(request: Request, exc: RequestValidationError):
+    if _is_api_request(request):
+        logger.warning("API validation error path=%s errors=%s", request.url.path, exc.errors())
+        return _json_error_response(
+            422,
+            "Request validation failed",
+            code="REQUEST_VALIDATION_ERROR",
+            detail="One or more request fields are invalid.",
+            extra={"errors": exc.errors()},
+        )
+    return PlainTextResponse("Request validation failed", status_code=422)
+
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception):
+    logger.exception("Unhandled application exception path=%s method=%s", request.url.path, request.method)
+    if _is_api_request(request):
+        return _json_error_response(500, "Internal server error", code="INTERNAL_SERVER_ERROR")
+    return PlainTextResponse("Internal server error", status_code=500)
 
 
 @api_router.get("/health/mongodb")
@@ -2655,6 +2728,14 @@ async def admin_razorpay_health(current_admin: AdminBase = Depends(get_current_a
     }
 
 
+@admin_router.get("/debug/payment-link-config")
+async def admin_payment_link_config_debug(current_admin: AdminBase = Depends(get_current_active_admin)):
+    return {
+        "success": True,
+        "config": _payment_link_config_status(),
+    }
+
+
 @admin_router.get("/debug/r2-health")
 async def admin_r2_health(current_admin: AdminBase = Depends(get_current_active_admin)):
     config = _r2_config_status()
@@ -2882,25 +2963,31 @@ async def admin_get_product(product_id: str, current_admin: AdminBase = Depends(
 
 @admin_router.post("/products/{product_id}/create-payment-link")
 async def admin_create_product_payment_link(product_id: str, current_admin: AdminBase = Depends(get_current_active_admin)):
+    print("ADMIN_CREATE_PAYMENT_LINK_START", product_id)
     if db is None:
+        print("ADMIN_CREATE_PAYMENT_LINK_RETURN_DB_MISSING", product_id)
         return _json_error_response(503, "Payment link creation failed", detail="Database not configured")
     if not RAZORPAY_KEY_ID or not RAZORPAY_KEY_SECRET or razorpay_client is None:
+        print("ADMIN_CREATE_PAYMENT_LINK_RETURN_CONFIG_ERROR", product_id, _payment_link_config_status())
         return _payment_link_config_error_response("create")
 
     try:
         product = await db.products.find_one({"id": product_id}, {"_id": 0})
     except Exception as error:
         safe_detail = mongodb_public_error(error)
+        print("ADMIN_CREATE_PAYMENT_LINK_RETURN_LOOKUP_ERROR", product_id, safe_detail)
         print("Payment link creation failed:", repr(error))
         logger.exception("Payment link product lookup failed product_id=%s detail=%s", product_id, safe_detail)
         return _json_error_response(503, "Payment link creation failed", detail=safe_detail)
 
     if not product:
+        print("ADMIN_CREATE_PAYMENT_LINK_RETURN_NOT_FOUND", product_id)
         return _json_error_response(404, "Product not found", code="PRODUCT_NOT_FOUND")
 
     try:
         link_result = await _create_razorpay_payment_link_for_product(product)
         await db.products.update_one({"id": product_id}, {"$set": link_result["fields"]})
+        print("ADMIN_CREATE_PAYMENT_LINK_RETURN_SUCCESS", product_id, link_result.get("created"))
         return {
             "success": True,
             "created": link_result["created"],
@@ -2909,6 +2996,7 @@ async def admin_create_product_payment_link(product_id: str, current_admin: Admi
         }
     except HTTPException as error:
         safe_detail = error.detail if isinstance(error.detail, str) else "Payment link creation failed"
+        print("ADMIN_CREATE_PAYMENT_LINK_RETURN_HTTP_ERROR", product_id, error.status_code, safe_detail)
         print("Payment link creation failed:", repr(error))
         if error.status_code in {401, 402, 403, 502, 503} and (
             safe_detail == RAZORPAY_AUTH_ERROR_MESSAGE or safe_detail == RAZORPAY_CONFIG_ERROR_MESSAGE
@@ -2921,6 +3009,7 @@ async def admin_create_product_payment_link(product_id: str, current_admin: Admi
         )
     except Exception as error:
         safe_detail = _razorpay_public_error(error)
+        print("ADMIN_CREATE_PAYMENT_LINK_RETURN_UNHANDLED_ERROR", product_id, safe_detail)
         print("Payment link creation failed:", repr(error))
         logger.exception("Payment link creation crashed product_id=%s", product_id)
         return _json_error_response(502, "Payment link creation failed", detail=safe_detail)
@@ -2929,24 +3018,29 @@ async def admin_create_product_payment_link(product_id: str, current_admin: Admi
 @admin_router.post("/products/{product_id}/refresh-payment-link")
 async def admin_refresh_product_payment_link(product_id: str, current_admin: AdminBase = Depends(get_current_active_admin)):
     if db is None:
+        print("ADMIN_REFRESH_PAYMENT_LINK_RETURN_DB_MISSING", product_id)
         return _json_error_response(503, "Payment link status refresh failed", detail="Database not configured")
     if not RAZORPAY_KEY_ID or not RAZORPAY_KEY_SECRET or razorpay_client is None:
+        print("ADMIN_REFRESH_PAYMENT_LINK_RETURN_CONFIG_ERROR", product_id, _payment_link_config_status())
         return _payment_link_config_error_response("refresh")
 
     try:
         product = await db.products.find_one({"id": product_id}, {"_id": 0})
     except Exception as error:
         safe_detail = mongodb_public_error(error)
+        print("ADMIN_REFRESH_PAYMENT_LINK_RETURN_LOOKUP_ERROR", product_id, safe_detail)
         print("Payment link status refresh failed:", repr(error))
         logger.exception("Payment link refresh product lookup failed product_id=%s detail=%s", product_id, safe_detail)
         return _json_error_response(503, "Payment link status refresh failed", detail=safe_detail)
 
     if not product:
+        print("ADMIN_REFRESH_PAYMENT_LINK_RETURN_NOT_FOUND", product_id)
         return _json_error_response(404, "Product not found", code="PRODUCT_NOT_FOUND")
 
     try:
         link_result = await _refresh_razorpay_payment_link_for_product(product)
         await db.products.update_one({"id": product_id}, {"$set": link_result["fields"]})
+        print("ADMIN_REFRESH_PAYMENT_LINK_RETURN_SUCCESS", product_id)
         return {
             "success": True,
             "product_id": product_id,
@@ -2954,6 +3048,7 @@ async def admin_refresh_product_payment_link(product_id: str, current_admin: Adm
         }
     except HTTPException as error:
         safe_detail = error.detail if isinstance(error.detail, str) else "Payment link status refresh failed"
+        print("ADMIN_REFRESH_PAYMENT_LINK_RETURN_HTTP_ERROR", product_id, error.status_code, safe_detail)
         print("Payment link status refresh failed:", repr(error))
         if error.status_code in {401, 402, 403, 502, 503} and (
             safe_detail == RAZORPAY_AUTH_ERROR_MESSAGE or safe_detail == RAZORPAY_CONFIG_ERROR_MESSAGE
@@ -2966,6 +3061,7 @@ async def admin_refresh_product_payment_link(product_id: str, current_admin: Adm
         )
     except Exception as error:
         safe_detail = _razorpay_public_error(error)
+        print("ADMIN_REFRESH_PAYMENT_LINK_RETURN_UNHANDLED_ERROR", product_id, safe_detail)
         print("Payment link status refresh failed:", repr(error))
         logger.exception("Payment link refresh crashed product_id=%s", product_id)
         return _json_error_response(502, "Payment link status refresh failed", detail=safe_detail)

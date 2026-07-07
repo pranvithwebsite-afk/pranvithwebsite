@@ -72,6 +72,17 @@ const normalizeSlug = (value) =>
 
 const productUrlForSlug = (slug) => `/assets/${slug}`;
 
+const adminRequestFailureMessage = (error, fallbackMessage) => {
+  const status = error?.response?.status || 'NETWORK';
+  const baseURL = String(error?.config?.baseURL || '').replace(/\/$/, '');
+  const requestPath = error?.config?.url || '';
+  const requestUrl = requestPath
+    ? (requestPath.startsWith('http') ? requestPath : `${baseURL}${requestPath}`)
+    : '';
+  const backendMessage = error?.response?.data?.message || formatApiErrorDetail(error?.response?.data?.detail);
+  return `${status} ${requestUrl || 'request'}: ${backendMessage || fallbackMessage}`;
+};
+
 const rejectUnsafeMediaUrl = (value) => {
   const trimmed = String(value || '').trim();
   if (/^(javascript|data|vbscript):/i.test(trimmed)) {
@@ -265,8 +276,7 @@ const Products = () => {
       toast.success(result?.created ? 'Payment Link created' : 'Payment Link already exists');
       await loadProducts({ showToast: false });
     } catch (error) {
-      const message = error?.response?.data?.message || formatApiErrorDetail(error?.response?.data?.detail);
-      toast.error(message || 'Could not create Payment Link');
+      toast.error(adminRequestFailureMessage(error, 'Could not create Payment Link'));
     } finally {
       setPaymentLinkLoading((prev) => ({ ...prev, [`create:${id}`]: false }));
     }
@@ -279,8 +289,7 @@ const Products = () => {
       toast.success('Payment Link status refreshed');
       await loadProducts({ showToast: false });
     } catch (error) {
-      const message = error?.response?.data?.message || formatApiErrorDetail(error?.response?.data?.detail);
-      toast.error(message || 'Could not refresh Payment Link');
+      toast.error(adminRequestFailureMessage(error, 'Could not refresh Payment Link'));
     } finally {
       setPaymentLinkLoading((prev) => ({ ...prev, [`refresh:${id}`]: false }));
     }

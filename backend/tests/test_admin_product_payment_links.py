@@ -3,6 +3,8 @@ import json
 from types import SimpleNamespace
 
 import server
+from fastapi import HTTPException
+from starlette.requests import Request
 
 
 class FakeProducts:
@@ -131,3 +133,64 @@ def test_refresh_payment_link_returns_clean_error_when_razorpay_api_throws(monke
         "detail": "Remote payment link fetch failed",
     }
     assert "super-secret" not in response.body.decode("utf-8")
+
+
+def test_payment_link_config_debug_route_returns_only_set_or_missing(monkeypatch):
+    monkeypatch.setattr(server, "RAZORPAY_KEY_ID", "rzp_live_public")
+    monkeypatch.setattr(server, "RAZORPAY_KEY_SECRET", "super-secret")
+    monkeypatch.setattr(server, "mongo_url", "mongodb+srv://example")
+    monkeypatch.setattr(server, "db_name", "pranvith")
+    monkeypatch.setenv("PUBLIC_SITE_URL", "https://pranvithdop.com")
+    monkeypatch.delenv("FRONTEND_URL", raising=False)
+
+    response = asyncio.run(server.admin_payment_link_config_debug(SimpleNamespace(role="admin")))
+
+    assert response == {
+        "success": True,
+        "config": {
+            "RAZORPAY_KEY_ID": "SET",
+            "RAZORPAY_KEY_SECRET_OR_RAZORPAY_SECRET": "SET",
+            "MONGO_URL_OR_DATABASE_URL": "SET",
+            "DB_NAME": "SET",
+            "PUBLIC_SITE_URL": "SET",
+            "FRONTEND_URL": "MISSING",
+        },
+    }
+    assert "super-secret" not in str(response)
+
+
+def test_unhandled_api_exception_handler_returns_json():
+    request = Request({
+        "type": "http",
+        "method": "POST",
+        "path": "/api/admin/products/product-1/create-payment-link",
+        "headers": [],
+    })
+
+    response = asyncio.run(server.unhandled_exception_handler(request, RuntimeError("boom")))
+    body = _body(response)
+
+    assert response.status_code == 500
+    assert body == {
+        "success": False,
+        "message": "Internal server error",
+        "code": "INTERNAL_SERVER_ERROR",
+    }
+
+
+def test_http_exception_handler_returns_json_for_api():
+    request = Request({
+        "type": "http",
+        "method": "POST",
+        "path": "/api/admin/products/product-1/create-payment-link",
+        "headers": [],
+    })
+
+    response = asyncio.run(server.http_exception_handler(request, HTTPException(status_code=403, detail="Forbidden")))
+    body = _body(response)
+
+    assert response.status_code == 403
+    assert body == {
+        "success": False,
+        "message": "Forbidden",
+    }
