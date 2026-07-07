@@ -24,18 +24,19 @@ RAZORPAY_WEBHOOK_SECRET=your_webhook_secret_from_razorpay
 VITE_RAZORPAY_KEY_ID=your_razorpay_key_id
 PUBLIC_SITE_URL=https://pranvithdop.com
 FRONTEND_URL=https://pranvithdop.com
+CLOUDFLARE_R2_PUBLIC_BASE_URL=https://assets.pranvithdop.com
 SMTP_HOST=smtp.example.com
 SMTP_PORT=587
 SMTP_USER=your_smtp_username
 SMTP_PASS=your_smtp_password
 FROM_EMAIL="PranvithDOP <no-reply@pranvithdop.com>"
-CORS_ORIGINS=https://pranvithdop.com,https://www.pranvithdop.com
+CORS_ORIGINS=https://pranvithdop.com
 JWT_EXPIRATION_MINUTES=180
 ```
 
-`VITE_BACKEND_URL` is optional. Leave it unset on Vercel so the frontend uses the same deployment origin and calls `/api`. Set it only if the frontend must call a separate backend host. The existing `REACT_APP_BACKEND_URL` and `REACT_APP_RAZORPAY_KEY_ID` names remain supported as local compatibility aliases.
+`VITE_BACKEND_URL` is optional for public pages, but for this architecture leave it unset on Vercel so the deployed frontend stays same-origin and the admin always calls `/api` on the same Vercel domain. The existing `REACT_APP_BACKEND_URL` and `REACT_APP_RAZORPAY_KEY_ID` names remain supported as local compatibility aliases.
 
-`RAZORPAY_KEY_SECRET` must only be set for the backend environment. The frontend receives only `VITE_RAZORPAY_KEY_ID`. `PUBLIC_SITE_URL` is preferred for absolute protected download links in confirmation emails; `FRONTEND_URL` is kept as the compatibility fallback.
+`RAZORPAY_KEY_SECRET` must only be set for the backend environment. The frontend receives only `VITE_RAZORPAY_KEY_ID`. `PUBLIC_SITE_URL` is preferred for absolute protected download links in confirmation emails and other backend-generated absolute URLs; `FRONTEND_URL` is the compatibility fallback. `CLOUDFLARE_R2_PUBLIC_BASE_URL` must point only to the asset host `https://assets.pranvithdop.com` and must not be reused for API or admin traffic.
 
 SMTP is optional. If `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, and `FROM_EMAIL` are all configured, a successful payment sends the protected download link to the checkout email address. If they are omitted, checkout and download access continue to work and the backend logs that email delivery was skipped.
 
@@ -61,7 +62,6 @@ Vercel project aliases:
 
 ```text
 pranvithdop.com
-www.pranvithdop.com
 ```
 
 Hostinger DNS must be:
@@ -69,10 +69,16 @@ Hostinger DNS must be:
 ```text
 Type  Name  Value
 A     @     76.76.21.21
-CNAME www   b29cf27618525d1a.vercel-dns-017.com
 ```
 
-Current root-domain issue: `pranvithdop.com` still resolves to `216.198.79.1`. Change the Hostinger `@` A record to `76.76.21.21`, then wait for DNS propagation. The `www` CNAME is already pointed at Vercel.
+Recommended architecture:
+
+```text
+pranvithdop.com -> Vercel frontend + /api backend
+assets.pranvithdop.com -> Cloudflare R2 public asset domain only
+```
+
+Do not route `admin`, `api`, `checkout`, `payments`, or Razorpay webhooks through Cloudflare. Only static asset URLs should use `assets.pranvithdop.com`.
 
 ## Local Production Check
 

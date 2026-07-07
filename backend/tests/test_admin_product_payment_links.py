@@ -159,6 +159,22 @@ def test_payment_link_config_debug_route_returns_only_set_or_missing(monkeypatch
     assert "super-secret" not in str(response)
 
 
+def test_domain_config_debug_route_returns_safe_domain_values(monkeypatch):
+    monkeypatch.setenv("PUBLIC_SITE_URL", "https://pranvithdop.com")
+    monkeypatch.setenv("FRONTEND_URL", "https://www.pranvithdop.com")
+    monkeypatch.setenv("CLOUDFLARE_R2_PUBLIC_BASE_URL", "https://assets.pranvithdop.com")
+
+    response = asyncio.run(server.admin_domain_config_debug(SimpleNamespace(role="admin")))
+
+    assert response == {
+        "success": True,
+        "PUBLIC_SITE_URL": "https://pranvithdop.com",
+        "FRONTEND_URL": "https://pranvithdop.com",
+        "CLOUDFLARE_R2_PUBLIC_BASE_URL": "https://assets.pranvithdop.com",
+        "api_expected": "/api routes on same Vercel domain",
+    }
+
+
 def test_unhandled_api_exception_handler_returns_json():
     request = Request({
         "type": "http",

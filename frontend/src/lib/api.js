@@ -12,6 +12,7 @@ const BACKEND_URL = normalizeBackendUrl(
   || ''
 );
 export const API = `${BACKEND_URL}/api`;
+export const ADMIN_API = '/api';
 const DEVELOPMENT_CATALOG_API = 'https://pranvithdop.com/api';
 const USE_DEVELOPMENT_CATALOG = process.env.NODE_ENV === 'development';
 const sessionCache = new Map();
@@ -101,7 +102,7 @@ export const api = axios.create({
 });
 
 export const adminApi = axios.create({
-  baseURL: API,
+  baseURL: ADMIN_API,
   timeout: 15000,
 });
 

@@ -201,6 +201,15 @@ def _payment_link_config_status() -> dict:
     }
 
 
+def _normalize_public_origin(value: Optional[str], default: str = "https://pranvithdop.com") -> str:
+    normalized = str(value or "").strip().rstrip("/")
+    if not normalized:
+        return default
+    if normalized == "https://www.pranvithdop.com":
+        return default
+    return normalized
+
+
 def _is_api_request(request: Request) -> bool:
     return request.url.path.startswith("/api")
 
@@ -2736,6 +2745,20 @@ async def admin_payment_link_config_debug(current_admin: AdminBase = Depends(get
     }
 
 
+@admin_router.get("/debug/domain-config")
+async def admin_domain_config_debug(current_admin: AdminBase = Depends(get_current_active_admin)):
+    return {
+        "success": True,
+        "PUBLIC_SITE_URL": _normalize_public_origin(os.environ.get("PUBLIC_SITE_URL")),
+        "FRONTEND_URL": _normalize_public_origin(os.environ.get("FRONTEND_URL")),
+        "CLOUDFLARE_R2_PUBLIC_BASE_URL": _normalize_public_origin(
+            os.environ.get("CLOUDFLARE_R2_PUBLIC_BASE_URL"),
+            default="https://assets.pranvithdop.com",
+        ),
+        "api_expected": "/api routes on same Vercel domain",
+    }
+
+
 @admin_router.get("/debug/r2-health")
 async def admin_r2_health(current_admin: AdminBase = Depends(get_current_active_admin)):
     config = _r2_config_status()
@@ -4585,12 +4608,12 @@ def _hash_download_token(token: str) -> str:
 
 
 def _public_site_base() -> str:
-    return (
+    return _normalize_public_origin(
         os.environ.get("PUBLIC_SITE_URL")
         or os.environ.get("FRONTEND_URL")
-        or os.environ.get("PUBLIC_BASE_URL")
-        or DEFAULT_PUBLIC_SITE_URL
-    ).rstrip("/")
+        or os.environ.get("PUBLIC_BASE_URL"),
+        default=DEFAULT_PUBLIC_SITE_URL,
+    )
 
 
 def _paid_download_url(order_id: str, token: str) -> str:
@@ -6213,7 +6236,7 @@ app.add_middleware(
         origin.strip()
         for origin in os.environ.get(
             "CORS_ORIGINS",
-            "https://pranvithdop.com,https://www.pranvithdop.com,http://localhost:3000",
+            "https://pranvithdop.com,http://localhost:3000",
         ).split(",")
         if origin.strip()
     ],
