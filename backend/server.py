@@ -633,11 +633,16 @@ class Product(BaseModel):
     before_images: List[str] = []
     after_images: List[str] = []
     images: List[str] = []
+    gallery_images: List[str] = []
     product_images: List[str] = []
     videos: List[str] = []
     video_type: Optional[str] = None
     youtube_url: Optional[str] = None
     video_url: Optional[str] = None
+    image_url: Optional[str] = None
+    thumbnail_url: Optional[str] = None
+    preview_image_url: Optional[str] = None
+    cover_image_url: Optional[str] = None
     before_image_url: Optional[str] = None
     after_image_url: Optional[str] = None
     download_file: Optional[str] = None
@@ -675,11 +680,16 @@ class ProductIn(BaseModel):
     before_images: List[str] = []
     after_images: List[str] = []
     images: List[str] = []
+    gallery_images: List[str] = []
     product_images: List[str] = []
     videos: List[str] = []
     video_type: Optional[str] = None
     youtube_url: Optional[str] = None
     video_url: Optional[str] = None
+    image_url: Optional[str] = None
+    thumbnail_url: Optional[str] = None
+    preview_image_url: Optional[str] = None
+    cover_image_url: Optional[str] = None
     before_image_url: Optional[str] = None
     after_image_url: Optional[str] = None
     download_file: Optional[str] = None
@@ -710,6 +720,10 @@ class ProductIn(BaseModel):
         "product_url",
         "youtube_url",
         "video_url",
+        "image_url",
+        "thumbnail_url",
+        "preview_image_url",
+        "cover_image_url",
         "before_image_url",
         "after_image_url",
     )
@@ -717,7 +731,7 @@ class ProductIn(BaseModel):
     def validate_media_url(cls, value):
         return _reject_unsafe_url(value)
 
-    @field_validator("images", "product_images", "videos", "before_images", "after_images")
+    @field_validator("images", "gallery_images", "product_images", "videos", "before_images", "after_images")
     @classmethod
     def validate_media_url_list(cls, value):
         return [_reject_unsafe_url(item) for item in (value or []) if item]
@@ -1843,6 +1857,10 @@ MEDIA_URL_FIELDS = {
     "product_url",
     "youtube_url",
     "video_url",
+    "image_url",
+    "thumbnail_url",
+    "preview_image_url",
+    "cover_image_url",
     "before_image_url",
     "after_image_url",
 }
@@ -2096,14 +2114,26 @@ def _normalize_product_media_fields(doc: dict) -> dict:
     for field_name in ("thank_you_content", "landing_content"):
         if field_name in doc and isinstance(doc.get(field_name), (dict, list)):
             doc[field_name] = _sanitize_cms_value(doc.get(field_name))
+    if not doc.get("gallery_images"):
+        doc["gallery_images"] = list(doc.get("gallery") or doc.get("image_urls") or doc.get("images") or doc.get("product_images") or [])
+    if not doc.get("product_images") and doc.get("gallery_images"):
+        doc["product_images"] = list(doc.get("gallery_images") or [])
+    if not doc.get("images") and doc.get("gallery_images"):
+        doc["images"] = list(doc.get("gallery_images") or [])
     if not doc.get("product_images") and doc.get("images"):
         doc["product_images"] = list(doc.get("images") or [])
     if not doc.get("images") and doc.get("product_images"):
         doc["images"] = list(doc.get("product_images") or [])
+    doc.setdefault("gallery_images", [])
     doc.setdefault("product_images", [])
     doc.setdefault("images", [])
+    doc["gallery_images"] = [_reject_unsafe_url(item) for item in (doc.get("gallery_images") or []) if item]
+    if not doc.get("images") and doc.get("gallery_images"):
+        doc["images"] = list(doc.get("gallery_images") or [])
+    if not doc.get("product_images") and doc.get("gallery_images"):
+        doc["product_images"] = list(doc.get("gallery_images") or [])
     doc["product_images"] = [_reject_unsafe_url(item) for item in (doc.get("product_images") or []) if item]
-    doc["images"] = [_reject_unsafe_url(item) for item in (doc.get("images") or doc["product_images"] or []) if item]
+    doc["images"] = [_reject_unsafe_url(item) for item in (doc.get("images") or doc["gallery_images"] or doc["product_images"] or []) if item]
     for field_name in MEDIA_URL_FIELDS:
         if field_name in doc:
             doc[field_name] = _reject_unsafe_url(doc.get(field_name))
@@ -2240,8 +2270,11 @@ def _public_product_summary(product: dict) -> dict:
     safe = _public_product(product)
     thumbnail_url = (
         safe.get("thumbnail_url")
+        or safe.get("image_url")
+        or safe.get("preview_image_url")
+        or safe.get("cover_image_url")
         or safe.get("hero_image")
-        or (safe.get("product_images") or safe.get("images") or [""])[0]
+        or (safe.get("gallery_images") or safe.get("images") or safe.get("product_images") or [""])[0]
         or ""
     )
     return {

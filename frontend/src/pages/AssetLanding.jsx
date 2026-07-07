@@ -41,13 +41,15 @@ const toMediaUrlList = (value) => {
   }
 
   if (value && typeof value === 'object') {
+    const mediaType = String(value.media_type || value.type || value.kind || '').trim().toLowerCase();
+    if (mediaType.includes('video')) return [];
+
     return [
       value.url,
       value.public_url,
       value.image_url,
       value.src,
       value.original_url,
-      value.thumbnail_url,
     ]
       .map((item) => String(item ?? '').trim())
       .filter(Boolean);
@@ -55,6 +57,13 @@ const toMediaUrlList = (value) => {
 
   return [];
 };
+
+const sanitizeUniqueImageList = (values) => (
+  values
+    .map((image) => safeImageSrc(image, ''))
+    .filter(Boolean)
+    .filter((image, index, list) => list.indexOf(image) === index)
+);
 
 const toFaqList = (value) => (
   Array.isArray(value)
@@ -87,30 +96,40 @@ const normalizeProduct = (value) => {
   const hasSalePrice = Number.isFinite(numericSalePrice) && numericSalePrice >= 0;
   const hasPrice = Number.isFinite(numericPrice) && numericPrice >= 0;
   const resolvedPrice = hasSalePrice ? numericSalePrice : (hasPrice ? numericPrice : null);
-  const images = [
-    ...toStringList(product.images),
-    ...toStringList(product.product_images),
-  ];
-  const galleryImages = [
-    ...toMediaUrlList(product.images),
-    ...toMediaUrlList(product.product_images),
-    ...toMediaUrlList(product.gallery),
-    ...toMediaUrlList(product.gallery_images),
-    ...toMediaUrlList(product.image_urls),
-    ...toMediaUrlList(product.media),
-    ...toMediaUrlList(product.image_url),
-    ...toMediaUrlList(product.thumbnail_url),
-    ...toMediaUrlList(product.preview_image_url),
-    ...toMediaUrlList(product.cover_image_url),
+  const mainImageCandidates = sanitizeUniqueImageList([
+    product.image_url,
+    product.preview_image_url,
+    product.cover_image_url,
+    product.thumbnail_url,
+    product.hero_image,
+  ]);
+  const mainImageUrl = mainImageCandidates[0] || '';
+  const excludedGalleryImages = new Set(mainImageCandidates);
+  [
+    product.image_url,
+    product.preview_image_url,
+    product.cover_image_url,
+    product.thumbnail_url,
   ]
     .map((image) => safeImageSrc(image, ''))
     .filter(Boolean)
-    .filter((image, index, list) => list.indexOf(image) === index);
+    .forEach((image) => excludedGalleryImages.add(image));
+
+  const galleryImages = [
+    ...toMediaUrlList(product.gallery),
+    ...toMediaUrlList(product.gallery_images),
+    ...toMediaUrlList(product.image_urls),
+    ...toMediaUrlList(product.images),
+    ...toMediaUrlList(product.media),
+  ]
+    .map((image) => safeImageSrc(image, ''))
+    .filter(Boolean)
+    .filter((image, index, list) => list.indexOf(image) === index)
+    .filter((image) => !excludedGalleryImages.has(image));
   const heroImage = safeImageSrc(
-    product.hero_image
-    || product.thumbnail_url
-    || product.image_url
-    || images[0]
+    mainImageUrl
+    || product.hero_image
+    || galleryImages[0]
     || '',
     ''
   );

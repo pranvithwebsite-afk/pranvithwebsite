@@ -41,11 +41,16 @@ const defaultProductForm = {
   before_images: [],
   after_images: [],
   images: [],
+  gallery_images: [],
   product_images: [],
   videos: [],
   video_type: '',
   youtube_url: '',
   video_url: '',
+  image_url: '',
+  thumbnail_url: '',
+  preview_image_url: '',
+  cover_image_url: '',
   before_image_url: '',
   after_image_url: '',
   download_file: '',
@@ -105,56 +110,77 @@ const rejectUnsafeMediaUrl = (value) => {
   return trimmed;
 };
 
-const getProductImageCandidates = (product = {}) => {
-  const fromList = (value) => (
-    Array.isArray(value)
-      ? value.map((item) => String(item ?? '').trim()).filter(Boolean)
-      : []
-  );
-  const fromMedia = (value) => {
-    if (Array.isArray(value)) {
-      return value.flatMap((item) => fromMedia(item));
-    }
-    if (typeof value === 'string') {
-      const trimmed = value.trim();
-      return trimmed ? [trimmed] : [];
-    }
-    if (value && typeof value === 'object') {
-      return [
-        value.url,
-        value.public_url,
-        value.image_url,
-        value.src,
-        value.original_url,
-        value.thumbnail_url,
-      ]
-        .map((item) => String(item ?? '').trim())
-        .filter(Boolean);
-    }
-    return [];
-  };
+const toImageList = (value) => (
+  Array.isArray(value)
+    ? value.map((item) => String(item ?? '').trim()).filter(Boolean)
+    : []
+);
 
-  return [
-    ...fromList(product.product_images),
-    ...fromList(product.images),
-    ...fromList(product.gallery),
-    ...fromList(product.gallery_images),
-    ...fromList(product.image_urls),
-    ...fromMedia(product.media),
-    String(product.image_url || '').trim(),
-    String(product.thumbnail_url || '').trim(),
-    String(product.preview_image_url || '').trim(),
-    String(product.cover_image_url || '').trim(),
-  ].filter((item, index, list) => item && list.indexOf(item) === index);
+const toMediaImageList = (value) => {
+  if (Array.isArray(value)) {
+    return value.flatMap((item) => toMediaImageList(item));
+  }
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    return trimmed ? [trimmed] : [];
+  }
+  if (value && typeof value === 'object') {
+    const mediaType = String(value.media_type || value.type || value.kind || '').trim().toLowerCase();
+    if (mediaType.includes('video')) return [];
+
+    return [
+      value.url,
+      value.public_url,
+      value.image_url,
+      value.src,
+      value.original_url,
+    ]
+      .map((item) => String(item ?? '').trim())
+      .filter(Boolean);
+  }
+  return [];
 };
 
+const dedupeImageList = (items) => items.filter((item, index, list) => item && list.indexOf(item) === index);
+
+const getMainProductImageFields = (product = {}) => ({
+  image_url: String(product.image_url || '').trim(),
+  thumbnail_url: String(product.thumbnail_url || product.hero_image || '').trim(),
+  preview_image_url: String(product.preview_image_url || '').trim(),
+  cover_image_url: String(product.cover_image_url || '').trim(),
+});
+
+const getGalleryImageCandidates = (product = {}) => {
+  const mainFields = getMainProductImageFields(product);
+  const excluded = new Set(Object.values(mainFields).filter(Boolean));
+  return dedupeImageList([
+    ...toImageList(product.gallery),
+    ...toImageList(product.gallery_images),
+    ...toImageList(product.image_urls),
+    ...toImageList(product.images),
+    ...toMediaImageList(product.media),
+    ...toImageList(product.product_images),
+  ]).filter((item) => !excluded.has(item));
+};
+
+const getLegacyProductImageCandidates = (product = {}) => (
+  dedupeImageList([
+    ...toImageList(product.product_images),
+    ...toImageList(product.images),
+  ])
+);
+
 const normalizeProductForForm = (product = {}) => {
-  const productImages = getProductImageCandidates(product);
+  const productImages = getLegacyProductImageCandidates(product);
+  const galleryImages = getGalleryImageCandidates(product);
+  const mainImages = getMainProductImageFields(product);
   return {
     ...defaultProductForm,
     ...product,
+    ...mainImages,
+    gallery_images: galleryImages,
     product_images: productImages,
-    images: productImages,
+    images: galleryImages,
     video_type: product.video_type || '',
     youtube_url: product.youtube_url || '',
     video_url: product.video_url || '',
@@ -229,8 +255,13 @@ const Products = () => {
       ...formData,
       slug,
       product_url: productUrlForSlug(slug),
-      images: formData.product_images || formData.images || [],
-      product_images: formData.product_images || formData.images || [],
+      gallery_images: formData.gallery_images || [],
+      images: formData.gallery_images || formData.images || [],
+      product_images: formData.gallery_images || formData.images || [],
+      image_url: rejectUnsafeMediaUrl(formData.image_url),
+      thumbnail_url: rejectUnsafeMediaUrl(formData.thumbnail_url),
+      preview_image_url: rejectUnsafeMediaUrl(formData.preview_image_url),
+      cover_image_url: rejectUnsafeMediaUrl(formData.cover_image_url),
       youtube_url: rejectUnsafeMediaUrl(formData.youtube_url),
       video_url: rejectUnsafeMediaUrl(formData.video_url),
       before_image_url: rejectUnsafeMediaUrl(formData.before_image_url),
@@ -307,7 +338,8 @@ const Products = () => {
     setFormData((prev) => ({
       ...prev,
       [name]: value,
-      ...(name === 'product_images' ? { images: value } : {}),
+      ...((name === 'gallery_images' || name === 'images') ? { images: value } : {}),
+      ...(name === 'gallery_images' ? { product_images: value } : {}),
     }));
   };
 
@@ -354,7 +386,8 @@ const Products = () => {
     setFormData((prev) => ({
       ...prev,
       [field]: [...(prev[field] || []), cleanItem],
-      ...(field === 'product_images' ? { images: [...(prev[field] || []), cleanItem] } : {}),
+      ...((field === 'gallery_images' || field === 'images') ? { images: [...(prev[field] || []), cleanItem] } : {}),
+      ...(field === 'gallery_images' ? { product_images: [...(prev[field] || []), cleanItem] } : {}),
     }));
   };
 
@@ -362,7 +395,8 @@ const Products = () => {
     setFormData((prev) => ({
       ...prev,
       [field]: prev[field]?.filter((_, i) => i !== index) || [],
-      ...(field === 'product_images' ? { images: prev[field]?.filter((_, i) => i !== index) || [] } : {}),
+      ...((field === 'gallery_images' || field === 'images') ? { images: prev[field]?.filter((_, i) => i !== index) || [] } : {}),
+      ...(field === 'gallery_images' ? { product_images: prev[field]?.filter((_, i) => i !== index) || [] } : {}),
     }));
   };
 
@@ -503,6 +537,7 @@ const ProductForm = ({
     before_images: '',
     after_images: '',
     images: '',
+    gallery_images: '',
     product_images: '',
     videos: '',
   });
@@ -724,6 +759,38 @@ const ProductForm = ({
           onUpload={uploadPrivateDownload}
         />
 
+        <MainProductImagesSection
+          formData={formData}
+          onInputChange={onInputChange}
+          onFieldChange={onFieldChange}
+          uploading={uploading}
+          uploadProgress={uploadProgress}
+          onUploadMain={(file) => uploadMedia({
+            file,
+            type: 'image',
+            purpose: 'product-image',
+            targetField: 'image_url',
+          })}
+          onUploadThumbnail={(file) => uploadMedia({
+            file,
+            type: 'image',
+            purpose: 'thumbnail',
+            targetField: 'thumbnail_url',
+          })}
+          onUploadPreview={(file) => uploadMedia({
+            file,
+            type: 'image',
+            purpose: 'product-image',
+            targetField: 'preview_image_url',
+          })}
+          onUploadCover={(file) => uploadMedia({
+            file,
+            type: 'image',
+            purpose: 'product-image',
+            targetField: 'cover_image_url',
+          })}
+        />
+
         <label className="flex items-start gap-3 rounded-lg border border-slate-800 bg-slate-900 p-4 text-sm text-slate-200">
           <input
             type="checkbox"
@@ -764,29 +831,29 @@ const ProductForm = ({
         />
 
         <ArrayEditor
-          label="Product Images"
-          helpText="Use this for thumbnails, banners, preview images, preview videos, and before/after LUT images."
-          items={formData.product_images || formData.images || []}
-          newItem={newArrayItems.product_images}
-          onNewItemChange={(val) => setNewArrayItems((p) => ({ ...p, product_images: val }))}
+          label="Gallery Images"
+          helpText="Use this only for extra product gallery images shown below the product details. Main product image and thumbnail should stay in the fields above."
+          items={formData.gallery_images || formData.images || []}
+          newItem={newArrayItems.gallery_images}
+          onNewItemChange={(val) => setNewArrayItems((p) => ({ ...p, gallery_images: val }))}
           onAdd={() => {
-            onArrayAdd('product_images', newArrayItems.product_images);
-            setNewArrayItems((p) => ({ ...p, product_images: '' }));
+            onArrayAdd('gallery_images', newArrayItems.gallery_images);
+            setNewArrayItems((p) => ({ ...p, gallery_images: '' }));
           }}
-          onRemove={(idx) => onArrayRemove('product_images', idx)}
+          onRemove={(idx) => onArrayRemove('gallery_images', idx)}
           isUrl
           previewType="image"
           uploadControl={
             <UploadButton
-              label="Upload Image"
+              label="Upload Gallery Image"
               accept={ADMIN_IMAGE_UPLOAD_ACCEPT}
-              disabled={!!uploading['product-image-product_images']}
-              progress={uploadProgress['product-image-product_images']}
+              disabled={!!uploading['product-image-gallery_images']}
+              progress={uploadProgress['product-image-gallery_images']}
               onFile={(file) => uploadMedia({
                 file,
                 type: 'image',
                 purpose: 'product-image',
-                targetField: 'product_images',
+                targetField: 'gallery_images',
                 append: true,
               })}
             />
@@ -961,6 +1028,69 @@ const PrivateDownloadSection = ({
         </button>
       </div>
     )}
+  </div>
+);
+
+const MainProductImagesSection = ({
+  formData,
+  onInputChange,
+  onFieldChange,
+  uploading,
+  uploadProgress,
+  onUploadMain,
+  onUploadThumbnail,
+  onUploadPreview,
+  onUploadCover,
+}) => (
+  <div className="space-y-4 rounded-2xl border border-slate-800 bg-slate-900/70 p-4">
+    <div>
+      <h2 className="text-sm font-semibold text-white">Main Product Images</h2>
+      <p className="mt-2 text-xs leading-relaxed text-slate-500">
+        Product Image and Thumbnail are the main hero/top images. Gallery Images below are extra images only and will not repeat these fields.
+      </p>
+    </div>
+    <div className="grid gap-4 sm:grid-cols-2">
+      <SingleImageField
+        label="Product Image"
+        name="image_url"
+        value={formData.image_url}
+        onInputChange={onInputChange}
+        onFieldChange={onFieldChange}
+        uploading={!!uploading['product-image-image_url']}
+        progress={uploadProgress['product-image-image_url']}
+        onUpload={onUploadMain}
+      />
+      <SingleImageField
+        label="Thumbnail Image"
+        name="thumbnail_url"
+        value={formData.thumbnail_url}
+        onInputChange={onInputChange}
+        onFieldChange={onFieldChange}
+        uploading={!!uploading['thumbnail-thumbnail_url']}
+        progress={uploadProgress['thumbnail-thumbnail_url']}
+        onUpload={onUploadThumbnail}
+      />
+      <SingleImageField
+        label="Preview Image"
+        name="preview_image_url"
+        value={formData.preview_image_url}
+        onInputChange={onInputChange}
+        onFieldChange={onFieldChange}
+        uploading={!!uploading['product-image-preview_image_url']}
+        progress={uploadProgress['product-image-preview_image_url']}
+        onUpload={onUploadPreview}
+      />
+      <SingleImageField
+        label="Cover Image"
+        name="cover_image_url"
+        value={formData.cover_image_url}
+        onInputChange={onInputChange}
+        onFieldChange={onFieldChange}
+        uploading={!!uploading['product-image-cover_image_url']}
+        progress={uploadProgress['product-image-cover_image_url']}
+        onUpload={onUploadCover}
+      />
+    </div>
   </div>
 );
 
