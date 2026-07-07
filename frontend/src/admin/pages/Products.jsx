@@ -1,8 +1,9 @@
-import React, { useEffect, useState } from 'react';
-import { ChevronDown, ChevronUp, Plus, Save, X, Edit2, Trash2, Copy, Link, RefreshCw, Upload, PlayCircle } from 'lucide-react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { ChevronDown, ChevronUp, Plus, Save, X, Edit2, Trash2, Copy, Link, RefreshCw, Upload, PlayCircle, Image as ImageIcon } from 'lucide-react';
 import {
   fetchAdminProducts,
   fetchAdminProduct,
+  fetchAdminMedia,
   createAdminProduct,
   updateAdminProduct,
   deleteAdminProduct,
@@ -76,6 +77,7 @@ const normalizeSlug = (value) =>
     .replace(/^-+|-+$/g, '');
 
 const productUrlForSlug = (slug) => `/assets/${slug}`;
+const mediaButtonClass = 'inline-flex items-center justify-center gap-2 rounded-lg border border-slate-700 px-4 py-2 text-sm font-semibold text-white transition hover:border-slate-500 disabled:pointer-events-none disabled:opacity-60';
 
 const adminRequestFailureMessage = (error, fallbackMessage) => {
   const status = error?.response?.status || 'NETWORK';
@@ -515,8 +517,21 @@ const ProductForm = ({
   const [uploading, setUploading] = useState({});
   const [uploadProgress, setUploadProgress] = useState({});
   const [selectedVideoSize, setSelectedVideoSize] = useState('');
+  const [mediaLibraryOpen, setMediaLibraryOpen] = useState(false);
+  const [mediaLibraryLoading, setMediaLibraryLoading] = useState(false);
+  const [mediaLibraryItems, setMediaLibraryItems] = useState([]);
+  const [mediaLibraryTarget, setMediaLibraryTarget] = useState(null);
 
   const currentSlug = normalizeSlug(formData.slug || formData.name);
+  const imageMediaItems = useMemo(() => (
+    (Array.isArray(mediaLibraryItems) ? mediaLibraryItems : []).filter((item) => {
+      const mediaType = String(item?.media_type || '').toLowerCase();
+      const mimeType = String(item?.mime_type || item?.type || '').toLowerCase();
+      const url = String(item?.public_url || item?.url || '').trim();
+      return !!url && (mediaType === 'image' || mimeType.startsWith('image/'));
+    })
+  ), [mediaLibraryItems]);
+  const appendUniqueUrl = (items, nextUrl) => dedupeImageList([...(items || []), nextUrl]);
 
   const uploadMedia = async ({ file, type, purpose, targetField, append = false }) => {
     if (!file) return;
@@ -586,7 +601,7 @@ const ProductForm = ({
       }
       const nextUrl = result?.media?.public_url || result?.media?.url || result?.url;
       if (append) {
-        onFieldChange(targetField, [...(formData[targetField] || []), nextUrl]);
+        onFieldChange(targetField, appendUniqueUrl(formData[targetField], nextUrl));
       } else {
         onFieldChange(targetField, nextUrl);
       }
@@ -633,6 +648,40 @@ const ProductForm = ({
       toast.error(error?.response?.data?.detail || 'Private upload failed');
     } finally {
       setUploading((prev) => ({ ...prev, [uploadKey]: false }));
+    }
+  };
+
+  const openMediaLibrary = async (target) => {
+    setMediaLibraryTarget(target);
+    setMediaLibraryOpen(true);
+    try {
+      setMediaLibraryLoading(true);
+      const data = await fetchAdminMedia();
+      setMediaLibraryItems(Array.isArray(data) ? data : []);
+    } catch (error) {
+      toast.error(adminRequestFailureMessage(error, 'Media Library could not be loaded'));
+      setMediaLibraryItems([]);
+    } finally {
+      setMediaLibraryLoading(false);
+    }
+  };
+
+  const closeMediaLibrary = () => {
+    setMediaLibraryOpen(false);
+    setMediaLibraryTarget(null);
+  };
+
+  const selectMediaLibraryItem = (url) => {
+    const cleanUrl = rejectUnsafeMediaUrl(url);
+    if (!cleanUrl) return;
+    if (mediaLibraryTarget === 'image_url') {
+      onFieldChange('image_url', cleanUrl);
+      closeMediaLibrary();
+      return;
+    }
+    if (mediaLibraryTarget === 'gallery_images') {
+      onFieldChange('gallery_images', appendUniqueUrl(formData.gallery_images, cleanUrl));
+      closeMediaLibrary();
     }
   };
 
@@ -736,6 +785,7 @@ const ProductForm = ({
           onFieldChange={onFieldChange}
           uploading={uploading}
           uploadProgress={uploadProgress}
+          onOpenMediaLibrary={() => openMediaLibrary('image_url')}
           onUploadMain={(file) => uploadMedia({
             file,
             type: 'image',
@@ -811,6 +861,16 @@ const ProductForm = ({
               })}
             />
           }
+          mediaLibraryControl={(
+            <button
+              type="button"
+              onClick={() => openMediaLibrary('gallery_images')}
+              className={mediaButtonClass}
+            >
+              <ImageIcon size={16} />
+              Select from Media Library
+            </button>
+          )}
         />
 
         <ProductVideoSection
@@ -902,6 +962,14 @@ const ProductForm = ({
           Cancel
         </button>
       </div>
+      {mediaLibraryOpen && (
+        <MediaLibraryModal
+          items={imageMediaItems}
+          loading={mediaLibraryLoading}
+          onClose={closeMediaLibrary}
+          onSelect={selectMediaLibraryItem}
+        />
+      )}
     </section>
   );
 };
@@ -990,6 +1058,7 @@ const MainProductImagesSection = ({
   onFieldChange,
   uploading,
   uploadProgress,
+  onOpenMediaLibrary,
   onUploadMain,
 }) => (
   <div className="space-y-4 rounded-2xl border border-slate-800 bg-slate-900/70 p-4">
@@ -1008,6 +1077,7 @@ const MainProductImagesSection = ({
         onFieldChange={onFieldChange}
         uploading={!!uploading['product-image-image_url']}
         progress={uploadProgress['product-image-image_url']}
+        onSelectFromMediaLibrary={onOpenMediaLibrary}
         onUpload={onUploadMain}
       />
     </div>
@@ -1155,7 +1225,7 @@ const BeforeAfterUploadSection = ({
   </div>
 );
 
-const SingleImageField = ({ label, name, value, onInputChange, onFieldChange, uploading, progress, onUpload }) => (
+const SingleImageField = ({ label, name, value, onInputChange, onFieldChange, uploading, progress, onUpload, onSelectFromMediaLibrary }) => (
   <div>
     <label className="mb-2 block text-sm font-semibold text-white">{label}</label>
     <input
@@ -1166,7 +1236,7 @@ const SingleImageField = ({ label, name, value, onInputChange, onFieldChange, up
       placeholder="https://assets.pranvithdop.com/products/..."
       className="w-full rounded-lg border border-slate-700 bg-slate-950 px-4 py-2 text-white placeholder:text-slate-600 focus:border-violet-500 focus:outline-none"
     />
-    <div className="mt-3">
+    <div className="mt-3 flex flex-wrap gap-2">
       <UploadButton
         label="Upload Image"
         accept={ADMIN_IMAGE_UPLOAD_ACCEPT}
@@ -1174,6 +1244,12 @@ const SingleImageField = ({ label, name, value, onInputChange, onFieldChange, up
         progress={progress}
         onFile={onUpload}
       />
+      {onSelectFromMediaLibrary && (
+        <button type="button" onClick={onSelectFromMediaLibrary} className={mediaButtonClass}>
+          <ImageIcon size={16} />
+          Select from Media Library
+        </button>
+      )}
     </div>
     {value && <img src={value} alt={label} className="mt-3 aspect-video w-full rounded-xl border border-slate-800 bg-slate-950 object-cover" />}
     {value && (
@@ -1198,6 +1274,7 @@ const ArrayEditor = ({
   onRemove,
   isUrl = false,
   uploadControl = null,
+  mediaLibraryControl = null,
   previewType = null,
 }) => {
   return (
@@ -1220,6 +1297,7 @@ const ArrayEditor = ({
           Add
         </button>
         {uploadControl}
+        {mediaLibraryControl}
       </div>
       {previewType === 'image' && items.length > 0 ? (
         <div className="mb-3 grid gap-3 sm:grid-cols-2">
@@ -1255,5 +1333,55 @@ const ArrayEditor = ({
     </div>
   );
 };
+
+const MediaLibraryModal = ({ items, loading, onClose, onSelect }) => (
+  <div className="fixed inset-0 z-[140] flex items-center justify-center bg-black/80 px-4 py-6 backdrop-blur-sm">
+    <div className="w-full max-w-5xl overflow-hidden rounded-3xl border border-slate-800 bg-slate-950 shadow-[0_24px_80px_rgba(0,0,0,0.45)]">
+      <div className="flex items-center justify-between border-b border-slate-800 px-5 py-4">
+        <h2 className="text-lg font-semibold text-white">Select from Media Library</h2>
+        <button
+          type="button"
+          onClick={onClose}
+          className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-700 text-slate-300 transition hover:border-slate-500 hover:text-white"
+          aria-label="Close media library"
+        >
+          <X size={18} />
+        </button>
+      </div>
+      <div className="max-h-[72vh] overflow-y-auto px-5 py-5">
+        {loading ? (
+          <div className="rounded-2xl border border-slate-800 bg-slate-900/60 px-4 py-8 text-center text-sm text-slate-400">
+            Loading media...
+          </div>
+        ) : items.length === 0 ? (
+          <div className="rounded-2xl border border-slate-800 bg-slate-900/60 px-4 py-8 text-center text-sm text-slate-400">
+            No media found
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-4">
+            {items.map((item) => {
+              const url = String(item?.public_url || item?.url || '').trim();
+              const label = item?.original_filename || item?.filename || item?.title || 'Media image';
+              return (
+                <button
+                  key={item?.id || url}
+                  type="button"
+                  onClick={() => onSelect(url)}
+                  className="overflow-hidden rounded-2xl border border-slate-800 bg-slate-900 text-left transition hover:border-violet-500"
+                >
+                  <img src={url} alt={label} className="aspect-video w-full object-cover" />
+                  <div className="px-3 py-3">
+                    <p className="truncate text-sm font-semibold text-white">{label}</p>
+                    <p className="mt-1 truncate text-xs text-slate-500">{url}</p>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  </div>
+);
 
 export default Products;
