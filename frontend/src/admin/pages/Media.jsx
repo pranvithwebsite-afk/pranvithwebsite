@@ -9,8 +9,7 @@ import {
   removeDuplicateAdminMedia,
   uploadAdminFile,
   uploadAdminImageToR2,
-  uploadFileToSignedUrl,
-} from '../../lib/api';
+import { uploadMultipleFiles } from '../../lib/mediaUploads';
 import { toast } from 'sonner';
 import { handleImageError, safeImageSrc } from '../../lib/utils';
 import { useAdminConfirm } from '../components/AdminConfirmProvider';
@@ -73,6 +72,7 @@ const Media = () => {
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadStatus, setUploadStatus] = useState('');
   const [error, setError] = useState('');
   const [dragActive, setDragActive] = useState(false);
   const [selectedVideoSize, setSelectedVideoSize] = useState('');
@@ -105,105 +105,44 @@ const Media = () => {
     }
   };
 
-  const validateFile = (file) => {
-    const validTypes = ['image/jpeg', 'image/png', 'image/webp', 'video/mp4', 'video/webm', 'video/quicktime', 'video/mov', 'application/pdf', 'application/zip', 'application/x-zip-compressed'];
-    if (!validTypes.includes(file.type)) return 'Unsupported file type. Allowed: JPEG, PNG, WebP, MP4, WEBM, MOV, PDF, ZIP';
-    if (!isVideoUploadFile(file) && file.size > 25 * 1024 * 1024) return 'File exceeds the 25 MB upload limit';
-    return '';
-  };
+  const handleFilesSelected = async (files) => {
+    if (!files.length) return;
 
-  const handleFileUpload = async (file) => {
-    if (!file) return;
-    if (!isVideoUploadFile(file)) setSelectedVideoSize('');
-    const validationError = validateFile(file);
-    if (validationError) {
-      toast.error(validationError);
-      return;
+    setUploading(true);
+    setUploadProgress(0);
+    setUploadStatus(`Starting upload of ${files.length} files...`);
+
+    const { results, errors } = await uploadMultipleFiles({
+      files,
+      purpose: 'media-library',
+      onProgress: ({ overallProgress, fileProgress, currentFile, totalFiles, currentFileName, stage }) => {
+        setUploadProgress(overallProgress);
+        const stageMessage = stage === 'presign' ? 'securing connection' : stage;
+        setUploadStatus(`Uploading ${currentFile} of ${totalFiles}: ${currentFileName} (${stageMessage} ${Math.round(fileProgress)}%)...`);
+      },
+    });
+
+    setUploading(false);
+    setUploadProgress(0);
+    setUploadStatus('');
+
+    if (results.length > 0) {
+      toast.success(`${results.length} file(s) uploaded successfully.`);
     }
 
-    try {
-      setUploading(true);
-      setUploadProgress(0);
-      let result;
-      if (isVideoUploadFile(file)) {
-        setSelectedVideoSize(formatMegabytes(file.size));
-        const videoError = validateVideoUploadFile(file);
-        if (videoError) {
-          toast.error(videoError);
-          return;
-        }
-        const signed = await createAdminDirectVideoUpload({
-          filename: file.name,
-          contentType: file.type,
-          fileSize: file.size,
-          purpose: 'media-library-video',
-        });
-        await uploadFileToSignedUrl({
-          uploadUrl: signed.upload_url,
-          file,
-          headers: signed.required_headers || signed.headers || {},
-          onUploadProgress: (event) => {
-            const total = event.total || file.size || 1;
-            setUploadProgress(Math.min(100, Math.round((event.loaded / total) * 100)));
-          },
-        });
-        result = await finalizeAdminDirectVideoUpload({
-          key: signed.key,
-          url: signed.public_url,
-          filename: file.name,
-          contentType: file.type,
-          size: file.size,
-          purpose: 'media-library-video',
-          title: file.name,
-        });
-      } else if (String(file.type || '').startsWith('image/')) {
-        const imageError = validateImageUploadFile(file);
-        if (imageError) {
-          toast.error(imageError);
-          return;
-        }
-        result = await uploadAdminImageToR2({
-          file,
-          purpose: 'media-library-image',
-          onUploadProgress: (event) => {
-            const total = event.total || file.size || 1;
-            setUploadProgress(Math.min(100, Math.round((event.loaded / total) * 100)));
-          },
-        });
-      } else {
-        result = await uploadAdminFile(file, (event) => {
-          const total = event.total || file.size || 1;
-          setUploadProgress(Math.min(100, Math.round((event.loaded / total) * 100)));
-        });
-      }
-      const uploadedUrl = result?.url || result?.media?.public_url || result?.media?.url;
-      if (!uploadedUrl) {
-        throw new Error('Upload completed but no media URL was returned');
-      }
-      toast.success('File uploaded successfully');
-      const refresh = await loadMedia({ notifyOnError: false });
-      if (!refresh?.ok) {
-        toast.warning(String(file.type || '').startsWith('image/')
-          ? 'Image uploaded successfully, but media list refresh failed. Please refresh.'
-          : 'Upload succeeded, but media list refresh failed. Please refresh.');
-      }
-    } catch (error) {
-      console.warn('[admin/media-library] upload failed', {
-        stage: error?.stage || 'unknown',
-        status: error?.response?.status || error?.originalError?.response?.status || null,
-        detail: error?.response?.data?.detail || error?.originalError?.response?.data?.detail || error?.message || error,
+    if (errors.length > 0) {
+      errors.forEach(({ file, error }) => {
+        toast.error(`Failed to upload ${file}: ${error}`);
       });
-      toast.error(formatUploadError(error));
-    } finally {
-      setUploading(false);
-      setUploadProgress(0);
     }
+
+    await loadMedia({ notifyOnError: false });
   };
 
-  const handleUpload = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    await handleFileUpload(file);
+  const handleUpload = (e) => {
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
+    handleFilesSelected(files);
     e.target.value = '';
   };
 
@@ -216,12 +155,12 @@ const Media = () => {
     setDragActive(false);
   };
 
-  const handleDrop = async (e) => {
+  const handleDrop = (e) => {
     e.preventDefault();
     setDragActive(false);
-    const file = e.dataTransfer.files?.[0];
-    if (!file) return;
-    await handleFileUpload(file);
+    const files = Array.from(e.dataTransfer.files || []);
+    if (!files.length) return;
+    handleFilesSelected(files);
   };
 
   const handleDelete = async (item) => {
@@ -326,20 +265,23 @@ const Media = () => {
               {uploading ? 'Uploading...' : 'Click to upload or drag & drop'}
             </p>
             <p className="text-sm text-slate-400 mt-1">
-              Images, Videos, PDFs, ZIP files. Normal uploads max 25MB. Videos go direct to R2.
+              Images, Videos, PDFs, ZIP files.
             </p>
+            {uploading && (
+              <>
+                <p className="text-sm text-violet-300 mt-2">{uploadStatus}</p>
+                <div className="h-2 w-full max-w-md overflow-hidden rounded-full bg-slate-800 mt-2">
+                  <div className="h-full bg-violet-500 transition-all" style={{ width: `${uploadProgress}%` }} />
+                </div>
+              </>
+            )}
             <p className="text-xs text-slate-500 mt-1">
               Max video size: {formatMegabytes(ADMIN_VIDEO_UPLOAD_MAX_BYTES)}
-              {selectedVideoSize ? ` • Selected video: ${selectedVideoSize}` : ''}
             </p>
           </div>
-          {uploading && (
-            <div className="h-2 w-full max-w-md overflow-hidden rounded-full bg-slate-800">
-              <div className="h-full bg-violet-500 transition-all" style={{ width: `${uploadProgress}%` }} />
-            </div>
-          )}
           <input
             type="file"
+            multiple
             onChange={handleUpload}
             disabled={uploading}
             className="hidden"

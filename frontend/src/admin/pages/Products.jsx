@@ -536,6 +536,70 @@ const ProductForm = ({
   ), [mediaLibraryItems]);
   const appendUniqueUrl = (items, nextUrl) => dedupeImageList([...(items || []), nextUrl]);
 
+  const uploadMultipleMedia = async ({ files, type, purpose, targetField }) => {
+    if (!files || files.length === 0) return;
+    if (!currentSlug) {
+      toast.error('Add a product name or slug before uploading');
+      return;
+    }
+
+    const uploadKey = `${purpose}-${targetField}-multiple`;
+    setUploading((prev) => ({ ...prev, [uploadKey]: true }));
+    setUploadProgress((prev) => ({ ...prev, [uploadKey]: 0 }));
+
+    const results = [];
+    const errors = [];
+
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      try {
+        const imageError = validateImageUploadFile(file);
+        if (imageError) {
+          throw new Error(imageError);
+        }
+
+        const onUploadProgress = (event) => {
+          if (!event.total) return;
+          const currentFileProgress = Math.round((event.loaded * 100) / event.total);
+          const overallProgress = ((i + (event.loaded / event.total)) / files.length) * 100;
+          setUploadProgress((prev) => ({
+            ...prev,
+            [uploadKey]: overallProgress,
+          }));
+        };
+
+        const result = await uploadAdminProductMedia({
+          file,
+          type,
+          purpose,
+          productSlug: currentSlug,
+          onUploadProgress,
+        });
+        
+        const nextUrl = result?.media?.public_url || result?.media?.url || result?.url;
+        if (nextUrl) {
+          results.push(nextUrl);
+        } else {
+          throw new Error('Upload succeeded but no URL was returned.');
+        }
+      } catch (error) {
+        errors.push({ file: file.name, error: formatUploadError(error) });
+      }
+    }
+
+    if (results.length > 0) {
+      onFieldChange(targetField, dedupeImageList([...(formData[targetField] || []), ...results]));
+      toast.success(`${results.length} image(s) uploaded and added to gallery.`);
+    }
+
+    if (errors.length > 0) {
+      toast.error(`${errors.length} upload(s) failed. See console for details.`);
+      errors.forEach(err => console.warn(`[admin/products] gallery upload failed: ${err.file}`, err.error));
+    }
+
+    setUploading((prev) => ({ ...prev, [uploadKey]: false }));
+  };
+
   const uploadMedia = async ({ file, type, purpose, targetField, append = false }) => {
     if (!file) return;
     if (!currentSlug) {
@@ -861,16 +925,16 @@ const ProductForm = ({
           previewType="image"
           uploadControl={
             <UploadButton
-              label="Upload Gallery Image"
+              label="Upload Gallery Images"
               accept={ADMIN_IMAGE_UPLOAD_ACCEPT}
-              disabled={!!uploading['product-image-gallery_images']}
-              progress={uploadProgress['product-image-gallery_images']}
-              onFile={(file) => uploadMedia({
-                file,
+              multiple
+              disabled={!!uploading['product-image-gallery_images-multiple']}
+              progress={uploadProgress['product-image-gallery_images-multiple']}
+              onFiles={(files) => uploadMultipleMedia({
+                files,
                 type: 'image',
                 purpose: 'product-image',
                 targetField: 'gallery_images',
-                append: true,
               })}
             />
           }
@@ -987,7 +1051,7 @@ const ProductForm = ({
   );
 };
 
-const UploadButton = ({ label, accept, disabled, progress, onFile }) => (
+const UploadButton = ({ label, accept, disabled, progress, onFile, onFiles, multiple }) => (
   <label className={`inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-slate-700 px-4 py-2 text-sm font-semibold text-white transition hover:border-slate-500 ${disabled ? 'pointer-events-none opacity-60' : ''}`}>
     <Upload size={16} />
     {disabled ? `Uploading${progress ? ` ${progress}%` : '...'}` : label}
@@ -995,10 +1059,17 @@ const UploadButton = ({ label, accept, disabled, progress, onFile }) => (
       type="file"
       accept={accept}
       disabled={disabled}
+      multiple={multiple}
       onChange={(event) => {
-        const file = event.target.files?.[0];
-        event.target.value = '';
-        if (file) onFile(file);
+        if (multiple) {
+          const files = Array.from(event.target.files || []);
+          event.target.value = '';
+          if (files.length > 0) onFiles?.(files);
+        } else {
+          const file = event.target.files?.[0];
+          event.target.value = '';
+          if (file) onFile?.(file);
+        }
       }}
       className="hidden"
     />
@@ -1091,7 +1162,12 @@ const MainProductImagesSection = ({
         uploading={!!uploading['product-image-image_url']}
         progress={uploadProgress['product-image-image_url']}
         onSelectFromMediaLibrary={onOpenMediaLibrary}
-        onUpload={onUploadMain}
+                onFiles={(files) => {
+          if (files.length > 1) {
+            toast.info('Only the first image will be used for this field.');
+          }
+          onUploadMain(files[0]);
+        }}
       />
     </div>
   </div>
@@ -1222,7 +1298,12 @@ const BeforeAfterUploadSection = ({
         onFieldChange={onFieldChange}
         uploading={!!uploading['before-image-before_image_url']}
         progress={uploadProgress['before-image-before_image_url']}
-        onUpload={onUploadBefore}
+        onFiles={(files) => {
+          if (files.length > 1) {
+            toast.info('Only the first image will be used for this field.');
+          }
+          onUploadBefore(files[0]);
+        }}
       />
       <SingleImageField
         label="After Image"
@@ -1232,7 +1313,12 @@ const BeforeAfterUploadSection = ({
         onFieldChange={onFieldChange}
         uploading={!!uploading['after-image-after_image_url']}
         progress={uploadProgress['after-image-after_image_url']}
-        onUpload={onUploadAfter}
+        onFiles={(files) => {
+          if (files.length > 1) {
+            toast.info('Only the first image will be used for this field.');
+          }
+          onUploadAfter(files[0]);
+        }}
       />
     </div>
   </div>
