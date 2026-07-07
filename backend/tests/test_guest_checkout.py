@@ -193,12 +193,12 @@ def test_admin_razorpay_health_does_not_expose_secrets(monkeypatch):
 
     response = asyncio.run(server.admin_razorpay_health(None))
 
-    assert response == {
-        "success": True,
-        "razorpay_key_id_present": True,
-        "razorpay_key_secret_present": True,
-        "razorpay_key_mode": "live",
-    }
+    assert response["success"] is True
+    assert response["razorpay_key_id_present"] is True
+    assert response["razorpay_key_secret_present"] is True
+    assert response["razorpay_key_mode"] == "live"
+    assert response["environment"]["razorpay_key_id_present"] is True
+    assert response["environment"]["razorpay_key_secret_present"] is True
     assert "rzp_live_publicid" not in str(response)
     assert "super-secret-value" not in str(response)
 

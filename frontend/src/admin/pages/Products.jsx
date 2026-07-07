@@ -13,6 +13,7 @@ import {
   uploadFileToSignedUrl,
   uploadAdminProductMedia,
   uploadAdminPrivateDownload,
+  formatApiErrorDetail,
 } from '../../lib/api';
 import { toast } from 'sonner';
 import SafeVideoEmbed from '../../components/SafeVideoEmbed';
@@ -112,6 +113,7 @@ const Products = () => {
   const [formData, setFormData] = useState(defaultProductForm);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [paymentLinkLoading, setPaymentLinkLoading] = useState({});
   const confirm = useAdminConfirm();
 
   useEffect(() => {
@@ -257,22 +259,30 @@ const Products = () => {
   };
 
   const handleCreatePaymentLink = async (id) => {
+    setPaymentLinkLoading((prev) => ({ ...prev, [`create:${id}`]: true }));
     try {
       const result = await createProductPaymentLink(id);
       toast.success(result?.created ? 'Payment Link created' : 'Payment Link already exists');
-      loadProducts();
+      await loadProducts({ showToast: false });
     } catch (error) {
-      toast.error(error?.response?.data?.detail || 'Could not create Payment Link');
+      const message = error?.response?.data?.message || formatApiErrorDetail(error?.response?.data?.detail);
+      toast.error(message || 'Could not create Payment Link');
+    } finally {
+      setPaymentLinkLoading((prev) => ({ ...prev, [`create:${id}`]: false }));
     }
   };
 
   const handleRefreshPaymentLink = async (id) => {
+    setPaymentLinkLoading((prev) => ({ ...prev, [`refresh:${id}`]: true }));
     try {
       await refreshProductPaymentLink(id);
       toast.success('Payment Link status refreshed');
-      loadProducts();
+      await loadProducts({ showToast: false });
     } catch (error) {
-      toast.error(error?.response?.data?.detail || 'Could not refresh Payment Link');
+      const message = error?.response?.data?.message || formatApiErrorDetail(error?.response?.data?.detail);
+      toast.error(message || 'Could not refresh Payment Link');
+    } finally {
+      setPaymentLinkLoading((prev) => ({ ...prev, [`refresh:${id}`]: false }));
     }
   };
 
@@ -337,8 +347,11 @@ const Products = () => {
         <div className="text-center text-slate-400">No products. Add one to get started!</div>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {products.map((product) => (
-            <div key={product.id} className="rounded-3xl border border-slate-800 bg-slate-950 p-5">
+          {products.map((product) => {
+            const isCreatingPaymentLink = !!paymentLinkLoading[`create:${product.id}`];
+            const isRefreshingPaymentLink = !!paymentLinkLoading[`refresh:${product.id}`];
+            return (
+              <div key={product.id} className="rounded-3xl border border-slate-800 bg-slate-950 p-5">
               <h2 className="text-lg font-semibold text-white line-clamp-2">{product.name}</h2>
               <p className="mt-2 text-sm text-slate-500">₹{product.price}</p>
               {product.sale_price && (
@@ -386,23 +399,26 @@ const Products = () => {
                 )}
                 <button
                   onClick={() => handleCreatePaymentLink(product.id)}
-                  className="flex items-center justify-center gap-1 rounded bg-violet-700 px-3 py-2 text-xs font-semibold text-white transition hover:bg-violet-600"
+                  disabled={isCreatingPaymentLink}
+                  className="flex items-center justify-center gap-1 rounded bg-violet-700 px-3 py-2 text-xs font-semibold text-white transition hover:bg-violet-600 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   <Link size={13} />
-                  Create Payment Link
+                  {isCreatingPaymentLink ? 'Creating...' : 'Create Payment Link'}
                 </button>
                 {product.razorpay_payment_link_id && (
                   <button
                     onClick={() => handleRefreshPaymentLink(product.id)}
-                    className="flex items-center justify-center gap-1 rounded bg-slate-800 px-3 py-2 text-xs font-semibold text-white transition hover:bg-slate-700"
+                    disabled={isRefreshingPaymentLink}
+                    className="flex items-center justify-center gap-1 rounded bg-slate-800 px-3 py-2 text-xs font-semibold text-white transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     <RefreshCw size={13} />
-                    Refresh Status
+                    {isRefreshingPaymentLink ? 'Refreshing...' : 'Refresh Status'}
                   </button>
                 )}
               </div>
-            </div>
-          ))}
+              </div>
+            );
+          })}
         </div>
       )}
     </section>

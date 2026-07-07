@@ -513,12 +513,12 @@ export const uploadAdminPrivateDownload = async ({ file, productSlug, purpose, o
 };
 
 export const createProductPaymentLink = async (productId) => {
-  const { data } = await adminApi.post(`/admin/products/${productId}/create-payment-link`);
+  const { data } = await adminApi.post(`/admin/products/${encodeURIComponent(productId)}/create-payment-link`);
   return data;
 };
 
 export const refreshProductPaymentLink = async (productId) => {
-  const { data } = await adminApi.post(`/admin/products/${productId}/refresh-payment-link`);
+  const { data } = await adminApi.post(`/admin/products/${encodeURIComponent(productId)}/refresh-payment-link`);
   return data;
 };
 

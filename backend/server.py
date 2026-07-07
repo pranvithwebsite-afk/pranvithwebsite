@@ -50,7 +50,16 @@ from seed_data import (
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
-mongo_url = os.environ.get('MONGO_URL')
+
+def _first_env(*names: str) -> str:
+    for name in names:
+        value = os.environ.get(name)
+        if value:
+            return value
+    return ""
+
+
+mongo_url = _first_env('MONGO_URL', 'DATABASE_URL')
 db_name = os.environ.get('DB_NAME')
 mongo_timeout_ms = int(os.environ.get("MONGO_SERVER_SELECTION_TIMEOUT_MS", "8000"))
 client = AsyncIOMotorClient(
@@ -93,8 +102,9 @@ def mongodb_public_error(exc: Exception) -> str:
 
 # Razorpay client (lazy / safe-init)
 RAZORPAY_KEY_ID = os.environ.get('RAZORPAY_KEY_ID', '')
-RAZORPAY_KEY_SECRET = os.environ.get('RAZORPAY_KEY_SECRET', '')
+RAZORPAY_KEY_SECRET = _first_env('RAZORPAY_KEY_SECRET', 'RAZORPAY_SECRET')
 RAZORPAY_AUTH_ERROR_MESSAGE = "Payment gateway authentication failed. Check Razorpay live keys in Vercel."
+RAZORPAY_CONFIG_ERROR_MESSAGE = "Razorpay credentials are missing or invalid"
 SUCCESSFUL_REVENUE_STATUSES = ("paid", "captured", "completed", "success")
 razorpay_client = None
 if RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET:
@@ -119,6 +129,64 @@ def razorpay_config_summary() -> dict:
         "razorpay_key_secret_present": bool(RAZORPAY_KEY_SECRET),
         "razorpay_key_mode": razorpay_key_mode(),
     }
+
+
+def backend_env_status() -> dict:
+    public_site_url = os.environ.get("PUBLIC_SITE_URL")
+    frontend_url = os.environ.get("FRONTEND_URL")
+    jwt_secret = os.environ.get("JWT_SECRET", "")
+    return {
+        "razorpay_key_id_present": bool(RAZORPAY_KEY_ID),
+        "razorpay_key_secret_present": bool(RAZORPAY_KEY_SECRET),
+        "public_site_url_present": bool(public_site_url),
+        "frontend_url_present": bool(frontend_url),
+        "public_origin_configured": bool(public_site_url or frontend_url),
+        "database_url_present": bool(mongo_url),
+        "db_name_present": bool(db_name),
+        "jwt_secret_present": bool(jwt_secret),
+        "jwt_secret_valid": len(jwt_secret) >= 32,
+    }
+
+
+def _missing_backend_env_vars() -> list[str]:
+    status = backend_env_status()
+    missing = []
+    if not status["razorpay_key_id_present"]:
+        missing.append("RAZORPAY_KEY_ID")
+    if not status["razorpay_key_secret_present"]:
+        missing.append("RAZORPAY_KEY_SECRET or RAZORPAY_SECRET")
+    if not status["public_origin_configured"]:
+        missing.append("PUBLIC_SITE_URL or FRONTEND_URL")
+    if not status["database_url_present"]:
+        missing.append("MONGO_URL or DATABASE_URL")
+    if not status["db_name_present"]:
+        missing.append("DB_NAME")
+    if not status["jwt_secret_present"] or not status["jwt_secret_valid"]:
+        missing.append("JWT_SECRET")
+    return missing
+
+
+def _json_error_response(status_code: int, message: str, *, code: Optional[str] = None, detail: Optional[str] = None, extra: Optional[dict] = None) -> JSONResponse:
+    content = {"success": False, "message": message}
+    if code:
+        content["code"] = code
+    if detail:
+        content["detail"] = detail
+    if extra:
+        content.update(extra)
+    return JSONResponse(status_code=status_code, content=content)
+
+
+def _payment_link_config_error_response(action: str) -> JSONResponse:
+    missing = _missing_backend_env_vars()
+    logger.warning("Payment link %s blocked by configuration missing=%s", action, missing)
+    return _json_error_response(
+        503,
+        RAZORPAY_CONFIG_ERROR_MESSAGE,
+        code="RAZORPAY_CONFIG_ERROR",
+        detail="Missing required environment variables for Razorpay payment link operations.",
+        extra={"missing": missing},
+    )
 
 
 def successful_revenue_order_filter() -> dict:
@@ -2583,6 +2651,7 @@ async def admin_razorpay_health(current_admin: AdminBase = Depends(get_current_a
     return {
         "success": True,
         **razorpay_config_summary(),
+        "environment": backend_env_status(),
     }
 
 
@@ -2813,31 +2882,93 @@ async def admin_get_product(product_id: str, current_admin: AdminBase = Depends(
 
 @admin_router.post("/products/{product_id}/create-payment-link")
 async def admin_create_product_payment_link(product_id: str, current_admin: AdminBase = Depends(get_current_active_admin)):
-    product = await db.products.find_one({"id": product_id}, {"_id": 0})
+    if db is None:
+        return _json_error_response(503, "Payment link creation failed", detail="Database not configured")
+    if not RAZORPAY_KEY_ID or not RAZORPAY_KEY_SECRET or razorpay_client is None:
+        return _payment_link_config_error_response("create")
+
+    try:
+        product = await db.products.find_one({"id": product_id}, {"_id": 0})
+    except Exception as error:
+        safe_detail = mongodb_public_error(error)
+        print("Payment link creation failed:", repr(error))
+        logger.exception("Payment link product lookup failed product_id=%s detail=%s", product_id, safe_detail)
+        return _json_error_response(503, "Payment link creation failed", detail=safe_detail)
+
     if not product:
-        raise HTTPException(status_code=404, detail="Product not found")
-    link_result = await _create_razorpay_payment_link_for_product(product)
-    await db.products.update_one({"id": product_id}, {"$set": link_result["fields"]})
-    return {
-        "success": True,
-        "created": link_result["created"],
-        "product_id": product_id,
-        **link_result["fields"],
-    }
+        return _json_error_response(404, "Product not found", code="PRODUCT_NOT_FOUND")
+
+    try:
+        link_result = await _create_razorpay_payment_link_for_product(product)
+        await db.products.update_one({"id": product_id}, {"$set": link_result["fields"]})
+        return {
+            "success": True,
+            "created": link_result["created"],
+            "product_id": product_id,
+            **link_result["fields"],
+        }
+    except HTTPException as error:
+        safe_detail = error.detail if isinstance(error.detail, str) else "Payment link creation failed"
+        print("Payment link creation failed:", repr(error))
+        if error.status_code in {401, 402, 403, 502, 503} and (
+            safe_detail == RAZORPAY_AUTH_ERROR_MESSAGE or safe_detail == RAZORPAY_CONFIG_ERROR_MESSAGE
+        ):
+            return _payment_link_config_error_response("create")
+        return _json_error_response(
+            error.status_code if error.status_code < 500 else 502,
+            "Payment link creation failed",
+            detail=safe_detail,
+        )
+    except Exception as error:
+        safe_detail = _razorpay_public_error(error)
+        print("Payment link creation failed:", repr(error))
+        logger.exception("Payment link creation crashed product_id=%s", product_id)
+        return _json_error_response(502, "Payment link creation failed", detail=safe_detail)
 
 
 @admin_router.post("/products/{product_id}/refresh-payment-link")
 async def admin_refresh_product_payment_link(product_id: str, current_admin: AdminBase = Depends(get_current_active_admin)):
-    product = await db.products.find_one({"id": product_id}, {"_id": 0})
+    if db is None:
+        return _json_error_response(503, "Payment link status refresh failed", detail="Database not configured")
+    if not RAZORPAY_KEY_ID or not RAZORPAY_KEY_SECRET or razorpay_client is None:
+        return _payment_link_config_error_response("refresh")
+
+    try:
+        product = await db.products.find_one({"id": product_id}, {"_id": 0})
+    except Exception as error:
+        safe_detail = mongodb_public_error(error)
+        print("Payment link status refresh failed:", repr(error))
+        logger.exception("Payment link refresh product lookup failed product_id=%s detail=%s", product_id, safe_detail)
+        return _json_error_response(503, "Payment link status refresh failed", detail=safe_detail)
+
     if not product:
-        raise HTTPException(status_code=404, detail="Product not found")
-    link_result = await _refresh_razorpay_payment_link_for_product(product)
-    await db.products.update_one({"id": product_id}, {"$set": link_result["fields"]})
-    return {
-        "success": True,
-        "product_id": product_id,
-        **link_result["fields"],
-    }
+        return _json_error_response(404, "Product not found", code="PRODUCT_NOT_FOUND")
+
+    try:
+        link_result = await _refresh_razorpay_payment_link_for_product(product)
+        await db.products.update_one({"id": product_id}, {"$set": link_result["fields"]})
+        return {
+            "success": True,
+            "product_id": product_id,
+            **link_result["fields"],
+        }
+    except HTTPException as error:
+        safe_detail = error.detail if isinstance(error.detail, str) else "Payment link status refresh failed"
+        print("Payment link status refresh failed:", repr(error))
+        if error.status_code in {401, 402, 403, 502, 503} and (
+            safe_detail == RAZORPAY_AUTH_ERROR_MESSAGE or safe_detail == RAZORPAY_CONFIG_ERROR_MESSAGE
+        ):
+            return _payment_link_config_error_response("refresh")
+        return _json_error_response(
+            error.status_code if error.status_code < 500 else 502,
+            "Payment link status refresh failed",
+            detail=safe_detail,
+        )
+    except Exception as error:
+        safe_detail = _razorpay_public_error(error)
+        print("Payment link status refresh failed:", repr(error))
+        logger.exception("Payment link refresh crashed product_id=%s", product_id)
+        return _json_error_response(502, "Payment link status refresh failed", detail=safe_detail)
 
 
 @admin_router.get("/orders")
