@@ -9,6 +9,7 @@ import {
   removeDuplicateAdminMedia,
   uploadAdminFile,
   uploadAdminImageToR2,
+} from '../../lib/api';
 import { uploadMultipleFiles } from '../../lib/mediaUploads';
 import { toast } from 'sonner';
 import { handleImageError, safeImageSrc } from '../../lib/utils';
