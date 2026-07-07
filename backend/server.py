@@ -3867,7 +3867,7 @@ async def admin_create_product(payload: ProductIn, current_admin: AdminBase = De
         doc["slug"],
     )
     warning = None
-    if create_payment_link and not doc.get("razorpay_payment_link_id"):
+    if create_payment_link and not (doc.get("razorpay_payment_link_id") or doc.get("razorpay_payment_link_url")):
         try:
             link_result = await _create_razorpay_payment_link_for_product(doc)
             doc.update(link_result["fields"])
@@ -3900,7 +3900,7 @@ async def admin_update_product(product_id: str, payload: ProductIn, current_admi
     warning = None
     if create_payment_link:
         product = await db.products.find_one({"id": product_id}, {"_id": 0})
-        if not product.get("razorpay_payment_link_id"):
+        if not (product.get("razorpay_payment_link_id") or product.get("razorpay_payment_link_url")):
             try:
                 link_result = await _create_razorpay_payment_link_for_product(product)
                 await db.products.update_one({"id": product_id}, {"$set": link_result["fields"]})
@@ -5026,7 +5026,7 @@ def _payment_link_error_http_exception(exc: Exception, *, action: str) -> HTTPEx
 
 async def _create_razorpay_payment_link_for_product(product: dict, force: bool = False) -> dict:
     client = _require_razorpay_client()
-    if product.get("razorpay_payment_link_id") and not force:
+    if (product.get("razorpay_payment_link_id") or product.get("razorpay_payment_link_url")) and not force:
         return {
             "created": False,
             "payment_link": {

@@ -59,7 +59,7 @@ const defaultProductForm = {
   download_file_key: '',
   download_file_name: '',
   download_file_bucket: '',
-  create_razorpay_payment_link: false,
+  create_razorpay_payment_link: true,
   razorpay_payment_link_id: '',
   razorpay_payment_link_url: '',
   razorpay_payment_link_status: '',
@@ -143,6 +143,7 @@ const getGalleryImageCandidates = (product = {}) => {
 const normalizeProductForForm = (product = {}) => {
   const galleryImages = getGalleryImageCandidates(product);
   const mainImageUrl = getMainProductImageUrl(product);
+  const hasExistingPaymentLink = !!(product.razorpay_payment_link_id || product.razorpay_payment_link_url);
   return {
     ...defaultProductForm,
     ...product,
@@ -163,6 +164,7 @@ const normalizeProductForForm = (product = {}) => {
     download_file_key: product.download_file_key || '',
     download_file_name: product.download_file_name || '',
     download_file_bucket: product.download_file_bucket || '',
+    create_razorpay_payment_link: !hasExistingPaymentLink,
   };
 };
 
@@ -523,6 +525,7 @@ const ProductForm = ({
   const [mediaLibraryTarget, setMediaLibraryTarget] = useState(null);
 
   const currentSlug = normalizeSlug(formData.slug || formData.name);
+  const hasExistingPaymentLink = !!(formData.razorpay_payment_link_id || formData.razorpay_payment_link_url);
   const imageMediaItems = useMemo(() => (
     (Array.isArray(mediaLibraryItems) ? mediaLibraryItems : []).filter((item) => {
       const mediaType = String(item?.media_type || '').toLowerCase();
@@ -799,12 +802,22 @@ const ProductForm = ({
             type="checkbox"
             name="create_razorpay_payment_link"
             checked={!!formData.create_razorpay_payment_link}
+            disabled={hasExistingPaymentLink}
             onChange={onInputChange}
             className="mt-1 h-4 w-4 rounded"
           />
           <span>
-            <span className="block font-semibold text-white">Also create Razorpay Payment Link after save</span>
-            <span className="mt-1 block text-slate-500">Leave this off for normal product saves. Website checkout uses Razorpay Orders automatically, and the manual Create Payment Link button remains available separately.</span>
+            <span className="block font-semibold text-white">
+              {hasExistingPaymentLink ? 'Payment Link already exists' : 'Also create Razorpay Payment Link after save'}
+            </span>
+            <span className="mt-1 block text-slate-500">
+              Enabled: creates a Razorpay Payment Link after saving this product. Website checkout still uses Razorpay Orders.
+            </span>
+            {hasExistingPaymentLink && (
+              <span className="mt-1 block text-xs text-emerald-300/80">
+                Existing links are reused and will not be recreated automatically.
+              </span>
+            )}
           </span>
         </label>
 
