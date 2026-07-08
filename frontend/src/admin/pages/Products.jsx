@@ -840,22 +840,6 @@ const ProductForm = ({
           />
         </div>
 
-        <div>
-          <label className="mb-2 block text-sm font-semibold text-white">Product Gallery Layout</label>
-          <select
-            name="gallery_layout"
-            value={formData.gallery_layout || 'grid'}
-            onChange={onInputChange}
-            className="w-full rounded-lg border border-slate-700 bg-slate-900 px-4 py-2 text-white focus:border-violet-500 focus:outline-none"
-          >
-            <option value="grid">Three Card Grid</option>
-            <option value="full">Full Image Size</option>
-          </select>
-          <p className="mt-2 text-xs text-slate-500">
-            Controls how Product Gallery images appear on the asset detail page.
-          </p>
-        </div>
-
         <PrivateDownloadSection
           formData={formData}
           onInputChange={onInputChange}
@@ -969,6 +953,22 @@ const ProductForm = ({
             </button>
           )}
         />
+
+        <div>
+          <label className="mb-2 block text-sm font-semibold text-white">Product Gallery Layout</label>
+          <select
+            name="gallery_layout"
+            value={formData.gallery_layout || 'grid'}
+            onChange={onInputChange}
+            className="w-full rounded-lg border border-slate-700 bg-slate-900 px-4 py-2 text-white focus:border-violet-500 focus:outline-none"
+          >
+            <option value="grid">Three Card Grid</option>
+            <option value="full">Full Image Size</option>
+          </select>
+          <p className="mt-2 text-xs text-slate-500">
+            Choose how gallery images appear on the asset detail page.
+          </p>
+        </div>
 
         <ProductVideoSection
           formData={formData}
