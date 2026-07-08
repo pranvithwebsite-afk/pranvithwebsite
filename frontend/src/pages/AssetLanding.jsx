@@ -70,17 +70,17 @@ const normalizeProduct = (value) => {
   const resolvedPrice = hasSalePrice ? numericSalePrice : (hasPrice ? numericPrice : null);
   const mainImageCandidates = sanitizeUniqueImageList([
     product.image_url,
+    product.thumbnail_url,
     product.preview_image_url,
     product.cover_image_url,
-    product.thumbnail_url,
   ]);
   const mainImageUrl = mainImageCandidates[0] || '';
   const excludedGalleryImages = new Set(mainImageCandidates);
   [
     product.image_url,
+    product.thumbnail_url,
     product.preview_image_url,
     product.cover_image_url,
-    product.thumbnail_url,
   ]
     .map((image) => safeImageSrc(image, ''))
     .filter(Boolean)

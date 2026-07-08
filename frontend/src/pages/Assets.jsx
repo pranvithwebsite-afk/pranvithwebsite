@@ -36,10 +36,10 @@ const normalize = (item = {}, index) => {
   const category = item.category || 'Asset';
   const slug = item.slug || item.id || `asset-${index}`;
   const heroImage = safeImageSrc(
-    item.image_url
+    item.thumbnail_url
+    || item.image_url
     || item.preview_image_url
     || item.cover_image_url
-    || item.thumbnail_url
     || item.hero_image
     || FALLBACK_IMAGE,
     FALLBACK_IMAGE
@@ -355,9 +355,9 @@ const ProductCard = ({ p, onView, onBuy }) => (
     data-testid={`asset-card-${p.slug}`}
     className="cinematic-card group flex cursor-pointer flex-col overflow-hidden transition-all duration-300 hover:-translate-y-1"
   >
-    <div className="relative aspect-[4/5] overflow-hidden">
+    <div className="relative aspect-[4/3] overflow-hidden rounded-[24px]">
       {p.image ? (
-        <OptimizedImage src={p.image} alt={p.title} width={360} height={450} className="absolute inset-0 h-full w-full object-contain sm:object-cover" fallback={FALLBACK_IMAGE} onError={handleImageError} />
+        <OptimizedImage src={p.image} alt={p.title} width={480} height={360} className="absolute inset-0 h-full w-full object-cover" fallback={FALLBACK_IMAGE} onError={handleImageError} />
       ) : (
         <div className="absolute inset-0" style={{ background: p.bg }} />
       )}

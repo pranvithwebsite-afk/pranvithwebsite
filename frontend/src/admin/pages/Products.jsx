@@ -132,6 +132,8 @@ const getMainProductImageUrl = (product = {}) => (
   ).trim()
 );
 
+const getThumbnailProductImageUrl = (product = {}) => String(product.thumbnail_url || '').trim();
+
 const getGalleryImageCandidates = (product = {}) => {
   const mainImageUrl = getMainProductImageUrl(product);
   const excluded = new Set([mainImageUrl].filter(Boolean));
@@ -144,12 +146,13 @@ const getGalleryImageCandidates = (product = {}) => {
 const normalizeProductForForm = (product = {}) => {
   const galleryImages = getGalleryImageCandidates(product);
   const mainImageUrl = getMainProductImageUrl(product);
+  const thumbnailImageUrl = getThumbnailProductImageUrl(product);
   const hasExistingPaymentLink = !!(product.razorpay_payment_link_id || product.razorpay_payment_link_url);
   return {
     ...defaultProductForm,
     ...product,
     image_url: mainImageUrl,
-    thumbnail_url: String(product.thumbnail_url || '').trim(),
+    thumbnail_url: thumbnailImageUrl,
     preview_image_url: String(product.preview_image_url || '').trim(),
     cover_image_url: String(product.cover_image_url || '').trim(),
     gallery_layout: product.gallery_layout === 'full' ? 'full' : 'grid',
@@ -228,6 +231,7 @@ const Products = () => {
     if (saving) return;
     const slug = normalizeSlug(formData.slug || formData.name);
     const mainImageUrl = rejectUnsafeMediaUrl(formData.image_url);
+    const thumbnailImageUrl = rejectUnsafeMediaUrl(formData.thumbnail_url);
     const payload = {
       ...formData,
       slug,
@@ -236,9 +240,9 @@ const Products = () => {
       images: formData.gallery_images || formData.images || [],
       product_images: formData.gallery_images || formData.images || [],
       image_url: mainImageUrl,
-      thumbnail_url: mainImageUrl,
-      preview_image_url: mainImageUrl,
-      cover_image_url: mainImageUrl,
+      thumbnail_url: thumbnailImageUrl,
+      preview_image_url: rejectUnsafeMediaUrl(formData.preview_image_url),
+      cover_image_url: rejectUnsafeMediaUrl(formData.cover_image_url),
       gallery_layout: formData.gallery_layout === 'full' ? 'full' : 'grid',
       youtube_url: rejectUnsafeMediaUrl(formData.youtube_url),
       video_url: rejectUnsafeMediaUrl(formData.video_url),
@@ -744,6 +748,11 @@ const ProductForm = ({
   const selectMediaLibraryItem = (url) => {
     const cleanUrl = rejectUnsafeMediaUrl(url);
     if (!cleanUrl) return;
+    if (mediaLibraryTarget === 'thumbnail_url') {
+      onFieldChange('thumbnail_url', cleanUrl);
+      closeMediaLibrary();
+      return;
+    }
     if (mediaLibraryTarget === 'image_url') {
       onFieldChange('image_url', cleanUrl);
       closeMediaLibrary();
@@ -847,6 +856,22 @@ const ProductForm = ({
           uploading={!!uploading['private-download']}
           progress={uploadProgress['private-download']}
           onUpload={uploadPrivateDownload}
+        />
+
+        <ThumbnailImageSection
+          formData={formData}
+          onInputChange={onInputChange}
+          onFieldChange={onFieldChange}
+          uploading={uploading}
+          uploadProgress={uploadProgress}
+          onOpenMediaLibrary={() => openMediaLibrary('thumbnail_url')}
+          onUploadThumbnail={(file) => uploadMedia({
+            file,
+            type: 'image',
+            purpose: 'product-thumbnail',
+            targetField: 'thumbnail_url',
+            errorMessage: 'Thumbnail Image upload failed. Please try again.',
+          })}
         />
 
         <MainProductImagesSection
@@ -1182,7 +1207,7 @@ const MainProductImagesSection = ({
     <div>
       <h2 className="text-sm font-semibold text-white">Main Product Image</h2>
       <p className="mt-2 text-xs leading-relaxed text-slate-500">
-        Used for product card, product hero, thumbnail, and preview image.
+        Used on product detail page hero. Recommended size: 1200 × 900 px or 1600 × 1200 px. For wide product posters use 1920 × 1080 px.
       </p>
     </div>
     <div>
@@ -1195,16 +1220,16 @@ const MainProductImagesSection = ({
         uploading={!!uploading['product-image-image_url']}
         progress={uploadProgress['product-image-image_url']}
         onSelectFromMediaLibrary={onOpenMediaLibrary}
-        helperText={(
-          <>
-            <span className="block">Recommended size:</span>
-            <span className="block">1200 × 900 px or 1600 × 1200 px</span>
-            <span className="block">Accepted formats: JPG, PNG, WEBP</span>
-            <span className="block">Use a clean product cover/poster image.</span>
-            <span className="block">Avoid very small or blurry images.</span>
-            <span className="block">For wide PSD preview images, use 1920 × 1080 px or 1600 × 900 px.</span>
-          </>
-        )}
+        helperText="Accepted formats: JPG, PNG, WEBP"
+        actionButton={formData.thumbnail_url ? (
+          <button
+            type="button"
+            onClick={() => onFieldChange('image_url', formData.thumbnail_url)}
+            className={mediaButtonClass}
+          >
+            Use same image as Thumbnail Image
+          </button>
+        ) : null}
         multipleUpload
         onFiles={(files) => {
           if (files.length > 1) {
@@ -1212,6 +1237,47 @@ const MainProductImagesSection = ({
           }
           onUploadMain(files[0]);
         }}
+      />
+    </div>
+  </div>
+);
+
+const ThumbnailImageSection = ({
+  formData,
+  onInputChange,
+  onFieldChange,
+  uploading,
+  uploadProgress,
+  onOpenMediaLibrary,
+  onUploadThumbnail,
+}) => (
+  <div className="space-y-4 rounded-2xl border border-slate-800 bg-slate-900/70 p-4">
+    <div>
+      <h2 className="text-sm font-semibold text-white">Thumbnail Image</h2>
+      <p className="mt-2 text-xs leading-relaxed text-slate-500">
+        Used on Assets listing cards. Recommended size: 1200 × 900 px or 4:3 ratio.
+      </p>
+    </div>
+    <div>
+      <SingleImageField
+        label="Thumbnail Image"
+        name="thumbnail_url"
+        value={formData.thumbnail_url}
+        onInputChange={onInputChange}
+        onFieldChange={onFieldChange}
+        uploading={!!uploading['product-thumbnail-thumbnail_url']}
+        progress={uploadProgress['product-thumbnail-thumbnail_url']}
+        onUpload={onUploadThumbnail}
+        onSelectFromMediaLibrary={onOpenMediaLibrary}
+        actionButton={formData.image_url ? (
+          <button
+            type="button"
+            onClick={() => onFieldChange('thumbnail_url', formData.image_url)}
+            className={mediaButtonClass}
+          >
+            Use same image as Main Product Image
+          </button>
+        ) : null}
       />
     </div>
   </div>
@@ -1381,6 +1447,7 @@ const SingleImageField = ({
   onSelectFromMediaLibrary,
   helperText,
   multipleUpload = false,
+  actionButton = null,
 }) => (
   <div>
     <label className="mb-2 block text-sm font-semibold text-white">{label}</label>
@@ -1411,6 +1478,7 @@ const SingleImageField = ({
           Select from Media Library
         </button>
       )}
+      {actionButton}
     </div>
     {value && <img src={value} alt={label} className="mt-3 aspect-video w-full rounded-xl border border-slate-800 bg-slate-950 object-contain" />}
     {value && (
