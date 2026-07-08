@@ -952,23 +952,24 @@ const ProductForm = ({
               Select from Media Library
             </button>
           )}
+          controlsFooter={(
+            <div className="mb-3">
+              <label className="mb-2 block text-sm font-semibold text-white">Product Gallery Layout</label>
+              <select
+                name="gallery_layout"
+                value={formData.gallery_layout || 'grid'}
+                onChange={onInputChange}
+                className="w-full rounded-lg border border-slate-700 bg-slate-900 px-4 py-2 text-white focus:border-violet-500 focus:outline-none"
+              >
+                <option value="grid">Three Card Grid</option>
+                <option value="full">Full Image Size</option>
+              </select>
+              <p className="mt-2 text-xs text-slate-500">
+                Choose how gallery images appear on the asset detail page.
+              </p>
+            </div>
+          )}
         />
-
-        <div>
-          <label className="mb-2 block text-sm font-semibold text-white">Product Gallery Layout</label>
-          <select
-            name="gallery_layout"
-            value={formData.gallery_layout || 'grid'}
-            onChange={onInputChange}
-            className="w-full rounded-lg border border-slate-700 bg-slate-900 px-4 py-2 text-white focus:border-violet-500 focus:outline-none"
-          >
-            <option value="grid">Three Card Grid</option>
-            <option value="full">Full Image Size</option>
-          </select>
-          <p className="mt-2 text-xs text-slate-500">
-            Choose how gallery images appear on the asset detail page.
-          </p>
-        </div>
 
         <ProductVideoSection
           formData={formData}
@@ -1436,6 +1437,7 @@ const ArrayEditor = ({
   uploadControl = null,
   mediaLibraryControl = null,
   previewType = null,
+  controlsFooter = null,
 }) => {
   return (
     <div>
@@ -1459,6 +1461,7 @@ const ArrayEditor = ({
         {uploadControl}
         {mediaLibraryControl}
       </div>
+      {controlsFooter}
       {previewType === 'image' && items.length > 0 ? (
         <div className="mb-3 grid gap-3 sm:grid-cols-2">
           {items.map((item, idx) => (
@@ -1474,7 +1477,8 @@ const ArrayEditor = ({
           ))}
         </div>
       ) : null}
-      <div className="flex flex-wrap gap-2">
+      {previewType !== 'image' && (
+        <div className="flex flex-wrap gap-2">
         {items.map((item, idx) => (
           <div
             key={`${item}-${idx}`}
@@ -1489,7 +1493,8 @@ const ArrayEditor = ({
             </button>
           </div>
         ))}
-      </div>
+        </div>
+      )}
     </div>
   );
 };
