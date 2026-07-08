@@ -116,6 +116,7 @@ const normalizeProduct = (value) => {
     isFree: product.is_free === true || resolvedPrice === 0,
     heroImage,
     galleryImages,
+    galleryLayout: product.gallery_layout === 'full' ? 'full' : 'grid',
     features: toStringList(product.features),
     benefits: toStringList(product.benefits),
     compatibility: toStringList(landing.compatibility),
@@ -575,6 +576,7 @@ const PriceCard = ({ price, isFree, busy, product, onPrimaryCta, onShare, classN
 const ProductMediaSection = ({ product, galleryImages }) => {
   const [failedImages, setFailedImages] = useState([]);
   const [lightboxIndex, setLightboxIndex] = useState(-1);
+  const galleryLayout = product?.galleryLayout === 'full' ? 'full' : 'grid';
   const visibleGalleryImages = (Array.isArray(galleryImages) ? galleryImages : [])
     .filter((image) => !failedImages.includes(image));
   const hasGallery = visibleGalleryImages.length > 0;
@@ -649,20 +651,28 @@ const ProductMediaSection = ({ product, galleryImages }) => {
         {hasGallery && (
           <div>
             <h2 className="mb-8 text-3xl font-bold tracking-tight">Product Gallery</h2>
-            <div className="grid gap-4 grid-cols-1 md:grid-cols-2 xl:grid-cols-3">
+            <div className={galleryLayout === 'full' ? 'space-y-6 md:space-y-8' : 'grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3'}>
               {visibleGalleryImages.map((image, index) => (
                 <button
                   key={`${image}-${index}`}
                   type="button"
                   onClick={() => openLightbox(index)}
-                  className="group relative overflow-hidden rounded-3xl border border-white/10 bg-[#090712] text-left shadow-[0_0_28px_rgba(0,0,0,0.28)] transition hover:border-purple-300/25 focus:outline-none focus:ring-2 focus:ring-violet-400/70"
+                  className={
+                    galleryLayout === 'full'
+                      ? 'group relative block overflow-hidden rounded-3xl border border-white/15 bg-[#090712] text-left shadow-[0_0_28px_rgba(0,0,0,0.28)] transition hover:border-purple-300/25 focus:outline-none focus:ring-2 focus:ring-violet-400/70'
+                      : 'group relative overflow-hidden rounded-3xl border border-white/10 bg-[#090712] text-left shadow-[0_0_28px_rgba(0,0,0,0.28)] transition hover:border-purple-300/25 focus:outline-none focus:ring-2 focus:ring-violet-400/70'
+                  }
                 >
                   <OptimizedImage
                     src={image}
                     alt={`${titleForAlt} gallery image`}
-                    width={420}
-                    height={236}
-                    className="product-gallery-image w-full cursor-pointer transition duration-300 group-hover:scale-[1.02]"
+                    width={galleryLayout === 'full' ? 1440 : 420}
+                    height={galleryLayout === 'full' ? 1080 : 236}
+                    className={
+                      galleryLayout === 'full'
+                        ? 'w-full cursor-pointer rounded-3xl object-contain transition duration-300 group-hover:scale-[1.01]'
+                        : 'product-gallery-image w-full cursor-pointer transition duration-300 group-hover:scale-[1.02]'
+                    }
                     fallback=""
                     onError={() => handleGalleryImageError(image)}
                   />

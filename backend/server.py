@@ -643,6 +643,7 @@ class Product(BaseModel):
     thumbnail_url: Optional[str] = None
     preview_image_url: Optional[str] = None
     cover_image_url: Optional[str] = None
+    gallery_layout: str = "grid"
     before_image_url: Optional[str] = None
     after_image_url: Optional[str] = None
     download_file: Optional[str] = None
@@ -690,6 +691,7 @@ class ProductIn(BaseModel):
     thumbnail_url: Optional[str] = None
     preview_image_url: Optional[str] = None
     cover_image_url: Optional[str] = None
+    gallery_layout: str = "grid"
     before_image_url: Optional[str] = None
     after_image_url: Optional[str] = None
     download_file: Optional[str] = None
@@ -742,6 +744,11 @@ class ProductIn(BaseModel):
         if value in {None, "", "youtube", "direct"}:
             return value
         raise ValueError("video_type must be youtube, direct, or empty")
+
+    @field_validator("gallery_layout")
+    @classmethod
+    def validate_gallery_layout(cls, value):
+        return "full" if value == "full" else "grid"
 
 
 class ServiceContentItem(BaseModel):
@@ -2116,6 +2123,7 @@ def _normalize_product_media_fields(doc: dict) -> dict:
             doc[field_name] = _sanitize_cms_value(doc.get(field_name))
     if not doc.get("gallery_images"):
         doc["gallery_images"] = list(doc.get("gallery") or [])
+    doc["gallery_layout"] = "full" if doc.get("gallery_layout") == "full" else "grid"
     main_image_url = (
         doc.get("image_url")
         or doc.get("preview_image_url")

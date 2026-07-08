@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronDown, ChevronUp, Plus, Save, X, Edit2, Trash2, Copy, Link, RefreshCw, Upload, PlayCircle, Image as ImageIcon } from 'lucide-react';
 import {
   fetchAdminProducts,
@@ -52,6 +52,7 @@ const defaultProductForm = {
   thumbnail_url: '',
   preview_image_url: '',
   cover_image_url: '',
+  gallery_layout: 'grid',
   before_image_url: '',
   after_image_url: '',
   download_file: '',
@@ -151,6 +152,7 @@ const normalizeProductForForm = (product = {}) => {
     thumbnail_url: String(product.thumbnail_url || '').trim(),
     preview_image_url: String(product.preview_image_url || '').trim(),
     cover_image_url: String(product.cover_image_url || '').trim(),
+    gallery_layout: product.gallery_layout === 'full' ? 'full' : 'grid',
     gallery_images: galleryImages,
     product_images: galleryImages,
     images: galleryImages,
@@ -237,6 +239,7 @@ const Products = () => {
       thumbnail_url: mainImageUrl,
       preview_image_url: mainImageUrl,
       cover_image_url: mainImageUrl,
+      gallery_layout: formData.gallery_layout === 'full' ? 'full' : 'grid',
       youtube_url: rejectUnsafeMediaUrl(formData.youtube_url),
       video_url: rejectUnsafeMediaUrl(formData.video_url),
       before_image_url: rejectUnsafeMediaUrl(formData.before_image_url),
@@ -600,7 +603,7 @@ const ProductForm = ({
     setUploading((prev) => ({ ...prev, [uploadKey]: false }));
   };
 
-  const uploadMedia = async ({ file, type, purpose, targetField, append = false }) => {
+  const uploadMedia = async ({ file, type, purpose, targetField, append = false, errorMessage = '' }) => {
     if (!file) return;
     if (!currentSlug) {
       toast.error('Add a product name or slug before uploading');
@@ -679,7 +682,7 @@ const ProductForm = ({
         status: error?.response?.status || error?.originalError?.response?.status || null,
         detail: error?.response?.data?.detail || error?.originalError?.response?.data?.detail || error?.message || error,
       });
-      toast.error(formatUploadError(error));
+      toast.error(errorMessage || formatUploadError(error));
     } finally {
       setUploading((prev) => ({ ...prev, [uploadKey]: false }));
     }
@@ -837,6 +840,22 @@ const ProductForm = ({
           />
         </div>
 
+        <div>
+          <label className="mb-2 block text-sm font-semibold text-white">Product Gallery Layout</label>
+          <select
+            name="gallery_layout"
+            value={formData.gallery_layout || 'grid'}
+            onChange={onInputChange}
+            className="w-full rounded-lg border border-slate-700 bg-slate-900 px-4 py-2 text-white focus:border-violet-500 focus:outline-none"
+          >
+            <option value="grid">Three Card Grid</option>
+            <option value="full">Full Image Size</option>
+          </select>
+          <p className="mt-2 text-xs text-slate-500">
+            Controls how Product Gallery images appear on the asset detail page.
+          </p>
+        </div>
+
         <PrivateDownloadSection
           formData={formData}
           onInputChange={onInputChange}
@@ -858,6 +877,7 @@ const ProductForm = ({
             type: 'image',
             purpose: 'product-image',
             targetField: 'image_url',
+            errorMessage: 'Main Product Image upload failed. Please try again.',
           })}
         />
 
@@ -1051,30 +1071,42 @@ const ProductForm = ({
   );
 };
 
-const UploadButton = ({ label, accept, disabled, progress, onFile, onFiles, multiple }) => (
-  <label className={`inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-slate-700 px-4 py-2 text-sm font-semibold text-white transition hover:border-slate-500 ${disabled ? 'pointer-events-none opacity-60' : ''}`}>
-    <Upload size={16} />
-    {disabled ? `Uploading${progress ? ` ${progress}%` : '...'}` : label}
-    <input
-      type="file"
-      accept={accept}
-      disabled={disabled}
-      multiple={multiple}
-      onChange={(event) => {
-        if (multiple) {
-          const files = Array.from(event.target.files || []);
-          event.target.value = '';
-          if (files.length > 0) onFiles?.(files);
-        } else {
-          const file = event.target.files?.[0];
-          event.target.value = '';
-          if (file) onFile?.(file);
-        }
-      }}
-      className="hidden"
-    />
-  </label>
-);
+const UploadButton = ({ label, accept, disabled, progress, onFile, onFiles, multiple }) => {
+  const inputRef = useRef(null);
+
+  return (
+    <>
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => inputRef.current?.click()}
+        className={`inline-flex items-center justify-center gap-2 rounded-lg border border-slate-700 px-4 py-2 text-sm font-semibold text-white transition hover:border-slate-500 ${disabled ? 'pointer-events-none opacity-60' : ''}`}
+      >
+        <Upload size={16} />
+        {disabled ? `Uploading${progress ? ` ${progress}%` : '...'}` : label}
+      </button>
+      <input
+        ref={inputRef}
+        type="file"
+        accept={accept}
+        disabled={disabled}
+        multiple={multiple}
+        onChange={(event) => {
+          if (multiple) {
+            const files = Array.from(event.target.files || []);
+            event.target.value = '';
+            if (files.length > 0) onFiles?.(files);
+          } else {
+            const file = event.target.files?.[0];
+            event.target.value = '';
+            if (file) onFile?.(file);
+          }
+        }}
+        className="hidden"
+      />
+    </>
+  );
+};
 
 const PrivateDownloadSection = ({
   formData,
@@ -1162,9 +1194,20 @@ const MainProductImagesSection = ({
         uploading={!!uploading['product-image-image_url']}
         progress={uploadProgress['product-image-image_url']}
         onSelectFromMediaLibrary={onOpenMediaLibrary}
-                onFiles={(files) => {
+        helperText={(
+          <>
+            <span className="block">Recommended size:</span>
+            <span className="block">1200 × 900 px or 1600 × 1200 px</span>
+            <span className="block">Accepted formats: JPG, PNG, WEBP</span>
+            <span className="block">Use a clean product cover/poster image.</span>
+            <span className="block">Avoid very small or blurry images.</span>
+            <span className="block">For wide PSD preview images, use 1920 × 1080 px or 1600 × 900 px.</span>
+          </>
+        )}
+        multipleUpload
+        onFiles={(files) => {
           if (files.length > 1) {
-            toast.info('Only the first image will be used for this field.');
+            toast.warning('Only the first image is used for Main Product Image.');
           }
           onUploadMain(files[0]);
         }}
@@ -1324,7 +1367,20 @@ const BeforeAfterUploadSection = ({
   </div>
 );
 
-const SingleImageField = ({ label, name, value, onInputChange, onFieldChange, uploading, progress, onUpload, onSelectFromMediaLibrary }) => (
+const SingleImageField = ({
+  label,
+  name,
+  value,
+  onInputChange,
+  onFieldChange,
+  uploading,
+  progress,
+  onUpload,
+  onFiles,
+  onSelectFromMediaLibrary,
+  helperText,
+  multipleUpload = false,
+}) => (
   <div>
     <label className="mb-2 block text-sm font-semibold text-white">{label}</label>
     <input
@@ -1335,13 +1391,18 @@ const SingleImageField = ({ label, name, value, onInputChange, onFieldChange, up
       placeholder="https://assets.pranvithdop.com/products/..."
       className="w-full rounded-lg border border-slate-700 bg-slate-950 px-4 py-2 text-white placeholder:text-slate-600 focus:border-violet-500 focus:outline-none"
     />
+    {helperText && (
+      <p className="mt-2 text-xs leading-relaxed text-slate-500">{helperText}</p>
+    )}
     <div className="mt-3 flex flex-wrap gap-2">
       <UploadButton
         label="Upload Image"
         accept={ADMIN_IMAGE_UPLOAD_ACCEPT}
         disabled={uploading}
         progress={progress}
+        multiple={multipleUpload}
         onFile={onUpload}
+        onFiles={onFiles}
       />
       {onSelectFromMediaLibrary && (
         <button type="button" onClick={onSelectFromMediaLibrary} className={mediaButtonClass}>
@@ -1350,7 +1411,7 @@ const SingleImageField = ({ label, name, value, onInputChange, onFieldChange, up
         </button>
       )}
     </div>
-    {value && <img src={value} alt={label} className="mt-3 aspect-video w-full rounded-xl border border-slate-800 bg-slate-950 object-cover" />}
+    {value && <img src={value} alt={label} className="mt-3 aspect-video w-full rounded-xl border border-slate-800 bg-slate-950 object-contain" />}
     {value && (
       <button
         type="button"

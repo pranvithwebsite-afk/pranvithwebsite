@@ -357,7 +357,7 @@ const ProductCard = ({ p, onView, onBuy }) => (
   >
     <div className="relative aspect-[4/5] overflow-hidden">
       {p.image ? (
-        <OptimizedImage src={p.image} alt={p.title} width={360} height={450} className="absolute inset-0 h-full w-full object-cover" fallback={FALLBACK_IMAGE} onError={handleImageError} />
+        <OptimizedImage src={p.image} alt={p.title} width={360} height={450} className="absolute inset-0 h-full w-full object-contain sm:object-cover" fallback={FALLBACK_IMAGE} onError={handleImageError} />
       ) : (
         <div className="absolute inset-0" style={{ background: p.bg }} />
       )}
