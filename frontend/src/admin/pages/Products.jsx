@@ -1255,7 +1255,7 @@ const ThumbnailImageSection = ({
     <div>
       <h2 className="text-sm font-semibold text-white">Thumbnail Image</h2>
       <p className="mt-2 text-xs leading-relaxed text-slate-500">
-        Used on Assets listing cards. Recommended size: 1200 × 900 px or 4:3 ratio.
+        Recommended Thumbnail Image Size: 1080 x 1080 px. Ratio: 1:1 square. Used only for Assets product cards.
       </p>
     </div>
     <div>

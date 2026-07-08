@@ -355,7 +355,7 @@ const ProductCard = ({ p, onView, onBuy }) => (
     data-testid={`asset-card-${p.slug}`}
     className="cinematic-card group flex cursor-pointer flex-col overflow-hidden transition-all duration-300 hover:-translate-y-1"
   >
-    <div className="relative aspect-[4/3] overflow-hidden rounded-[24px]">
+    <div className="relative aspect-square overflow-hidden rounded-[20px]">
       {p.image ? (
         <OptimizedImage src={p.image} alt={p.title} width={480} height={360} className="absolute inset-0 h-full w-full object-cover" fallback={FALLBACK_IMAGE} onError={handleImageError} />
       ) : (
