@@ -32,14 +32,17 @@ const ShowreelSection = ({ section }) => {
         </p>
       </div>
 
-      <div className="cinematic-card mt-10 overflow-hidden">
-        <SafeVideoEmbed
-          videoType={section?.media_type || 'video_url'}
-          videoUrl={mainVideoUrl}
-          title={section?.title || 'Featured showreel'}
-          posterUrl={mainPoster}
-          className="rounded-none border-0"
-        />
+      <div className="video-glow-card mt-10">
+        <div className="video-glow-card__inner cinematic-card overflow-hidden">
+          <SafeVideoEmbed
+            videoType={section?.media_type || 'video_url'}
+            videoUrl={mainVideoUrl}
+            title={section?.title || 'Featured showreel'}
+            posterUrl={mainPoster}
+            className="rounded-none border-0"
+            showPlayOverlay={false}
+          />
+        </div>
       </div>
 
       <div className="mt-8 grid gap-5 md:grid-cols-3">

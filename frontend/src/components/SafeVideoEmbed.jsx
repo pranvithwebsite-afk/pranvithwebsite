@@ -154,7 +154,7 @@ const SafeVideoEmbed = ({
   const safePosterUrl = getSafePosterUrl(posterUrl || poster);
   const youtubeThumbnail = !safePosterUrl || posterFailed ? getYouTubeThumbnail(videoUrl, youtubeMaxFailed ? 'hqdefault' : 'maxresdefault') : '';
   const thumbnailUrl = thumbnailUnavailable ? '' : (safePosterUrl && !posterFailed ? safePosterUrl : youtubeThumbnail);
-  const wrapperClass = `group relative ${aspectRatio || 'aspect-video'} overflow-hidden rounded-[inherit] border border-violet-500/15 bg-black ${className}`.trim();
+  const wrapperClass = `group relative z-[2] ${aspectRatio || 'aspect-video'} overflow-hidden rounded-[inherit] border border-violet-500/15 bg-black ${className}`.trim();
   const frameRef = useRef(null);
   const shouldLoadPlayer = activated || (loadWhenVisible && nearViewport);
   const allowAutoplay = autoplayOnClick && !isMobile;
@@ -189,7 +189,7 @@ const SafeVideoEmbed = ({
           muted={allowAutoplay}
           playsInline
           preload={activated ? 'metadata' : 'none'}
-          className="absolute inset-0 h-full w-full object-contain"
+          className="absolute inset-0 z-[3] h-full w-full object-contain"
         />
       </div>
     );
@@ -201,7 +201,7 @@ const SafeVideoEmbed = ({
         <iframe
           title={title}
           src={allowAutoplay && activated ? withAutoplay(embedUrl) : embedUrl}
-          className="absolute inset-0 h-full w-full"
+          className="absolute inset-0 z-[3] h-full w-full"
           loading="lazy"
           referrerPolicy="strict-origin-when-cross-origin"
           allow="autoplay; encrypted-media; picture-in-picture"

@@ -82,6 +82,28 @@ h1, h2, h3, h4, h5, h6 {
     box-shadow: 0 0 60px rgba(124, 58, 237, 0.18);
   }
 
+  .video-glow-card {
+    position: relative;
+    overflow: visible;
+  }
+
+  .video-glow-card::before {
+    content: '';
+    position: absolute;
+    inset: -28px;
+    border-radius: 32px;
+    background: radial-gradient(circle, rgba(139, 92, 246, 0.34) 0%, rgba(139, 92, 246, 0.16) 38%, transparent 72%);
+    filter: blur(34px);
+    z-index: 0;
+    pointer-events: none;
+  }
+
+  .video-glow-card__inner {
+    position: relative;
+    z-index: 2;
+    overflow: hidden;
+  }
+
   .cinematic-icon {
     background: rgba(124, 58, 237, 0.18);
     border: 1px solid rgba(167, 139, 250, 0.30);
