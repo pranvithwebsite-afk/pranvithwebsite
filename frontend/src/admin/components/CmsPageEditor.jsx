@@ -5,6 +5,7 @@ import {
   createAdminCmsSection,
   deleteAdminCmsSection,
   fetchAdminCmsPage,
+  formatApiErrorDetail,
   reorderAdminCmsSections,
   updateAdminCmsPage,
   updateAdminCmsSection,
@@ -19,6 +20,20 @@ const fieldClass = 'w-full rounded-xl border border-slate-800 bg-slate-900 px-4 
 const getSortOrder = (section, index) => {
   const order = Number(section?.sort_order);
   return Number.isFinite(order) ? order : index + 1;
+};
+
+const formatCmsSaveError = (error) => {
+  const status = error?.response?.status;
+  const detail = error?.response?.data?.detail;
+  const message = formatApiErrorDetail(detail) || error?.message || 'Could not save section';
+  const fieldName = Array.isArray(detail)
+    ? detail.map((item) => item?.loc?.[item.loc.length - 1]).filter(Boolean)[0]
+    : '';
+  const parts = [];
+  if (status) parts.push(`Status ${status}`);
+  if (fieldName) parts.push(`Field: ${fieldName}`);
+  parts.push(message);
+  return parts.join(' - ');
 };
 
 const normalizeSectionOrder = (sections = []) =>
@@ -133,7 +148,7 @@ const CmsPageEditor = ({ pageKey, title, path, mediaItems, onBack }) => {
       }
     } catch (error) {
       console.error('[admin/cms] Failed to save section', error?.response?.data?.detail || error?.message || error);
-      toast.error(error?.response?.data?.detail || 'Could not save section');
+      toast.error(formatCmsSaveError(error));
     } finally {
       setSaving(false);
     }

@@ -1983,7 +1983,7 @@ def _sanitize_cms_media_reference(field_name: str, value: Any, media_type: Optio
         if not _is_cms_image_url(cleaned):
             raise HTTPException(
                 status_code=422,
-                detail="Poster/thumbnail must be an image URL. For YouTube videos, leave poster empty or upload a thumbnail image.",
+                detail="Poster/thumbnail must be an image URL. Leave it empty for videos or upload a thumbnail image.",
             )
         return cleaned
 
