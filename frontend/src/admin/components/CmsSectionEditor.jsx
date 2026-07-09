@@ -657,6 +657,7 @@ const EditableField = ({ field, value, onChange, mediaItems, label, pageKey, med
     return (
       <MediaUrlInput
         label={label}
+        fieldName={field}
         value={value || ''}
         onChange={onChange}
         accept={accept}

@@ -28,6 +28,22 @@ const getExtension = (filename = '') => {
   return dot >= 0 ? clean.slice(dot) : '';
 };
 
+const extractErrorDetail = (detail) => {
+  if (!detail) return '';
+  if (typeof detail === 'string') return detail;
+  if (typeof detail?.message === 'string' && detail.message.trim()) return detail.message.trim();
+  if (typeof detail?.detail === 'string' && detail.detail.trim()) return detail.detail.trim();
+  return '';
+};
+
+const errorCodeMessage = (code, message) => `${code}: ${message}`;
+
+const stringifyUploadErrorBody = (value) => {
+  if (!value) return '';
+  if (typeof value === 'string') return value.trim();
+  return extractErrorDetail(value?.detail || value) || '';
+};
+
 export const isVideoUploadFile = (file) => {
   const extension = getExtension(file?.name);
   return VIDEO_EXTENSIONS.has(extension) || VIDEO_MIME_TYPES.has(String(file?.type || '').toLowerCase());
@@ -54,28 +70,51 @@ export const validateVideoUploadFile = (file) => {
   const extension = getExtension(file.name);
   const mimeType = String(file.type || '').toLowerCase();
   if (!VIDEO_EXTENSIONS.has(extension) || !VIDEO_MIME_TYPES.has(mimeType)) {
-    return 'Unsupported video type. Allowed: MP4, WEBM, MOV.';
+    return errorCodeMessage('INVALID_VIDEO_FILE', 'Unsupported video type. Allowed: MP4, WEBM, MOV.');
   }
   if (file.size > ADMIN_VIDEO_UPLOAD_MAX_BYTES) {
-    return `Video is ${formatMegabytes(file.size)}. Maximum allowed video size is ${formatMegabytes(ADMIN_VIDEO_UPLOAD_MAX_BYTES)}. Please compress the video or upload it manually to Cloudflare R2/YouTube and paste the URL.`;
+    return errorCodeMessage('VIDEO_TOO_LARGE', `Video is ${formatMegabytes(file.size)}. Maximum allowed video size is ${formatMegabytes(ADMIN_VIDEO_UPLOAD_MAX_BYTES)}. Please compress the video or upload it manually to Cloudflare R2/YouTube and paste the URL.`);
   }
   return '';
 };
 
 export const formatUploadError = (error, fallback = 'Upload failed') => {
   const status = error?.response?.status;
-  const detail = error?.response?.data?.detail || error?.message || fallback;
+  const responseDetail = error?.response?.data?.detail;
+  const detail = extractErrorDetail(responseDetail) || error?.message || fallback;
   if (error?.stage === 'presign') {
+    if (status === 415) {
+      return errorCodeMessage('INVALID_VIDEO_FILE', detail || 'Unsupported video type. Allowed: MP4, WEBM, MOV.');
+    }
+    if (status === 413) {
+      return errorCodeMessage('VIDEO_TOO_LARGE', detail || 'Video exceeds the maximum allowed upload size.');
+    }
     if (status === 500 && /Cloudflare R2 is not configured/i.test(String(detail))) {
       return 'Cloudflare R2 is not configured. Please add R2 environment variables.';
     }
-    return 'Could not create R2 upload URL. Check backend R2 configuration.';
+    return errorCodeMessage('R2_UPLOAD_FAILED', detail || 'Could not create R2 upload URL. Check backend R2 configuration.');
   }
   if (error?.stage === 'r2_put') {
-    return 'Video upload to R2 failed. Check Cloudflare R2 CORS settings.';
+    if (!status) {
+      return errorCodeMessage('R2_CORS_ERROR', 'Browser could not upload to Cloudflare R2. Check R2 CORS for this origin and inspect the browser network error.');
+    }
+    const body = stringifyUploadErrorBody(error?.response?.data);
+    return errorCodeMessage('R2_UPLOAD_FAILED', body || `Cloudflare R2 rejected the upload with status ${status}.`);
+  }
+  if (error?.stage === 'complete') {
+    if (status === 415) {
+      return errorCodeMessage('INVALID_VIDEO_FILE', detail || 'Unsupported video type. Allowed: MP4, WEBM, MOV.');
+    }
+    if (status === 413) {
+      return errorCodeMessage('VIDEO_TOO_LARGE', detail || 'Video exceeds the maximum allowed upload size.');
+    }
+    return errorCodeMessage('R2_UPLOAD_FAILED', detail || 'Video upload finished, but the backend could not finalize it.');
   }
   if (status === 413) {
-    return 'This video is too large for normal upload. Upload directly to Cloudflare R2 or paste a YouTube/Vimeo/R2 URL.';
+    return errorCodeMessage('VIDEO_TOO_LARGE', detail || 'This video is too large for upload.');
+  }
+  if (status === 415) {
+    return errorCodeMessage('INVALID_VIDEO_FILE', detail || 'Unsupported video type. Allowed: MP4, WEBM, MOV.');
   }
   if (status === 500 && /Cloudflare R2 is not configured/i.test(String(detail))) {
     return 'Cloudflare R2 is not configured. Please add R2 environment variables.';

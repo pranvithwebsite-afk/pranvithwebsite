@@ -562,16 +562,25 @@ export const createAdminDirectVideoUpload = async ({ filename, contentType, file
 };
 
 export const finalizeAdminDirectVideoUpload = async ({ key, url, filename, contentType, size, purpose, title }) => {
-  const { data } = await adminApi.post('/admin/uploads/video/complete', {
-    key,
-    url,
-    filename,
-    content_type: contentType,
-    size,
-    purpose,
-    title,
-  });
-  return data;
+  try {
+    const { data } = await adminApi.post('/admin/uploads/video/complete', {
+      key,
+      url,
+      filename,
+      content_type: contentType,
+      size,
+      purpose,
+      title,
+    });
+    return data;
+  } catch (error) {
+    const wrapped = new Error(error?.message || 'Could not finalize upload');
+    wrapped.stage = 'complete';
+    wrapped.originalError = error;
+    wrapped.response = error?.response;
+    wrapped.request = error?.request;
+    throw wrapped;
+  }
 };
 
 export const uploadFileToSignedUrl = async ({ uploadUrl, file, headers = {}, onUploadProgress }) => {

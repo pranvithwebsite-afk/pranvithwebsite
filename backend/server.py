@@ -1891,6 +1891,41 @@ def _reject_unsafe_url(value: Optional[str]) -> Optional[str]:
     return cleaned
 
 
+CMS_IMAGE_EXTENSIONS = (".jpg", ".jpeg", ".png", ".webp", ".gif")
+CMS_VIDEO_EXTENSIONS = (".mp4", ".webm", ".mov")
+CMS_YOUTUBE_HOSTS = {"youtube.com", "www.youtube.com", "m.youtube.com", "youtu.be", "www.youtu.be", "youtube-nocookie.com", "www.youtube-nocookie.com"}
+CMS_VIMEO_HOSTS = {"vimeo.com", "www.vimeo.com", "player.vimeo.com"}
+
+
+def _cms_url_host_and_path(value: str) -> tuple[str, str]:
+    parsed = urlparse(value)
+    return (parsed.netloc or "").lower(), (parsed.path or "").lower()
+
+
+def _is_cms_image_url(value: str) -> bool:
+    host, path = _cms_url_host_and_path(value)
+    if value.startswith("/") and not value.startswith("//"):
+        return path.endswith(CMS_IMAGE_EXTENSIONS)
+    return bool(host) and path.endswith(CMS_IMAGE_EXTENSIONS)
+
+
+def _is_cms_direct_video_url(value: str) -> bool:
+    host, path = _cms_url_host_and_path(value)
+    if value.startswith("/") and not value.startswith("//"):
+        return path.endswith(CMS_VIDEO_EXTENSIONS)
+    return bool(host) and path.endswith(CMS_VIDEO_EXTENSIONS)
+
+
+def _is_cms_youtube_url(value: str) -> bool:
+    host, _path = _cms_url_host_and_path(value)
+    return host in CMS_YOUTUBE_HOSTS
+
+
+def _is_cms_vimeo_url(value: str) -> bool:
+    host, _path = _cms_url_host_and_path(value)
+    return host in CMS_VIMEO_HOSTS
+
+
 def _decode_html_entities(value: Any) -> Any:
     if isinstance(value, str):
         previous = value
@@ -1934,6 +1969,75 @@ def _sanitize_cms_value(value: Any) -> Any:
     if isinstance(value, (bool, int, float)) or value is None:
         return value
     return str(value)[:1000]
+
+
+def _sanitize_cms_media_reference(field_name: str, value: Any, media_type: Optional[str] = None) -> str:
+    cleaned = _reject_unsafe_url(value) or ""
+    if not cleaned:
+        return ""
+
+    normalized_field = str(field_name or "").strip().lower()
+    normalized_media_type = str(media_type or "").strip().lower()
+
+    if normalized_field in {"poster_url", "thumbnail_url", "thumbnail_image_url", "student_image_url"}:
+        if not _is_cms_image_url(cleaned):
+            raise HTTPException(
+                status_code=422,
+                detail="Poster/thumbnail must be an image URL. For YouTube videos, leave poster empty or upload a thumbnail image.",
+            )
+        return cleaned
+
+    if normalized_field == "image_url":
+        if not _is_cms_image_url(cleaned):
+            raise HTTPException(status_code=422, detail="Image URL must be jpg, jpeg, png, webp, or gif.")
+        return cleaned
+
+    if normalized_field == "video_url":
+        if not (_is_cms_direct_video_url(cleaned) or _is_cms_youtube_url(cleaned) or _is_cms_vimeo_url(cleaned)):
+            raise HTTPException(status_code=422, detail="Video URL must be a YouTube URL, Vimeo URL, or direct mp4/webm/mov URL.")
+        return cleaned
+
+    if normalized_field != "media_url":
+        return cleaned
+
+    allowed = False
+    if normalized_media_type == "image":
+        allowed = _is_cms_image_url(cleaned)
+    elif normalized_media_type == "video_file":
+        allowed = _is_cms_direct_video_url(cleaned)
+    elif normalized_media_type == "youtube":
+        allowed = _is_cms_youtube_url(cleaned)
+    elif normalized_media_type == "vimeo":
+        allowed = _is_cms_vimeo_url(cleaned)
+    elif normalized_media_type in {"video_url", "auto", ""}:
+        allowed = _is_cms_image_url(cleaned) or _is_cms_direct_video_url(cleaned) or _is_cms_youtube_url(cleaned) or _is_cms_vimeo_url(cleaned)
+
+    if not allowed:
+        if normalized_media_type == "youtube":
+            raise HTTPException(status_code=422, detail="Media URL must be a YouTube URL.")
+        if normalized_media_type == "vimeo":
+            raise HTTPException(status_code=422, detail="Media URL must be a Vimeo URL.")
+        if normalized_media_type == "video_file":
+            raise HTTPException(status_code=422, detail="Media URL must be a direct mp4/webm/mov URL.")
+        if normalized_media_type == "image":
+            raise HTTPException(status_code=422, detail="Media URL must be an image URL.")
+        raise HTTPException(status_code=422, detail="Media URL must be an image URL, YouTube URL, Vimeo URL, or direct mp4/webm/mov URL.")
+    return cleaned
+
+
+def _sanitize_cms_media_fields(value: Any, inherited_media_type: Optional[str] = None) -> Any:
+    if isinstance(value, list):
+        return [_sanitize_cms_media_fields(item, inherited_media_type) for item in value]
+    if isinstance(value, dict):
+        local_media_type = str(value.get("media_type") or value.get("video_type") or inherited_media_type or "").strip().lower()
+        safe = {}
+        for key, item in value.items():
+            if key in {"poster_url", "thumbnail_url", "thumbnail_image_url", "student_image_url", "image_url", "video_url", "media_url"}:
+                safe[key] = _sanitize_cms_media_reference(key, item, local_media_type)
+            else:
+                safe[key] = _sanitize_cms_media_fields(item, local_media_type)
+        return safe
+    return value
 
 
 def _normalize_cms_page_key(page_key: str) -> str:
@@ -2016,6 +2120,7 @@ def _cms_section_doc(page_key: str, payload: CmsSectionIn, existing: Optional[di
         if field_name in incoming and incoming.get(field_name) is not None:
             incoming[field_name] = _normalize_text_value(incoming.get(field_name), max_length)
     incoming["data"] = _sanitize_cms_value(incoming.get("data") or {})
+    incoming = _sanitize_cms_media_fields(incoming, incoming.get("media_type"))
     if "section_id" in incoming and incoming["section_id"]:
         incoming["section_id"] = normalize_slug(incoming["section_id"])
     base.update({k: v for k, v in incoming.items() if v is not None})

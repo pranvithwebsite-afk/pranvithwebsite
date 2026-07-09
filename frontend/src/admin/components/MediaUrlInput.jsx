@@ -33,6 +33,7 @@ const posterFieldPattern = /(poster|thumbnail)/i;
 
 const MediaUrlInput = ({
   label,
+  fieldName = '',
   value,
   onChange,
   accept = 'image/*',
@@ -56,7 +57,7 @@ const MediaUrlInput = ({
   const currentType = normalizedMediaType || detectMediaType(value);
   const supportsImageUpload = accept.includes('image');
   const supportsVideoUpload = accept.includes('video');
-  const isPosterField = posterFieldPattern.test(String(label || ''));
+  const isPosterField = posterFieldPattern.test(String(fieldName || label || ''));
   const videoMode = supportsVideoUpload && (videoMediaTypes.has(normalizedMediaType) || videoMediaTypes.has(currentType));
   const trimmedValue = String(value || '').trim();
   const posterValueInvalid = isPosterField && trimmedValue && !isImageUrl(trimmedValue);
@@ -198,11 +199,11 @@ const MediaUrlInput = ({
           value={value || ''}
           onChange={(event) => onChange(event.target.value)}
           placeholder={placeholder}
-          className="min-w-0 flex-1 rounded-2xl border border-slate-800 bg-slate-900 px-4 py-3 text-white outline-none focus:border-violet-500"
+          className={`min-w-0 flex-1 rounded-2xl border bg-slate-900 px-4 py-3 text-white outline-none focus:border-violet-500 ${posterValueInvalid ? 'border-amber-500' : 'border-slate-800'}`}
         />
         <div className="flex flex-wrap gap-2">
           {supportsImageUpload && (
-            <label className={buttonClass}>
+            <label className={`${buttonClass} ${uploadingImage || uploadingVideo ? 'pointer-events-none opacity-60' : ''}`}>
               <Upload size={14} />
               {uploadingImage ? 'Uploading image...' : 'Upload Image/Thumbnail'}
               <input
@@ -215,7 +216,7 @@ const MediaUrlInput = ({
             </label>
           )}
           {supportsVideoUpload && (
-            <label className={buttonClass}>
+            <label className={`${buttonClass} ${uploadingImage || uploadingVideo ? 'pointer-events-none opacity-60' : ''}`}>
               <Video size={14} />
               {uploadingVideo ? `Uploading video ${videoProgress || 0}%` : 'Upload Video to R2'}
               <input
@@ -236,10 +237,15 @@ const MediaUrlInput = ({
         </div>
       </div>
       <p className="mt-2 text-xs text-slate-500">{resolvedHelperText}</p>
+      {uploadingVideo && (
+        <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-800">
+          <div className="h-full bg-violet-500 transition-all" style={{ width: `${videoProgress || 0}%` }} />
+        </div>
+      )}
       {supportsVideoUpload && (
         <p className="mt-1 text-xs text-slate-500">
           Max video size: {formatMegabytes(ADMIN_VIDEO_UPLOAD_MAX_BYTES)}
-          {selectedVideoSize ? ` • Selected video: ${selectedVideoSize}` : ''}
+          {selectedVideoSize ? ` - Selected video: ${selectedVideoSize}` : ''}
         </p>
       )}
       {supportsVideoUpload && (
