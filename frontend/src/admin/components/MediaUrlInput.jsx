@@ -2,11 +2,9 @@ import React, { useMemo, useState } from 'react';
 import { Image as ImageIcon, Upload, Video, X } from 'lucide-react';
 import { toast } from 'sonner';
 import {
-  createAdminDirectVideoUpload,
+  uploadAdminVideoToR2,
   fetchAdminMedia,
-  finalizeAdminDirectVideoUpload,
   uploadAdminImageToR2,
-  uploadFileToSignedUrl,
 } from '../../lib/api';
 import {
   ADMIN_IMAGE_RECOMMENDED_BYTES,
@@ -120,38 +118,23 @@ const MediaUrlInput = ({
     try {
       setUploadingVideo(true);
       setVideoProgress(0);
-      const signed = await createAdminDirectVideoUpload({
-        filename: file.name,
-        contentType: file.type,
-        fileSize: file.size,
+      const completed = await uploadAdminVideoToR2({
+        file,
         purpose: videoUploadPurpose,
         slug: videoUploadSlug,
-      });
-      await uploadFileToSignedUrl({
-        uploadUrl: signed.upload_url,
-        file,
-        headers: {
-          'Content-Type': file.type,
-          ...(signed.required_headers || signed.headers || {}),
-        },
+        title: file.name,
         onUploadProgress: (progressEvent) => {
           const total = progressEvent.total || file.size || 1;
           setVideoProgress(Math.min(100, Math.round((progressEvent.loaded / total) * 100)));
         },
+        onFallback: () => {
+          setVideoProgress(0);
+        },
       });
-      const completed = await finalizeAdminDirectVideoUpload({
-        key: signed.key,
-        url: signed.public_url,
-        filename: file.name,
-        contentType: file.type,
-        size: file.size,
-        purpose: videoUploadPurpose,
-        title: file.name,
-      });
-      const url = completed?.media?.public_url || completed?.media?.url || completed?.url || signed.public_url;
+      const url = completed?.media?.public_url || completed?.media?.url || completed?.url;
       onChange(url);
       onUploaded?.(completed?.media || { url, type: file.type, title: file.name });
-      toast.success('Video uploaded directly to Cloudflare R2');
+      toast.success(completed?.message || 'Video uploaded');
     } catch (error) {
       console.warn('[admin/media] direct video upload failed', {
         stage: error?.stage || 'unknown',
@@ -186,7 +169,7 @@ const MediaUrlInput = ({
     isPosterField
       ? 'Poster/thumbnail must be an image URL. For YouTube videos, leave poster empty or upload a thumbnail image.'
       : videoMode
-      ? 'Paste YouTube/Vimeo/R2 video URL, or upload video directly to Cloudflare R2.'
+      ? 'Paste YouTube/Vimeo/R2 video URL, or upload video directly to Cloudflare R2. If browser CORS fails, admin upload will retry through the backend.'
       : `Use JPG/PNG/WebP images. Recommended compressed JPG/WebP under ${formatBytes(ADMIN_IMAGE_RECOMMENDED_BYTES)}. Hard image limit: ${formatMegabytes(ADMIN_IMAGE_UPLOAD_MAX_BYTES)}.`
   );
 
@@ -255,7 +238,7 @@ const MediaUrlInput = ({
       )}
       {supportsVideoUpload && (
         <p className="mt-1 text-xs text-slate-500">
-          For R2 upload, bucket CORS must allow PUT from pranvithdop.com and localhost.
+          Direct browser upload prefers R2 CORS, but admin upload will fall back to a secure backend transfer if the browser PUT is blocked.
         </p>
       )}
       {showPreview && <MediaPreview value={value} type={currentType} isPosterField={isPosterField} posterValueInvalid={posterValueInvalid} mediaValueIsSupportedVideo={mediaValueIsSupportedVideo} />}

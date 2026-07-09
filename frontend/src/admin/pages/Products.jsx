@@ -9,9 +9,7 @@ import {
   deleteAdminProduct,
   createProductPaymentLink,
   refreshProductPaymentLink,
-  createAdminDirectVideoUpload,
-  finalizeAdminDirectVideoUpload,
-  uploadFileToSignedUrl,
+  uploadAdminVideoToR2,
   uploadAdminProductMedia,
   uploadAdminPrivateDownload,
   formatApiErrorDetail,
@@ -642,27 +640,15 @@ const ProductForm = ({
       };
       let result;
       if (type === 'video') {
-        const signed = await createAdminDirectVideoUpload({
-          filename: file.name,
-          contentType: file.type,
-          fileSize: file.size,
+        result = await uploadAdminVideoToR2({
+          file,
           purpose: 'product-video',
           slug: currentSlug,
-        });
-        await uploadFileToSignedUrl({
-          uploadUrl: signed.upload_url,
-          file,
-          headers: signed.required_headers || signed.headers || {},
           onUploadProgress,
-        });
-        result = await finalizeAdminDirectVideoUpload({
-          key: signed.key,
-          url: signed.public_url,
-          filename: file.name,
-          contentType: file.type,
-          size: file.size,
-          purpose: 'product-video',
           title: file.name,
+          onFallback: () => {
+            setUploadProgress((prev) => ({ ...prev, [uploadKey]: 0 }));
+          },
         });
       } else {
         result = await uploadAdminProductMedia({
@@ -679,7 +665,7 @@ const ProductForm = ({
       } else {
         onFieldChange(targetField, nextUrl);
       }
-      toast.success('Upload complete');
+      toast.success(result?.message || 'Upload complete');
     } catch (error) {
       console.warn('[admin/products] upload failed', {
         stage: error?.stage || 'unknown',

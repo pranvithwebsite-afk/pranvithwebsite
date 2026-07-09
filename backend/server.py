@@ -4154,7 +4154,7 @@ R2_IMAGE_TYPES = {
     ".webp": {"image/webp"},
 }
 R2_VIDEO_TYPES = {
-    ".mov": {"video/quicktime", "video/mov"},
+    ".mov": {"video/quicktime"},
     ".mp4": {"video/mp4"},
     ".webm": {"video/webm"},
 }
@@ -4366,6 +4366,82 @@ def _r2_media_library_key(file_ext: str, media_type: str) -> str:
     return f"media-library/{media_type}/{today}/{uuid.uuid4()}{file_ext}"
 
 
+def _video_media_record(
+    *,
+    key: str,
+    bucket: str,
+    public_url: str,
+    filename: str,
+    content_type: str,
+    size: int,
+    purpose: str,
+    title: Optional[str] = None,
+) -> dict:
+    original_name = Path(filename or "").name or "upload"
+    now = datetime.now(timezone.utc).isoformat()
+    return {
+        "id": str(uuid.uuid4()),
+        "title": (title or original_name or "Video").strip(),
+        "filename": original_name,
+        "original_filename": original_name,
+        "type": content_type,
+        "mime_type": content_type,
+        "url": public_url,
+        "public_url": public_url,
+        "thumbnail": None,
+        "description": "",
+        "size": size,
+        "size_bytes": size,
+        "uploaded_at": now,
+        "created_at": now,
+        "updated_at": now,
+        "tags": ["direct-r2-video", purpose],
+        "media_type": "video",
+        "key": key,
+        "bucket": bucket,
+        "r2_key": key,
+        "r2_bucket": bucket,
+        "storage_key": key,
+        "used_by": [],
+    }
+
+
+async def _save_direct_video_media_record(
+    *,
+    key: str,
+    filename: str,
+    content_type: str,
+    size: int,
+    purpose: str,
+    title: Optional[str] = None,
+) -> dict:
+    if db is None:
+        raise HTTPException(status_code=500, detail="Database is not configured")
+
+    bucket, public_base = _require_r2_public_upload_config()
+    media_record = _video_media_record(
+        key=key,
+        bucket=bucket,
+        public_url=f"{public_base}/{key}",
+        filename=filename,
+        content_type=content_type,
+        size=size,
+        purpose=purpose,
+        title=title,
+    )
+    try:
+        saved_media = await _upsert_media_record_by_storage(media_record)
+    except Exception:
+        logger.exception(
+            "Direct video upload completed in R2 but media DB insert failed key=%s content_type=%s size=%d",
+            key,
+            content_type,
+            size,
+        )
+        raise HTTPException(status_code=500, detail="Video uploaded to storage, but media record could not be saved")
+    return saved_media
+
+
 def _document_contains_value(value: Any, target: str) -> bool:
     if isinstance(value, str):
         return value == target
@@ -4561,40 +4637,84 @@ async def admin_complete_direct_video_upload(
     if _r2_public_key_from_url(payload.url) != payload.key:
         raise HTTPException(status_code=400, detail="Uploaded video URL does not match the signed key")
 
-    media_record = {
-        "id": str(uuid.uuid4()),
-        "title": (payload.title or Path(payload.filename).name or "Video").strip(),
-        "type": payload.content_type,
-        "url": payload.url,
-        "public_url": payload.url,
-        "thumbnail": None,
-        "description": "",
-        "size": payload.size,
-        "filename": Path(payload.filename).name,
-        "uploaded_at": datetime.now(timezone.utc).isoformat(),
-        "tags": ["direct-r2-video", payload.purpose],
-        "media_type": "video",
-        "key": payload.key,
-        "bucket": os.environ.get("CLOUDFLARE_R2_BUCKET", "pranvith-assets-public").strip(),
-    }
-    try:
-        saved_media = await _upsert_media_record_by_storage(media_record)
-    except Exception:
-        logger.exception(
-            "Direct video upload completed in R2 but media DB insert failed key=%s content_type=%s size=%d",
-            payload.key,
-            payload.content_type,
-            payload.size,
-        )
-        raise HTTPException(status_code=500, detail="Video uploaded to storage, but media record could not be saved")
+    saved_media = await _save_direct_video_media_record(
+        key=payload.key,
+        filename=payload.filename,
+        content_type=payload.content_type,
+        size=payload.size,
+        purpose=payload.purpose,
+        title=payload.title,
+    )
     return {
         "success": True,
         "media": saved_media,
         "url": saved_media.get("public_url") or saved_media.get("url") or payload.url,
         "key": payload.key,
+        "message": "Video uploaded directly to Cloudflare R2.",
         "filename": saved_media.get("filename") or Path(payload.filename).name,
         "mime_type": saved_media.get("type") or payload.content_type,
         "size_bytes": saved_media.get("size") or payload.size,
+    }
+
+
+@admin_router.post("/uploads/video/fallback")
+async def admin_upload_video_fallback(
+    file: UploadFile = File(...),
+    purpose: str = Form(...),
+    slug: str = Form(""),
+    title: str = Form(""),
+    current_admin: AdminBase = Depends(get_current_active_admin),
+):
+    if db is None:
+        raise HTTPException(status_code=500, detail="Database is not configured")
+
+    safe_filename = _safe_filename(file.filename or "video")
+    file_ext = Path(safe_filename).suffix.lower()
+    allowed_types = R2_VIDEO_TYPES.get(file_ext)
+    if purpose not in R2_DIRECT_VIDEO_PURPOSES:
+        raise HTTPException(status_code=422, detail="Unsupported video upload purpose")
+    if not allowed_types or file.content_type not in allowed_types:
+        raise HTTPException(status_code=415, detail="Unsupported video type. Allowed: MP4, WEBM, MOV.")
+
+    content = await file.read(R2_MAX_VIDEO_BYTES + 1)
+    if len(content) > R2_MAX_VIDEO_BYTES:
+        limit_mb = R2_MAX_VIDEO_BYTES // (1024 * 1024)
+        raise HTTPException(status_code=413, detail=f"Video exceeds the maximum allowed upload size of {limit_mb} MB.")
+
+    bucket, public_base = _require_r2_public_upload_config()
+    key = _r2_direct_video_object_key(purpose, file_ext, slug)
+    try:
+        _r2_client().put_object(
+            Bucket=bucket,
+            Key=key,
+            Body=content,
+            ContentType=file.content_type,
+            CacheControl="public, max-age=31536000, immutable",
+        )
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Fallback video upload failed key=%s content_type=%s size=%d", key, file.content_type, len(content))
+        raise HTTPException(status_code=502, detail="Cloudflare R2 upload failed")
+
+    saved_media = await _save_direct_video_media_record(
+        key=key,
+        filename=file.filename or safe_filename,
+        content_type=file.content_type,
+        size=len(content),
+        purpose=purpose,
+        title=title or file.filename or safe_filename,
+    )
+    public_url = saved_media.get("public_url") or saved_media.get("url") or f"{public_base}/{key}"
+    return {
+        "success": True,
+        "media": saved_media,
+        "url": public_url,
+        "key": key,
+        "message": "Video uploaded via backend fallback.",
+        "filename": saved_media.get("filename") or Path(safe_filename).name,
+        "mime_type": saved_media.get("mime_type") or saved_media.get("type") or file.content_type,
+        "size_bytes": saved_media.get("size_bytes") or saved_media.get("size") or len(content),
     }
 
 

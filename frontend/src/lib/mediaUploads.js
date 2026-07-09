@@ -1,9 +1,7 @@
 import {
   uploadAdminFile,
   uploadAdminImageToR2,
-  createAdminDirectVideoUpload,
-  uploadFileToSignedUrl,
-  finalizeAdminDirectVideoUpload,
+  uploadAdminVideoToR2,
 } from './api';
 import {
   validateImageUploadFile,
@@ -46,6 +44,7 @@ export const uploadMultipleFiles = async ({ files, purpose, onProgress }) => {
       if (isVideoUploadFile(file)) {
         const videoError = validateVideoUploadFile(file);
         if (videoError) throw new Error(videoError);
+        const videoPurpose = purpose === 'media-library' ? 'media-library-video' : purpose;
 
         onProgress({
           overallProgress: (i / totalFiles) * 100,
@@ -56,26 +55,10 @@ export const uploadMultipleFiles = async ({ files, purpose, onProgress }) => {
           stage: 'presign',
         });
 
-        const signed = await createAdminDirectVideoUpload({
-          filename: file.name,
-          contentType: file.type,
-          fileSize: file.size,
-          purpose,
-        });
-
-        onProgress({
-          overallProgress: (i / totalFiles) * 100,
-          fileProgress: 0,
-          currentFile,
-          totalFiles,
-          currentFileName,
-          stage: 'uploading',
-        });
-
-        await uploadFileToSignedUrl({
-          uploadUrl: signed.upload_url,
+        result = await uploadAdminVideoToR2({
           file,
-          headers: signed.required_headers || signed.headers || {},
+          purpose: videoPurpose,
+          title: file.name,
           onUploadProgress: (event) => {
             const total = event.total || file.size || 1;
             const progress = Math.min(100, Math.round((event.loaded / total) * 100));
@@ -88,25 +71,16 @@ export const uploadMultipleFiles = async ({ files, purpose, onProgress }) => {
               stage: 'uploading',
             });
           },
-        });
-
-        onProgress({
-          overallProgress: (i / totalFiles) * 100 + 99 / totalFiles,
-          fileProgress: 99,
-          currentFile,
-          totalFiles,
-          currentFileName,
-          stage: 'completing',
-        });
-
-        result = await finalizeAdminDirectVideoUpload({
-          key: signed.key,
-          url: signed.public_url,
-          filename: file.name,
-          contentType: file.type,
-          size: file.size,
-          purpose,
-          title: file.name,
+          onFallback: () => {
+            onProgress({
+              overallProgress: (i / totalFiles) * 100,
+              fileProgress: 0,
+              currentFile,
+              totalFiles,
+              currentFileName,
+              stage: 'fallback',
+            });
+          },
         });
       } else if (String(file.type || '').startsWith('image/')) {
         const imageError = validateImageUploadFile(file);

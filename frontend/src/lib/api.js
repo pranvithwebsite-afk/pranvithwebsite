@@ -583,6 +583,103 @@ export const finalizeAdminDirectVideoUpload = async ({ key, url, filename, conte
   }
 };
 
+export const uploadAdminVideoViaBackend = async ({ file, purpose, slug = '', title = '', onUploadProgress }) => {
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('purpose', purpose);
+  if (slug) formData.append('slug', slug);
+  if (title) formData.append('title', title);
+  try {
+    const { data } = await adminApi.post('/admin/uploads/video/fallback', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 30 * 60 * 1000,
+      onUploadProgress,
+    });
+    return data;
+  } catch (error) {
+    const wrapped = new Error(error?.message || 'Backend fallback upload failed');
+    wrapped.stage = 'fallback';
+    wrapped.originalError = error;
+    wrapped.response = error?.response;
+    wrapped.request = error?.request;
+    throw wrapped;
+  }
+};
+
+const shouldFallbackToBackendVideoUpload = (error) => (
+  error?.stage === 'r2_put' && !error?.response?.status
+);
+
+export const uploadAdminVideoToR2 = async ({
+  file,
+  purpose,
+  slug = '',
+  title = '',
+  onUploadProgress,
+  onFallback,
+}) => {
+  try {
+    const signed = await createAdminDirectVideoUpload({
+      filename: file.name,
+      contentType: file.type,
+      fileSize: file.size,
+      purpose,
+      slug,
+    });
+    await uploadFileToSignedUrl({
+      uploadUrl: signed.upload_url,
+      file,
+      headers: {
+        'Content-Type': file.type,
+        ...(signed.required_headers || signed.headers || {}),
+      },
+      onUploadProgress,
+    });
+    const completed = await finalizeAdminDirectVideoUpload({
+      key: signed.key,
+      url: signed.public_url,
+      filename: file.name,
+      contentType: file.type,
+      size: file.size,
+      purpose,
+      title: title || file.name,
+    });
+    return {
+      ...completed,
+      upload_strategy: 'direct',
+      message: completed?.message || 'Video uploaded directly to Cloudflare R2.',
+    };
+  } catch (directError) {
+    if (!shouldFallbackToBackendVideoUpload(directError)) {
+      throw directError;
+    }
+    onFallback?.(directError);
+    try {
+      const fallback = await uploadAdminVideoViaBackend({
+        file,
+        purpose,
+        slug,
+        title: title || file.name,
+        onUploadProgress,
+      });
+      return {
+        ...fallback,
+        upload_strategy: 'backend-fallback',
+        message: fallback?.message || 'Video uploaded via backend fallback.',
+      };
+    } catch (fallbackError) {
+      const wrapped = new Error('Browser upload to Cloudflare R2 failed, and backend fallback upload also failed.');
+      wrapped.stage = 'fallback_combined';
+      wrapped.directError = directError;
+      wrapped.fallbackError = fallbackError;
+      wrapped.originalError = fallbackError?.originalError || fallbackError;
+      wrapped.response = fallbackError?.response;
+      wrapped.request = fallbackError?.request;
+      throw wrapped;
+    }
+  }
+};
+
 export const uploadFileToSignedUrl = async ({ uploadUrl, file, headers = {}, onUploadProgress }) => {
   try {
     const { data } = await axios.put(uploadUrl, file, {

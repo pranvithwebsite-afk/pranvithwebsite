@@ -91,6 +91,39 @@ class FakeDatabase:
         self.seed_state = FakeSeedState()
 
 
+class FakeMediaCollection:
+    def __init__(self):
+        self.documents = []
+
+    async def find_one(self, query, projection=None):
+        document = next(
+            (
+                item
+                for item in self.documents
+                if all(item.get(key) == value for key, value in query.items())
+            ),
+            None,
+        )
+        if document is None:
+            return None
+        if not projection:
+            return dict(document)
+        return {
+            key: value
+            for key, value in document.items()
+            if key != "_id" and projection.get(key, 0)
+        }
+
+    async def insert_one(self, document):
+        self.documents.append(dict(document))
+        return SimpleNamespace(inserted_id=document["id"])
+
+
+class FakeMediaDatabase:
+    def __init__(self):
+        self.media = FakeMediaCollection()
+
+
 def product_payload(slug="transitions"):
     return server.ProductIn(
         slug=slug,
@@ -363,6 +396,48 @@ def test_upload_rejects_invalid_video_type(monkeypatch):
             file=upload_file("trailer.mov", "application/octet-stream"),
             product_slug="creative-lut",
             purpose="product-video",
+            current_admin=None,
+        ))
+
+    assert raised.value.status_code == 415
+
+
+def test_admin_video_fallback_upload_saves_video_to_r2(monkeypatch):
+    calls = []
+
+    class FakeR2:
+        def put_object(self, **kwargs):
+            calls.append(kwargs)
+
+    monkeypatch.setattr(server, "_r2_client", lambda: FakeR2())
+    monkeypatch.setattr(server, "db", FakeMediaDatabase())
+    monkeypatch.setenv("CLOUDFLARE_R2_BUCKET", "pranvith-assets-public")
+    monkeypatch.setenv("CLOUDFLARE_R2_PUBLIC_BASE_URL", "https://assets.pranvithdop.com")
+
+    response = asyncio.run(server.admin_upload_video_fallback(
+        file=upload_file("trailer.mp4", "video/mp4", b"video-bytes"),
+        purpose="product-video",
+        slug="Creative LUT",
+        title="Trailer",
+        current_admin=None,
+    ))
+
+    assert response["success"] is True
+    assert response["message"] == "Video uploaded via backend fallback."
+    assert response["key"].startswith("products/creative-lut/videos/")
+    assert response["url"].startswith("https://assets.pranvithdop.com/products/creative-lut/videos/")
+    assert calls[0]["ContentType"] == "video/mp4"
+
+
+def test_admin_video_fallback_rejects_non_quicktime_mov(monkeypatch):
+    monkeypatch.setattr(server, "db", FakeMediaDatabase())
+
+    with pytest.raises(HTTPException) as raised:
+        asyncio.run(server.admin_upload_video_fallback(
+            file=upload_file("trailer.mov", "video/mov", b"video-bytes"),
+            purpose="cms-video",
+            slug="",
+            title="Trailer",
             current_admin=None,
         ))
 

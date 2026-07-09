@@ -3,12 +3,12 @@ export const ADMIN_VIDEO_UPLOAD_MAX_BYTES = 200 * 1024 * 1024;
 export const ADMIN_IMAGE_RECOMMENDED_BYTES = 300 * 1024;
 
 export const ADMIN_IMAGE_UPLOAD_ACCEPT = '.jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp';
-export const ADMIN_VIDEO_UPLOAD_ACCEPT = '.mp4,.webm,.mov,video/mp4,video/webm,video/quicktime,video/mov';
+export const ADMIN_VIDEO_UPLOAD_ACCEPT = '.mp4,.webm,.mov,video/mp4,video/webm,video/quicktime';
 
 const IMAGE_EXTENSIONS = new Set(['.jpg', '.jpeg', '.png', '.webp']);
 const VIDEO_EXTENSIONS = new Set(['.mp4', '.webm', '.mov']);
 const IMAGE_MIME_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
-const VIDEO_MIME_TYPES = new Set(['video/mp4', 'video/webm', 'video/quicktime', 'video/mov']);
+const VIDEO_MIME_TYPES = new Set(['video/mp4', 'video/webm', 'video/quicktime']);
 
 const bytesToUnit = (value, divisor, unit) => `${(value / divisor).toFixed(1)} ${unit}`;
 
@@ -100,6 +100,19 @@ export const formatUploadError = (error, fallback = 'Upload failed') => {
     }
     const body = stringifyUploadErrorBody(error?.response?.data);
     return errorCodeMessage('R2_UPLOAD_FAILED', body || `Cloudflare R2 rejected the upload with status ${status}.`);
+  }
+  if (error?.stage === 'fallback') {
+    if (status === 415) {
+      return errorCodeMessage('INVALID_VIDEO_FILE', detail || 'Unsupported video type. Allowed: MP4, WEBM, MOV.');
+    }
+    if (status === 413) {
+      return errorCodeMessage('VIDEO_TOO_LARGE', detail || 'Video exceeds the maximum allowed upload size.');
+    }
+    return errorCodeMessage('R2_UPLOAD_FAILED', detail || 'Backend fallback could not upload the video to Cloudflare R2.');
+  }
+  if (error?.stage === 'fallback_combined') {
+    const fallbackMessage = formatUploadError(error?.fallbackError, 'Backend fallback upload failed');
+    return errorCodeMessage('R2_CORS_ERROR', `Browser could not upload to Cloudflare R2, and backend fallback upload failed. ${fallbackMessage}`);
   }
   if (error?.stage === 'complete') {
     if (status === 415) {
