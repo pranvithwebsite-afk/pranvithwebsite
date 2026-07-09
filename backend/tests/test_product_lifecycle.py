@@ -444,6 +444,41 @@ def test_admin_video_fallback_rejects_non_quicktime_mov(monkeypatch):
     assert raised.value.status_code == 415
 
 
+def test_admin_presign_video_upload_alias_returns_signed_put_url(monkeypatch):
+    calls = []
+
+    class FakeR2:
+        def generate_presigned_url(self, operation_name, Params=None, ExpiresIn=None, HttpMethod=None):
+            calls.append({
+                "operation_name": operation_name,
+                "Params": Params,
+                "ExpiresIn": ExpiresIn,
+                "HttpMethod": HttpMethod,
+            })
+            return "https://signed.example/upload"
+
+    monkeypatch.setattr(server, "_r2_client", lambda: FakeR2())
+    monkeypatch.setenv("CLOUDFLARE_R2_BUCKET", "pranvith-assets-public")
+    monkeypatch.setenv("CLOUDFLARE_R2_PUBLIC_BASE_URL", "https://assets.pranvithdop.com")
+
+    payload = server.DirectVideoUploadSignIn(
+        filename="cms-video.mp4",
+        content_type="video/mp4",
+        file_size=28_300_000,
+        purpose="cms-video",
+        slug="home",
+    )
+    response = asyncio.run(server.admin_presign_video_upload(payload, None))
+
+    assert response["success"] is True
+    assert response["upload_url"] == "https://signed.example/upload"
+    assert response["public_url"].startswith("https://assets.pranvithdop.com/cms/home/videos/")
+    assert response["key"].startswith("cms/home/videos/")
+    assert response["method"] == "PUT"
+    assert calls[0]["operation_name"] == "put_object"
+    assert calls[0]["Params"]["ContentType"] == "video/mp4"
+
+
 def test_private_zip_upload_stores_key_without_public_url(monkeypatch):
     calls = []
 

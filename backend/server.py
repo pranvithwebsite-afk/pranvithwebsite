@@ -4602,6 +4602,7 @@ async def admin_presign_direct_video_upload(
         raise HTTPException(status_code=502, detail="Cloudflare R2 upload could not be prepared")
 
     return {
+        "success": True,
         "upload_url": upload_url,
         "public_url": f"{public_base}/{key}",
         "key": key,
@@ -4614,6 +4615,14 @@ async def admin_presign_direct_video_upload(
         },
         "max_bytes": max_bytes,
     }
+
+
+@admin_router.post("/uploads/presign-video")
+async def admin_presign_video_upload(
+    payload: DirectVideoUploadSignIn,
+    current_admin: AdminBase = Depends(get_current_active_admin),
+):
+    return await admin_presign_direct_video_upload(payload, current_admin)
 
 
 @admin_router.post("/uploads/video/complete")

@@ -123,12 +123,11 @@ const MediaUrlInput = ({
         purpose: videoUploadPurpose,
         slug: videoUploadSlug,
         title: file.name,
+        allowBackendFallback: false,
+        presignEndpoint: '/admin/uploads/presign-video',
         onUploadProgress: (progressEvent) => {
           const total = progressEvent.total || file.size || 1;
           setVideoProgress(Math.min(100, Math.round((progressEvent.loaded / total) * 100)));
-        },
-        onFallback: () => {
-          setVideoProgress(0);
         },
       });
       const url = completed?.media?.public_url || completed?.media?.url || completed?.url;
@@ -169,7 +168,7 @@ const MediaUrlInput = ({
     isPosterField
       ? 'Poster/thumbnail must be an image URL. For YouTube videos, leave poster empty or upload a thumbnail image.'
       : videoMode
-      ? 'Paste YouTube/Vimeo/R2 video URL, or upload video directly to Cloudflare R2. If browser CORS fails, admin upload will retry through the backend.'
+      ? 'Paste YouTube/Vimeo/R2 video URL, or upload video directly to Cloudflare R2.'
       : `Use JPG/PNG/WebP images. Recommended compressed JPG/WebP under ${formatBytes(ADMIN_IMAGE_RECOMMENDED_BYTES)}. Hard image limit: ${formatMegabytes(ADMIN_IMAGE_UPLOAD_MAX_BYTES)}.`
   );
 
@@ -238,7 +237,7 @@ const MediaUrlInput = ({
       )}
       {supportsVideoUpload && (
         <p className="mt-1 text-xs text-slate-500">
-          Direct browser upload prefers R2 CORS, but admin upload will fall back to a secure backend transfer if the browser PUT is blocked.
+          Cloudflare R2 CORS must allow PUT from https://pranvithdop.com and https://www.pranvithdop.com
         </p>
       )}
       {showPreview && <MediaPreview value={value} type={currentType} isPosterField={isPosterField} posterValueInvalid={posterValueInvalid} mediaValueIsSupportedVideo={mediaValueIsSupportedVideo} />}

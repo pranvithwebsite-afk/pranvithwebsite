@@ -540,7 +540,14 @@ export const uploadAdminFile = async (file, onUploadProgress) => {
   return data;
 };
 
-export const createAdminDirectVideoUpload = async ({ filename, contentType, fileSize, purpose, slug }) => {
+export const createAdminDirectVideoUpload = async ({
+  filename,
+  contentType,
+  fileSize,
+  purpose,
+  slug,
+  endpoint = '/admin/uploads/video/presign',
+}) => {
   const payload = {
     filename,
     content_type: contentType,
@@ -549,7 +556,7 @@ export const createAdminDirectVideoUpload = async ({ filename, contentType, file
   };
   if (slug) payload.slug = slug;
   try {
-    const { data } = await adminApi.post('/admin/uploads/video/presign', payload);
+    const { data } = await adminApi.post(endpoint, payload);
     return data;
   } catch (error) {
     const wrapped = new Error(error?.message || 'Could not create upload URL');
@@ -617,6 +624,8 @@ export const uploadAdminVideoToR2 = async ({
   title = '',
   onUploadProgress,
   onFallback,
+  allowBackendFallback = true,
+  presignEndpoint = '/admin/uploads/video/presign',
 }) => {
   try {
     const signed = await createAdminDirectVideoUpload({
@@ -625,6 +634,7 @@ export const uploadAdminVideoToR2 = async ({
       fileSize: file.size,
       purpose,
       slug,
+      endpoint: presignEndpoint,
     });
     await uploadFileToSignedUrl({
       uploadUrl: signed.upload_url,
@@ -650,7 +660,7 @@ export const uploadAdminVideoToR2 = async ({
       message: completed?.message || 'Video uploaded directly to Cloudflare R2.',
     };
   } catch (directError) {
-    if (!shouldFallbackToBackendVideoUpload(directError)) {
+    if (!shouldFallbackToBackendVideoUpload(directError) || !allowBackendFallback) {
       throw directError;
     }
     onFallback?.(directError);

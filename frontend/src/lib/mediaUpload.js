@@ -96,7 +96,7 @@ export const formatUploadError = (error, fallback = 'Upload failed') => {
   }
   if (error?.stage === 'r2_put') {
     if (!status) {
-      return errorCodeMessage('R2_CORS_ERROR', 'Browser could not upload to Cloudflare R2. Check R2 CORS for this origin and inspect the browser network error.');
+      return errorCodeMessage('R2_CORS_ERROR', 'Browser could not upload to Cloudflare R2. Cloudflare R2 CORS must allow PUT from https://pranvithdop.com and https://www.pranvithdop.com');
     }
     const body = stringifyUploadErrorBody(error?.response?.data);
     return errorCodeMessage('R2_UPLOAD_FAILED', body || `Cloudflare R2 rejected the upload with status ${status}.`);
