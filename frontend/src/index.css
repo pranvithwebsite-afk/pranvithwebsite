@@ -1,29 +1,49 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Space+Grotesk:wght@400;500;600;700&display=swap');
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+html,
+body,
+#root,
+.App {
+  min-height: 100%;
+  background: transparent;
+  background-color: #05000d;
+}
+
 body {
+  position: relative;
   margin: 0;
   overflow-x: hidden;
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background:
-    radial-gradient(circle at 20% 0%, rgba(124, 58, 237, 0.16), transparent 32%),
-    radial-gradient(circle at 85% 12%, rgba(167, 139, 250, 0.10), transparent 34%),
-    linear-gradient(180deg, #05000d 0%, #0b0318 45%, #05000d 100%);
   color: #ffffff;
+  background-color: #05000d;
+}
+
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -2;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 20% 0%, rgba(124, 58, 237, 0.14), transparent 32%),
+    radial-gradient(circle at 85% 12%, rgba(167, 139, 250, 0.08), transparent 34%),
+    linear-gradient(180deg, #05000d 0%, #0b0318 45%, #05000d 100%);
 }
 
 html {
   scroll-padding-top: var(--navbar-height);
+  background-color: #05000d;
 }
 
 main.page,
 .page-content {
+  min-height: 100%;
   padding-top: var(--navbar-height);
+  background: transparent;
 }
 
 code {
@@ -67,7 +87,27 @@ h1, h2, h3, h4, h5, h6 {
   }
 
   .section-block {
+    position: relative;
     padding-block: clamp(3rem, 6vw, 5rem);
+    background: transparent;
+  }
+
+  .page {
+    background: transparent;
+    isolation: isolate;
+  }
+
+  .page > section,
+  .page-content > section {
+    margin: 0;
+    background: transparent;
+    position: relative;
+    z-index: 0;
+  }
+
+  .page > section + section,
+  .page-content > section + section {
+    margin-top: -1px;
   }
 
   .cinematic-card {
@@ -84,24 +124,43 @@ h1, h2, h3, h4, h5, h6 {
 
   .video-glow-card {
     position: relative;
+    isolation: isolate;
     overflow: visible;
   }
 
   .video-glow-card::before {
     content: '';
     position: absolute;
-    inset: -28px;
+    inset: -32px -20px;
     border-radius: 32px;
-    background: radial-gradient(circle, rgba(139, 92, 246, 0.34) 0%, rgba(139, 92, 246, 0.16) 38%, transparent 72%);
-    filter: blur(34px);
-    z-index: 0;
+    background: radial-gradient(circle, rgba(139, 92, 246, 0.26) 0%, rgba(139, 92, 246, 0.10) 40%, transparent 74%);
+    filter: blur(40px);
+    z-index: -1;
     pointer-events: none;
   }
 
   .video-glow-card__inner {
     position: relative;
-    z-index: 2;
+    z-index: 1;
     overflow: hidden;
+  }
+
+  .video-card,
+  .video-player-wrap {
+    background: transparent;
+    overflow: hidden;
+    border-radius: inherit;
+  }
+
+  .video-card video,
+  .video-player-wrap video,
+  .video-card iframe,
+  .video-player-wrap iframe {
+    width: 100%;
+    height: 100%;
+    display: block;
+    background: transparent;
+    border: 0;
   }
 
   .cinematic-icon {

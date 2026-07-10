@@ -15,7 +15,7 @@ const OurWorks = ({ section }) => {
   if (!section || visibleProjects.length === 0) return null;
 
   return (
-    <section className="relative overflow-hidden bg-gradient-to-b from-[var(--bg-main)] via-[var(--bg-soft)] to-[var(--bg-main)] px-6 py-24">
+    <section className="section-block overflow-hidden px-6">
       <div className="relative mx-auto max-w-7xl">
         <div className="mb-12 text-center">
           <p className="section-eyebrow text-xs">{section.data?.eyebrow || 'Our Works'}</p>

@@ -74,6 +74,25 @@ const Hero = ({ pageData }) => {
   const hasVideo = !!videoUrl;
   const hasMedia = !!(videoUrl || imageUrl || posterUrl);
 
+  useEffect(() => {
+    if (hasVideo || !imageUrl || typeof document === 'undefined') return undefined;
+    const href = safeImageSrc(imageUrl, '');
+    if (!href) return undefined;
+
+    const existing = document.head.querySelector(`link[rel="preload"][as="image"][href="${href}"]`);
+    if (existing) return undefined;
+
+    const preload = document.createElement('link');
+    preload.rel = 'preload';
+    preload.as = 'image';
+    preload.href = href;
+    document.head.appendChild(preload);
+
+    return () => {
+      if (preload.parentNode) preload.parentNode.removeChild(preload);
+    };
+  }, [hasVideo, imageUrl]);
+
   const media = useMemo(() => {
     if (hasVideo) {
       return (
@@ -84,6 +103,13 @@ const Hero = ({ pageData }) => {
           posterUrl={posterUrl}
           className="h-full w-full rounded-none border-0"
           aspectRatio="h-full"
+          autoplayOnClick={false}
+          loadWhenVisible={false}
+          loadOnInteractionOnly
+          thumbnailLoading="eager"
+          thumbnailFetchPriority="high"
+          thumbnailWidth={1280}
+          thumbnailHeight={640}
         />
       );
     }
@@ -99,6 +125,7 @@ const Hero = ({ pageData }) => {
         priority
         width={1280}
         height={640}
+        loading="eager"
         className="absolute inset-0 w-full h-full object-cover opacity-30"
         onError={handleImageError}
       />
@@ -139,14 +166,6 @@ const Hero = ({ pageData }) => {
           >
             {hero.secondary_button_text}
           </a>
-        </div>
-
-        <div className="hidden md:flex items-center justify-center gap-2 mt-4 -mx-10 opacity-60">
-          <div className="h-px w-40 bg-gradient-to-r from-transparent to-violet-500/60" />
-          <div className="w-1.5 h-1.5 rounded-full bg-violet-400" />
-          <div className="w-[420px]" />
-          <div className="w-1.5 h-1.5 rounded-full bg-violet-400" />
-          <div className="h-px w-40 bg-gradient-to-l from-transparent to-violet-500/60" />
         </div>
 
         <div className="relative mt-16 max-w-5xl mx-auto">

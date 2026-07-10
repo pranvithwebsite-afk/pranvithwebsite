@@ -87,8 +87,8 @@ const Hire = () => {
   return (
     <>
       <Header />
-      <main className="page bg-[var(--bg-main)] text-white">
-        {showMainSection && <section className="relative overflow-hidden px-6 pb-24 pt-12">
+      <main className="page bg-transparent text-white">
+        {showMainSection && <section className="section-block overflow-hidden px-6 pb-24 pt-12">
           <div className="absolute left-1/2 top-0 h-96 w-96 -translate-x-1/2 rounded-full bg-violet-600/20 blur-3xl" />
           <div className="absolute bottom-16 right-0 h-72 w-72 rounded-full bg-purple-500/10 blur-3xl" />
 

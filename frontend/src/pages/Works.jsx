@@ -69,9 +69,9 @@ const Works = () => {
   return (
     <>
       <Header />
-      <main className="page bg-[var(--bg-main)] text-white">
+      <main className="page bg-transparent text-white">
         {showHero && (
-          <section className="relative overflow-hidden px-6 pb-12 pt-16 text-center">
+          <section className="section-block overflow-hidden px-6 pb-12 text-center">
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(124,58,237,0.22),transparent_45%)]" />
             <div className="relative mx-auto max-w-5xl">
               <p className="section-eyebrow text-xs">{hero.subtitle || 'PORTFOLIO'}</p>
@@ -82,7 +82,7 @@ const Works = () => {
         )}
 
         {showreel.section_id && (
-          <section className="px-6 pb-16 pt-8">
+          <section className="section-block px-6 pb-16 pt-8">
             <div className="cinematic-card mx-auto grid max-w-7xl gap-8 p-6 md:p-8 lg:grid-cols-[1.05fr_0.95fr] lg:items-center">
               <div>
                 <p className="section-eyebrow text-xs">{showreel.subtitle || 'FEATURED SHOWREEL'}</p>
@@ -121,7 +121,7 @@ const Works = () => {
           </section>
         )}
 
-        {(projectsSection.section_id || finalProjects.length > 0) && <section id="works-grid" className="px-6 pb-24 pt-10">
+        {(projectsSection.section_id || finalProjects.length > 0) && <section id="works-grid" className="section-block px-6 pb-24 pt-10">
           <div className="mx-auto max-w-7xl">
             {visibleCategories.length > 0 && 
             <div className="mb-8 flex flex-wrap justify-center gap-2">
@@ -156,7 +156,7 @@ const Works = () => {
         </section>}
         {clientTestimonialsSection?.section_id && <ClientTestimonialsSection section={clientTestimonialsSection} />}
         {ctaSection?.section_id && (
-          <section className="px-6 pb-24">
+          <section className="section-block px-6 pb-24 pt-0">
             <div className="cinematic-card mx-auto max-w-5xl px-6 py-8 text-center md:px-10">
               <h2 className="text-3xl font-bold text-white md:text-5xl">{ctaSection.title}</h2>
               {ctaSection.description && <p className="mx-auto mt-4 max-w-2xl text-sm leading-7 text-white/65">{ctaSection.description}</p>}

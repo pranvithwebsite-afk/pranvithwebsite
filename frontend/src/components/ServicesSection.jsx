@@ -17,7 +17,7 @@ const ServicesSection = ({ section }) => {
   const visibleServices = cmsItems.length > 0 ? cmsItems : fallbackServices;
 
   return (
-    <section className="relative px-6 py-24">
+    <section className="section-block px-6">
       {/* Subtle background glow */}
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_10%,rgba(124,58,237,0.1),transparent_40%)]" />
       <div className="relative mx-auto max-w-7xl">

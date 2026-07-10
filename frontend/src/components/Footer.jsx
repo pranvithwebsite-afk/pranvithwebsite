@@ -63,8 +63,9 @@ const Footer = () => {
   };
 
   return (
-    <footer className="relative border-t border-purple-300/15">
-      <div className="max-w-7xl mx-auto px-6 py-16">
+    <footer className="relative overflow-hidden bg-transparent">
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-20 bg-[radial-gradient(circle_at_top,rgba(124,58,237,0.08),transparent_72%)] opacity-70" />
+      <div className="relative mx-auto max-w-7xl px-6 py-16">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-10">
           <div>
             <h4 className="text-2xl font-bold text-white">{footer.brand_title}</h4>
@@ -132,7 +133,7 @@ const Footer = () => {
           </div>
         </div>
 
-        <div className="mt-14 pt-6 border-t border-purple-300/15 flex flex-col md:flex-row items-center justify-between gap-3">
+        <div className="mt-14 flex flex-col items-center justify-between gap-3 pt-6 md:flex-row">
           <p className="text-xs text-white/55">© {new Date().getFullYear()} {footer.brand_title}. All rights reserved.</p>
           <div className="flex items-center gap-6 text-xs text-white/55">
             <Link to="/privacy#terms" className="hover:text-white">Terms</Link>

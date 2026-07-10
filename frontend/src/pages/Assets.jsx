@@ -151,7 +151,7 @@ const Assets = () => {
   return (
     <>
       <Header />
-      <main className="page min-h-screen bg-[var(--bg-main)] text-white">
+      <main className="page min-h-screen bg-transparent text-white">
         {!pageHidden && heroSection?.section_id && (
           <section className="pt-8 pb-8">
             <div className="page-shell">

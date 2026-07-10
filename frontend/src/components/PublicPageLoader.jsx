@@ -18,7 +18,7 @@ export const usePublicPageLoading = (loading) => {
 };
 
 const PublicPageLoaderProvider = ({ children }) => {
-  const [showLoader, setShowLoader] = useState(() => !isAdminPath(window.location.pathname));
+  const [showLoader] = useState(false);
   const [loaderLeaving, setLoaderLeaving] = useState(false);
 
   const setPageLoading = useCallback((id, loading) => {
@@ -26,17 +26,9 @@ const PublicPageLoaderProvider = ({ children }) => {
   }, []);
 
   useEffect(() => {
-    if (isAdminPath(window.location.pathname)) {
-      setShowLoader(false);
-      return undefined;
-    }
-
-    const leaveTimer = window.setTimeout(() => setLoaderLeaving(true), 220);
-    const hideTimer = window.setTimeout(() => setShowLoader(false), 420);
-    return () => {
-      window.clearTimeout(leaveTimer);
-      window.clearTimeout(hideTimer);
-    };
+    if (isAdminPath(window.location.pathname)) return undefined;
+    setLoaderLeaving(false);
+    return undefined;
   }, []);
 
   const contextValue = useMemo(() => ({ setPageLoading }), [setPageLoading]);

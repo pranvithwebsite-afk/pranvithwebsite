@@ -12,6 +12,7 @@ const OptimizedImage = ({
   width,
   height,
   fit = 'cover',
+  fetchPriority,
   onError,
   ...props
 }) => {
@@ -29,7 +30,7 @@ const OptimizedImage = ({
       height={height}
       loading={imageLoading}
       decoding={decoding}
-      fetchPriority={priority ? 'high' : undefined}
+      fetchPriority={fetchPriority || (priority ? 'high' : undefined)}
       className={className}
       style={style}
       onError={onError || ((event) => handleImageError(event, fallback))}

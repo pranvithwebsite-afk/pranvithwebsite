@@ -25,13 +25,17 @@ const Header = () => {
   return (
     <header className="fixed left-0 right-0 top-0 z-[80] flex justify-center px-4 pt-4 md:pt-5">
       <nav
-        className={`flex w-full max-w-[1160px] items-center justify-between gap-3 rounded-full border border-[var(--border-soft)] bg-[rgba(12,4,27,0.72)] px-3 py-2 backdrop-blur-[18px] transition-all duration-300 md:gap-8 md:px-5`}
+        className={`flex w-full max-w-[1160px] items-center justify-between gap-3 rounded-full border border-white/10 bg-[rgba(8,4,20,0.62)] px-3 py-2 backdrop-blur-[18px] transition-all duration-300 md:gap-8 md:px-5`}
       >
         <Link to="/" onClick={refreshHomeIfActive} className="flex items-center gap-2 shrink-0" data-testid="header-brand">
           <div className="h-9 w-9 overflow-hidden rounded-full bg-gradient-to-br from-rose-500 to-orange-500 ring-2 ring-violet-400/45 shadow-[0_0_26px_rgba(139,92,246,0.32)]">
             <img
               src={FALLBACK_IMAGE}
               alt="PranvithDOP"
+              width="36"
+              height="36"
+              loading="eager"
+              decoding="async"
               className="w-full h-full object-cover"
               onError={handleImageError}
             />
@@ -71,7 +75,7 @@ const Header = () => {
       </nav>
 
       {open && (
-        <div className="absolute left-4 right-4 top-[4.75rem] rounded-3xl border border-[var(--border-soft)] bg-[rgba(12,4,27,0.9)] p-3 shadow-[0_22px_70px_rgba(124,58,237,0.28)] backdrop-blur-xl md:hidden">
+        <div className="absolute left-4 right-4 top-[4.75rem] rounded-3xl border border-white/10 bg-[rgba(8,4,20,0.88)] p-3 shadow-[0_22px_70px_rgba(124,58,237,0.22)] backdrop-blur-xl md:hidden">
           <ul className="flex flex-col gap-1">
             {navLinks.map((l) => {
               const active = location.pathname === l.path;

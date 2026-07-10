@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { portfolioProjects, showreelUrl } from '../data/portfolio';
 import { handleImageError, safeImageSrc, safePublicHref } from '../lib/utils';
 import SafeVideoEmbed from './SafeVideoEmbed';
+import OptimizedImage from './OptimizedImage';
 
 const enabledSorted = (items = []) =>
   [...items].filter((item) => item.enabled !== false).sort((a, b) => Number(a.sort_order || 0) - Number(b.sort_order || 0));
@@ -17,7 +18,7 @@ const ShowreelSection = ({ section }) => {
   if (section && !section.title && !section.description && previewItems.length === 0) return null;
 
   return (
-  <section className="relative overflow-hidden px-6 py-24">
+  <section className="section-block overflow-hidden px-6">
     <div className="absolute inset-x-0 top-1/3 h-64 bg-violet-600/10 blur-3xl" />
     <div className="relative mx-auto max-w-7xl">
       <div className="grid gap-8 lg:grid-cols-[1.2fr_0.8fr] lg:items-end">
@@ -39,8 +40,8 @@ const ShowreelSection = ({ section }) => {
             videoUrl={mainVideoUrl}
             title={section?.title || 'Featured showreel'}
             posterUrl={mainPoster}
-            className="rounded-none border-0"
-            showPlayOverlay={false}
+            fit="cover"
+            className="video-card rounded-none border-0"
           />
         </div>
       </div>
@@ -58,11 +59,12 @@ const ShowreelSection = ({ section }) => {
                   videoUrl={project.video_url || project.videoLink}
                   title={project.title}
                   posterUrl={project.thumbnail_image_url || project.thumbnail_url || project.image_url || project.thumbnail}
-                  className="h-full w-full rounded-none border-0"
+                  fit="cover"
+                  className="video-card h-full w-full rounded-none border-0"
                   aspectRatio="aspect-[16/10]"
                 />
               ) : (project.thumbnail_image_url || project.thumbnail_url || project.image_url || project.thumbnail) ? (
-                <img src={safeImageSrc(project.thumbnail_image_url || project.thumbnail_url || project.image_url || project.thumbnail)} alt={project.title} className="h-full w-full object-cover opacity-70 transition group-hover:scale-105 group-hover:opacity-90" onError={handleImageError} />
+                <OptimizedImage src={safeImageSrc(project.thumbnail_image_url || project.thumbnail_url || project.image_url || project.thumbnail)} alt={project.title} width={640} height={400} className="h-full w-full object-cover opacity-70 transition group-hover:scale-105 group-hover:opacity-90" onError={handleImageError} />
               ) : null}
               <span className="pointer-events-none absolute left-3 top-3 rounded-full bg-black/60 px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-violet-200">{project.category}</span>
             </div>

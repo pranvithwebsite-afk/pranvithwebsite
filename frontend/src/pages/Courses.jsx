@@ -113,7 +113,7 @@ const Courses = () => {
   return (
     <>
       <Header />
-      <main className="page bg-[var(--bg-main)] text-white">
+      <main className="page bg-transparent text-white">
         {!loading && pageHidden ? (
           <CourseComingSoon visibility={settings} />
         ) : showComingSoon ? (

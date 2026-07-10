@@ -2,12 +2,13 @@ import React, { Suspense, lazy } from 'react';
 import { ArrowRight } from 'lucide-react';
 import Header from '../components/Header';
 import Hero from '../components/Hero';
-import ServicesSection from '../components/ServicesSection';
 import Footer from '../components/Footer';
+import ViewportGate from '../components/ViewportGate';
 import { usePublicPageLoading } from '../components/PublicPageLoader';
 import { useCmsPage } from '../hooks/useCmsPage';
 import { safePublicHref } from '../lib/utils';
 
+const ServicesSection = lazy(() => import('../components/ServicesSection'));
 const ShowreelSection = lazy(() => import('../components/ShowreelSection'));
 const TransformVision = lazy(() => import('../components/TransformVision'));
 const OurWorks = lazy(() => import('../components/OurWorks'));
@@ -58,6 +59,7 @@ const Home = () => {
   const showreelSection = findSection('showreel');
   const faqSection = findSection('faq');
   const order = homeOrderFromCms(cmsSections);
+  const deferredKeys = new Set(['featuredAssets', 'instagramProfile', 'services', 'showreel', 'footerCta']);
 
   const heroData = heroSection ? {
     badgeText: firstText(heroSection.subtitle, heroSection.data?.badge_text),
@@ -77,7 +79,7 @@ const Home = () => {
   return (
     <>
       <Header />
-      <main className="page relative overflow-hidden bg-[var(--bg-main)] text-white">
+      <main className="page relative overflow-hidden bg-transparent text-white">
         {order.map((sectionKey) => {
           const sections = {
             hero: <Hero key="hero" pageData={heroData} />,
@@ -104,7 +106,18 @@ const Home = () => {
               </Suspense>
             ) : null,
           };
-          return sections[sectionKey] || null;
+          const content = sections[sectionKey] || null;
+          if (!content) return null;
+          if (!deferredKeys.has(sectionKey)) return content;
+          return (
+            <ViewportGate
+              key={`gate-${sectionKey}`}
+              rootMargin="320px 0px"
+              fallback={<SectionSkeleton compact={sectionKey !== 'footerCta'} />}
+            >
+              {content}
+            </ViewportGate>
+          );
         })}
       </main>
       <Footer />
@@ -113,7 +126,7 @@ const Home = () => {
 };
 
 const HomeCta = ({ section }) => (
-  <section className="relative overflow-hidden px-6 py-20">
+  <section className="section-block overflow-hidden px-6">
     <div className="page-shell rounded-3xl border border-[var(--border-soft)] bg-[var(--panel-purple)] px-6 py-8 shadow-2xl shadow-black/20 md:px-10">
       <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
         <div>
@@ -134,8 +147,8 @@ const HomeCta = ({ section }) => (
   </section>
 );
 
-const SectionSkeleton = () => (
-  <section className="px-6 py-16" aria-hidden="true">
+const SectionSkeleton = ({ compact = false }) => (
+  <section className={`section-block px-6 ${compact ? 'py-10' : ''}`.trim()} aria-hidden="true">
     <div className="mx-auto max-w-7xl">
       <div className="h-8 w-56 animate-pulse rounded-full bg-white/8" />
       <div className="mt-6 grid gap-5 md:grid-cols-3">

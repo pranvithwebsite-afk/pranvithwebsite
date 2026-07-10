@@ -137,11 +137,18 @@ const SafeVideoEmbed = ({
   posterUrl = '',
   className = '',
   aspectRatio = 'aspect-video',
+  fit = 'cover',
   autoplayOnClick = true,
   showPlayOverlay = true,
   loadWhenVisible = true,
+  loadOnInteractionOnly = false,
+  thumbnailLoading = 'lazy',
+  thumbnailDecoding = 'async',
+  thumbnailFetchPriority,
+  thumbnailWidth,
+  thumbnailHeight,
 }) => {
-  const [activated, setActivated] = useState(!showPlayOverlay);
+  const [activated, setActivated] = useState(false);
   const [nearViewport, setNearViewport] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [posterFailed, setPosterFailed] = useState(false);
@@ -154,9 +161,10 @@ const SafeVideoEmbed = ({
   const safePosterUrl = getSafePosterUrl(posterUrl || poster);
   const youtubeThumbnail = !safePosterUrl || posterFailed ? getYouTubeThumbnail(videoUrl, youtubeMaxFailed ? 'hqdefault' : 'maxresdefault') : '';
   const thumbnailUrl = thumbnailUnavailable ? '' : (safePosterUrl && !posterFailed ? safePosterUrl : youtubeThumbnail);
-  const wrapperClass = `group relative z-[2] ${aspectRatio || 'aspect-video'} overflow-hidden rounded-[inherit] border border-violet-500/15 bg-black ${className}`.trim();
+  const mediaFitClass = fit === 'contain' ? 'object-contain' : 'object-cover';
+  const wrapperClass = `video-player-wrap group relative z-[2] ${aspectRatio || 'aspect-video'} overflow-hidden rounded-[inherit] bg-transparent ${className}`.trim();
   const frameRef = useRef(null);
-  const shouldLoadPlayer = activated || (loadWhenVisible && nearViewport);
+  const shouldLoadPlayer = activated || (!loadOnInteractionOnly && loadWhenVisible && nearViewport);
   const allowAutoplay = autoplayOnClick && !isMobile;
 
   useEffect(() => {
@@ -189,7 +197,7 @@ const SafeVideoEmbed = ({
           muted={allowAutoplay}
           playsInline
           preload={activated ? 'metadata' : 'none'}
-          className="absolute inset-0 z-[3] h-full w-full object-contain"
+          className={`absolute inset-0 z-[3] h-full w-full bg-transparent ${mediaFitClass}`}
         />
       </div>
     );
@@ -201,7 +209,7 @@ const SafeVideoEmbed = ({
         <iframe
           title={title}
           src={allowAutoplay && activated ? withAutoplay(embedUrl) : embedUrl}
-          className="absolute inset-0 z-[3] h-full w-full"
+          className="absolute inset-0 z-[3] h-full w-full rounded-[inherit] border-0 bg-transparent"
           loading="lazy"
           referrerPolicy="strict-origin-when-cross-origin"
           allow="autoplay; encrypted-media; picture-in-picture"
@@ -224,8 +232,12 @@ const SafeVideoEmbed = ({
           <img
             src={thumbnailUrl}
             alt={title}
-            className="absolute inset-0 h-full w-full object-cover transition duration-500 group-hover:scale-105"
-            loading="lazy"
+            width={thumbnailWidth}
+            height={thumbnailHeight}
+            className={`absolute inset-0 h-full w-full ${mediaFitClass} transition duration-500 group-hover:scale-105`}
+            loading={thumbnailLoading}
+            decoding={thumbnailDecoding}
+            fetchPriority={thumbnailFetchPriority}
             onError={() => {
               if (safePosterUrl && !posterFailed) setPosterFailed(true);
               else if (youtubeThumbnail && !youtubeMaxFailed) setYoutubeMaxFailed(true);
@@ -235,7 +247,6 @@ const SafeVideoEmbed = ({
         ) : (
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_35%,rgba(124,58,237,0.35),transparent_38%),linear-gradient(135deg,#1a0a3a,#0f0625_52%,var(--bg-main))]" />
         )}
-        <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/75 via-black/20 to-transparent" />
         <span className="absolute left-1/2 top-1/2 flex h-16 w-16 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-white/20 bg-violet-600 text-white shadow-[0_0_35px_rgba(139,92,246,0.75)] transition group-hover:scale-110 group-hover:bg-violet-500 sm:h-20 sm:w-20">
           <Play size={28} fill="currentColor" className="ml-1" />
         </span>

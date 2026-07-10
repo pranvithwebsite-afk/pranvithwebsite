@@ -23,6 +23,7 @@ import { usePublicPageLoading } from '../components/PublicPageLoader';
 import SafeVideoEmbed, { getSafeVideoEmbedUrl, isDirectVideoUrl } from '../components/SafeVideoEmbed';
 import OptimizedImage from '../components/OptimizedImage';
 import ProductDescription from '../components/ProductDescription';
+import ViewportGate from '../components/ViewportGate';
 
 const toStringList = (value) => (
   Array.isArray(value)
@@ -225,7 +226,7 @@ const AssetLanding = () => {
   return (
     <>
       <Header />
-      <main className="page min-h-screen bg-[var(--bg-main)] text-white">
+      <main className="page min-h-screen bg-transparent text-white">
         {loading ? (
           <section className="px-6 pb-16 pt-8">
             <div className="cinematic-card mx-auto max-w-7xl p-8 lg:p-12">
@@ -316,7 +317,12 @@ const AssetLanding = () => {
               </div>
             </section>
 
-            <ProductMediaSection product={asset} galleryImages={galleryImages} />
+            <ViewportGate
+              rootMargin="360px 0px"
+              fallback={<section className="pb-16" aria-hidden="true"><div className="page-shell"><div className="h-72 animate-pulse rounded-[22px] border border-white/10 bg-white/[0.04]" /></div></section>}
+            >
+              <ProductMediaSection product={asset} galleryImages={galleryImages} />
+            </ViewportGate>
 
             {features.length > 0 && (
               <section className="section-block pt-0">

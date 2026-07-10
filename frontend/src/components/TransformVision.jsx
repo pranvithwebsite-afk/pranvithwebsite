@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Instagram, ArrowRight } from 'lucide-react';
 import { FALLBACK_IMAGE, handleImageError, safePublicHref } from '../lib/utils';
 import { fetchPublicSettings } from '../lib/api';
+import OptimizedImage from './OptimizedImage';
 
 const instagramProfileUrl =
   'https://www.instagram.com/pranvith_dop?utm_source=ig_web_button_share_sheet&igsh=ZDNlZDc0MzIxNw==';
@@ -136,8 +137,8 @@ const TransformVision = ({ section }) => {
   ].filter(Boolean);
 
   return (
-    <section className="relative py-24 overflow-hidden">
-      <div className="max-w-7xl mx-auto px-6">
+    <section className="section-block relative overflow-hidden px-6">
+      <div className="max-w-7xl mx-auto">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
           <div>
             <h2 className="text-4xl md:text-6xl font-bold tracking-tight leading-[1.1]">
@@ -185,9 +186,11 @@ const TransformVision = ({ section }) => {
                   </div>
                   <div className="flex items-center gap-3 mb-3">
                     <div className="w-14 h-14 rounded-full overflow-hidden bg-gradient-to-br from-orange-500 to-rose-500">
-                      <img
+                      <OptimizedImage
                         src={instagramProfile.profile_image_url || FALLBACK_IMAGE}
                         alt={instagramProfile.display_name}
+                        width={56}
+                        height={56}
                         className="w-full h-full object-cover"
                         onError={handleImageError}
                       />
@@ -247,14 +250,16 @@ const TransformVision = ({ section }) => {
                         style={{ background: card.background }}
                       >
                         {card.thumbnail_image_url && (
-                          <img
+                          <OptimizedImage
                             src={card.thumbnail_image_url}
                             alt=""
+                            width={160}
+                            height={160}
                             className="absolute inset-0 h-full w-full object-cover opacity-70 transition-transform duration-300 group-hover:scale-105"
                             onError={handleImageError}
                           />
                         )}
-                        <div className="absolute inset-0 opacity-30 [background-image:linear-gradient(rgba(255,255,255,.12)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,.12)_1px,transparent_1px)] [background-size:12px_12px]" />
+                        <div className="absolute inset-0 opacity-12 [background-image:linear-gradient(rgba(255,255,255,.12)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,.12)_1px,transparent_1px)] [background-size:12px_12px]" />
                         <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/10 to-transparent" />
                         <span className="absolute inset-x-2 top-1/2 -translate-y-1/2 text-center text-[9px] font-black leading-tight tracking-wide text-white/90">
                           {card.coverText}

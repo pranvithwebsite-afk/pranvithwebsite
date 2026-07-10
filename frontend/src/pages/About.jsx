@@ -7,6 +7,7 @@ import { FALLBACK_IMAGE, handleImageError, safeImageSrc, safePublicHref } from '
 import { usePublicPageLoading } from '../components/PublicPageLoader';
 import PageReadyPlaceholder from '../components/PageReadyPlaceholder';
 import { useCmsPage } from '../hooks/useCmsPage';
+import OptimizedImage from '../components/OptimizedImage';
 
 const statIcons = [Film, Camera, Plane, Clock];
 
@@ -77,22 +78,24 @@ const About = () => {
   return (
     <>
       <Header />
-      <main className="page bg-[var(--bg-main)] text-white">
+      <main className="page bg-transparent text-white">
         {loading ? (
           <PageReadyPlaceholder />
         ) : (
           <div className="flex flex-col">
             {showHero && (
-              <section style={{ order: heroOrder }} className="relative overflow-hidden px-6 py-24">
+              <section style={{ order: heroOrder }} className="section-block overflow-hidden px-6">
                 <div className="absolute inset-0 bg-[radial-gradient(circle_at_40%_0%,rgba(124,58,237,0.22),transparent_45%)]" />
 
                 <div className="relative mx-auto grid max-w-7xl gap-12 lg:grid-cols-[0.9fr_1.1fr] lg:items-center">
                   {hero.enabled !== false && (
                     <div className="cinematic-card overflow-hidden p-3">
                       <div className="relative flex aspect-[4/5] items-center justify-center overflow-hidden rounded-2xl bg-[radial-gradient(circle_at_30%_20%,rgba(167,139,250,0.22),transparent_35%),linear-gradient(145deg,#1a102d,#05000d)]">
-                        <img
+                        <OptimizedImage
                           src={heroImageUrl}
                           alt="PranvithDOP profile"
+                          width={800}
+                          height={1000}
                           className="h-full w-full object-cover"
                           onError={handleImageError}
                         />
@@ -136,7 +139,7 @@ const About = () => {
             )}
 
             {statsSection.section_id && stats.length > 0 && (
-              <section style={{ order: statsOrder }} className="px-6 pb-20">
+              <section style={{ order: statsOrder }} className="section-block px-6 pt-0">
                 <div className="mx-auto grid max-w-7xl gap-5 sm:grid-cols-2 lg:grid-cols-4">
                   {stats.map((stat, index) => {
                     const Icon = statIcons[index % statIcons.length];
@@ -159,7 +162,7 @@ const About = () => {
             )}
 
             {(creativeSection.section_id || gearSection.section_id) && (
-              <section style={{ order: creativeGearOrder }} className="px-6 pb-24">
+              <section style={{ order: creativeGearOrder }} className="section-block px-6 pt-0">
                 <div className="mx-auto grid max-w-7xl gap-8 lg:grid-cols-2">
                   {creativeSection.section_id && (
                     <div className="cinematic-card p-8">
