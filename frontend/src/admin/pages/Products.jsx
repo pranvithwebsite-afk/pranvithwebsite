@@ -85,17 +85,37 @@ const adminRequestFailureMessage = (error, fallbackMessage) => {
   const requestUrl = requestPath
     ? (requestPath.startsWith('http') ? requestPath : `${baseURL}${requestPath}`)
     : '';
-  const backendMessage = error?.response?.data?.message || formatApiErrorDetail(error?.response?.data?.detail);
-  return `${status} ${requestUrl || 'request'}: ${backendMessage || fallbackMessage}`;
+  const data = error?.response?.data || {};
+  const code = data?.code || (typeof data?.detail === 'object' ? data.detail?.code : '') || '';
+  const backendMessage = data?.message || (typeof data?.detail === 'object' ? data.detail?.message : '') || fallbackMessage;
+  const detail = typeof data?.detail === 'object' && data.detail?.detail != null
+    ? formatApiErrorDetail(data.detail.detail)
+    : formatApiErrorDetail(data?.detail);
+  const parts = [`${status}${code ? ` [${code}]` : ''}: ${backendMessage}`];
+  if (detail && detail !== backendMessage && detail !== 'Something went wrong. Please try again.') parts.push(detail);
+  if (Array.isArray(data?.errors)) {
+    const validationDetails = data.errors.map((item) => `${Array.isArray(item.loc) ? item.loc.slice(-1)[0] : 'field'}: ${item.msg}`).join('; ');
+    if (validationDetails) parts.push(validationDetails);
+  }
+  if (requestUrl) parts.push(requestUrl);
+  return parts.join(' — ');
+};
+
+const formatCurrency = (value) => `₹${Number(value || 0).toLocaleString('en-IN')}`;
+const formatProductDate = (product) => {
+  const value = product.updated_at || product.created_at;
+  if (!value) return '—';
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? '—' : date.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
 };
 
 const paymentLinkWarningMessage = (warning, fallbackMessage) => {
   if (!warning) return fallbackMessage;
-  if (typeof warning === 'string') return warning;
+  if (typeof warning === 'string') return `Product saved. Payment Link warning: ${warning}`;
   const code = warning?.code || 'UNKNOWN';
   const message = warning?.message || fallbackMessage;
   const detail = warning?.detail || '';
-  return `${code}: ${message}${detail ? ` (${detail})` : ''}`;
+  return `Product saved. Payment Link warning — ${code}: ${message}${detail ? ` (${detail})` : ''}`;
 };
 
 const rejectUnsafeMediaUrl = (value) => {
@@ -180,6 +200,11 @@ const Products = () => {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [paymentLinkLoading, setPaymentLinkLoading] = useState({});
+  const [deletingIds, setDeletingIds] = useState({});
+  const [search, setSearch] = useState('');
+  const [filter, setFilter] = useState('all');
+  const [sort, setSort] = useState('newest');
+  const saveInFlight = useRef(false);
   const confirm = useAdminConfirm();
 
   useEffect(() => {
@@ -226,7 +251,7 @@ const Products = () => {
   };
 
   const handleSave = async () => {
-    if (saving) return;
+    if (saveInFlight.current) return;
     const slug = normalizeSlug(formData.slug || formData.name);
     const mainImageUrl = rejectUnsafeMediaUrl(formData.image_url);
     const thumbnailImageUrl = rejectUnsafeMediaUrl(formData.thumbnail_url);
@@ -255,6 +280,7 @@ const Products = () => {
     }
 
     try {
+      saveInFlight.current = true;
       setSaving(true);
       if (editingId) {
         const result = await updateAdminProduct(editingId, payload);
@@ -271,8 +297,9 @@ const Products = () => {
       }
     } catch (error) {
       console.error('[admin/products] Failed to save product', error?.response?.data?.detail || error?.message || error);
-      toast.error(error?.response?.data?.detail || 'Failed to save product');
+      toast.error(adminRequestFailureMessage(error, 'Failed to save product'));
     } finally {
+      saveInFlight.current = false;
       setSaving(false);
     }
   };
@@ -286,18 +313,46 @@ const Products = () => {
       confirmText: 'Delete',
       loadingText: 'Deleting...',
       onConfirm: async () => {
+        if (deletingIds[id]) return false;
+        setDeletingIds((items) => ({ ...items, [id]: true }));
         try {
           await deleteAdminProduct(id);
           toast.success('Product deleted');
-          setProducts((items) => items.filter((item) => item.id !== id));
+          await loadProducts({ showToast: false });
         } catch (error) {
-          toast.error('Failed to delete product');
+          toast.error(adminRequestFailureMessage(error, 'Failed to delete product'));
           return false;
+        } finally {
+          setDeletingIds((items) => ({ ...items, [id]: false }));
         }
         return true;
       },
     });
   };
+
+  const visibleProducts = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    const filtered = products.filter((product) => {
+      const searchable = [product.name, product.title, product.slug, product.category, product.format, product.price, product.sale_price]
+        .filter((value) => value != null)
+        .join(' ')
+        .toLowerCase();
+      if (query && !searchable.includes(query)) return false;
+      const hasLink = !!product.razorpay_payment_link_url;
+      if (filter === 'published') return !!product.published;
+      if (filter === 'draft') return !product.published;
+      if (filter === 'with-link') return hasLink;
+      if (filter === 'without-link') return !hasLink;
+      return true;
+    });
+    return [...filtered].sort((a, b) => {
+      if (sort === 'oldest') return new Date(a.created_at || 0) - new Date(b.created_at || 0);
+      if (sort === 'title') return String(a.name || a.title || '').localeCompare(String(b.name || b.title || ''));
+      if (sort === 'price-low') return Number(a.price || 0) - Number(b.price || 0);
+      if (sort === 'price-high') return Number(b.price || 0) - Number(a.price || 0);
+      return new Date(b.created_at || b.updated_at || 0) - new Date(a.created_at || a.updated_at || 0);
+    });
+  }, [products, search, filter, sort]);
 
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -414,87 +469,25 @@ const Products = () => {
         </button>
       </div>
 
+      <div className="rounded-2xl border border-slate-800 bg-slate-950 p-4">
+        <div className="grid gap-3 lg:grid-cols-[minmax(260px,1fr)_220px_190px]">
+          <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search products by title, slug, category..." className="rounded-lg border border-slate-700 bg-slate-900 px-4 py-2.5 text-sm text-white outline-none placeholder:text-slate-500 focus:border-violet-500" />
+          <select value={filter} onChange={(event) => setFilter(event.target.value)} aria-label="Filter products" className="rounded-lg border border-slate-700 bg-slate-900 px-3 py-2.5 text-sm text-white"><option value="all">All</option><option value="published">Published</option><option value="draft">Draft/Hidden</option><option value="with-link">With Payment Link</option><option value="without-link">Without Payment Link</option></select>
+          <select value={sort} onChange={(event) => setSort(event.target.value)} aria-label="Sort products" className="rounded-lg border border-slate-700 bg-slate-900 px-3 py-2.5 text-sm text-white"><option value="newest">Newest first</option><option value="oldest">Oldest first</option><option value="title">Title A-Z</option><option value="price-low">Price low-high</option><option value="price-high">Price high-low</option></select>
+        </div>
+        <p className="mt-3 text-sm text-slate-400">Showing {visibleProducts.length} of {products.length} products</p>
+      </div>
+
       {loading ? (
         <div className="text-center text-slate-400">Loading products...</div>
       ) : error ? (
         <div className="rounded-3xl border border-rose-500/20 bg-rose-500/10 p-5 text-rose-100">{error}</div>
       ) : products.length === 0 ? (
         <div className="text-center text-slate-400">No products. Add one to get started!</div>
+      ) : visibleProducts.length === 0 ? (
+        <div className="rounded-2xl border border-slate-800 bg-slate-950 p-8 text-center text-slate-400">No products match your search and filters.</div>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {products.map((product) => {
-            const isCreatingPaymentLink = !!paymentLinkLoading[`create:${product.id}`];
-            const isRefreshingPaymentLink = !!paymentLinkLoading[`refresh:${product.id}`];
-            return (
-              <div key={product.id} className="rounded-3xl border border-slate-800 bg-slate-950 p-5">
-              <h2 className="text-lg font-semibold text-white line-clamp-2">{product.name}</h2>
-              <p className="mt-2 text-sm text-slate-500">₹{product.price}</p>
-              {product.sale_price && (
-                <p className="text-xs text-green-400">Sale: ₹{product.sale_price}</p>
-              )}
-              <p className="mt-2 text-xs text-slate-500">
-                {product.published ? '✓ Published' : 'Draft'}
-              </p>
-              {product.razorpay_payment_link_url ? (
-                <div className="mt-3 rounded-lg border border-slate-800 bg-slate-900 p-3">
-                  <p className="text-xs font-semibold text-slate-300">Razorpay Payment Link</p>
-                  <a href={product.razorpay_payment_link_url} target="_blank" rel="noreferrer" className="mt-1 block truncate text-xs text-violet-300">
-                    {product.razorpay_payment_link_url}
-                  </a>
-                  <p className="mt-1 text-xs text-slate-500">Status: {product.razorpay_payment_link_status || 'unknown'}</p>
-                </div>
-              ) : (
-                <p className="mt-3 text-xs text-slate-600">No optional Payment Link</p>
-              )}
-              <div className="mt-4 flex gap-2">
-                <button
-                  onClick={() => openEditForm(product)}
-                  className="flex-1 flex items-center justify-center gap-1 px-3 py-2 rounded bg-purple-600 hover:bg-purple-500 text-white text-sm font-semibold transition"
-                >
-                  <Edit2 size={14} />
-                  Edit
-                </button>
-                <button
-                  onClick={() => handleDelete(product.id)}
-                  className="flex-1 flex items-center justify-center gap-1 px-3 py-2 rounded bg-red-600 hover:bg-red-500 text-white text-sm font-semibold transition"
-                >
-                  <Trash2 size={14} />
-                  Delete
-                </button>
-              </div>
-              <div className="mt-2 grid gap-2 sm:grid-cols-2">
-                {product.razorpay_payment_link_url && (
-                  <button
-                    onClick={() => handleCopyPaymentLink(product.razorpay_payment_link_url)}
-                    className="flex items-center justify-center gap-1 rounded bg-slate-800 px-3 py-2 text-xs font-semibold text-white transition hover:bg-slate-700"
-                  >
-                    <Copy size={13} />
-                    Copy Payment Link
-                  </button>
-                )}
-                <button
-                  onClick={() => handleCreatePaymentLink(product.id)}
-                  disabled={isCreatingPaymentLink}
-                  className="flex items-center justify-center gap-1 rounded bg-violet-700 px-3 py-2 text-xs font-semibold text-white transition hover:bg-violet-600 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  <Link size={13} />
-                  {isCreatingPaymentLink ? 'Creating...' : 'Create Payment Link'}
-                </button>
-                {product.razorpay_payment_link_id && (
-                  <button
-                    onClick={() => handleRefreshPaymentLink(product.id)}
-                    disabled={isRefreshingPaymentLink}
-                    className="flex items-center justify-center gap-1 rounded bg-slate-800 px-3 py-2 text-xs font-semibold text-white transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    <RefreshCw size={13} />
-                    {isRefreshingPaymentLink ? 'Refreshing...' : 'Refresh Status'}
-                  </button>
-                )}
-              </div>
-              </div>
-            );
-          })}
-        </div>
+        <ProductList products={visibleProducts} paymentLinkLoading={paymentLinkLoading} deletingIds={deletingIds} onEdit={openEditForm} onDelete={handleDelete} onCopy={handleCopyPaymentLink} onCreateLink={handleCreatePaymentLink} onRefreshLink={handleRefreshPaymentLink} />
       )}
     </section>
   );
@@ -1119,6 +1112,22 @@ const UploadButton = ({ label, accept, disabled, progress, onFile, onFiles, mult
     </>
   );
 };
+
+const ProductActions = ({ product, paymentLinkLoading, deleting, onEdit, onDelete, onCopy, onCreateLink, onRefreshLink }) => {
+  const creating = !!paymentLinkLoading[`create:${product.id}`];
+  const refreshing = !!paymentLinkLoading[`refresh:${product.id}`];
+  const button = 'inline-flex items-center justify-center gap-1 rounded-md bg-slate-800 px-2 py-1.5 text-xs font-semibold text-slate-200 hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-45';
+  return <div className="flex flex-wrap gap-1.5"><button className={button} onClick={() => onEdit(product)}><Edit2 size={13} />Edit</button><button className={`${button} text-rose-300`} disabled={deleting} onClick={() => onDelete(product.id)}><Trash2 size={13} />{deleting ? 'Deleting...' : 'Delete'}</button>{product.razorpay_payment_link_url && <button className={button} onClick={() => onCopy(product.razorpay_payment_link_url)}><Copy size={13} />Copy</button>}<button className={button} disabled={creating || !!product.razorpay_payment_link_url} onClick={() => onCreateLink(product.id)}><Link size={13} />{creating ? 'Creating...' : 'Create Link'}</button>{product.razorpay_payment_link_id && <button className={button} disabled={refreshing} onClick={() => onRefreshLink(product.id)}><RefreshCw size={13} />{refreshing ? 'Refreshing...' : 'Refresh'}</button>}</div>;
+};
+
+const ProductList = ({ products, paymentLinkLoading, deletingIds, onEdit, onDelete, onCopy, onCreateLink, onRefreshLink }) => <>
+  <div className="hidden overflow-x-auto rounded-2xl border border-slate-800 bg-slate-950 lg:block"><table className="w-full min-w-[1180px] table-fixed text-left text-sm"><thead className="border-b border-slate-800 bg-slate-900/80 text-xs uppercase text-slate-400"><tr><th className="w-20 px-4 py-3">Thumbnail</th><th className="w-56 px-4 py-3">Product Title</th><th className="w-24 px-4 py-3">Price</th><th className="w-24 px-4 py-3">Sale Price</th><th className="w-28 px-4 py-3">Status</th><th className="w-52 px-4 py-3">Payment Link</th><th className="w-32 px-4 py-3">Created/Updated</th><th className="w-72 px-4 py-3">Actions</th></tr></thead><tbody className="divide-y divide-slate-800">{products.map((product) => <tr key={product.id} className="hover:bg-slate-900/50"><td className="px-4 py-3"><ProductThumbnail product={product} /></td><td className="px-4 py-3"><button title={product.name || product.title} onClick={() => onEdit(product)} className="block w-full truncate text-left font-semibold text-white hover:text-violet-300">{product.name || product.title}</button><span title={product.slug} className="block truncate text-xs text-slate-500">{product.slug}</span></td><td className="px-4 py-3 text-slate-300">{formatCurrency(product.price)}</td><td className="px-4 py-3 text-emerald-400">{product.sale_price ? formatCurrency(product.sale_price) : '—'}</td><td className="px-4 py-3"><ProductStatus product={product} /></td><td className="px-4 py-3"><PaymentLink product={product} /></td><td className="px-4 py-3 text-xs text-slate-400">{formatProductDate(product)}</td><td className="px-4 py-3"><ProductActions product={product} paymentLinkLoading={paymentLinkLoading} deleting={!!deletingIds[product.id]} onEdit={onEdit} onDelete={onDelete} onCopy={onCopy} onCreateLink={onCreateLink} onRefreshLink={onRefreshLink} /></td></tr>)}</tbody></table></div>
+  <div className="space-y-3 lg:hidden">{products.map((product) => <div key={product.id} className="rounded-2xl border border-slate-800 bg-slate-950 p-4"><div className="flex gap-3"><ProductThumbnail product={product} large /><div className="min-w-0 flex-1"><h2 title={product.name || product.title} className="truncate font-semibold text-white">{product.name || product.title}</h2><p className="mt-1 text-sm text-slate-300">{formatCurrency(product.price)}{product.sale_price ? <span className="ml-2 text-emerald-400">Sale {formatCurrency(product.sale_price)}</span> : null}</p><div className="mt-2"><ProductStatus product={product} /></div></div></div><div className="mt-3"><PaymentLink product={product} /></div><div className="mt-4"><ProductActions product={product} paymentLinkLoading={paymentLinkLoading} deleting={!!deletingIds[product.id]} onEdit={onEdit} onDelete={onDelete} onCopy={onCopy} onCreateLink={onCreateLink} onRefreshLink={onRefreshLink} /></div></div>)}</div>
+</>;
+
+const ProductThumbnail = ({ product, large = false }) => <div className={`${large ? 'h-16 w-16' : 'h-12 w-12'} shrink-0 overflow-hidden rounded-lg border border-slate-700 bg-slate-900`}>{product.thumbnail_url ? <img src={product.thumbnail_url} alt="" className="h-full w-full object-cover" /> : <ImageIcon className="m-auto h-full text-slate-600" size={22} />}</div>;
+const ProductStatus = ({ product }) => <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${product.published ? 'bg-emerald-500/15 text-emerald-300' : 'bg-amber-500/15 text-amber-300'}`}>{product.published ? 'Published' : 'Draft/Hidden'}</span>;
+const PaymentLink = ({ product }) => product.razorpay_payment_link_url ? <><a href={product.razorpay_payment_link_url} title={product.razorpay_payment_link_url} target="_blank" rel="noreferrer" className="block truncate text-xs text-violet-300">{product.razorpay_payment_link_url}</a><span className="text-xs text-slate-500">{product.razorpay_payment_link_status || 'unknown'}</span></> : <span className="text-xs text-slate-600">No optional Payment Link</span>;
 
 const PrivateDownloadSection = ({
   formData,

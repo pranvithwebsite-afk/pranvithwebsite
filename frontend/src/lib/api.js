@@ -443,6 +443,9 @@ export const formatApiErrorDetail = (detail) => {
       .join(' ');
   }
   if (detail && typeof detail.msg === 'string') return detail.msg;
+  if (typeof detail === 'object') {
+    try { return JSON.stringify(detail); } catch (_) { return String(detail); }
+  }
   return String(detail);
 };
 

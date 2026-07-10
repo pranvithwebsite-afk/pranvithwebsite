@@ -16,6 +16,7 @@ import hmac
 import hashlib
 import html
 import logging
+import math
 import re
 import secrets
 import smtplib
@@ -712,6 +713,21 @@ class ProductIn(BaseModel):
     seo_description: Optional[str] = None
     published: bool = True
     product_url: Optional[str] = None
+
+    @field_validator("price", "sale_price", mode="before")
+    @classmethod
+    def validate_product_price(cls, value, info):
+        if info.field_name == "sale_price" and (value is None or value == ""):
+            return None
+        if isinstance(value, bool):
+            raise ValueError(f"{info.field_name} must be a valid non-negative whole number")
+        try:
+            number = float(value)
+        except (TypeError, ValueError):
+            raise ValueError(f"{info.field_name} must be a valid non-negative whole number")
+        if not math.isfinite(number) or number < 0 or not number.is_integer():
+            raise ValueError(f"{info.field_name} must be a valid non-negative whole number")
+        return int(number)
 
     @field_validator(
         "download_file",
@@ -3955,7 +3971,12 @@ async def admin_create_product(payload: ProductIn, current_admin: AdminBase = De
         "updated_at": None,
         "sold_count": 0,
     })
-    existing = await db.products.find_one({"slug": doc["slug"]})
+    try:
+        existing = await db.products.find_one({"slug": doc["slug"]})
+    except Exception as exc:
+        detail = mongodb_public_error(exc)
+        logger.exception("Product create lookup failed slug=%s detail=%s", doc["slug"], detail)
+        return _json_error_response(503, "Product could not be saved", code="PRODUCT_DATABASE_ERROR", detail=detail)
     if existing:
         raise HTTPException(status_code=409, detail="Product slug already exists")
     logger.info(
@@ -3973,6 +3994,10 @@ async def admin_create_product(payload: ProductIn, current_admin: AdminBase = De
             doc["slug"],
         )
         raise HTTPException(status_code=409, detail="Product slug already exists")
+    except Exception as exc:
+        detail = mongodb_public_error(exc)
+        logger.exception("Product create failed id=%s slug=%s detail=%s", doc["id"], doc["slug"], detail)
+        return _json_error_response(503, "Product could not be saved", code="PRODUCT_DATABASE_ERROR", detail=detail)
     logger.info(
         "Product created database=%s collection=products id=%s slug=%s",
         db_name,
@@ -4003,11 +4028,23 @@ async def admin_update_product(product_id: str, payload: ProductIn, current_admi
         raise HTTPException(status_code=422, detail="Product slug is required")
     if not update_doc.get("product_url"):
         update_doc["product_url"] = product_url_for_slug(update_doc["slug"])
-    existing = await db.products.find_one({"slug": update_doc["slug"], "id": {"$ne": product_id}})
+    try:
+        existing = await db.products.find_one({"slug": update_doc["slug"], "id": {"$ne": product_id}})
+    except Exception as exc:
+        detail = mongodb_public_error(exc)
+        logger.exception("Product update lookup failed id=%s slug=%s detail=%s", product_id, update_doc["slug"], detail)
+        return _json_error_response(503, "Product could not be saved", code="PRODUCT_DATABASE_ERROR", detail=detail)
     if existing:
         raise HTTPException(status_code=409, detail="Product slug already exists")
     update_doc["updated_at"] = datetime.now(timezone.utc).isoformat()
-    result = await db.products.update_one({"id": product_id}, {"$set": update_doc})
+    try:
+        result = await db.products.update_one({"id": product_id}, {"$set": update_doc})
+    except DuplicateKeyError:
+        raise HTTPException(status_code=409, detail="Product slug already exists")
+    except Exception as exc:
+        detail = mongodb_public_error(exc)
+        logger.exception("Product update failed id=%s slug=%s detail=%s", product_id, update_doc["slug"], detail)
+        return _json_error_response(503, "Product could not be saved", code="PRODUCT_DATABASE_ERROR", detail=detail)
     if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="Product not found")
     warning = None
