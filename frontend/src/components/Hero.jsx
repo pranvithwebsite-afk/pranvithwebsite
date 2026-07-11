@@ -135,7 +135,7 @@ const Hero = ({ pageData }) => {
   }, [hasMedia, hasVideo, imageUrl, mediaType, posterUrl, videoUrl, hero.hero_title]);
 
   return (
-    <section className="relative min-h-[calc(100vh-var(--navbar-height))] pb-20 pt-10 sm:pb-24 sm:pt-14">
+    <section className="home-hero hero-section relative">
       <div className="absolute inset-0 radial-purple pointer-events-none" />
 
       <div className="relative max-w-7xl mx-auto px-6 text-center">
@@ -144,7 +144,7 @@ const Hero = ({ pageData }) => {
           <span>{hero.badge_text}</span>
         </div>
 
-        <h1 className="mb-8 max-w-full break-words text-[clamp(38px,12vw,62px)] font-bold leading-[0.95] tracking-tight md:text-[clamp(56px,7vw,110px)]">
+        <h1 className="mx-auto mb-8 w-full max-w-[1100px] break-words text-[clamp(48px,7vw,108px)] font-bold leading-[0.95] tracking-tight">
           <span className="text-white">{hero.hero_title}</span>
         </h1>
 

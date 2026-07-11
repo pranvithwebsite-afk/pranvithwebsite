@@ -228,3 +228,72 @@ h1, h2, h3, h4, h5, h6 {
     object-fit: contain;
   }
 }
+
+/* Public layout safety: keep page content in normal document flow. */
+html,
+body,
+#root {
+  width: 100%;
+  min-height: 100%;
+  margin: 0;
+  background:
+    radial-gradient(circle at 50% 0%, rgba(124, 58, 237, 0.22), transparent 34%),
+    linear-gradient(180deg, #05000d 0%, #090016 45%, #05000d 100%);
+  color: #ffffff;
+}
+
+body {
+  overflow-x: hidden;
+}
+
+.home-page,
+.public-page,
+.page-shell,
+main {
+  width: 100%;
+  min-height: auto;
+  overflow: visible;
+  background: transparent;
+}
+
+.home-hero,
+.hero-section,
+.hero,
+[class*="Hero"] {
+  height: auto !important;
+  max-height: none !important;
+  overflow: visible !important;
+}
+
+.home-hero {
+  min-height: auto !important;
+  padding-top: 160px;
+  padding-bottom: 120px;
+}
+
+.home-hero h1,
+.hero-section h1,
+.hero h1 {
+  max-width: 1100px;
+  overflow: visible !important;
+  font-size: clamp(48px, 7vw, 108px);
+  line-height: 0.95;
+  overflow-wrap: break-word;
+}
+
+footer,
+.site-footer {
+  width: 100%;
+  max-width: none;
+  position: relative;
+  transform: none;
+  scale: 1;
+  background: transparent;
+}
+
+@media (max-width: 767px) {
+  .home-hero {
+    padding-top: 160px;
+    padding-bottom: 120px;
+  }
+}
