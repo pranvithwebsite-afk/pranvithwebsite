@@ -34,7 +34,7 @@ const Services = () => {
   return (
     <>
       <Header />
-      <main className="min-h-screen bg-[var(--bg-main)] text-white">
+      <main className="page min-h-screen bg-transparent text-white">
         <section className="relative overflow-hidden px-6 pb-14 pt-32 md:pt-36">
           <div className="cinematic-card mx-auto max-w-6xl px-6 py-8 md:px-10">
             <div className="relative mx-auto max-w-7xl">
