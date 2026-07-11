@@ -63,7 +63,7 @@ const Footer = () => {
   };
 
   return (
-    <footer className="relative overflow-hidden bg-transparent">
+    <footer className="relative w-full shrink-0 overflow-hidden bg-[#05000d]">
       <div className="pointer-events-none absolute inset-x-0 top-0 h-20 bg-[radial-gradient(circle_at_top,rgba(124,58,237,0.08),transparent_72%)] opacity-70" />
       <div className="relative mx-auto max-w-7xl px-6 py-16">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-10">

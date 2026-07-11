@@ -79,7 +79,7 @@ const Home = () => {
   return (
     <>
       <Header />
-      <main className="page relative overflow-hidden bg-transparent text-white">
+      <main className="page relative bg-transparent text-white">
         {order.map((sectionKey) => {
           const sections = {
             hero: <Hero key="hero" pageData={heroData} />,

@@ -433,6 +433,10 @@ const stableSerialize = (value) => JSON.stringify(normalizeForCompare(value || {
 
 const CmsSectionEditor = ({ pageKey, section, mediaItems, onSave, saving, onDirtyChange }) => {
   const [draft, setDraft] = useState(section || emptySection);
+  const [expandedItems, setExpandedItems] = useState(() => {
+    const firstItem = section?.data?.items?.[0];
+    return new Set(firstItem ? [getItemIdentity(firstItem, 0)] : []);
+  });
   const localItemCounter = useRef(0);
   const sectionIdentity = `${pageKey}:${getSectionIdentity(section)}`;
   const previousSectionIdentity = useRef(sectionIdentity);
@@ -443,6 +447,8 @@ const CmsSectionEditor = ({ pageKey, section, mediaItems, onSave, saving, onDirt
     if (previousSectionIdentity.current !== nextIdentity) {
       previousSectionIdentity.current = nextIdentity;
       setDraft(section || emptySection);
+      const firstItem = section?.data?.items?.[0];
+      setExpandedItems(new Set(firstItem ? [getItemIdentity(firstItem, 0)] : []));
     }
   }, [pageKey, section, sectionIdentity]);
 
@@ -479,6 +485,7 @@ const CmsSectionEditor = ({ pageKey, section, mediaItems, onSave, saving, onDirt
     const localId = `cms-item-${localItemCounter.current}`;
     localItemCounter.current += 1;
     updateItems([...items, { ...createEmptyItem(schema.itemFields || []), __cmsLocalId: localId, sort_order: items.length }]);
+    setExpandedItems((current) => new Set([...current, localId]));
   };
   const deleteItem = async (index) => {
     const item = items[index] || {};
@@ -489,6 +496,12 @@ const CmsSectionEditor = ({ pageKey, section, mediaItems, onSave, saving, onDirt
       confirmText: 'Delete',
       loadingText: 'Deleting...',
       onConfirm: () => {
+        const itemIdentity = getItemIdentity(item, index);
+        setExpandedItems((current) => {
+          const next = new Set(current);
+          next.delete(itemIdentity);
+          return next;
+        });
         updateItems(items.filter((_, itemIndex) => itemIndex !== index).map((nextItem, itemIndex) => ({ ...nextItem, sort_order: itemIndex })));
         return true;
       },
@@ -518,6 +531,12 @@ const CmsSectionEditor = ({ pageKey, section, mediaItems, onSave, saving, onDirt
       data: mergedData,
     });
   };
+  const toggleItem = (identity) => setExpandedItems((current) => {
+    const next = new Set(current);
+    if (next.has(identity)) next.delete(identity);
+    else next.add(identity);
+    return next;
+  });
 
   return (
     <div className="rounded-2xl border border-slate-800 bg-slate-950 p-5">
@@ -561,23 +580,40 @@ const CmsSectionEditor = ({ pageKey, section, mediaItems, onSave, saving, onDirt
               <h3 className="text-lg font-semibold text-white">Items</h3>
               <p className="mt-1 text-xs text-slate-500">Only the fields used by this public section are shown.</p>
             </div>
-            <button type="button" onClick={addItem} className="rounded-lg border border-slate-700 px-3 py-2 text-sm font-semibold text-white hover:border-violet-500">Add item</button>
+            <div className="flex flex-wrap gap-2">
+              <button type="button" onClick={() => setExpandedItems(new Set())} className="rounded-lg border border-slate-700 px-3 py-2 text-xs font-semibold text-slate-300 hover:border-violet-500">Collapse all</button>
+              <button type="button" onClick={() => setExpandedItems(new Set(items.map(getItemIdentity)))} className="rounded-lg border border-slate-700 px-3 py-2 text-xs font-semibold text-slate-300 hover:border-violet-500">Expand all</button>
+              <button type="button" onClick={addItem} className="rounded-lg border border-slate-700 px-3 py-2 text-sm font-semibold text-white hover:border-violet-500">Add item</button>
+            </div>
           </div>
           {items.length === 0 ? (
             <p className="mt-4 text-sm text-slate-500">No items yet.</p>
           ) : (
             <div className="mt-4 space-y-4">
-              {items.map((item, index) => (
-                <div key={getItemIdentity(item, index)} className="rounded-2xl border border-slate-800 bg-slate-950 p-4">
-                  <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-                    <p className="text-sm font-semibold text-white">Item {index + 1}</p>
-                    <div className="flex flex-wrap gap-2">
+              {items.map((item, index) => {
+                const identity = getItemIdentity(item, index);
+                const expanded = expandedItems.has(identity);
+                const itemTitle = item.title || item.question || item.student_name || item.display_name || 'Untitled item';
+                const thumbnail = item.thumbnail_url || item.thumbnail_image_url || item.image_url || item.student_image_url || item.poster_url;
+                return (
+                <div key={identity} className={`overflow-hidden rounded-2xl border bg-slate-950 transition ${expanded ? 'border-violet-500/40' : 'border-slate-800'}`}>
+                  <div className="flex flex-col gap-3 p-3 sm:flex-row sm:items-center sm:justify-between sm:p-4">
+                    <button type="button" onClick={() => toggleItem(identity)} aria-expanded={expanded} className="flex min-w-0 flex-1 items-center gap-3 rounded-xl text-left focus:outline-none focus:ring-2 focus:ring-violet-500/60">
+                      {thumbnail && <img src={thumbnail} alt="" className="h-12 w-16 shrink-0 rounded-lg border border-slate-700 bg-slate-900 object-cover" onError={(event) => { event.currentTarget.style.display = 'none'; }} />}
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm font-semibold text-white">Item {index + 1}: {itemTitle}</span>
+                        {item.category && <span className="mt-1 block truncate text-xs text-violet-300">Category: {item.category}</span>}
+                      </span>
+                      <span aria-hidden="true" className={`shrink-0 text-xl text-slate-400 transition-transform ${expanded ? 'rotate-180' : ''}`}>⌄</span>
+                      <span className="sr-only">{expanded ? 'Close item' : 'Open item'}</span>
+                    </button>
+                    <div className="flex flex-wrap gap-2 sm:shrink-0">
                       <button type="button" onClick={() => moveItem(index, -1)} disabled={index === 0} className="rounded-lg border border-slate-700 px-2 py-1 text-xs text-white disabled:opacity-40">Up</button>
                       <button type="button" onClick={() => moveItem(index, 1)} disabled={index === items.length - 1} className="rounded-lg border border-slate-700 px-2 py-1 text-xs text-white disabled:opacity-40">Down</button>
                       <button type="button" onClick={() => deleteItem(index)} className="rounded-lg border border-rose-500/30 px-2 py-1 text-xs text-rose-100">Delete</button>
                     </div>
                   </div>
-                  <div className="grid gap-4 lg:grid-cols-2">
+                  {expanded && <div className="grid gap-4 border-t border-slate-800 p-4 lg:grid-cols-2">
                     {schema.itemFields.map((field) => (
                       <ItemField
                         key={field}
@@ -590,9 +626,9 @@ const CmsSectionEditor = ({ pageKey, section, mediaItems, onSave, saving, onDirt
                         itemMediaType={item.media_type || item.video_type}
                       />
                     ))}
-                  </div>
+                  </div>}
                 </div>
-              ))}
+              );})}
             </div>
           )}
         </div>

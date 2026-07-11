@@ -1,6 +1,10 @@
 .App {
   min-height: 100vh;
-  background: transparent;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow-x: clip;
+  background: #05000d;
 }
 
 .home-loading-screen {
