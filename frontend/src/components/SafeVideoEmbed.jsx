@@ -101,10 +101,13 @@ export const getYouTubeThumbnail = (url, quality = 'maxresdefault') => {
   return id ? `https://img.youtube.com/vi/${id}/${quality}.jpg` : '';
 };
 
-const withAutoplay = (url) => {
+const withAutoplay = (url, { loop = false, youtubeId = '' } = {}) => {
   if (!url) return '';
   const separator = url.includes('?') ? '&' : '?';
-  return `${url}${separator}autoplay=1&mute=1&playsinline=1`;
+  const loopParams = loop
+    ? `${youtubeId ? `&loop=1&playlist=${youtubeId}` : '&loop=1'}`
+    : '';
+  return `${url}${separator}autoplay=1&mute=1&playsinline=1${loopParams}`;
 };
 
 const externalVideoLabel = (videoType, videoUrl) => {
@@ -138,6 +141,9 @@ const SafeVideoEmbed = ({
   className = '',
   aspectRatio = 'aspect-video',
   fit = 'cover',
+  autoPlay = false,
+  muted = true,
+  loop = false,
   autoplayOnClick = true,
   showPlayOverlay = true,
   loadWhenVisible = true,
@@ -164,8 +170,8 @@ const SafeVideoEmbed = ({
   const mediaFitClass = fit === 'contain' ? 'object-contain' : 'object-cover';
   const wrapperClass = `video-player-wrap group relative z-[2] ${aspectRatio || 'aspect-video'} overflow-hidden rounded-[inherit] bg-transparent ${className}`.trim();
   const frameRef = useRef(null);
-  const shouldLoadPlayer = activated || (!loadOnInteractionOnly && loadWhenVisible && nearViewport);
-  const allowAutoplay = autoplayOnClick && !isMobile;
+  const shouldLoadPlayer = autoPlay || activated || (!loadOnInteractionOnly && loadWhenVisible && nearViewport);
+  const allowAutoplay = autoPlay || (autoplayOnClick && !isMobile);
 
   useEffect(() => {
     setIsMobile(window.matchMedia?.('(max-width: 767px)').matches || false);
@@ -194,9 +200,10 @@ const SafeVideoEmbed = ({
           poster={safePosterUrl || undefined}
           controls
           autoPlay={allowAutoplay}
-          muted={allowAutoplay}
+          muted={autoPlay || muted || allowAutoplay}
+          loop={loop}
           playsInline
-          preload={activated ? 'metadata' : 'none'}
+          preload={autoPlay ? 'auto' : (activated ? 'metadata' : 'none')}
           className={`absolute inset-0 z-[3] h-full w-full bg-transparent ${mediaFitClass}`}
         />
       </div>
@@ -208,7 +215,9 @@ const SafeVideoEmbed = ({
       <div ref={frameRef} className={wrapperClass}>
         <iframe
           title={title}
-          src={allowAutoplay && activated ? withAutoplay(embedUrl) : embedUrl}
+          src={allowAutoplay && (autoPlay || activated)
+            ? withAutoplay(embedUrl, { loop, youtubeId: getYouTubeId(videoUrl) })
+            : embedUrl}
           className="absolute inset-0 z-[3] h-full w-full rounded-[inherit] border-0 bg-transparent"
           loading="lazy"
           referrerPolicy="strict-origin-when-cross-origin"

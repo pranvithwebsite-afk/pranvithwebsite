@@ -294,22 +294,39 @@ export const normalizeWorkItem = (project) => {
   const workVideoMediaTypes = new Set(['video_file', 'video_url', 'youtube', 'vimeo']);
 
   const getYouTubeThumbnail = (url, quality = 'hqdefault') => {
-      if (!url || !url.includes('youtube.com') && !url.includes('youtu.be')) return null;
-      const videoIdMatch = url.match(/(?:v=|\/|embed\/|watch\?v=)([a-zA-Z0-9_-]{11})/);
-      const videoId = videoIdMatch ? videoIdMatch[1] : null;
-      if (!videoId) return null;
-      return `https://i.ytimg.com/vi/${videoId}/${quality}.jpg`;
+    try {
+      const parsed = new URL(String(url || '').trim());
+      const host = parsed.hostname.toLowerCase().replace(/^www\./, '');
+      if (!['youtube.com', 'm.youtube.com', 'youtu.be', 'youtube-nocookie.com'].includes(host)) return '';
+      const parts = parsed.pathname.split('/').filter(Boolean);
+      const videoId = host === 'youtu.be'
+        ? parts[0]
+        : (['shorts', 'embed', 'live', 'v'].includes(parts[0]) ? parts[1] : parsed.searchParams.get('v'));
+      return /^[a-zA-Z0-9_-]{6,}$/.test(videoId || '')
+        ? `https://img.youtube.com/vi/${videoId}/${quality}.jpg`
+        : '';
+    } catch {
+      return '';
+    }
   };
 
-  const mediaType = project.media_type || (project.video_url ? 'video_url' : 'image');
+  const mediaUrl = String(project.media_url || '').trim();
+  const mediaUrlIsImage = /\.(jpe?g|png|webp|gif)(\?.*)?$/i.test(mediaUrl);
+  const mediaUrlIsVideo = workVideoMediaTypes.has(project.media_type)
+    || /\.(mp4|webm|mov)(\?.*)?$/i.test(mediaUrl)
+    || !!getYouTubeThumbnail(mediaUrl);
 
-  const videoUrl = project.video_url || (workVideoMediaTypes.has(mediaType) ? project.media_url : null);
-  
-  const thumbnail = project.thumbnail_url || project.image_url || project.poster_url || project.thumbnail_image_url || getYouTubeThumbnail(videoUrl);
+  const videoUrl = project.video_url || (mediaUrlIsVideo ? mediaUrl : '');
+  const thumbnail = project.thumbnail_url
+    || project.poster_url
+    || project.image_url
+    || project.thumbnail_image_url
+    || (mediaUrlIsImage ? mediaUrl : '')
+    || getYouTubeThumbnail(videoUrl);
 
   return {
       title: project.title,
-      category: project.category,
+      category: String(project.category || '').trim() || 'Other',
       description: project.description,
       thumbnail_url: thumbnail,
       video_url: videoUrl,

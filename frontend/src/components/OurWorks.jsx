@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { handleImageError, safeImageSrc, safePublicHref, normalizeWorkItem } from '../lib/utils';
 import SafeVideoEmbed, { detectMediaType } from './SafeVideoEmbed';
 import OptimizedImage from './OptimizedImage';
@@ -7,12 +7,17 @@ const enabledSorted = (items = []) =>
   [...items].filter((item) => item.enabled !== false).sort((a, b) => Number(a.sort_order || 0) - Number(b.sort_order || 0));
 
 const OurWorks = ({ section }) => {
-  const visibleProjects = useMemo(() => {
+  const [activeCategory, setActiveCategory] = useState('All');
+  const projects = useMemo(() => {
     const items = section?.data?.items || section?.items || section?.data?.projects || section?.projects || [];
-    return enabledSorted(items.map(normalizeWorkItem).filter(Boolean)).slice(0, 5)
+    return enabledSorted(items.map(normalizeWorkItem).filter(Boolean));
   }, [section]);
+  const categories = useMemo(() => ['All', ...new Set(projects.map((project) => project.category || 'Other'))], [projects]);
+  const visibleProjects = useMemo(() => (
+    (activeCategory === 'All' ? projects : projects.filter((project) => project.category === activeCategory)).slice(0, 5)
+  ), [activeCategory, projects]);
 
-  if (!section || visibleProjects.length === 0) return null;
+  if (!section || projects.length === 0) return null;
 
   return (
     <section className="section-block overflow-hidden px-6">
@@ -24,6 +29,23 @@ const OurWorks = ({ section }) => {
             {section.description || section.subtitle || 'Selected films, commercial visuals, drone sequences, and edits from the PranvithDOP portfolio.'}
           </p>
         </div>
+
+        {categories.length > 1 && (
+          <div className="-mx-2 mb-8 flex gap-2 overflow-x-auto px-2 pb-2 md:mx-0 md:flex-wrap md:justify-center md:overflow-visible md:px-0">
+            {categories.map((category) => (
+              <button
+                key={category}
+                type="button"
+                onClick={() => setActiveCategory(category)}
+                className={`shrink-0 whitespace-nowrap rounded-full border px-4 py-2 text-sm font-semibold backdrop-blur transition ${activeCategory === category
+                  ? 'border-violet-400/60 bg-violet-600 text-white shadow-[0_8px_24px_rgba(124,58,237,0.28)]'
+                  : 'border-white/10 bg-black/30 text-white/70 hover:border-violet-400/40 hover:bg-violet-500/10 hover:text-white'}`}
+              >
+                {category}
+              </button>
+            ))}
+          </div>
+        )}
 
         <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
           {visibleProjects.map((project, index) => (
@@ -49,7 +71,7 @@ const WorkCard = ({ project }) => {
 
   return (
     <article className="cinematic-card group overflow-hidden transition hover:-translate-y-1">
-      <div className="relative aspect-[16/11] overflow-hidden bg-gradient-to-br from-[#1a102d] via-[#0b0318] to-black">
+      <div className="relative aspect-video overflow-hidden rounded-t-[inherit] bg-gradient-to-br from-[#1a102d] via-[#0b0318] to-black">
         {hasVideo ? (
           <SafeVideoEmbed
             videoType={detectMediaType(video_url)}
@@ -57,15 +79,16 @@ const WorkCard = ({ project }) => {
             title={title}
             posterUrl={thumbnail_url}
             className="h-full w-full rounded-none border-0"
-            aspectRatio="aspect-[16/11]"
+            aspectRatio="aspect-video"
+            loadOnInteractionOnly
           />
         ) : thumbnail_url ? (
-          <OptimizedImage src={safeImageSrc(thumbnail_url)} alt={title} loading="lazy" className="h-full w-full object-cover opacity-75 transition duration-500 group-hover:scale-105 group-hover:opacity-95" onError={handleImageError} />
+          <OptimizedImage src={safeImageSrc(thumbnail_url)} alt={title} width={640} height={360} loading="lazy" className="h-full w-full object-cover transition duration-500 group-hover:scale-105" onError={handleImageError} />
         ) : (
           <div className="flex h-full w-full items-center justify-center px-6 text-center text-sm font-semibold uppercase tracking-[0.24em] text-violet-200/70">PranvithDOP</div>
         )}
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[var(--bg-main)] via-transparent to-transparent" />
-        <span className="pointer-events-none absolute left-4 top-4 rounded-full bg-black/60 px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-violet-200">{category}</span>
+        <span className="pointer-events-none absolute left-4 top-4 rounded-full bg-black/60 px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-violet-200">{category || 'Other'}</span>
       </div>
       <div className="p-5">
         <h3 className="text-lg font-semibold text-white">{title}</h3>

@@ -42,6 +42,10 @@ const ShowreelSection = ({ section }) => {
             posterUrl={mainPoster}
             fit="cover"
             className="video-card rounded-none border-0"
+            autoPlay
+            muted
+            loop
+            showPlayOverlay={false}
           />
         </div>
       </div>
@@ -62,6 +66,7 @@ const ShowreelSection = ({ section }) => {
                   fit="cover"
                   className="video-card h-full w-full rounded-none border-0"
                   aspectRatio="aspect-[16/10]"
+                  loadOnInteractionOnly
                 />
               ) : (project.thumbnail_image_url || project.thumbnail_url || project.image_url || project.thumbnail) ? (
                 <OptimizedImage src={safeImageSrc(project.thumbnail_image_url || project.thumbnail_url || project.image_url || project.thumbnail)} alt={project.title} width={640} height={400} className="h-full w-full object-cover opacity-70 transition group-hover:scale-105 group-hover:opacity-90" onError={handleImageError} />

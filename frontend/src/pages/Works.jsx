@@ -9,7 +9,6 @@ import ClientTestimonialsSection from '../components/ClientTestimonialsSection';
 import { usePublicPageLoading } from '../components/PublicPageLoader';
 import OptimizedImage from '../components/OptimizedImage';
 
-const filters = ['All', 'Commercial', 'Wedding', 'Drone', 'Editing', 'Product', 'Film'];
 const EMPTY_SECTIONS = [];
 
 const enabledSorted = (items = []) =>
@@ -45,27 +44,23 @@ const Works = () => {
     return enabledSorted(items.map(normalizeWorkItem).filter(Boolean));
   }, [projectsSection]);
 
-  const projects = useMemo(() => (
-    active === 'All' ? allProjects : allProjects.filter((project) => project.category === active)
-  ), [active, allProjects]);
+  const sourceProjects = useMemo(() => (
+    allProjects.length > 0
+      ? allProjects
+      : enabledSorted(page?.portfolio?.map(normalizeWorkItem).filter(Boolean) || [])
+  ), [allProjects, page?.portfolio]);
+
+  const finalProjects = useMemo(() => (
+    active === 'All' ? sourceProjects : sourceProjects.filter((project) => project.category === active)
+  ), [active, sourceProjects]);
 
   const visibleCategories = useMemo(() => {
-    const available = new Set(allProjects.map((project) => project.category).filter(Boolean));
-    if (available.size === 0) {
-      // Fallback for old hardcoded portfolio items, if any
-      const legacyCats = new Set(page?.portfolio?.map(p => p.category).filter(Boolean) || []);
-      if (legacyCats.size > 0) return ['All', ...legacyCats];
-      return [];
-    }
-    const categoryFilters = filters.filter((filter) => filter === 'All' || available.has(filter));
-    return categoryFilters.length > 1 ? categoryFilters : [];
-  }, [allProjects, page?.portfolio]);
+    const available = [...new Set(sourceProjects.map((project) => project.category || 'Other'))];
+    return ['All', ...available];
+  }, [sourceProjects]);
 
   const showHero = hero.section_id || !page;
   
-  const finalProjects = projects.length > 0 ? projects : enabledSorted(page?.portfolio?.map(normalizeWorkItem).filter(Boolean) || []);
-
-
   return (
     <>
       <Header />
@@ -123,16 +118,16 @@ const Works = () => {
 
         {(projectsSection.section_id || finalProjects.length > 0) && <section id="works-grid" className="section-block px-6 pb-24 pt-10">
           <div className="mx-auto max-w-7xl">
-            {visibleCategories.length > 0 && 
-            <div className="mb-8 flex flex-wrap justify-center gap-2">
+            {visibleCategories.length > 1 &&
+            <div className="-mx-2 mb-8 flex gap-2 overflow-x-auto px-2 pb-2 md:mx-0 md:flex-wrap md:justify-center md:overflow-visible md:px-0">
               {visibleCategories.map((filter) => (
                 <button
                   key={filter}
                   onClick={() => setActive(filter)}
-                  className={`rounded-full border px-4 py-2 text-sm font-semibold transition ${
+                  className={`shrink-0 whitespace-nowrap rounded-full border px-4 py-2 text-sm font-semibold backdrop-blur transition ${
                     active === filter
-                      ? 'border-purple-300/35 bg-purple-500/20 text-white'
-                      : 'border-purple-300/20 bg-purple-500/10 text-white/70 hover:border-purple-300/35 hover:text-white'
+                      ? 'border-violet-400/60 bg-violet-600 text-white shadow-[0_8px_24px_rgba(124,58,237,0.28)]'
+                      : 'border-white/10 bg-black/30 text-white/70 hover:border-violet-400/40 hover:bg-violet-500/10 hover:text-white'
                   }`}
                 >
                   {filter}
@@ -190,7 +185,7 @@ const ProjectCard = ({ project }) => {
 
   return (
     <div className="cinematic-card group block h-full overflow-hidden transition duration-300 hover:-translate-y-1">
-      <div className="relative aspect-[16/11] overflow-hidden bg-gradient-to-br from-[#1a102d] via-[#0b0318] to-black">
+      <div className="relative aspect-video overflow-hidden rounded-t-[inherit] bg-gradient-to-br from-[#1a102d] via-[#0b0318] to-black">
         {hasVideo ? (
           <SafeVideoEmbed
             videoType={detectMediaType(video_url)}
@@ -198,15 +193,16 @@ const ProjectCard = ({ project }) => {
             title={title}
             posterUrl={thumbnail_url}
             className="h-full w-full rounded-none border-0"
-            aspectRatio="aspect-[16/11]"
+            aspectRatio="aspect-video"
+            loadOnInteractionOnly
           />
         ) : thumbnail_url ? (
-          <OptimizedImage src={safeImageSrc(thumbnail_url)} alt={title} width={420} height={289} className="h-full w-full object-cover opacity-75 transition duration-500 group-hover:scale-105 group-hover:opacity-95" onError={handleImageError} />
+          <OptimizedImage src={safeImageSrc(thumbnail_url)} alt={title} width={640} height={360} className="h-full w-full object-cover transition duration-500 group-hover:scale-105" onError={handleImageError} />
         ) : (
           <div className="flex h-full w-full items-center justify-center px-6 text-center text-sm font-semibold uppercase tracking-[0.24em] text-violet-200/70">PranvithDOP</div>
         )}
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[var(--bg-main)] via-transparent to-transparent" />
-        <span className="pointer-events-none absolute left-4 top-4 rounded-full bg-black/60 px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-violet-200">{category || 'Film'}</span>
+        <span className="pointer-events-none absolute left-4 top-4 rounded-full bg-black/60 px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-violet-200">{category || 'Other'}</span>
       </div>
       <div className="p-6">
         <h3 className="text-xl font-semibold text-white">{title}</h3>

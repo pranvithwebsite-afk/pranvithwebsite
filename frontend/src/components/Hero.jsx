@@ -103,9 +103,11 @@ const Hero = ({ pageData }) => {
           posterUrl={posterUrl}
           className="h-full w-full rounded-none border-0"
           aspectRatio="h-full"
-          autoplayOnClick={false}
+          autoPlay
+          muted
+          loop
+          showPlayOverlay={false}
           loadWhenVisible={false}
-          loadOnInteractionOnly
           thumbnailLoading="eager"
           thumbnailFetchPriority="high"
           thumbnailWidth={1280}
