@@ -68,7 +68,7 @@ const Works = () => {
       <Header />
       <main className="page bg-transparent text-white">
         {showHero && (
-          <section className="section-block overflow-hidden px-6 pb-12 text-center">
+          <section className="section-block px-6 pb-12 text-center">
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(124,58,237,0.22),transparent_45%)]" />
             <div className="relative mx-auto max-w-5xl">
               <p className="section-eyebrow text-xs">{hero.subtitle || 'PORTFOLIO'}</p>

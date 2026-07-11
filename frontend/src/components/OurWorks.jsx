@@ -22,7 +22,7 @@ const OurWorks = ({ section }) => {
   if (!section || projects.length === 0) return null;
 
   return (
-    <section className="section-block overflow-hidden px-6">
+    <section className="section-block px-6">
       <div className="relative mx-auto max-w-7xl">
         <div className="mb-12 text-center">
           <p className="section-eyebrow text-xs">{section.data?.eyebrow || 'Our Works'}</p>

@@ -135,7 +135,7 @@ const Hero = ({ pageData }) => {
   }, [hasMedia, hasVideo, imageUrl, mediaType, posterUrl, videoUrl, hero.hero_title]);
 
   return (
-    <section className="relative overflow-hidden pb-12 pt-8 sm:pt-10">
+    <section className="relative min-h-[calc(100vh-var(--navbar-height))] pb-20 pt-10 sm:pb-24 sm:pt-14">
       <div className="absolute inset-0 radial-purple pointer-events-none" />
 
       <div className="relative max-w-7xl mx-auto px-6 text-center">
@@ -144,7 +144,7 @@ const Hero = ({ pageData }) => {
           <span>{hero.badge_text}</span>
         </div>
 
-        <h1 className="text-5xl md:text-7xl lg:text-8xl font-bold tracking-tight leading-[1.05] mb-7 fade-in-up">
+        <h1 className="mb-8 max-w-full break-words text-[clamp(38px,12vw,62px)] font-bold leading-[0.95] tracking-tight md:text-[clamp(56px,7vw,110px)]">
           <span className="text-white">{hero.hero_title}</span>
         </h1>
 
@@ -170,7 +170,7 @@ const Hero = ({ pageData }) => {
           </a>
         </div>
 
-        <div className="relative mt-16 max-w-5xl mx-auto">
+        <div className="relative mx-auto mt-16 max-w-5xl">
           <div className="absolute -inset-6 bg-violet-600/20 blur-3xl rounded-3xl" />
           <div className="relative rounded-3xl border border-violet-500/30 bg-gradient-to-br from-[#1a0a3a] via-[#0f0625] to-[#0a0518] p-1 overflow-hidden">
             <div className="relative aspect-[16/8] rounded-[20px] overflow-hidden bg-gradient-to-br from-[#1e0a45] to-[#0a0518]">
