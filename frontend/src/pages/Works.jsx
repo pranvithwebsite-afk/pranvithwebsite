@@ -27,6 +27,7 @@ const Works = () => {
   const { page, loading } = useCmsPage('works');
   usePublicPageLoading(loading);
   const [active, setActive] = useState('All');
+  const [selectedVideo, setSelectedVideo] = useState(null);
   const sections = page?.sections || page?.page?.sections || page?.data?.sections || EMPTY_SECTIONS;
   const hero = section(sections, 'hero') || {};
   const showreel = section(sections, 'showreel') || {};
@@ -140,7 +141,7 @@ const Works = () => {
             {finalProjects.length ? (
               <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
                 {finalProjects.map((project, index) => (
-                  <ProjectCard key={project.id || `${project.title}-${index}`} project={project} />
+                  <ProjectCard key={project.id || `${project.title}-${index}`} project={project} onPlay={() => setSelectedVideo(project)} />
                 ))}
               </div>
             ) : (
@@ -164,14 +165,14 @@ const Works = () => {
             </div>
           </section>
         )}
+        <VideoModal open={!!selectedVideo} onClose={() => setSelectedVideo(null)} videoUrl={selectedVideo?.video_url} title={selectedVideo?.title} posterUrl={selectedVideo?.thumbnail_url} />
       </main>
       <Footer />
     </>
   );
 };
 
-const ProjectCard = ({ project }) => {
-  const [modalOpen, setModalOpen] = useState(false);
+const ProjectCard = ({ project, onPlay }) => {
   const {
     title,
     category,
@@ -197,7 +198,7 @@ const ProjectCard = ({ project }) => {
             className="h-full w-full rounded-none border-0"
             aspectRatio="aspect-video"
             loadOnInteractionOnly
-            onPlay={() => setModalOpen(true)}
+            onPlay={onPlay}
           />
         ) : thumbnail_url ? (
           <OptimizedImage src={safeImageSrc(thumbnail_url)} alt={title} width={640} height={360} className="h-full w-full object-cover transition duration-500 group-hover:scale-105" onError={handleImageError} />
@@ -216,7 +217,6 @@ const ProjectCard = ({ project }) => {
           {date && <p>Date: {date}</p>}
         </div>
       </div>
-      <VideoModal open={modalOpen} onClose={() => setModalOpen(false)} videoUrl={video_url} title={title} posterUrl={thumbnail_url} />
     </div>
   );
 };

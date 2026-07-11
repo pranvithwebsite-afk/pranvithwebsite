@@ -9,6 +9,7 @@ const enabledSorted = (items = []) =>
 
 const OurWorks = ({ section }) => {
   const [activeCategory, setActiveCategory] = useState('All');
+  const [selectedVideo, setSelectedVideo] = useState(null);
   const projects = useMemo(() => {
     const items = section?.data?.items || section?.items || section?.data?.projects || section?.projects || [];
     return enabledSorted(items.map(normalizeWorkItem).filter(Boolean));
@@ -50,7 +51,7 @@ const OurWorks = ({ section }) => {
 
         <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
           {visibleProjects.map((project, index) => (
-            <WorkCard key={project.id || `${project.title}-${index}`} project={project} />
+            <WorkCard key={project.id || `${project.title}-${index}`} project={project} onPlay={() => setSelectedVideo(project)} />
           ))}
         </div>
 
@@ -61,13 +62,13 @@ const OurWorks = ({ section }) => {
             </a>
           </div>
         )}
+        <VideoModal open={!!selectedVideo} onClose={() => setSelectedVideo(null)} videoUrl={selectedVideo?.video_url} title={selectedVideo?.title} posterUrl={selectedVideo?.thumbnail_url} />
       </div>
     </section>
   );
 };
 
-const WorkCard = ({ project }) => {
-  const [modalOpen, setModalOpen] = useState(false);
+const WorkCard = ({ project, onPlay }) => {
   const { title, category, description, thumbnail_url, video_url } = project;
   const hasVideo = !!video_url;
 
@@ -83,7 +84,7 @@ const WorkCard = ({ project }) => {
             className="h-full w-full rounded-none border-0"
             aspectRatio="aspect-video"
             loadOnInteractionOnly
-            onPlay={() => setModalOpen(true)}
+            onPlay={onPlay}
           />
         ) : thumbnail_url ? (
           <OptimizedImage src={safeImageSrc(thumbnail_url)} alt={title} width={640} height={360} loading="lazy" className="h-full w-full object-cover transition duration-500 group-hover:scale-105" onError={handleImageError} />
@@ -97,7 +98,6 @@ const WorkCard = ({ project }) => {
         <h3 className="text-lg font-semibold text-white">{title}</h3>
         <p className="mt-2 line-clamp-2 text-sm leading-relaxed text-white/60">{description}</p>
       </div>
-      <VideoModal open={modalOpen} onClose={() => setModalOpen(false)} videoUrl={video_url} title={title} posterUrl={thumbnail_url} />
     </article>
   );
 }

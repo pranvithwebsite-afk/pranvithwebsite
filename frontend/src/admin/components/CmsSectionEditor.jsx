@@ -4,8 +4,9 @@ import { useAdminConfirm } from './AdminConfirmProvider';
 
 const fieldClass = 'w-full rounded-xl border border-slate-800 bg-slate-900 px-4 py-3 text-white outline-none focus:border-violet-500';
 const sectionTypes = ['hero', 'text', 'image_text', 'video', 'showreel', 'services_cards', 'portfolio_grid', 'product_showcase', 'course_showcase', 'testimonial_videos', 'video_reviews', 'reviews', 'testimonials', 'faq', 'cta', 'contact_form', 'gallery', 'before_after'];
-const mediaTypes = ['auto', 'image', 'video_file', 'video_url', 'youtube', 'vimeo'];
-const workCategories = ['Wedding Teaser', 'Pre Wedding', 'Haldi', 'Half Saree', 'Anniversary Shoot', 'Commercial', 'Drone', 'Other'];
+const mediaTypes = ['auto', 'image', 'video_file', 'youtube', 'vimeo'];
+const workCategories = ['Wedding Teaser', 'Pre Wedding', 'Haldi', 'Half Saree', 'Anniversary Shoot', '1st Birthday', 'Commercial', 'Drone', 'Other'];
+const instagramItemTypes = ['Reel', 'Post', 'Video'];
 
 const emptySection = {
   section_id: '',
@@ -615,10 +616,11 @@ const SectionField = ({ field, value, onChange, mediaItems, labels, pageKey, sec
     );
   }
   if (field === 'media_type') {
+    const options = value && !mediaTypes.includes(value) ? [value, ...mediaTypes] : mediaTypes;
     return (
       <Field label={getFieldLabel(field, labels)}>
         <select value={value || 'auto'} onChange={(event) => onChange(event.target.value)} className={fieldClass}>
-          {mediaTypes.map((type) => <option key={type} value={type}>{type}</option>)}
+          {options.map((type) => <option key={type} value={type}>{type}</option>)}
         </select>
       </Field>
     );
@@ -631,10 +633,10 @@ const DataField = ({ field, value, onChange, labels }) => (
 );
 
 const ItemField = ({ field, labels, value, onChange, mediaItems, pageKey, itemMediaType }) => (
-  <EditableField field={field} value={value} onChange={onChange} mediaItems={mediaItems} label={getFieldLabel(field, labels)} pageKey={pageKey} mediaTypeValue={itemMediaType} isWorksCategory={field === 'category' && ['home', 'works'].includes(pageKey)} />
+  <EditableField field={field} value={value} onChange={onChange} mediaItems={mediaItems} label={getFieldLabel(field, labels)} pageKey={pageKey} mediaTypeValue={itemMediaType} isWorksCategory={field === 'category' && ['home', 'works'].includes(pageKey)} isInstagramType={field === 'type' && pageKey === 'home'} />
 );
 
-const EditableField = ({ field, value, onChange, mediaItems, label, pageKey, mediaTypeValue, isWorksCategory = false }) => {
+const EditableField = ({ field, value, onChange, mediaItems, label, pageKey, mediaTypeValue, isWorksCategory = false, isInstagramType = false }) => {
   if (isWorksCategory) {
     const options = value && !workCategories.includes(value) ? [value, ...workCategories] : workCategories;
     return (
@@ -645,11 +647,16 @@ const EditableField = ({ field, value, onChange, mediaItems, label, pageKey, med
       </Field>
     );
   }
+  if (isInstagramType) {
+    const options = value && !instagramItemTypes.includes(value) ? [value, ...instagramItemTypes] : instagramItemTypes;
+    return <Field label={label}><select value={value || 'Post'} onChange={(event) => onChange(event.target.value)} className={fieldClass}>{options.map((option) => <option key={option} value={option}>{option}</option>)}</select></Field>;
+  }
   if (field === 'media_type') {
+    const options = value && !mediaTypes.includes(value) ? [value, ...mediaTypes] : mediaTypes;
     return (
       <Field label={label}>
         <select value={value || 'auto'} onChange={(event) => onChange(event.target.value)} className={fieldClass}>
-          {mediaTypes.map((type) => <option key={type} value={type}>{type}</option>)}
+          {options.map((type) => <option key={type} value={type}>{type}</option>)}
         </select>
       </Field>
     );
