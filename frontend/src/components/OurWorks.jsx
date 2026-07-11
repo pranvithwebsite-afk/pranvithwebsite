@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { handleImageError, safeImageSrc, safePublicHref, normalizeWorkItem } from '../lib/utils';
 import SafeVideoEmbed, { detectMediaType } from './SafeVideoEmbed';
 import OptimizedImage from './OptimizedImage';
+import VideoModal from './VideoModal';
 
 const enabledSorted = (items = []) =>
   [...items].filter((item) => item.enabled !== false).sort((a, b) => Number(a.sort_order || 0) - Number(b.sort_order || 0));
@@ -66,6 +67,7 @@ const OurWorks = ({ section }) => {
 };
 
 const WorkCard = ({ project }) => {
+  const [modalOpen, setModalOpen] = useState(false);
   const { title, category, description, thumbnail_url, video_url } = project;
   const hasVideo = !!video_url;
 
@@ -81,6 +83,7 @@ const WorkCard = ({ project }) => {
             className="h-full w-full rounded-none border-0"
             aspectRatio="aspect-video"
             loadOnInteractionOnly
+            onPlay={() => setModalOpen(true)}
           />
         ) : thumbnail_url ? (
           <OptimizedImage src={safeImageSrc(thumbnail_url)} alt={title} width={640} height={360} loading="lazy" className="h-full w-full object-cover transition duration-500 group-hover:scale-105" onError={handleImageError} />
@@ -94,6 +97,7 @@ const WorkCard = ({ project }) => {
         <h3 className="text-lg font-semibold text-white">{title}</h3>
         <p className="mt-2 line-clamp-2 text-sm leading-relaxed text-white/60">{description}</p>
       </div>
+      <VideoModal open={modalOpen} onClose={() => setModalOpen(false)} videoUrl={video_url} title={title} posterUrl={thumbnail_url} />
     </article>
   );
 }

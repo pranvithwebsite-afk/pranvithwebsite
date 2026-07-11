@@ -5,6 +5,7 @@ import { useAdminConfirm } from './AdminConfirmProvider';
 const fieldClass = 'w-full rounded-xl border border-slate-800 bg-slate-900 px-4 py-3 text-white outline-none focus:border-violet-500';
 const sectionTypes = ['hero', 'text', 'image_text', 'video', 'showreel', 'services_cards', 'portfolio_grid', 'product_showcase', 'course_showcase', 'testimonial_videos', 'video_reviews', 'reviews', 'testimonials', 'faq', 'cta', 'contact_form', 'gallery', 'before_after'];
 const mediaTypes = ['auto', 'image', 'video_file', 'video_url', 'youtube', 'vimeo'];
+const workCategories = ['Wedding Teaser', 'Pre Wedding', 'Haldi', 'Half Saree', 'Anniversary Shoot', 'Commercial', 'Drone', 'Other'];
 
 const emptySection = {
   section_id: '',
@@ -630,10 +631,20 @@ const DataField = ({ field, value, onChange, labels }) => (
 );
 
 const ItemField = ({ field, labels, value, onChange, mediaItems, pageKey, itemMediaType }) => (
-  <EditableField field={field} value={value} onChange={onChange} mediaItems={mediaItems} label={getFieldLabel(field, labels)} pageKey={pageKey} mediaTypeValue={itemMediaType} />
+  <EditableField field={field} value={value} onChange={onChange} mediaItems={mediaItems} label={getFieldLabel(field, labels)} pageKey={pageKey} mediaTypeValue={itemMediaType} isWorksCategory={field === 'category' && ['home', 'works'].includes(pageKey)} />
 );
 
-const EditableField = ({ field, value, onChange, mediaItems, label, pageKey, mediaTypeValue }) => {
+const EditableField = ({ field, value, onChange, mediaItems, label, pageKey, mediaTypeValue, isWorksCategory = false }) => {
+  if (isWorksCategory) {
+    const options = value && !workCategories.includes(value) ? [value, ...workCategories] : workCategories;
+    return (
+      <Field label={label}>
+        <select value={value || 'Other'} onChange={(event) => onChange(event.target.value)} className={fieldClass}>
+          {options.map((option) => <option key={option} value={option}>{option}</option>)}
+        </select>
+      </Field>
+    );
+  }
   if (field === 'media_type') {
     return (
       <Field label={label}>

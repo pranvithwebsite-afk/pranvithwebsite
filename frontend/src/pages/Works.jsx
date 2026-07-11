@@ -8,6 +8,7 @@ import { useCmsPage } from '../hooks/useCmsPage';
 import ClientTestimonialsSection from '../components/ClientTestimonialsSection';
 import { usePublicPageLoading } from '../components/PublicPageLoader';
 import OptimizedImage from '../components/OptimizedImage';
+import VideoModal from '../components/VideoModal';
 
 const EMPTY_SECTIONS = [];
 
@@ -170,6 +171,7 @@ const Works = () => {
 };
 
 const ProjectCard = ({ project }) => {
+  const [modalOpen, setModalOpen] = useState(false);
   const {
     title,
     category,
@@ -195,6 +197,7 @@ const ProjectCard = ({ project }) => {
             className="h-full w-full rounded-none border-0"
             aspectRatio="aspect-video"
             loadOnInteractionOnly
+            onPlay={() => setModalOpen(true)}
           />
         ) : thumbnail_url ? (
           <OptimizedImage src={safeImageSrc(thumbnail_url)} alt={title} width={640} height={360} className="h-full w-full object-cover transition duration-500 group-hover:scale-105" onError={handleImageError} />
@@ -213,6 +216,7 @@ const ProjectCard = ({ project }) => {
           {date && <p>Date: {date}</p>}
         </div>
       </div>
+      <VideoModal open={modalOpen} onClose={() => setModalOpen(false)} videoUrl={video_url} title={title} posterUrl={thumbnail_url} />
     </div>
   );
 };
