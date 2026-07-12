@@ -26,10 +26,7 @@ body::before {
   inset: 0;
   z-index: 0;
   pointer-events: none;
-  background:
-    radial-gradient(circle at 20% 0%, rgba(124, 58, 237, 0.14), transparent 32%),
-    radial-gradient(circle at 85% 12%, rgba(167, 139, 250, 0.08), transparent 34%),
-    linear-gradient(180deg, #05000d 0%, #0b0318 45%, #05000d 100%);
+  background: linear-gradient(180deg, #05000d 0%, #090313 48%, #05000d 100%);
 }
 
 #root {
@@ -86,8 +83,8 @@ h1, h2, h3, h4, h5, h6 {
     --navbar-height: 96px;
 
     --bg-base: #05000d;
-    --bg-elevated: #0b0716;
-    --bg-card: #141022;
+    --bg-elevated: #120a24;
+    --bg-card: #1c1330;
 
     --accent-primary: #7c3aed;
     --accent-primary-hover: #8b5cf6;
@@ -96,7 +93,7 @@ h1, h2, h3, h4, h5, h6 {
 
     --text-primary: #f8f7ff;
     --text-secondary: #d4d0df;
-    --text-muted: #a7a1b3;
+    --text-muted: #b9b4c4;
     --border-subtle: rgba(196, 181, 253, 0.16);
 
     /* Backward-compatible aliases used by existing public components. */
@@ -104,7 +101,7 @@ h1, h2, h3, h4, h5, h6 {
     --bg-soft: var(--bg-elevated);
 
     --panel-dark: var(--bg-elevated);
-    --panel-soft: #100b1d;
+    --panel-soft: #17102a;
     --panel-purple: var(--bg-card);
 
     --border-soft: var(--border-subtle);
@@ -145,7 +142,7 @@ h1, h2, h3, h4, h5, h6 {
 
   .page > .site-section--soft,
   .site-section--soft {
-    background: linear-gradient(180deg, rgba(20, 16, 34, 0.72), rgba(11, 7, 22, 0.88));
+    background: linear-gradient(180deg, rgba(28, 19, 48, 0.78), rgba(18, 10, 36, 0.94));
   }
 
   .page {
@@ -160,7 +157,7 @@ h1, h2, h3, h4, h5, h6 {
   }
 
   .cinematic-card {
-    background: rgba(20, 16, 34, 0.88);
+    background: rgba(28, 19, 48, 0.92);
     border: 1px solid var(--border-subtle);
     border-radius: 22px;
     box-shadow: 0 0 45px rgba(124, 58, 237, 0.12);
@@ -182,7 +179,7 @@ h1, h2, h3, h4, h5, h6 {
     position: absolute;
     inset: -32px -20px;
     border-radius: 32px;
-    background: radial-gradient(circle, rgba(139, 92, 246, 0.26) 0%, rgba(139, 92, 246, 0.10) 40%, transparent 74%);
+    background: radial-gradient(circle, rgba(139, 92, 246, 0.20) 0%, transparent 68%);
     filter: blur(40px);
     z-index: -1;
     pointer-events: none;
@@ -361,6 +358,15 @@ footer,
   scale: 1;
   background: var(--bg-elevated);
   border-top: 1px solid var(--border-subtle);
+}
+
+.site-footer a:hover {
+  color: var(--accent-secondary);
+}
+
+#faq button:hover > span:last-child {
+  border-color: color-mix(in srgb, var(--accent-secondary) 48%, transparent);
+  color: var(--accent-secondary-hover);
 }
 
 .site-footer__inner {
