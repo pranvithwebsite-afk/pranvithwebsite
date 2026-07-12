@@ -25,8 +25,9 @@ const RouteFallback = () => (
 );
 
 const PublicApp = () => (
-  <Suspense fallback={<RouteFallback />}>
-    <Routes>
+  <div className="public-site min-h-screen">
+    <Suspense fallback={<RouteFallback />}>
+      <Routes>
       <Route path="/" element={<Home />} />
       <Route path="/courses" element={<Courses />} />
       <Route path="/about" element={<About />} />
@@ -44,8 +45,9 @@ const PublicApp = () => (
       <Route path="/commercial-video-production" element={<ServicePage type="commercial" />} />
       <Route path="/wedding-cinematography" element={<ServicePage type="wedding" />} />
       <Route path="/drone-cinematography" element={<ServicePage type="drone" />} />
-    </Routes>
-  </Suspense>
+      </Routes>
+    </Suspense>
+  </div>
 );
 
 export default PublicApp;
