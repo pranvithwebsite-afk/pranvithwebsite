@@ -52,7 +52,7 @@ const ServiceCard = ({ service, index = 0, linkTarget: customLinkTarget }) => {
       <div className="p-6">
         <h3 className="text-xl font-semibold text-white">{service.title}</h3>
         <p className="mt-3 line-clamp-3 text-sm leading-relaxed text-white/65">{description}</p>
-        <span className="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-accent-purple transition group-hover:text-purple-200">
+        <span className="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-[var(--accent-secondary)] transition group-hover:text-[var(--accent-secondary-hover)]">
           View service
           <ArrowUpRight size={16} className="transition group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
         </span>

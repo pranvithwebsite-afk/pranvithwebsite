@@ -71,10 +71,10 @@ const Footer = () => {
             <h4 className="text-2xl font-bold text-white">{footer.brand_title}</h4>
             <p className="mt-4 whitespace-pre-line text-sm text-white/65 leading-relaxed max-w-xs">{footer.description}</p>
             <div className="mt-6 flex items-center gap-3">
-              <a href={footer.youtube_link || '#'} aria-label="YouTube" className="w-9 h-9 rounded-full bg-purple-500/10 hover:bg-purple-500/20 border border-purple-300/20 flex items-center justify-center transition">
+              <a href={footer.youtube_link || '#'} aria-label="YouTube" className="flex h-9 w-9 items-center justify-center rounded-full border border-[var(--border-subtle)] bg-white/5 text-[var(--accent-secondary)] transition hover:bg-cyan-400/10">
                 <Youtube size={16} />
               </a>
-              <a href={footer.instagram_link || '#'} aria-label="Instagram" className="w-9 h-9 rounded-full bg-purple-500/10 hover:bg-purple-500/20 border border-purple-300/20 flex items-center justify-center transition">
+              <a href={footer.instagram_link || '#'} aria-label="Instagram" className="flex h-9 w-9 items-center justify-center rounded-full border border-[var(--border-subtle)] bg-white/5 text-[var(--accent-secondary)] transition hover:bg-cyan-400/10">
                 <Instagram size={16} />
               </a>
             </div>
@@ -97,15 +97,15 @@ const Footer = () => {
             <h4 className="text-base font-semibold text-white mb-5">Contact</h4>
             <ul className="space-y-3 text-sm text-white/65">
               <li className="flex items-center gap-3">
-                <MapPin size={16} className="text-purple-200" />
+                <MapPin size={16} className="text-[var(--accent-secondary)]" />
                 {footer.contact_location}
               </li>
               <li className="flex items-center gap-3">
-                <Mail size={16} className="text-purple-200" />
+                <Mail size={16} className="text-[var(--accent-secondary)]" />
                 {footer.contact_email}
               </li>
               <li className="flex items-center gap-3">
-                <Phone size={16} className="text-purple-200" />
+                <Phone size={16} className="text-[var(--accent-secondary)]" />
                 {footer.contact_phone}
               </li>
             </ul>

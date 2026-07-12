@@ -126,7 +126,7 @@ const Home = () => {
 };
 
 const HomeCta = ({ section }) => (
-  <section className="section-block px-6">
+  <section className="section-block site-section--elevated px-6">
     <div className="page-shell rounded-3xl border border-[var(--border-soft)] bg-[var(--panel-purple)] px-6 py-8 shadow-2xl shadow-black/20 md:px-10">
       <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
         <div>

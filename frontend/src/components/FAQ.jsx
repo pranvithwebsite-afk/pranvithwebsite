@@ -36,7 +36,7 @@ const FAQ = ({ section }) => {
   if (section && faqs.length === 0) return null;
 
   return (
-    <section id="faq" className="relative py-24">
+    <section id="faq" className="site-section--soft relative py-24">
       <div className="max-w-4xl mx-auto px-6">
         <div className="text-center mb-14">
           <span className="inline-block px-4 py-1.5 rounded-full bg-purple-500/15 border border-purple-300/20 text-xs text-purple-200">
@@ -84,7 +84,7 @@ const FAQ = ({ section }) => {
 
         <div className="text-center mt-14">
           <p className="text-white/65 text-sm mb-4">Still have questions? We&apos;re here to help!</p>
-          <a href={safePublicHref(section?.button_link, '/hire')} className="inline-flex items-center gap-2 bg-violet-600 hover:bg-violet-500 transition-colors text-white px-8 py-3 rounded-full text-sm font-semibold">
+          <a href={safePublicHref(section?.button_link, '/hire')} className="inline-flex items-center gap-2 bg-[var(--accent-secondary)] hover:bg-[var(--accent-secondary-hover)] transition-colors text-[#031014] px-8 py-3 rounded-full text-sm font-semibold">
             {section?.button_text || 'Contact Us'}
           </a>
         </div>
