@@ -154,7 +154,7 @@ const Assets = () => {
       <main className="page min-h-screen bg-transparent text-white">
         {!pageHidden && heroSection?.section_id && (
           <section className="pt-8 pb-8">
-            <div className="page-shell">
+            <div className="mx-auto w-[calc(100%-2rem)] max-w-[90rem]">
               <div className="cinematic-card px-5 py-6 sm:px-8 sm:py-7">
                 <h1 className="max-w-3xl text-2xl font-bold tracking-tight sm:text-4xl" data-testid="assets-page-title">{heroSection?.title || cmsPage?.title || 'Creative Assets Store'}</h1>
                 <p className="mt-3 max-w-2xl text-sm leading-relaxed text-white/65">
@@ -166,7 +166,7 @@ const Assets = () => {
         )}
 
         {showProductListing && <section className="pb-24">
-          <div className="page-shell grid min-w-0 grid-cols-1 gap-5 lg:grid-cols-[280px_minmax(0,1fr)] lg:gap-6">
+          <div className="mx-auto grid w-[calc(100%-2rem)] max-w-[90rem] min-w-0 grid-cols-1 gap-5 lg:grid-cols-[300px_minmax(0,1fr)] lg:gap-8">
             {showFilters && (
               <div ref={mobileFilterRef} className="lg:hidden">
                 <button
@@ -226,9 +226,9 @@ const Assets = () => {
 
             <div className="min-w-0">
               {loading || cmsLoading ? (
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3" aria-hidden="true">
+                <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3" aria-hidden="true">
                   {Array.from({ length: 8 }).map((_, index) => (
-                    <div key={index} className="cinematic-card h-[320px] animate-pulse" />
+                    <div key={index} className="cinematic-card h-[560px] animate-pulse md:h-[620px]" />
                   ))}
                 </div>
               ) : loadError ? (
@@ -240,7 +240,7 @@ const Assets = () => {
                   No assets match your filters.
                 </div>
               ) : (
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3" data-testid="assets-grid">
+                <div className="grid grid-cols-1 items-stretch gap-5 md:grid-cols-2 xl:grid-cols-3" data-testid="assets-grid">
                   {filtered.map((p, index) => (
                     <ProductCard
                       key={getCatalogItemKey(p, index)}
@@ -353,11 +353,11 @@ const ProductCard = ({ p, onView, onBuy }) => (
   <div
     onClick={onView}
     data-testid={`asset-card-${p.slug}`}
-    className="cinematic-card group flex min-w-0 cursor-pointer flex-col overflow-hidden transition-all duration-300 hover:-translate-y-1"
+    className="cinematic-card group flex h-full min-w-0 cursor-pointer flex-col overflow-hidden transition-all duration-300 hover:-translate-y-1"
   >
-    <div className="relative h-56 w-full shrink-0 overflow-hidden rounded-t-[20px] sm:h-60">
+    <div className="relative aspect-square h-auto w-full shrink-0 overflow-hidden rounded-t-[22px]">
       {p.image ? (
-        <OptimizedImage src={p.image} alt={p.title} width={480} height={360} className="absolute inset-0 h-full w-full object-cover" fallback={FALLBACK_IMAGE} onError={handleImageError} />
+        <OptimizedImage src={p.image} alt={p.title} width={1080} height={1080} className="absolute inset-0 h-full w-full object-cover object-center" fallback={FALLBACK_IMAGE} onError={handleImageError} />
       ) : (
         <div className="absolute inset-0" style={{ background: p.bg }} />
       )}
@@ -403,7 +403,7 @@ const ProductCard = ({ p, onView, onBuy }) => (
       ) : (
         <div className="mt-2 h-10" />
       )}
-      <div className="mt-3 flex flex-wrap items-center gap-1.5 sm:gap-2">
+      <div className="mb-4 mt-3 flex flex-wrap items-center gap-1.5 sm:gap-2">
         {p.original && (
           <span className="text-sm text-white/40 line-through">Rs {p.original.toLocaleString('en-IN')}.00</span>
         )}
@@ -414,7 +414,7 @@ const ProductCard = ({ p, onView, onBuy }) => (
       <button
         onClick={(e) => { e.stopPropagation(); p.isFree ? onView() : onBuy(); }}
         data-testid={`view-asset-btn-${p.slug}`}
-        className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-violet-600 py-2.5 text-xs font-semibold text-white transition-colors hover:bg-violet-500 sm:text-sm"
+        className="mt-auto inline-flex w-full items-center justify-center gap-2 rounded-xl bg-violet-600 py-2.5 text-xs font-semibold text-white transition-colors hover:bg-violet-500 sm:text-sm"
       >
         {p.isFree ? 'Get Free' : 'Buy Now'}
       </button>
