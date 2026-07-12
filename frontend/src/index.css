@@ -267,8 +267,19 @@ main {
 
 .home-hero {
   min-height: auto !important;
-  padding-top: 160px;
-  padding-bottom: 120px;
+  padding-top: 96px;
+  padding-bottom: 64px;
+}
+
+/* Home sections use a tighter rhythm so adjacent padding does not create blank bands. */
+.home-page .section-block {
+  padding-top: 64px;
+  padding-bottom: 64px;
+}
+
+.home-page #faq {
+  padding-top: 64px;
+  padding-bottom: 64px;
 }
 
 .home-hero h1,
@@ -291,9 +302,29 @@ footer,
   background: transparent;
 }
 
+.site-footer__inner {
+  padding-top: 72px;
+  padding-bottom: 32px;
+}
+
 @media (max-width: 767px) {
   .home-hero {
-    padding-top: 160px;
-    padding-bottom: 120px;
+    padding-top: 72px;
+    padding-bottom: 48px;
+  }
+
+  .home-page .section-block {
+    padding-top: 56px;
+    padding-bottom: 56px;
+  }
+
+  .home-page #faq {
+    padding-top: 56px;
+    padding-bottom: 56px;
+  }
+
+  .site-footer__inner {
+    padding-top: 56px;
+    padding-bottom: 28px;
   }
 }
