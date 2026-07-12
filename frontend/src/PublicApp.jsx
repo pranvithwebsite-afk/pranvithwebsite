@@ -16,7 +16,7 @@ const PaymentSuccess = lazy(() => import('./pages/PaymentSuccess'));
 const PaymentFailed = lazy(() => import('./pages/PaymentFailed'));
 
 const RouteFallback = () => (
-  <main className="min-h-screen bg-[var(--bg-main)] text-white">
+  <main className="site-gradient-bg min-h-screen text-white">
     <div className="mx-auto max-w-7xl px-6 pt-28">
       <div className="h-10 w-52 animate-pulse rounded-full bg-white/8" />
       <div className="mt-8 h-72 animate-pulse rounded-3xl border border-white/10 bg-white/[0.04]" />
