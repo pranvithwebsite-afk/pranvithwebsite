@@ -27,10 +27,9 @@ body::before {
   z-index: 0;
   pointer-events: none;
   background:
-    radial-gradient(circle at 50% 0%, rgba(124, 58, 237, 0.32), transparent 32%),
-    radial-gradient(circle at 50% 48%, rgba(88, 28, 135, 0.24), transparent 42%),
-    radial-gradient(circle at 50% 100%, rgba(124, 58, 237, 0.18), transparent 38%),
-    linear-gradient(180deg, #06000d 0%, #120028 35%, #090016 70%, #05000d 100%);
+    radial-gradient(circle at 20% 0%, rgba(124, 58, 237, 0.14), transparent 32%),
+    radial-gradient(circle at 85% 12%, rgba(167, 139, 250, 0.08), transparent 34%),
+    linear-gradient(180deg, #05000d 0%, #0b0318 45%, #05000d 100%);
 }
 
 #root {
@@ -260,7 +259,6 @@ main {
 .App,
 .public-site,
 .public-site main,
-.public-site section,
 .public-site footer,
 main.page,
 main.public-page {
