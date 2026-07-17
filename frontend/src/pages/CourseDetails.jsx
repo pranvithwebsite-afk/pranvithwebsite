@@ -69,7 +69,7 @@ const CourseDetails = () => {
   return (
     <main className="page min-h-screen bg-[var(--bg-main)] text-white">
       <Header />
-      <section className="section-block pt-8">
+      <section className="section-block pt-32 md:pt-36">
         <div className="page-shell">
           <Link to="/courses" className="mb-6 inline-flex items-center gap-2 text-sm text-violet-400 hover:text-violet-300">
             <ArrowLeft size={16} />

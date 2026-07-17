@@ -7,13 +7,11 @@ import { FALLBACK_IMAGE, handleImageError } from '../lib/utils';
 const Header = () => {
   const location = useLocation();
   const [open, setOpen] = useState(false);
-  const [scrolled, setScrolled] = useState(false);
+  useEffect(() => setOpen(false), [location.pathname]);
 
-  useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 20);
-    window.addEventListener('scroll', onScroll);
-    return () => window.removeEventListener('scroll', onScroll);
-  }, []);
+  const isActive = (path) => (
+    path === '/' ? location.pathname === '/' : location.pathname === path || location.pathname.startsWith(`${path}/`)
+  );
 
   const refreshHomeIfActive = (event) => {
     if (location.pathname === '/') {
@@ -23,7 +21,7 @@ const Header = () => {
   };
 
   return (
-    <header className="fixed left-0 right-0 top-0 z-[80] flex justify-center px-4 pt-4 md:pt-5">
+    <header className="site-header fixed left-0 right-0 top-0 z-[80] flex justify-center bg-transparent px-4 pt-4 md:pt-5">
       <nav
         className={`flex w-full max-w-[1160px] items-center justify-between gap-3 rounded-full border border-[var(--border-soft)] bg-[rgba(12,4,27,0.72)] px-3 py-2 backdrop-blur-[18px] transition-all duration-300 md:gap-8 md:px-5`}
       >
@@ -45,7 +43,7 @@ const Header = () => {
 
         <ul className="hidden md:flex items-center gap-1">
           {navLinks.map((l) => {
-            const active = location.pathname === l.path;
+            const active = isActive(l.path);
             return (
               <li key={l.name}>
                 <Link
@@ -78,7 +76,7 @@ const Header = () => {
         <div className="absolute left-4 right-4 top-[4.75rem] rounded-3xl border border-[var(--border-soft)] bg-[var(--bg-elevated)] p-3 shadow-[0_22px_70px_rgba(124,58,237,0.28)] backdrop-blur-xl md:hidden">
           <ul className="flex flex-col gap-1">
             {navLinks.map((l) => {
-              const active = location.pathname === l.path;
+              const active = isActive(l.path);
               return (
                 <li key={l.name}>
                   <Link

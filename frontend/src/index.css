@@ -55,7 +55,6 @@ main.page,
   min-height: 100vh;
   width: 100%;
   flex: 1 0 auto;
-  padding-top: 96px;
   background: transparent;
 }
 
@@ -282,7 +281,7 @@ main {
 .public-site main,
 main.page,
 main.public-page {
-  background: var(--bg-base);
+  background: transparent;
 }
 
 .home-hero,

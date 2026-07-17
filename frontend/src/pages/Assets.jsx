@@ -153,7 +153,7 @@ const Assets = () => {
       <Header />
       <main className="page min-h-screen bg-transparent text-white">
         {!pageHidden && heroSection?.section_id && (
-          <section className="pt-8 pb-8">
+          <section className="pb-8 pt-32 md:pt-36">
             <div className="mx-auto w-[calc(100%-2rem)] max-w-[90rem]">
               <div className="cinematic-card px-5 py-6 sm:px-8 sm:py-7">
                 <h1 className="max-w-3xl text-2xl font-bold tracking-tight sm:text-4xl" data-testid="assets-page-title">{heroSection?.title || cmsPage?.title || 'Creative Assets Store'}</h1>

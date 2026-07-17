@@ -60,7 +60,7 @@ const PaymentSuccess = () => {
   return (
     <main className="page min-h-screen bg-[var(--bg-main)] text-white">
       <Header />
-      <section className="pt-8 pb-24">
+      <section className="pb-24 pt-32 md:pt-36">
         <div className="mx-auto max-w-4xl px-6">
           <div className="rounded-[2rem] border border-emerald-500/20 bg-[var(--bg-card)] p-8 text-center md:p-12">
             <div className={`mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-2xl ${

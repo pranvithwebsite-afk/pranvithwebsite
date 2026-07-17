@@ -127,7 +127,7 @@ const Privacy = () => {
     <>
       <Header />
       <main className="page bg-[var(--bg-main)] text-white">
-        <section className="px-6 py-16">
+        <section className="px-6 pb-16 pt-32 md:pt-36">
           <div className="mx-auto max-w-5xl">
             <p className="text-xs font-semibold uppercase tracking-[0.35em] text-violet-300">{termsPage?.subtitle || 'Legal'}</p>
             <h1 className="mt-4 text-4xl font-bold tracking-tight md:text-6xl">{termsPage?.title || 'Terms & Conditions'}</h1>

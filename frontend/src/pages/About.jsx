@@ -84,7 +84,7 @@ const About = () => {
         ) : (
           <div className="flex flex-col">
             {showHero && (
-              <section style={{ order: heroOrder }} className="section-block overflow-hidden px-6">
+              <section style={{ order: heroOrder }} className="section-block overflow-hidden px-6 pt-32 md:pt-36">
                 <div className="absolute inset-0 bg-[radial-gradient(circle_at_40%_0%,rgba(124,58,237,0.22),transparent_45%)]" />
 
                 <div className="relative mx-auto grid max-w-7xl gap-12 lg:grid-cols-[0.9fr_1.1fr] lg:items-center">

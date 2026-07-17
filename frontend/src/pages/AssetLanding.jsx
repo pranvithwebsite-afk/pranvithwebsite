@@ -228,7 +228,7 @@ const AssetLanding = () => {
       <Header />
       <main className="page min-h-screen bg-transparent text-white">
         {loading ? (
-          <section className="px-6 pb-16 pt-8">
+          <section className="px-6 pb-16 pt-32 md:pt-36">
             <div className="cinematic-card mx-auto max-w-7xl p-8 lg:p-12">
               <div className="grid gap-10 lg:grid-cols-[1fr_440px]">
                 <div>
@@ -252,7 +252,7 @@ const AssetLanding = () => {
           />
         ) : (
           <>
-            <section className="section-block pt-8">
+            <section className="section-block pt-32 md:pt-36">
               <div className="page-shell">
                 <nav className="mb-8 flex flex-wrap items-center gap-2 text-sm text-white/55" data-testid="asset-breadcrumb">
                   <Link to="/" className="hover:text-white">Home</Link>
