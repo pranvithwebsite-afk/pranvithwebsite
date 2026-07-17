@@ -71,10 +71,10 @@ const Footer = () => {
             <h4 className="text-2xl font-bold text-white">{footer.brand_title}</h4>
             <p className="mt-4 whitespace-pre-line text-sm text-white/65 leading-relaxed max-w-xs">{footer.description}</p>
             <div className="mt-6 flex items-center gap-3">
-              <a href={footer.youtube_link || '#'} aria-label="YouTube" className="flex h-9 w-9 items-center justify-center rounded-full border border-[var(--border-subtle)] bg-white/5 text-[var(--accent-secondary)] transition hover:bg-cyan-400/10">
+              <a href={footer.youtube_link || '#'} aria-label="YouTube" className="flex h-9 w-9 items-center justify-center rounded-full border border-[var(--border-subtle)] bg-purple-500/10 text-[var(--accent-purple)] transition hover:bg-purple-500/20">
                 <Youtube size={16} />
               </a>
-              <a href={footer.instagram_link || '#'} aria-label="Instagram" className="flex h-9 w-9 items-center justify-center rounded-full border border-[var(--border-subtle)] bg-white/5 text-[var(--accent-secondary)] transition hover:bg-cyan-400/10">
+              <a href={footer.instagram_link || '#'} aria-label="Instagram" className="flex h-9 w-9 items-center justify-center rounded-full border border-[var(--border-subtle)] bg-purple-500/10 text-[var(--accent-purple)] transition hover:bg-purple-500/20">
                 <Instagram size={16} />
               </a>
             </div>
@@ -97,15 +97,15 @@ const Footer = () => {
             <h4 className="text-base font-semibold text-white mb-5">Contact</h4>
             <ul className="space-y-3 text-sm text-white/65">
               <li className="flex items-center gap-3">
-                <MapPin size={16} className="text-[var(--accent-secondary)]" />
+                <MapPin size={16} className="text-[var(--accent-purple)]" />
                 {footer.contact_location}
               </li>
               <li className="flex items-center gap-3">
-                <Mail size={16} className="text-[var(--accent-secondary)]" />
+                <Mail size={16} className="text-[var(--accent-purple)]" />
                 {footer.contact_email}
               </li>
               <li className="flex items-center gap-3">
-                <Phone size={16} className="text-[var(--accent-secondary)]" />
+                <Phone size={16} className="text-[var(--accent-purple)]" />
                 {footer.contact_phone}
               </li>
             </ul>

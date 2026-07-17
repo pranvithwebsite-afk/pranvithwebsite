@@ -143,7 +143,7 @@ const Hire = () => {
                   <FormInput label={formContent.phone_label} value={form.phone} onChange={(value) => updateField('phone', value)} placeholder={formContent.phone_placeholder} />
                   <label className="block">
                     <span className="mb-1.5 block text-xs text-white/65">{formContent.project_type_label}</span>
-                    <select value={form.project_type} onChange={(event) => updateField('project_type', event.target.value)} className="w-full rounded-xl border border-purple-300/20 bg-[#120824] px-4 py-3 text-sm text-white outline-none transition focus:border-purple-300/35">
+                    <select value={form.project_type} onChange={(event) => updateField('project_type', event.target.value)} className="w-full rounded-xl border border-purple-300/20 bg-[var(--bg-elevated)] px-4 py-3 text-sm text-white outline-none transition focus:border-purple-300/35">
                       <option value="">{formContent.project_type_placeholder}</option>
                       {visibleProjectTypes.map((type) => <option key={type} value={type}>{type}</option>)}
                     </select>

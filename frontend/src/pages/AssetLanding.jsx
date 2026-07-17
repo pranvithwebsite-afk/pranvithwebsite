@@ -408,7 +408,7 @@ const AssetLanding = () => {
                   <h2 className="mb-8 text-3xl font-bold tracking-tight">Market Comparison</h2>
                   <div className="cinematic-card overflow-x-auto">
                     <table className="min-w-full text-left text-sm text-white/75">
-                      <thead className="border-b border-purple-300/15 bg-[#090712]/95 text-white/85">
+                      <thead className="border-b border-purple-300/15 bg-[var(--bg-elevated)] text-white/85">
                         <tr>
                           <th className="px-6 py-4">Feature</th>
                           <th className="px-6 py-4">PranvithDOP</th>
@@ -544,7 +544,7 @@ const ProductHeroImage = ({ heroImage, name }) => (
 );
 
 const PriceCard = ({ price, isFree, busy, product, onPrimaryCta, onShare, className = '' }) => (
-  <div className={`rounded-[22px] border border-purple-300/20 bg-[#0b0716] p-4 sm:p-5 ${className}`.trim()}>
+  <div className={`rounded-[22px] border border-purple-300/20 bg-[var(--bg-elevated)] p-4 sm:p-5 ${className}`.trim()}>
     <p className="text-[11px] uppercase tracking-[0.3em] text-white/45">
       {price == null ? 'Price status' : isFree ? 'Price' : 'One-time price'}
     </p>
@@ -665,8 +665,8 @@ const ProductMediaSection = ({ product, galleryImages }) => {
                   onClick={() => openLightbox(index)}
                   className={
                     galleryLayout === 'full'
-                      ? 'group relative block overflow-hidden rounded-3xl border border-white/15 bg-[#090712] text-left shadow-[0_0_28px_rgba(0,0,0,0.28)] transition hover:border-purple-300/25 focus:outline-none focus:ring-2 focus:ring-violet-400/70'
-                      : 'group relative overflow-hidden rounded-3xl border border-white/10 bg-[#090712] text-left shadow-[0_0_28px_rgba(0,0,0,0.28)] transition hover:border-purple-300/25 focus:outline-none focus:ring-2 focus:ring-violet-400/70'
+                      ? 'group relative block overflow-hidden rounded-3xl border border-white/15 bg-[var(--bg-card)] text-left shadow-[0_0_28px_rgba(0,0,0,0.28)] transition hover:border-purple-300/25 focus:outline-none focus:ring-2 focus:ring-violet-400/70'
+                      : 'group relative overflow-hidden rounded-3xl border border-white/10 bg-[var(--bg-card)] text-left shadow-[0_0_28px_rgba(0,0,0,0.28)] transition hover:border-purple-300/25 focus:outline-none focus:ring-2 focus:ring-violet-400/70'
                   }
                 >
                   <OptimizedImage

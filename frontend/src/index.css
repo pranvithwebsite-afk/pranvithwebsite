@@ -12,7 +12,7 @@ body,
 }
 
 html {
-  background: #05000d;
+  background: var(--bg-base);
 }
 
 body,
@@ -26,7 +26,7 @@ body::before {
   inset: 0;
   z-index: 0;
   pointer-events: none;
-  background: linear-gradient(180deg, #05000d 0%, #090313 48%, #05000d 100%);
+  background: var(--bg-base);
 }
 
 #root {
@@ -86,20 +86,18 @@ h1, h2, h3, h4, h5, h6 {
 
     --accent-primary: #7c3aed;
     --accent-primary-hover: #8b5cf6;
-    --accent-secondary: #22d3ee;
-    --accent-secondary-hover: #67e8f9;
 
-    --text-primary: #f8f7ff;
-    --text-secondary: #d4d0df;
-    --text-muted: #b9b4c4;
-    --border-subtle: rgba(196, 181, 253, 0.16);
+    --text-primary: #ffffff;
+    --text-secondary: rgba(255, 255, 255, 0.82);
+    --text-muted: rgba(255, 255, 255, 0.68);
+    --border-subtle: rgba(167, 139, 250, 0.22);
 
     /* Backward-compatible aliases used by existing public components. */
     --bg-main: var(--bg-base);
     --bg-soft: var(--bg-elevated);
 
     --panel-dark: var(--bg-elevated);
-    --panel-soft: #17102a;
+    --panel-soft: var(--bg-elevated);
     --panel-purple: var(--bg-card);
 
     --border-soft: var(--border-subtle);
@@ -140,11 +138,11 @@ h1, h2, h3, h4, h5, h6 {
 
   .page > .site-section--soft,
   .site-section--soft {
-    background: linear-gradient(180deg, rgba(28, 19, 48, 0.78), rgba(18, 10, 36, 0.94));
+    background: var(--bg-base);
   }
 
   .page {
-    background: transparent;
+    background: var(--bg-base);
   }
 
   .page > section,
@@ -155,7 +153,7 @@ h1, h2, h3, h4, h5, h6 {
   }
 
   .cinematic-card {
-    background: rgba(28, 19, 48, 0.92);
+    background: var(--bg-card);
     border: 1px solid var(--border-subtle);
     border-radius: 22px;
     box-shadow: 0 0 45px rgba(124, 58, 237, 0.12);
@@ -276,7 +274,6 @@ main {
   width: 100%;
   min-height: auto;
   overflow: visible;
-  background: transparent;
 }
 
 .site-gradient-bg,
@@ -285,7 +282,7 @@ main {
 .public-site main,
 main.page,
 main.public-page {
-  background: transparent !important;
+  background: var(--bg-base);
 }
 
 .home-hero,
@@ -354,17 +351,17 @@ footer,
   position: relative;
   transform: none;
   scale: 1;
-  background: var(--bg-elevated);
+  background: var(--bg-base);
   border-top: 1px solid var(--border-subtle);
 }
 
 .site-footer a:hover {
-  color: var(--accent-secondary);
+  color: var(--accent-purple);
 }
 
 #faq button:hover > span:last-child {
-  border-color: color-mix(in srgb, var(--accent-secondary) 48%, transparent);
-  color: var(--accent-secondary-hover);
+  border-color: rgba(167, 139, 250, 0.48);
+  color: var(--accent-purple);
 }
 
 .site-footer__inner {

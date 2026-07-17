@@ -75,7 +75,7 @@ const Header = () => {
       </nav>
 
       {open && (
-        <div className="absolute left-4 right-4 top-[4.75rem] rounded-3xl border border-[var(--border-soft)] bg-[rgba(12,4,27,0.9)] p-3 shadow-[0_22px_70px_rgba(124,58,237,0.28)] backdrop-blur-xl md:hidden">
+        <div className="absolute left-4 right-4 top-[4.75rem] rounded-3xl border border-[var(--border-soft)] bg-[var(--bg-elevated)] p-3 shadow-[0_22px_70px_rgba(124,58,237,0.28)] backdrop-blur-xl md:hidden">
           <ul className="flex flex-col gap-1">
             {navLinks.map((l) => {
               const active = location.pathname === l.path;

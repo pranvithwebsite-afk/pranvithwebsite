@@ -103,7 +103,7 @@ const CourseDetails = () => {
               </div>
 
               <aside className="space-y-4 xl:sticky xl:top-[7.5rem]">
-                <div className="rounded-[24px] border border-violet-500/20 bg-[#0b0716] p-5">
+                <div className="rounded-[24px] border border-violet-500/20 bg-[var(--bg-card)] p-5">
                   <p className="text-[11px] uppercase tracking-[0.3em] text-white/45">Course price</p>
                   <div className="mt-3 flex flex-wrap items-end gap-3">
                     <span className="text-3xl font-extrabold text-violet-300 sm:text-4xl">{formatPrice(course.price)}</span>
@@ -129,7 +129,7 @@ const CourseDetails = () => {
                   </div>
                 </div>
 
-                <div id="course-outline" className="rounded-[24px] border border-violet-500/20 bg-[#0b0716] p-5">
+                <div id="course-outline" className="rounded-[24px] border border-violet-500/20 bg-[var(--bg-card)] p-5">
                   <p className="text-sm font-semibold text-white">What this landing improves</p>
                   <ul className="mt-4 space-y-3 text-sm leading-relaxed text-white/65">
                     <li>Better mobile stacking for title, price, and CTA.</li>

@@ -97,7 +97,7 @@ const CheckoutModal = ({ product, open, onClose, onSuccess, onFailure }) => {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4 py-6">
-      <div className="w-full max-w-md rounded-[24px] border border-white/10 bg-[#0d0820] p-5 text-left shadow-2xl sm:p-6">
+      <div className="w-full max-w-md rounded-[24px] border border-white/10 bg-[var(--bg-elevated)] p-5 text-left shadow-2xl sm:p-6">
         <div className="flex items-start justify-between gap-4">
           <div>
             <p className="text-xs uppercase tracking-[0.3em] text-violet-300">Checkout</p>

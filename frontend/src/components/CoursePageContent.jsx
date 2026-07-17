@@ -376,7 +376,7 @@ const CoursePageContent = ({ children, contentOverride }) => {
 const VideoModal = ({ video, onClose }) => {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 px-4 py-8 backdrop-blur">
-      <div className="relative w-full max-w-5xl overflow-hidden rounded-3xl border border-purple-300/20 bg-[#090316]">
+      <div className="relative w-full max-w-5xl overflow-hidden rounded-3xl border border-purple-300/20 bg-[var(--bg-elevated)]">
         <button type="button" onClick={onClose} className="absolute right-4 top-4 z-10 rounded-full bg-black/70 p-2 text-white hover:bg-violet-600" aria-label="Close video">
           <X size={18} />
         </button>

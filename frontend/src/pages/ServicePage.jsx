@@ -46,7 +46,7 @@ const ServicePage = ({ type }) => {
     <main className="page bg-[var(--bg-main)] text-white">
       <Header />
       <section className="relative overflow-hidden px-6 py-24">
-        <div className="mx-auto max-w-6xl rounded-3xl border border-violet-500/15 bg-[#100830]/60 from-[#1a124a]/70 to-[#0f0830]/60 px-6 py-8 text-center shadow-2xl shadow-violet-950/20 md:px-10">
+        <div className="mx-auto max-w-6xl rounded-3xl border border-violet-500/15 bg-[var(--bg-elevated)] px-6 py-8 text-center shadow-2xl shadow-violet-950/20 md:px-10">
           <p className="text-xs font-semibold uppercase tracking-[0.4em] text-violet-300">{content.eyebrow}</p>
           <h1 className="mt-5 text-5xl font-bold tracking-tight md:text-7xl">{content.heading}</h1>
           <p className="mx-auto mt-7 max-w-3xl text-lg leading-relaxed text-white/70">{content.body}</p>
