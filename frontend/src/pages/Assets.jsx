@@ -153,8 +153,8 @@ const Assets = () => {
       <Header />
       <main className="page min-h-screen bg-transparent text-white">
         {!pageHidden && heroSection?.section_id && (
-          <section className="pb-8 pt-32 md:pt-36">
-            <div className="mx-auto w-[calc(100%-2.5rem)] max-w-[93.75rem]">
+          <section className="pb-8 pt-28 md:pt-32">
+            <div className="site-container">
               <div className="cinematic-card rounded-[18px] px-5 py-6 sm:px-[34px] sm:py-7">
                 <h1 className="max-w-3xl text-[28px] font-bold leading-[1.1] tracking-tight sm:text-[clamp(30px,2.3vw,38px)]" data-testid="assets-page-title">{heroSection?.title || cmsPage?.title || 'Creative Assets Store'}</h1>
                 <p className="mt-2.5 max-w-2xl text-[15px] leading-relaxed text-white/65 sm:text-base">
@@ -165,8 +165,8 @@ const Assets = () => {
           </section>
         )}
 
-        {showProductListing && <section className={`pb-20 ${heroSection?.section_id ? '' : 'pt-32 md:pt-36'}`}>
-          <div className={`mx-auto grid w-[calc(100%-2.5rem)] max-w-[93.75rem] min-w-0 grid-cols-1 gap-[22px] ${showFilters ? 'lg:grid-cols-[250px_minmax(0,1fr)]' : ''}`}>
+        {showProductListing && <section className={`pb-20 ${heroSection?.section_id ? '' : 'pt-28 md:pt-32'}`}>
+          <div className={`site-container grid min-w-0 grid-cols-1 gap-5 ${showFilters ? 'lg:grid-cols-[240px_minmax(0,1fr)]' : ''}`}>
             {showFilters && (
               <div ref={mobileFilterRef} className="lg:hidden">
                 <button

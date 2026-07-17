@@ -64,8 +64,7 @@ const Footer = () => {
 
   return (
     <footer className="site-footer relative w-full shrink-0 bg-transparent">
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-20 bg-[radial-gradient(circle_at_top,rgba(124,58,237,0.08),transparent_72%)] opacity-70" />
-      <div className="site-footer__inner relative mx-auto max-w-7xl px-6">
+      <div className="site-footer__inner site-container relative">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-10">
           <div>
             <h4 className="text-2xl font-bold text-white">{footer.brand_title}</h4>

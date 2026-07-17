@@ -114,9 +114,24 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 @layer components {
+  .site-container,
   .page-shell {
-    width: min(100% - 2rem, 72rem);
+    width: min(calc(100% - 2rem), 72.5rem);
     margin-inline: auto;
+  }
+
+  @media (min-width: 768px) {
+    .site-container,
+    .page-shell {
+      width: min(calc(100% - 3rem), 72.5rem);
+    }
+  }
+
+  @media (min-width: 1280px) {
+    .site-container,
+    .page-shell {
+      width: min(calc(100% - 4rem), 72.5rem);
+    }
   }
 
   .section-block {
@@ -350,8 +365,9 @@ footer,
   position: relative;
   transform: none;
   scale: 1;
-  background: var(--bg-base);
-  border-top: 1px solid var(--border-subtle);
+  background: transparent;
+  border: 0;
+  box-shadow: none;
 }
 
 .site-footer a:hover {
