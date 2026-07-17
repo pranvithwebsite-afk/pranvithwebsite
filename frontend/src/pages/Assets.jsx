@@ -151,7 +151,7 @@ const Assets = () => {
   return (
     <>
       <Header />
-      <main className="page min-h-screen bg-transparent text-white">
+      <main className="assets-page page min-h-screen bg-transparent text-white">
         {!pageHidden && heroSection?.section_id && (
           <section className="pb-8 pt-28 md:pt-32">
             <div className="site-container">

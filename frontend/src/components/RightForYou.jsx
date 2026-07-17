@@ -22,7 +22,7 @@ const RightForYou = ({ section, buttonLink = '/courses', buttonText = 'Start Now
   return (
     <section className="relative py-24 overflow-hidden">
       <div className="absolute inset-0 grid-bg opacity-50" />
-      <div className="relative max-w-7xl mx-auto px-6">
+      <div className="relative mx-auto max-w-7xl">
         <div className="flex items-center gap-6 mb-14">
           <h2 className="text-xs md:text-sm font-semibold tracking-[0.25em] text-white/95 whitespace-nowrap">
             {section?.title || 'IS THIS COURSE RIGHT FOR YOU?'}

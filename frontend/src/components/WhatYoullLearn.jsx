@@ -4,7 +4,7 @@ import { whatYoullLearn } from '../data/mock';
 const WhatYoullLearn = () => {
   return (
     <section className="relative py-24">
-      <div className="max-w-7xl mx-auto px-6">
+      <div className="mx-auto max-w-7xl">
         <h2 className="text-center text-4xl md:text-6xl font-bold tracking-tight mb-20">
           What You'll Learn
         </h2>

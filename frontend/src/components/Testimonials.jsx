@@ -24,7 +24,7 @@ const Testimonials = () => {
 
   return (
     <section className="relative py-24 overflow-hidden">
-      <div className="max-w-7xl mx-auto px-6 text-center mb-14">
+      <div className="mx-auto mb-14 max-w-7xl text-center">
         <h2 className="text-4xl md:text-6xl font-bold tracking-tight">WHAT OUR STUDENTS SAY</h2>
         <p className="mt-4 text-white/65">Join thousands of satisfied students who transformed their editing careers</p>
       </div>

@@ -134,6 +134,62 @@ h1, h2, h3, h4, h5, h6 {
     }
   }
 
+  /* Public content follows the same responsive edges as the fixed navbar. */
+  .public-site main.page > section,
+  .public-site main.page > .flex > section {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+
+  .public-site main.page > section > [class*="max-w-"],
+  .public-site main.page > .flex > section > [class*="max-w-"] {
+    width: 100%;
+    max-width: 72.5rem;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .public-site [class~="max-w-7xl"] {
+    max-width: 72.5rem;
+  }
+
+  .public-site main.page > section .page-shell,
+  .public-site main.page > .flex > section .page-shell {
+    width: 100%;
+    max-width: 72.5rem;
+  }
+
+  .public-site main.assets-page > section {
+    padding-left: 0;
+    padding-right: 0;
+  }
+
+  @media (min-width: 768px) {
+    .public-site main.page > section,
+    .public-site main.page > .flex > section {
+      padding-left: 1.5rem;
+      padding-right: 1.5rem;
+    }
+
+    .public-site main.assets-page > section {
+      padding-left: 0;
+      padding-right: 0;
+    }
+  }
+
+  @media (min-width: 1280px) {
+    .public-site main.page > section,
+    .public-site main.page > .flex > section {
+      padding-left: 2rem;
+      padding-right: 2rem;
+    }
+
+    .public-site main.assets-page > section {
+      padding-left: 0;
+      padding-right: 0;
+    }
+  }
+
   .section-block {
     position: relative;
     padding-block: clamp(3rem, 6vw, 5rem);

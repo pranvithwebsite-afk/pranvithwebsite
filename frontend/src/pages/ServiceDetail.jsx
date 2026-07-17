@@ -45,9 +45,9 @@ const ServiceDetail = () => {
   return (
     <>
       <Header />
-      <main className="min-h-screen bg-[var(--bg-main)] text-white">
+      <main className="page min-h-screen bg-[var(--bg-main)] text-white">
         {loading ? (
-          <div className="mx-auto max-w-7xl px-6 pt-32">
+          <div className="mx-auto max-w-7xl pt-32">
             <div className="cinematic-card h-[520px] animate-pulse" />
             <div className="mt-10 grid gap-4 md:grid-cols-3">
               {[0, 1, 2].map((item) => <div key={item} className="cinematic-card h-44 animate-pulse" />)}

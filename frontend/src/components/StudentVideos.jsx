@@ -9,7 +9,7 @@ const StudentVideos = () => {
 
   return (
     <section className="relative py-20 overflow-hidden">
-      <div className="max-w-7xl mx-auto px-6 mb-10">
+      <div className="mx-auto mb-10 max-w-7xl">
         <div className="text-center">
           <span className="inline-block px-4 py-1.5 rounded-full bg-purple-500/15 border border-purple-300/20 text-xs text-purple-200 tracking-wider">
             SUCCESS STORIES

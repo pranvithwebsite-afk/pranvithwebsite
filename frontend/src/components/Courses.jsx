@@ -49,7 +49,7 @@ const Courses = ({ section }) => {
   return (
     <section className="relative py-24">
       <div className="absolute inset-0 radial-purple-bottom pointer-events-none" />
-      <div className="relative max-w-7xl mx-auto px-6">
+      <div className="relative mx-auto max-w-7xl">
         <div className="text-center mb-4">
           <h2 className="text-4xl md:text-6xl font-bold tracking-tight">{section?.title || 'MASTER VIDEO EDITING'}</h2>
           <p className="mt-4 text-[#c4b5fd] text-base md:text-lg font-medium">{section?.subtitle || 'Expand Your Career Opportunity'}</p>

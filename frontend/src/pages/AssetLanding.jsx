@@ -382,7 +382,7 @@ const AssetLanding = () => {
 
             {compatibility.length > 0 && (
               <section className="pb-16">
-                <div className="mx-auto max-w-7xl px-6">
+                <div className="mx-auto max-w-7xl">
                   <div className="cinematic-card p-8">
                     <div className="flex flex-col gap-8 lg:flex-row lg:items-center lg:justify-between">
                       <div>

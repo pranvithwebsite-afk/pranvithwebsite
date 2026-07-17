@@ -138,7 +138,7 @@ const Hero = ({ pageData }) => {
     <section className="home-hero hero-section relative">
       <div className="absolute inset-0 radial-purple pointer-events-none" />
 
-      <div className="relative max-w-7xl mx-auto px-6 text-center">
+      <div className="relative mx-auto max-w-7xl text-center">
         <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-violet-500/10 border border-violet-500/30 text-violet-300 text-xs font-medium mb-7 backdrop-blur">
           <Sparkles size={12} />
           <span>{hero.badge_text}</span>

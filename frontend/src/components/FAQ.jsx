@@ -37,7 +37,7 @@ const FAQ = ({ section }) => {
 
   return (
     <section id="faq" className="site-section--base relative py-24">
-      <div className="max-w-4xl mx-auto px-6">
+      <div className="mx-auto max-w-4xl">
         <div className="text-center mb-14">
           <span className="inline-block px-4 py-1.5 rounded-full bg-purple-500/15 border border-purple-300/20 text-xs text-purple-200">
             F.A.Q.
