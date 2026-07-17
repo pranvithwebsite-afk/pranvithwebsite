@@ -154,10 +154,10 @@ const Assets = () => {
       <main className="page min-h-screen bg-transparent text-white">
         {!pageHidden && heroSection?.section_id && (
           <section className="pb-8 pt-32 md:pt-36">
-            <div className="mx-auto w-[calc(100%-2rem)] max-w-[90rem]">
-              <div className="cinematic-card px-5 py-6 sm:px-8 sm:py-7">
-                <h1 className="max-w-3xl text-2xl font-bold tracking-tight sm:text-4xl" data-testid="assets-page-title">{heroSection?.title || cmsPage?.title || 'Creative Assets Store'}</h1>
-                <p className="mt-3 max-w-2xl text-sm leading-relaxed text-white/65">
+            <div className="mx-auto w-[calc(100%-2.5rem)] max-w-[93.75rem]">
+              <div className="cinematic-card rounded-[18px] px-5 py-6 sm:px-[34px] sm:py-7">
+                <h1 className="max-w-3xl text-[28px] font-bold leading-[1.1] tracking-tight sm:text-[clamp(30px,2.3vw,38px)]" data-testid="assets-page-title">{heroSection?.title || cmsPage?.title || 'Creative Assets Store'}</h1>
+                <p className="mt-2.5 max-w-2xl text-[15px] leading-relaxed text-white/65 sm:text-base">
                   {heroSection?.subtitle || heroSection?.description || cmsPage?.subtitle || 'Premium LUTs, sound packs, motion templates and more - built for editors.'}
                 </p>
               </div>
@@ -165,8 +165,8 @@ const Assets = () => {
           </section>
         )}
 
-        {showProductListing && <section className="pb-24">
-          <div className="mx-auto grid w-[calc(100%-2rem)] max-w-[90rem] min-w-0 grid-cols-1 gap-5 lg:grid-cols-[300px_minmax(0,1fr)] lg:gap-8">
+        {showProductListing && <section className={`pb-20 ${heroSection?.section_id ? '' : 'pt-32 md:pt-36'}`}>
+          <div className={`mx-auto grid w-[calc(100%-2.5rem)] max-w-[93.75rem] min-w-0 grid-cols-1 gap-[22px] ${showFilters ? 'lg:grid-cols-[250px_minmax(0,1fr)]' : ''}`}>
             {showFilters && (
               <div ref={mobileFilterRef} className="lg:hidden">
                 <button
@@ -174,7 +174,7 @@ const Assets = () => {
                   aria-expanded={isMobileFilterOpen}
                   aria-controls={mobileFilterPanelId}
                   onClick={() => setIsMobileFilterOpen((open) => !open)}
-                  className="flex w-full items-center justify-between rounded-[18px] border border-purple-300/20 bg-[linear-gradient(145deg,rgba(23,16,37,0.96),rgba(13,8,24,0.98))] px-5 py-4 text-left shadow-[0_0_45px_rgba(124,58,237,0.12)] transition hover:border-purple-300/35"
+                  className="flex w-full items-center justify-between rounded-[18px] border border-purple-300/20 bg-[linear-gradient(145deg,rgba(23,16,37,0.96),rgba(13,8,24,0.98))] px-4 py-3 text-left shadow-[0_0_45px_rgba(124,58,237,0.12)] transition hover:border-purple-300/35"
                 >
                   <span className="inline-flex items-center gap-3 text-sm font-semibold text-white">
                     <span className="flex h-9 w-9 items-center justify-center rounded-2xl border border-purple-300/20 bg-purple-500/15 text-[#c4b5fd]">
@@ -191,7 +191,7 @@ const Assets = () => {
                   }`}
                 >
                   <div className="min-h-0 overflow-hidden">
-                    <div className="cinematic-card p-5">
+                    <div className="cinematic-card rounded-[18px] p-5">
                       <FilterContent
                         query={query}
                         setQuery={setQuery}
@@ -210,7 +210,7 @@ const Assets = () => {
             )}
 
             {showFilters && (
-              <aside className="cinematic-card hidden h-fit p-6 lg:sticky lg:top-28 lg:block">
+              <aside className="cinematic-card hidden h-fit rounded-[18px] p-[22px] lg:sticky lg:top-28 lg:block">
                 <FilterContent
                   query={query}
                   setQuery={setQuery}
@@ -226,9 +226,9 @@ const Assets = () => {
 
             <div className="min-w-0">
               {loading || cmsLoading ? (
-                <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3" aria-hidden="true">
+                <div className="grid grid-cols-2 gap-3 min-[768px]:gap-5 min-[1100px]:grid-cols-3 min-[1440px]:grid-cols-4 max-[374px]:grid-cols-1" aria-hidden="true">
                   {Array.from({ length: 8 }).map((_, index) => (
-                    <div key={index} className="cinematic-card h-[560px] animate-pulse md:h-[620px]" />
+                    <div key={index} className="cinematic-card aspect-[3/4] animate-pulse rounded-[18px]" />
                   ))}
                 </div>
               ) : loadError ? (
@@ -240,7 +240,7 @@ const Assets = () => {
                   No assets match your filters.
                 </div>
               ) : (
-                <div className="grid grid-cols-1 items-stretch gap-5 md:grid-cols-2 xl:grid-cols-3" data-testid="assets-grid">
+                <div className="grid grid-cols-2 items-stretch gap-3 min-[768px]:gap-5 min-[1100px]:grid-cols-3 min-[1440px]:grid-cols-4 max-[374px]:grid-cols-1" data-testid="assets-grid">
                   {filtered.map((p, index) => (
                     <ProductCard
                       key={getCatalogItemKey(p, index)}
@@ -308,9 +308,9 @@ const FilterContent = ({
 
   return (
     <>
-      <h3 className="section-eyebrow mb-5 text-xs">FILTERS</h3>
+      <h3 className="section-eyebrow mb-4 text-[11px]">FILTERS</h3>
 
-      <div className="relative mb-6 lg:mb-7">
+      <div className="relative mb-5">
         <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40" />
         <input
           type="text"
@@ -318,18 +318,18 @@ const FilterContent = ({
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search assets..."
           data-testid={inputTestId}
-          className="w-full rounded-lg border border-purple-300/20 bg-purple-500/10 py-3 pl-9 pr-3 text-sm text-white placeholder:text-white/35 focus:border-purple-300/35 focus:outline-none lg:py-2.5"
+          className="h-11 w-full rounded-lg border border-purple-300/20 bg-purple-500/10 pl-9 pr-3 text-sm text-white placeholder:text-white/35 focus:border-purple-300/35 focus:outline-none"
         />
       </div>
 
-      <div className="mb-6 lg:mb-7">
-        <p className="mb-3 text-sm font-semibold text-white">Sort By</p>
+      <div className="mb-5">
+        <p className="mb-2 text-[13px] font-semibold text-white">Sort By</p>
         <RadioRow name={`sort-${radioNameSuffix}`} value="newest" checked={sort === 'newest'} onChange={() => setSortAndClose('newest')} label="Newest First" />
         <RadioRow name={`sort-${radioNameSuffix}`} value="oldest" checked={sort === 'oldest'} onChange={() => setSortAndClose('oldest')} label="Oldest First" />
       </div>
 
       <div>
-        <p className="mb-3 text-sm font-semibold text-white">Price</p>
+        <p className="mb-2 text-[13px] font-semibold text-white">Price</p>
         <RadioRow name={`price-${radioNameSuffix}`} value="all" checked={priceFilter === 'all'} onChange={() => setPriceAndClose('all')} label="All" />
         <RadioRow name={`price-${radioNameSuffix}`} value="free" checked={priceFilter === 'free'} onChange={() => setPriceAndClose('free')} label="Free" />
         <RadioRow name={`price-${radioNameSuffix}`} value="paid" checked={priceFilter === 'paid'} onChange={() => setPriceAndClose('paid')} label="Paid" />
@@ -339,13 +339,13 @@ const FilterContent = ({
 };
 
 const RadioRow = ({ name, value, checked, onChange, label }) => (
-  <label className="group flex cursor-pointer items-center gap-3 rounded-xl py-2.5 transition hover:bg-purple-500/10 lg:py-1.5">
+  <label className="group flex cursor-pointer items-center gap-2.5 rounded-lg py-1.5 transition hover:bg-purple-500/10">
     <span className="relative inline-flex">
       <input type="radio" name={name} value={value} checked={checked} onChange={onChange} className="sr-only" />
       <span className={`h-4 w-4 rounded-full border-2 transition ${checked ? 'border-purple-300' : 'border-purple-300/30 group-hover:border-purple-300/50'}`} />
       {checked && <span className="absolute inset-0 m-auto h-2 w-2 rounded-full bg-accent-purple" />}
     </span>
-    <span className={`text-sm ${checked ? 'text-white' : 'text-white/75'}`}>{label}</span>
+    <span className={`text-[13px] ${checked ? 'text-white' : 'text-white/75'}`}>{label}</span>
   </label>
 );
 
@@ -353,11 +353,11 @@ const ProductCard = ({ p, onView, onBuy }) => (
   <div
     onClick={onView}
     data-testid={`asset-card-${p.slug}`}
-    className="cinematic-card group flex h-full min-w-0 cursor-pointer flex-col overflow-hidden transition-all duration-300 hover:-translate-y-1"
+    className="cinematic-card group flex h-full min-w-0 cursor-pointer flex-col overflow-hidden rounded-[18px] transition-all duration-300 hover:-translate-y-1"
   >
-    <div className="relative aspect-square h-auto w-full shrink-0 overflow-hidden rounded-t-[22px]">
+    <div className="relative aspect-square h-auto w-full shrink-0 overflow-hidden bg-[#f4f0ea]">
       {p.image ? (
-        <OptimizedImage src={p.image} alt={p.title} width={1080} height={1080} className="absolute inset-0 h-full w-full object-cover object-center" fallback={FALLBACK_IMAGE} onError={handleImageError} />
+        <OptimizedImage src={p.image} alt={p.title} width={640} height={640} className="absolute inset-0 h-full w-full object-contain object-center" fallback={FALLBACK_IMAGE} onError={handleImageError} />
       ) : (
         <div className="absolute inset-0" style={{ background: p.bg }} />
       )}
@@ -376,7 +376,7 @@ const ProductCard = ({ p, onView, onBuy }) => (
           </div>
         </div>
       )}
-      <span className={`absolute left-3 top-3 rounded-full px-2.5 py-1 text-[10px] font-bold tracking-wider sm:text-[11px] ${
+      <span className={`absolute left-2.5 top-2.5 inline-flex h-7 items-center rounded-full px-2.5 text-[10px] font-bold tracking-wider sm:text-[11px] ${
         p.isFree ? 'bg-violet-500 text-white' : 'bg-rose-500 text-white'
       }`}>
         {p.badge}
@@ -388,33 +388,33 @@ const ProductCard = ({ p, onView, onBuy }) => (
           e.stopPropagation();
           shareProduct(p);
         }}
-        className="absolute right-3 top-3 inline-flex h-8 w-8 items-center justify-center rounded-full border border-purple-300/20 bg-black/55 text-white/90 backdrop-blur transition hover:border-purple-300/35 hover:bg-purple-500/30"
+        className="absolute right-2.5 top-2.5 inline-flex h-9 w-9 items-center justify-center rounded-full border border-purple-300/20 bg-black/55 text-white/90 backdrop-blur transition hover:border-purple-300/35 hover:bg-purple-500/30"
       >
         <Share2 size={15} />
       </button>
     </div>
     <div className="flex flex-1 flex-col p-3 sm:p-4">
-      <div className="mb-2 inline-flex w-fit rounded-full border border-purple-300/15 bg-purple-500/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.22em] text-[#c4b5fd]">
+      <div className="mb-2 inline-flex w-fit rounded-full border border-purple-300/15 bg-purple-500/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#c4b5fd] sm:text-[11px]">
         {p.category}
       </div>
-      <h3 className="line-clamp-2 text-sm font-semibold leading-snug text-white sm:text-base">{p.title}</h3>
+      <h3 className="line-clamp-2 text-[13px] font-semibold leading-[1.35] text-white sm:text-[17px]">{p.title}</h3>
       {p.description ? (
-        <p className="mt-2 line-clamp-2 text-xs leading-relaxed text-white/55 sm:text-sm">{p.description}</p>
+        <p className="mt-2 line-clamp-2 text-xs leading-relaxed text-white/55 sm:text-[13px]">{p.description}</p>
       ) : (
         <div className="mt-2 h-10" />
       )}
       <div className="mb-4 mt-3 flex flex-wrap items-center gap-1.5 sm:gap-2">
         {p.original && (
-          <span className="text-sm text-white/40 line-through">Rs {p.original.toLocaleString('en-IN')}.00</span>
+          <span className="text-xs text-white/40 line-through sm:text-[13px]">Rs {p.original.toLocaleString('en-IN')}.00</span>
         )}
-        <span className="text-sm font-bold text-white sm:text-base">
+        <span className="text-sm font-bold text-white sm:text-lg">
           {p.isFree ? 'Free' : `Rs ${p.price.toLocaleString('en-IN')}.00`}
         </span>
       </div>
       <button
         onClick={(e) => { e.stopPropagation(); p.isFree ? onView() : onBuy(); }}
         data-testid={`view-asset-btn-${p.slug}`}
-        className="mt-auto inline-flex w-full items-center justify-center gap-2 rounded-xl bg-violet-600 py-2.5 text-xs font-semibold text-white transition-colors hover:bg-violet-500 sm:text-sm"
+        className="mt-auto inline-flex w-full items-center justify-center gap-2 rounded-lg bg-violet-600 py-2 text-xs font-semibold text-white transition-colors hover:bg-violet-500 sm:text-[13px]"
       >
         {p.isFree ? 'Get Free' : 'Buy Now'}
       </button>
