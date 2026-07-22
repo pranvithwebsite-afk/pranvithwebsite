@@ -7,6 +7,8 @@ const Reports = () => {
   const [tab, setTab] = useState('orders'); const [range, setRange] = useState('Last 7 Days'); const [search, setSearch] = useState(''); const [status, setStatus] = useState('all'); const [data, setData] = useState({ items: [], summary: {} }); const [dashboard, setDashboard] = useState({});
   const params = () => { const days = ranges[range]; const end = new Date(); const start = new Date(); start.setDate(end.getDate() - days); if (range === 'Yesterday') { end.setDate(end.getDate() - 1); } return { start: start.toISOString().slice(0, 10), end: end.toISOString().slice(0, 10), search, status_filter: status }; };
   const load = async () => { setData(await fetchAdminReport(tab, params())); setDashboard(await fetchAdminReport('dashboard')); };
+  // Keep search manual: changing the search box should not reload until Enter or refresh.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { load().catch(() => setData({ items: [], summary: {} })); }, [tab, range, status]);
   const exportFile = async (format) => { const res = await adminApi.get(`/admin/reports/export/${format}`, { params: params(), responseType: 'blob' }); const a = document.createElement('a'); a.href = URL.createObjectURL(res.data); a.download = `report.${format === 'excel' ? 'xlsx' : format}`; a.click(); URL.revokeObjectURL(a.href); };
   const cards = [['Today’s Orders', dashboard.today_orders], ['Today’s Revenue', `₹${((dashboard.today_revenue || 0) / 100).toLocaleString()}`], ['Lifetime Revenue', `₹${((dashboard.lifetime_revenue || 0) / 100).toLocaleString()}`], ['Customers', dashboard.total_customers], ['Downloads', dashboard.total_downloads], ['Pending', dashboard.pending_orders]];
