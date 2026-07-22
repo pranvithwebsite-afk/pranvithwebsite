@@ -148,7 +148,7 @@ const HomeCta = ({ section }) => (
 );
 
 const SectionSkeleton = ({ compact = false }) => (
-  <section className={`section-block px-6 ${compact ? 'py-10' : ''}`.trim()} aria-hidden="true">
+  <section className={`home-section-skeleton section-block px-6 ${compact ? 'py-10' : ''}`.trim()} aria-hidden="true">
     <div className="mx-auto max-w-7xl">
       <div className="h-8 w-56 animate-pulse rounded-full bg-white/8" />
       <div className="mt-6 grid gap-5 md:grid-cols-3">

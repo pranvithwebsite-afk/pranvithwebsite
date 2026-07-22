@@ -27,21 +27,29 @@ const compactObject = (value) =>
 
 const Hero = ({ pageData }) => {
   const [settingsHero, setSettingsHero] = useState(null);
+  const [settingsLoaded, setSettingsLoaded] = useState(!!pageData);
   const hasCmsHero = !!pageData;
 
   useEffect(() => {
     if (hasCmsHero) {
       setSettingsHero(null);
+      setSettingsLoaded(true);
       return undefined;
     }
 
     let mounted = true;
     fetchPublicSettings()
       .then((settings) => {
-        if (mounted) setSettingsHero(settings?.home_hero || null);
+        if (mounted) {
+          setSettingsHero(settings?.home_hero || null);
+          setSettingsLoaded(true);
+        }
       })
       .catch(() => {
-        if (mounted) setSettingsHero(null);
+        if (mounted) {
+          setSettingsHero(null);
+          setSettingsLoaded(true);
+        }
       });
     return () => {
       mounted = false;
@@ -61,6 +69,7 @@ const Hero = ({ pageData }) => {
     hero_media_poster_url: cleanText(pageData.posterUrl || pageData.thumbnailUrl || pageData.imageUrl),
   }) : {};
   const hero = { ...fallbackHero, ...(settingsHero || {}), ...cmsHero };
+  const isLoading = !hasCmsHero && !settingsLoaded;
   const rawMediaUrl = hero.hero_media_url || '';
   const explicitMediaType = hero.hero_media_type || 'auto';
   const detectedMediaType = explicitMediaType === 'auto' ? detectMediaType(rawMediaUrl) : explicitMediaType;
@@ -135,38 +144,38 @@ const Hero = ({ pageData }) => {
   }, [hasMedia, hasVideo, imageUrl, mediaType, posterUrl, videoUrl, hero.hero_title]);
 
   return (
-    <section className="home-hero hero-section relative">
+    <section className={`home-hero hero-section relative ${isLoading ? 'hero-is-loading' : 'hero-is-ready'}`}>
       <div className="absolute inset-0 radial-purple pointer-events-none" />
 
       <div className="relative mx-auto max-w-7xl text-center">
-        <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-violet-500/10 border border-violet-500/30 text-violet-300 text-xs font-medium mb-7 backdrop-blur">
+        <div className="hero-badge inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-violet-500/10 border border-violet-500/30 text-violet-300 text-xs font-medium mb-7 backdrop-blur">
           <Sparkles size={12} />
-          <span>{hero.badge_text}</span>
+          <span className={isLoading ? 'hero-skeleton hero-skeleton-badge' : 'hero-fade-in'}>{isLoading ? '' : hero.badge_text}</span>
         </div>
 
-        <h1 className="mx-auto mb-8 w-full max-w-[1100px] break-words text-[clamp(48px,7vw,108px)] font-bold leading-[0.95] tracking-tight">
-          <span className="text-white">{hero.hero_title}</span>
+        <h1 className="hero-title-slot mx-auto mb-8 w-full max-w-[1100px] break-words text-[clamp(48px,7vw,108px)] font-bold leading-[0.95] tracking-tight">
+          <span className={isLoading ? 'hero-skeleton hero-skeleton-title' : 'text-white hero-fade-in'}>{isLoading ? '' : hero.hero_title}</span>
         </h1>
 
-        <p className="max-w-2xl mx-auto text-white/70 text-base md:text-lg leading-relaxed mb-10">
-          {hero.hero_subtitle}
+        <p className="hero-description-slot max-w-2xl mx-auto text-white/70 text-base md:text-lg leading-relaxed mb-10">
+          <span className={isLoading ? 'hero-skeleton hero-skeleton-description' : 'hero-fade-in'}>{isLoading ? '' : hero.hero_subtitle}</span>
         </p>
 
-        <div className="flex items-center justify-center gap-4 flex-wrap">
+        <div className="hero-actions flex items-center justify-center gap-4 flex-wrap">
           <a
             href={safePublicHref(hero.primary_button_link, '/assets')}
-            className="group inline-flex items-center gap-3 bg-violet-600 hover:bg-violet-500 transition-colors text-white px-7 py-3.5 rounded-full text-sm font-semibold shadow-[0_8px_30px_rgba(139,92,246,0.45)]"
+            className="hero-primary-cta group inline-flex items-center gap-3 bg-violet-600 hover:bg-violet-500 transition-colors text-white px-7 py-3.5 rounded-full text-sm font-semibold shadow-[0_8px_30px_rgba(139,92,246,0.45)]"
           >
-            {hero.primary_button_text}
+            <span className={isLoading ? 'hero-skeleton hero-skeleton-button' : 'hero-fade-in'}>{isLoading ? '' : hero.primary_button_text}</span>
             <span className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center group-hover:translate-x-0.5 transition-transform">
               <ArrowRight size={12} />
             </span>
           </a>
           <a
             href={safePublicHref(hero.secondary_button_link, '/courses')}
-            className="inline-flex items-center gap-3 bg-white/5 hover:bg-white/10 border border-white/15 text-white px-7 py-3.5 rounded-full text-sm font-semibold transition"
+            className="hero-secondary-cta inline-flex items-center gap-3 bg-white/5 hover:bg-white/10 border border-white/15 text-white px-7 py-3.5 rounded-full text-sm font-semibold transition"
           >
-            {hero.secondary_button_text}
+            <span className={isLoading ? 'hero-skeleton hero-skeleton-button' : 'hero-fade-in'}>{isLoading ? '' : hero.secondary_button_text}</span>
           </a>
         </div>
 

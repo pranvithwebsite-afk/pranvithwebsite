@@ -652,12 +652,12 @@ const ProductMediaSection = ({ product, galleryImages }) => {
   }
 
   return (
-    <section className="pb-16">
-      <div className="page-shell space-y-10">
+    <section className="product-gallery-section w-full max-w-full overflow-hidden px-4 pb-16 sm:px-6 lg:px-8">
+      <div className="site-container w-full min-w-0 space-y-10">
         {hasGallery && (
           <div>
             <h2 className="mb-8 text-3xl font-bold tracking-tight">Product Gallery</h2>
-            <div className={galleryLayout === 'full' ? 'space-y-6 md:space-y-8' : 'grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3'}>
+            <div className={`w-full min-w-0 ${galleryLayout === 'full' ? 'space-y-6 md:space-y-8' : 'grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3'}`}>
               {visibleGalleryImages.map((image, index) => (
                 <button
                   key={`${image}-${index}`}
@@ -674,11 +674,11 @@ const ProductMediaSection = ({ product, galleryImages }) => {
                     alt={`${titleForAlt} gallery image`}
                     width={galleryLayout === 'full' ? 1440 : 420}
                     height={galleryLayout === 'full' ? 1080 : 236}
-                    className={
-                      galleryLayout === 'full'
-                        ? 'w-full cursor-pointer rounded-3xl object-contain transition duration-300 group-hover:scale-[1.01]'
-                        : 'product-gallery-image w-full cursor-pointer transition duration-300 group-hover:scale-[1.02]'
-                    }
+                  className={`block w-full min-w-0 overflow-hidden ${
+                    galleryLayout === 'full'
+                      ? 'cursor-pointer rounded-3xl object-cover transition duration-300 group-hover:scale-[1.01]'
+                      : 'product-gallery-image cursor-pointer transition duration-300 group-hover:scale-[1.02]'
+                  }`}
                     fallback=""
                     onError={() => handleGalleryImageError(image)}
                   />
