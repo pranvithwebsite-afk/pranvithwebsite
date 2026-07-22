@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { X, Loader2 } from 'lucide-react';
 import { payWithRazorpay } from '../lib/razorpay';
 import { createFreeOrder } from '../lib/api';
@@ -27,6 +27,7 @@ const CheckoutModal = ({ product, open, onClose, onSuccess, onFailure }) => {
   const [form, setForm] = useState(initialForm);
   const [errors, setErrors] = useState({});
   const [busy, setBusy] = useState(false);
+  const submitLock = useRef(false);
   const [message, setMessage] = useState('');
 
   if (!open || !product) return null;
@@ -41,10 +42,14 @@ const CheckoutModal = ({ product, open, onClose, onSuccess, onFailure }) => {
 
   const submit = async (e) => {
     e.preventDefault();
+    // State updates are asynchronous; the ref closes the small window in
+    // which a double click can submit the form twice.
+    if (submitLock.current) return;
     const nextErrors = validate(form);
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) return;
 
+    submitLock.current = true;
     setBusy(true);
     setMessage('');
 
@@ -83,6 +88,7 @@ const CheckoutModal = ({ product, open, onClose, onSuccess, onFailure }) => {
     }
 
     setBusy(false);
+    submitLock.current = false;
 
     if (result.success) {
       setForm(initialForm);

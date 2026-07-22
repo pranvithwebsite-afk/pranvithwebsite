@@ -54,6 +54,9 @@ export async function payWithRazorpay({ amountRupees, itemId, itemName, productS
       phone: prefill.contact || '',
     });
     order = data;
+    if (order?.already_owned) {
+      return { success: false, alreadyOwned: true, error: order.message || 'You already own this asset.' };
+    }
   } catch (err) {
     const msg = err?.response?.data?.detail || 'Could not create order';
     const safeMessage = typeof msg === 'string' && msg.toLowerCase().includes('authentication failed')

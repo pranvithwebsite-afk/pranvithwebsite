@@ -4892,6 +4892,7 @@ async def prepare_cms_collections():
         "blog_posts",
         "blog_categories",
         "webhook_events",
+        "checkout_sessions",
     ]:
         if collection_name not in existing_collections:
             try:
@@ -4934,6 +4935,17 @@ async def prepare_cms_collections():
         await db.webhook_events.create_index("id", unique=True)
     except Exception:
         pass
+    # A session is the concurrency boundary for a guest checkout.  Orders remain
+    # the immutable audit trail, while this collection has exactly one document
+    # for each customer/asset pair.
+    try:
+        await db.checkout_sessions.create_index([("customer_email", 1), ("product_id", 1)], unique=True)
+        await db.checkout_sessions.create_index("expires_at", expireAfterSeconds=0)
+        await db.orders.create_index("razorpay_order_id", unique=True, sparse=True)
+        await db.orders.create_index("razorpay_payment_id", unique=True, sparse=True)
+        await db.orders.create_index([("customer_email", 1), ("product_id", 1), ("payment_status", 1)])
+    except Exception:
+        logger.exception("Could not create checkout idempotency indexes")
     try:
         await db.seed_state.create_index("key", unique=True)
     except Exception:
@@ -6002,6 +6014,10 @@ async def _verify_razorpay_paid_order(order: dict, razorpay_payment_id: str) -> 
 
 
 async def _mark_order_not_paid(order: dict, payment_status: str, reason: str, payment_id: Optional[str] = None) -> dict:
+    # Late or duplicate failure events must never downgrade a completed sale.
+    if order.get("payment_status") == "paid" or order.get("status") == "paid":
+        logger.info("Ignoring non-paid transition for already-paid order_id=%s incoming_status=%s", order.get("razorpay_order_id"), payment_status)
+        return order
     now = datetime.now(timezone.utc).isoformat()
     order_filter = {"$or": [{"razorpay_order_id": order.get("razorpay_order_id")}, {"id": order.get("id")}]}
     update_fields = {
@@ -6027,6 +6043,14 @@ async def _mark_order_not_paid(order: dict, payment_status: str, reason: str, pa
             },
         },
     )
+    # Failed and dismissed attempts remain in the audit trail but immediately
+    # release the active-checkout reservation for a valid retry.
+    await db.checkout_sessions.delete_one({
+        "customer_email": (order.get("customer_email") or order.get("buyer_email") or "").lower().strip(),
+        "product_id": order.get("product_id"),
+        "order_id": order.get("razorpay_order_id"),
+    })
+    logger.info("Checkout attempt closed order_id=%s status=%s reason=%s", order.get("razorpay_order_id"), payment_status, reason)
     corrected_order = {**order, **update_fields}
     corrected_order.pop("paid_at", None)
     corrected_order.pop("download_token_hash", None)
@@ -6135,6 +6159,16 @@ async def _fulfill_paid_order(order: dict, product: dict, payment_id: str, send_
     if order.get("razorpay_order_id"):
         paid_fields["razorpay_order_id"] = order.get("razorpay_order_id")
 
+    # A payment id is globally unique at Razorpay.  Refuse to attach it to a
+    # second local order even if two webhook/API requests race each other.
+    other_payment = await db.orders.find_one({
+        "razorpay_payment_id": payment_id,
+        "razorpay_order_id": {"$ne": order.get("razorpay_order_id")},
+    }, {"_id": 0, "razorpay_order_id": 1})
+    if other_payment:
+        logger.warning("Duplicate payment ignored payment_id=%s existing_order=%s", payment_id, other_payment.get("razorpay_order_id"))
+        raise HTTPException(status_code=409, detail="Payment has already been processed")
+
     await db.orders.update_one(
         {"$or": [{"razorpay_order_id": order.get("razorpay_order_id")}, {"id": order.get("id")}]},
         {"$set": paid_fields},
@@ -6142,29 +6176,42 @@ async def _fulfill_paid_order(order: dict, product: dict, payment_id: str, send_
     if not was_paid:
         await db.products.update_one({"id": product.get("id")}, {"$inc": {"sold_count": 1}})
 
+    await db.checkout_sessions.update_one(
+        {"customer_email": (order.get("customer_email") or order.get("buyer_email") or "").lower().strip(), "product_id": order.get("product_id")},
+        {"$set": {"state": "paid", "order_id": order.get("razorpay_order_id"), "updated_at": now}, "$unset": {"expires_at": ""}},
+    )
     email_delivery_status = order.get("email_delivery_status") or ("sent" if order.get("email_sent") else ("failed" if order.get("email_error") else "pending"))
     email_sent = email_delivery_status == "sent"
     email_error = order.get("email_delivery_error") if order.get("email_delivery_error") is not None else order.get("email_error")
     email_attempted_at = order.get("email_delivery_attempted_at") or order.get("email_attempted_at")
     buyer_email = (order.get("customer_email") or order.get("buyer_email") or "").lower().strip()
     if send_email and buyer_email and not email_sent:
-        result = _send_download_email(
+        # Only one concurrent webhook/verification request can claim delivery.
+        claim = await db.orders.update_one(
+            {"$or": [{"razorpay_order_id": order.get("razorpay_order_id")}, {"id": order.get("id")}], "email_delivery_status": {"$in": ["pending", "failed"]}},
+            {"$set": {"email_delivery_status": "sending", "email_delivery_attempted_at": now}},
+        )
+        if claim.modified_count:
+            result = _send_download_email(
             buyer_email,
             order.get("customer_name") or order.get("buyer_name", "there"),
             order.get("product_name") or product.get("name", "your asset"),
             payment_id,
             _public_download_url(download_url),
-        )
-        email_sent, email_error = _normalize_email_result(result)
-        email_attempted_at = now
-        email_update = _email_delivery_update(email_sent, email_error, email_attempted_at)
-        if email_sent:
-            email_update["email_delivery_sent_at"] = now
-        await db.orders.update_one(
-            {"$or": [{"razorpay_order_id": order.get("razorpay_order_id")}, {"id": order.get("id")}]},
-            {"$set": email_update},
-        )
-        email_delivery_status = email_update["email_delivery_status"]
+            )
+            email_sent, email_error = _normalize_email_result(result)
+            email_attempted_at = now
+            email_update = _email_delivery_update(email_sent, email_error, email_attempted_at)
+            if email_sent:
+                email_update["email_delivery_sent_at"] = now
+            await db.orders.update_one(
+                {"$or": [{"razorpay_order_id": order.get("razorpay_order_id")}, {"id": order.get("id")}]},
+                {"$set": email_update},
+            )
+            email_delivery_status = email_update["email_delivery_status"]
+        else:
+            logger.info("Duplicate email delivery suppressed order_id=%s", order.get("razorpay_order_id"))
+            email_delivery_status = "sending"
 
     fulfilled_order = {
         **order,
@@ -6202,6 +6249,56 @@ async def checkout_create_order(payload: PaymentCreateOrderIn):
     customer_name = payload.name.strip()
     customer_email = str(payload.email).lower().strip()
 
+    # Claim the customer/asset pair *before* calling Razorpay.  This makes
+    # repeated HTTP requests (including separate browser tabs) converge on one
+    # local attempt and one Razorpay order.
+    now_dt = datetime.now(timezone.utc)
+    expires_at = now_dt + timedelta(minutes=15)
+    session_key = {"customer_email": customer_email, "product_id": product.get("id")}
+    paid_order = await db.orders.find_one({**session_key, "payment_status": "paid"}, {"_id": 0, "razorpay_order_id": 1})
+    if paid_order:
+        logger.info("Duplicate checkout blocked: customer already owns asset email=%s product=%s", customer_email, product.get("slug"))
+        return {"already_owned": True, "message": "You already own this asset."}
+
+    session = {
+        **session_key,
+        "state": "creating",
+        "order_id": None,
+        "created_at": now_dt.isoformat(),
+        "updated_at": now_dt.isoformat(),
+        "expires_at": expires_at,
+    }
+    try:
+        await db.checkout_sessions.insert_one(session)
+        claimed_session = True
+    except DuplicateKeyError:
+        claimed_session = False
+
+    if not claimed_session:
+        existing = await db.checkout_sessions.find_one(session_key, {"_id": 0})
+        # If an earlier process died before creating Razorpay's order, reclaim
+        # only after the bounded checkout window has elapsed.
+        if existing and existing.get("expires_at") and existing["expires_at"] <= now_dt:
+            await db.checkout_sessions.delete_one({**session_key, "expires_at": existing["expires_at"]})
+            try:
+                await db.checkout_sessions.insert_one(session)
+                claimed_session = True
+            except DuplicateKeyError:
+                existing = await db.checkout_sessions.find_one(session_key, {"_id": 0})
+        if not claimed_session:
+            order_id = (existing or {}).get("order_id")
+            if order_id:
+                existing_order = await db.orders.find_one({"razorpay_order_id": order_id}, {"_id": 0})
+                if existing_order and existing_order.get("payment_status") == "paid":
+                    return {"already_owned": True, "message": "You already own this asset."}
+                if existing_order:
+                    logger.info("Duplicate checkout request reused order_id=%s", order_id)
+                    return {"order_id": order_id, "amount": existing_order.get("amount"), "currency": existing_order.get("currency", "INR"), "key_id": RAZORPAY_KEY_ID, "product_name": product.get("name"), "reused": True}
+            logger.info("Duplicate checkout request is waiting for order creation email=%s product=%s", customer_email, product.get("slug"))
+            raise HTTPException(status_code=409, detail="Checkout is being prepared. Please wait a moment and retry.")
+
+    logger.info("Checkout session claimed email=%s product=%s", customer_email, product.get("slug"))
+
     try:
         razorpay_order = client.order.create({
             "amount": amount,
@@ -6219,15 +6316,18 @@ async def checkout_create_order(payload: PaymentCreateOrderIn):
             },
         })
     except razorpay.errors.BadRequestError as e:
+        await db.checkout_sessions.delete_one(session_key)
         if _is_razorpay_auth_error(e):
             logger.warning("Razorpay order create authentication failed config=%s error=%s", razorpay_config_summary(), _razorpay_error_summary(e))
             raise HTTPException(status_code=502, detail=RAZORPAY_AUTH_ERROR_MESSAGE)
         logger.exception("Razorpay bad request")
         raise HTTPException(status_code=400, detail=_razorpay_public_error(e))
     except razorpay.errors.ServerError:
+        await db.checkout_sessions.delete_one(session_key)
         logger.exception("Razorpay server error")
         raise HTTPException(status_code=502, detail="Payment gateway error")
     except Exception as exc:
+        await db.checkout_sessions.delete_one(session_key)
         if _is_razorpay_auth_error(exc):
             logger.warning("Razorpay order create authentication failed config=%s error=%s", razorpay_config_summary(), _razorpay_error_summary(exc))
             raise HTTPException(status_code=502, detail=RAZORPAY_AUTH_ERROR_MESSAGE)
@@ -6260,7 +6360,10 @@ async def checkout_create_order(payload: PaymentCreateOrderIn):
         "email_error": None,
     }
     await db.orders.insert_one(order_doc)
+    await db.checkout_sessions.update_one(session_key, {"$set": {"state": "pending", "order_id": razorpay_order.get("id"), "updated_at": datetime.now(timezone.utc).isoformat()}})
     await _upsert_checkout_customer(order_doc, product)
+
+    logger.info("Razorpay order created order_id=%s email=%s product=%s", razorpay_order.get("id"), customer_email, product.get("slug"))
 
     return {
         "order_id": razorpay_order.get("id"),
