@@ -3,7 +3,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.security import OAuth2PasswordBearer
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
-from starlette.responses import JSONResponse, RedirectResponse, PlainTextResponse
+from starlette.responses import JSONResponse, RedirectResponse, PlainTextResponse, StreamingResponse
 from motor.motor_asyncio import AsyncIOMotorClient
 from pymongo.errors import DuplicateKeyError, OperationFailure, ServerSelectionTimeoutError
 from passlib.context import CryptContext
@@ -30,6 +30,8 @@ from datetime import datetime, timedelta, timezone
 import razorpay
 import shutil
 import mimetypes
+import csv
+import io
 try:
     import boto3
 except ImportError:  # pragma: no cover - optional unless R2 uploads are used
@@ -3406,6 +3408,118 @@ async def admin_refresh_product_payment_link(product_id: str, current_admin: Adm
         return _json_error_response(502, "Payment link status refresh failed", detail=safe_detail)
 
 
+def _report_match(start: Optional[str], end: Optional[str], status_filter: Optional[str], search: Optional[str]) -> dict:
+    match: dict = {}
+    if start or end:
+        match["created_at"] = {}
+        if start: match["created_at"]["$gte"] = start
+        if end: match["created_at"]["$lte"] = f"{end}T23:59:59.999999+00:00"
+    if status_filter and status_filter != "all": match["payment_status"] = status_filter
+    if search:
+        escaped = re.escape(search.strip())
+        match["$or"] = [{field: {"$regex": escaped, "$options": "i"}} for field in ["id", "razorpay_order_id", "razorpay_payment_id", "customer_name", "customer_email", "product_name", "product_slug"]]
+    return match
+
+
+async def _report_orders(start=None, end=None, status_filter=None, search=None, skip=0, limit=100):
+    match = _report_match(start, end, status_filter, search)
+    pipeline = [{"$match": match}, {"$sort": {"created_at": -1}}, {"$facet": {"rows": [{"$skip": max(skip, 0)}, {"$limit": min(max(limit, 1), 500)}, {"$project": {"_id": 0}}], "total": [{"$count": "count"}], "summary": [{"$group": {"_id": None, "orders": {"$sum": 1}, "revenue": {"$sum": {"$cond": [{"$eq": ["$payment_status", "paid"]}, "$amount", 0]}}, "paid": {"$sum": {"$cond": [{"$eq": ["$payment_status", "paid"]}, 1, 0]}}, "failed": {"$sum": {"$cond": [{"$eq": ["$payment_status", "failed"]}, 1, 0]}}, "pending": {"$sum": {"$cond": [{"$eq": ["$payment_status", "pending"]}, 1, 0]}}, "cancelled": {"$sum": {"$cond": [{"$eq": ["$payment_status", "cancelled"]}, 1, 0]}}}}]} }]
+    result = await db.orders.aggregate(pipeline, allowDiskUse=True).to_list(1)
+    data = result[0] if result else {}
+    return {"items": data.get("rows", []), "total": (data.get("total") or [{}])[0].get("count", 0), "summary": (data.get("summary") or [{}])[0]}
+
+
+@admin_router.get("/reports/orders")
+async def admin_report_orders(start: Optional[str] = None, end: Optional[str] = None, status_filter: Optional[str] = None, search: Optional[str] = None, page: int = 1, page_size: int = 50, current_admin: AdminBase = Depends(get_current_active_admin)):
+    return await _report_orders(start, end, status_filter, search, (max(page, 1) - 1) * page_size, page_size)
+
+
+@admin_router.get("/reports/dashboard")
+async def admin_report_dashboard(current_admin: AdminBase = Depends(get_current_active_admin)):
+    today = datetime.now(timezone.utc).date().isoformat()
+    all_data = await _report_orders(limit=1)
+    today_data = await _report_orders(start=today, end=today, limit=1)
+    customers = await db.orders.distinct("customer_email", {"payment_status": "paid"})
+    downloads = await db.download_logs.count_documents({})
+    products = await db.products.count_documents({})
+    return {"today_orders": today_data["summary"].get("orders", 0), "today_revenue": today_data["summary"].get("revenue", 0), "lifetime_revenue": all_data["summary"].get("revenue", 0), "total_customers": len([x for x in customers if x]), "total_products": products, "total_downloads": downloads, "pending_orders": all_data["summary"].get("pending", 0), "failed_orders": all_data["summary"].get("failed", 0), "cancelled_orders": all_data["summary"].get("cancelled", 0)}
+
+
+@admin_router.get("/reports/customers")
+async def admin_report_customers(start: Optional[str] = None, end: Optional[str] = None, search: Optional[str] = None, current_admin: AdminBase = Depends(get_current_active_admin)):
+    match = _report_match(start, end, None, search)
+    if "$or" in match: match.pop("$or")  # Customer search is applied after aggregation by stable fields.
+    pipeline = [{"$match": match}, {"$group": {"_id": "$customer_email", "customer_name": {"$last": "$customer_name"}, "phone": {"$last": "$customer_phone"}, "first_purchase": {"$min": "$created_at"}, "last_purchase": {"$max": "$created_at"}, "total_orders": {"$sum": 1}, "successful_orders": {"$sum": {"$cond": [{"$eq": ["$payment_status", "paid"]}, 1, 0]}}, "failed_orders": {"$sum": {"$cond": [{"$eq": ["$payment_status", "failed"]}, 1, 0]}}, "amount_spent": {"$sum": {"$cond": [{"$eq": ["$payment_status", "paid"]}, "$amount", 0]}}, "products": {"$addToSet": "$product_name"}, "downloads": {"$sum": {"$ifNull": ["$download_count", 0]}}}}, {"$project": {"_id": 0, "email": "$_id", "customer_name": 1, "phone": 1, "first_purchase": 1, "last_purchase": 1, "total_orders": 1, "successful_orders": 1, "failed_orders": 1, "amount_spent": 1, "purchased_products": "$products", "downloads": 1}}, {"$sort": {"last_purchase": -1}}]
+    return {"items": await db.orders.aggregate(pipeline, allowDiskUse=True).to_list(10000)}
+
+
+@admin_router.get("/reports/downloads")
+async def admin_report_downloads(start: Optional[str] = None, end: Optional[str] = None, current_admin: AdminBase = Depends(get_current_active_admin)):
+    match = {"downloaded_at": {}}
+    if start: match["downloaded_at"]["$gte"] = start
+    if end: match["downloaded_at"]["$lte"] = f"{end}T23:59:59.999999+00:00"
+    if not match["downloaded_at"]: match = {}
+    return {"items": await db.download_logs.find(match, {"_id": 0}).sort("downloaded_at", -1).to_list(10000), "total": await db.download_logs.count_documents(match)}
+
+
+@admin_router.get("/reports/revenue")
+async def admin_report_revenue(start: Optional[str] = None, end: Optional[str] = None, current_admin: AdminBase = Depends(get_current_active_admin)):
+    match = _report_match(start, end, "paid", None)
+    pipeline = [{"$match": match}, {"$group": {"_id": {"$substrBytes": ["$paid_at", 0, 10]}, "revenue": {"$sum": "$amount"}, "orders": {"$sum": 1}}}, {"$sort": {"_id": 1}}]
+    return {"items": [{"date": row["_id"], "revenue": row["revenue"], "orders": row["orders"]} async for row in db.orders.aggregate(pipeline, allowDiskUse=True)]}
+
+
+@admin_router.get("/reports/products")
+async def admin_report_products(start: Optional[str] = None, end: Optional[str] = None, current_admin: AdminBase = Depends(get_current_active_admin)):
+    match = _report_match(start, end, None, None)
+    pipeline = [{"$match": match}, {"$group": {"_id": "$product_slug", "product": {"$last": "$product_name"}, "sales_count": {"$sum": {"$cond": [{"$eq": ["$payment_status", "paid"]}, 1, 0]}}, "revenue": {"$sum": {"$cond": [{"$eq": ["$payment_status", "paid"]}, "$amount", 0]}}, "unique_customers": {"$addToSet": "$customer_email"}, "downloads": {"$sum": {"$ifNull": ["$download_count", 0]}}}}, {"$project": {"_id": 0, "product_slug": "$_id", "product": 1, "sales_count": 1, "revenue": 1, "unique_customers": {"$size": "$unique_customers"}, "downloads": 1}}, {"$sort": {"revenue": -1}}]
+    return {"items": await db.orders.aggregate(pipeline, allowDiskUse=True).to_list(10000)}
+
+
+@admin_router.get("/reports/export/csv")
+async def admin_report_csv(start: Optional[str] = None, end: Optional[str] = None, status_filter: Optional[str] = None, search: Optional[str] = None, current_admin: AdminBase = Depends(get_current_active_admin)):
+    data = await _report_orders(start, end, status_filter, search, 0, 100000)
+    fields = ["id", "created_at", "customer_name", "customer_email", "customer_phone", "product_name", "product_slug", "amount", "currency", "payment_status", "razorpay_order_id", "razorpay_payment_id", "email_delivery_status", "download_count"]
+    def stream():
+        output = io.StringIO(); writer = csv.DictWriter(output, fieldnames=fields); writer.writeheader(); yield "\ufeff" + output.getvalue(); output.seek(0); output.truncate(0)
+        for row in data["items"]:
+            writer.writerow({key: row.get(key, "") for key in fields}); yield output.getvalue(); output.seek(0); output.truncate(0)
+    return StreamingResponse(stream(), media_type="text/csv; charset=utf-8", headers={"Content-Disposition": "attachment; filename=orders-report.csv"})
+
+
+@admin_router.get("/reports/export/excel")
+async def admin_report_excel(start: Optional[str] = None, end: Optional[str] = None, current_admin: AdminBase = Depends(get_current_active_admin)):
+    from openpyxl import Workbook
+    from openpyxl.styles import Font
+    rows = (await _report_orders(start, end, None, None, 0, 100000))["items"]
+    workbook = Workbook(); sheet = workbook.active; sheet.title = "Orders"
+    fields = ["id", "created_at", "customer_name", "customer_email", "customer_phone", "product_name", "amount", "currency", "payment_status", "razorpay_order_id", "razorpay_payment_id", "email_delivery_status", "download_count"]
+    sheet.append(fields)
+    for cell in sheet[1]: cell.font = Font(bold=True)
+    sheet.freeze_panes = "A2"; sheet.auto_filter.ref = f"A1:{chr(64 + len(fields))}{max(len(rows) + 1, 1)}"
+    for row in rows: sheet.append([row.get(key, "") for key in fields])
+    for column in sheet.columns: sheet.column_dimensions[column[0].column_letter].width = min(max(len(str(cell.value or "")) for cell in column) + 2, 36)
+    output = io.BytesIO(); workbook.save(output); output.seek(0)
+    return StreamingResponse(output, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", headers={"Content-Disposition": "attachment; filename=orders-report.xlsx"})
+
+
+@admin_router.get("/reports/export/pdf")
+async def admin_report_pdf(start: Optional[str] = None, end: Optional[str] = None, current_admin: AdminBase = Depends(get_current_active_admin)):
+    from reportlab.lib.pagesizes import A4
+    from reportlab.pdfgen import canvas
+    data = await _report_orders(start, end, None, None, 0, 500)
+    output = io.BytesIO(); pdf = canvas.Canvas(output, pagesize=A4); _, height = A4
+    pdf.setFont("Helvetica-Bold", 18); pdf.drawString(42, height - 48, "PranvithDOP — Orders Report")
+    pdf.setFont("Helvetica", 10); pdf.drawString(42, height - 68, f"Date range: {start or 'All time'} to {end or 'Today'}")
+    summary = data["summary"]; pdf.drawString(42, height - 88, f"Orders: {summary.get('orders', 0)}   Paid revenue: ₹{summary.get('revenue', 0) / 100:,.2f}")
+    y = height - 116
+    for row in data["items"]:
+        if y < 50: pdf.showPage(); y = height - 45
+        pdf.drawString(42, y, f"{row.get('created_at', '')[:10]}  {row.get('customer_email', '')[:28]}  {row.get('product_name', '')[:28]}  {row.get('payment_status', '')}"); y -= 14
+    pdf.save(); output.seek(0)
+    return StreamingResponse(output, media_type="application/pdf", headers={"Content-Disposition": "attachment; filename=orders-report.pdf"})
+
+
 @admin_router.get("/orders")
 async def admin_orders(current_admin: AdminBase = Depends(get_current_active_admin)):
     try:
@@ -4886,6 +5000,7 @@ async def prepare_cms_collections():
         "settings",
         "seed_state",
         "downloads",
+        "download_logs",
         "coupons",
         "hire_requests",
         "testimonials",
@@ -4944,6 +5059,10 @@ async def prepare_cms_collections():
         await db.orders.create_index("razorpay_order_id", unique=True, sparse=True)
         await db.orders.create_index("razorpay_payment_id", unique=True, sparse=True)
         await db.orders.create_index([("customer_email", 1), ("product_id", 1), ("payment_status", 1)])
+        await db.orders.create_index([("created_at", -1), ("payment_status", 1)])
+        await db.orders.create_index("product_slug")
+        await db.download_logs.create_index([("downloaded_at", -1)])
+        await db.download_logs.create_index([("customer_email", 1), ("product_slug", 1)])
     except Exception:
         logger.exception("Could not create checkout idempotency indexes")
     try:
@@ -6747,7 +6866,7 @@ async def order_access(order_id: str, token: str):
 
 
 @api_router.get("/orders/{order_id}/download")
-async def order_download(order_id: str, token: str):
+async def order_download(order_id: str, token: str, request: Request):
     if db is None:
         raise HTTPException(status_code=500, detail="Database not configured")
     order = await db.orders.find_one(
@@ -6765,6 +6884,7 @@ async def order_download(order_id: str, token: str):
         {"$or": [{"razorpay_order_id": order_id}, {"id": order_id}]},
         {"$inc": {"download_count": 1}, "$set": {"last_downloaded_at": datetime.now(timezone.utc).isoformat()}},
     )
+    await db.download_logs.insert_one({"customer_email": order.get("customer_email") or order.get("buyer_email"), "customer_name": order.get("customer_name") or order.get("buyer_name"), "product_slug": order.get("product_slug"), "product_name": order.get("product_name"), "downloaded_at": datetime.now(timezone.utc).isoformat(), "ip_address": request.headers.get("x-forwarded-for", request.client.host if request.client else "").split(",")[0].strip(), "user_agent": request.headers.get("user-agent", ""), "browser": request.headers.get("user-agent", "")[:180], "os": request.headers.get("sec-ch-ua-platform", ""), "status": "success"})
     if download_fields.get("download_file_key"):
         download_url = _private_download_presigned_url(
             download_fields["download_file_key"],
@@ -6780,7 +6900,7 @@ async def order_download(order_id: str, token: str):
 
 
 @api_router.get("/downloads/{order_id}/{product_id}")
-async def protected_product_download(order_id: str, product_id: str, token: Optional[str] = None):
+async def protected_product_download(order_id: str, product_id: str, request: Request, token: Optional[str] = None):
     if db is None:
         raise HTTPException(status_code=500, detail="Database not configured")
     order = await db.orders.find_one(
@@ -6808,6 +6928,7 @@ async def protected_product_download(order_id: str, product_id: str, token: Opti
         {"$or": [{"razorpay_order_id": order_id}, {"id": order_id}]},
         {"$inc": {"download_count": 1}, "$set": {"last_downloaded_at": datetime.now(timezone.utc).isoformat()}},
     )
+    await db.download_logs.insert_one({"customer_email": order.get("customer_email") or order.get("buyer_email"), "customer_name": order.get("customer_name") or order.get("buyer_name"), "product_slug": order.get("product_slug"), "product_name": order.get("product_name"), "downloaded_at": datetime.now(timezone.utc).isoformat(), "ip_address": request.headers.get("x-forwarded-for", request.client.host if request.client else "").split(",")[0].strip(), "user_agent": request.headers.get("user-agent", ""), "browser": request.headers.get("user-agent", "")[:180], "os": request.headers.get("sec-ch-ua-platform", ""), "status": "success"})
     return RedirectResponse(
         download_url,
         status_code=302,

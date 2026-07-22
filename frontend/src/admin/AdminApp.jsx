@@ -11,6 +11,7 @@ const Products = lazy(() => import('./pages/Products'));
 const AdminServices = lazy(() => import('./pages/Services'));
 const Orders = lazy(() => import('./pages/Orders'));
 const Customers = lazy(() => import('./pages/Customers'));
+const Reports = lazy(() => import('./pages/Reports'));
 const Enquiries = lazy(() => import('./pages/Enquiries'));
 const Media = lazy(() => import('./pages/Media'));
 const Settings = lazy(() => import('./pages/Settings'));
@@ -39,6 +40,7 @@ const AdminApp = () => (
             <Route path="products" element={<Products />} />
             <Route path="orders" element={<Orders />} />
             <Route path="customers" element={<Customers />} />
+            <Route path="reports" element={<Reports />} />
             <Route path="enquiries" element={<Enquiries />} />
             <Route path="media" element={<Media />} />
             <Route path="admin-users" element={<AdminUsers />} />

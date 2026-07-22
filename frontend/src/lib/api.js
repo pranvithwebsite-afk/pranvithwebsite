@@ -363,6 +363,16 @@ export const fetchAdminCustomers = async () => {
   return data;
 };
 
+export const fetchAdminReport = async (name, params = {}) => {
+  const { data } = await adminApi.get(`/admin/reports/${encodeURIComponent(name)}`, { params });
+  return data;
+};
+
+export const adminReportDownloadUrl = (format, params = {}) => {
+  const query = new URLSearchParams(Object.entries(params).filter(([, value]) => value !== '' && value != null)).toString();
+  return `${adminApi.defaults.baseURL}/admin/reports/export/${format}${query ? `?${query}` : ''}`;
+};
+
 export const fetchAdminEnquiries = async () => {
   const { data } = await adminApi.get('/admin/enquiries');
   return data;
