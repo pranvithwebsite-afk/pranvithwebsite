@@ -195,12 +195,60 @@ const Orders = () => {
     }
   };
 
-  const exportOrders = (type) => {
+  const exportOrders = async (type) => {
     if (type === 'pdf') {
       window.print();
       return;
     }
-    exportCsv(filteredOrders, `orders-${type}.csv`);
+    if (type === 'csv') {
+      exportCsv(filteredOrders, `orders-filtered.csv`);
+      return;
+    }
+    if (type === 'excel') {
+      setExporting(true);
+      try {
+        const getRangeDates = (range) => {
+            const now = new Date();
+            const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+            const startOfWeek = new Date(startOfDay);
+            startOfWeek.setDate(startOfDay.getDate() - startOfDay.getDay());
+            const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+            const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+            const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0);
+            const yesterday = new Date(startOfDay);
+            yesterday.setDate(yesterday.getDate() - 1);
+        
+            switch (range) {
+                case 'today':
+                    return { start: startOfDay.toISOString(), end: now.toISOString() };
+                case 'yesterday':
+                    return { start: yesterday.toISOString(), end: startOfDay.toISOString() };
+                case 'this_week':
+                    return { start: startOfWeek.toISOString(), end: now.toISOString() };
+                case 'this_month':
+                    return { start: startOfMonth.toISOString(), end: now.toISOString() };
+                case 'last_month':
+                    return { start: startOfLastMonth.toISOString(), end: endOfLastMonth.toISOString() };
+                default:
+                    return { start: null, end: null };
+            }
+        };
+
+        const { start, end } = getRangeDates(range);
+
+        await downloadAdminOrdersExcelReport({
+          start,
+          end,
+          status_filter: status === 'all' ? null : status,
+          search: query,
+        });
+        toast.success('Excel report downloaded successfully.');
+      } catch (error) {
+        toast.error('Failed to download Excel report.');
+      } finally {
+        setExporting(false);
+      }
+    }
   };
 
   return (
@@ -213,7 +261,19 @@ const Orders = () => {
             <p className="mt-2 text-slate-400">Verified customer purchases</p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <button type="button" onClick={() => exportOrders('excel')} className="inline-flex h-10 items-center gap-2 rounded-2xl border border-violet-500/30 bg-violet-500/10 px-4 text-sm font-semibold text-violet-100 transition hover:bg-violet-500/20"><FileSpreadsheet size={15} />Export Excel</button>
+            <button type="button" onClick={() => exportOrders('excel')} disabled={exporting} className="inline-flex h-10 items-center gap-2 rounded-2xl border border-violet-500/30 bg-violet-500/10 px-4 text-sm font-semibold text-violet-100 transition hover:bg-violet-500/20 disabled:opacity-50">
+              {exporting ? (
+                <>
+                  <RefreshCw size={15} className="animate-spin" />
+                  Exporting...
+                </>
+              ) : (
+                <>
+                  <FileSpreadsheet size={15} />
+                  Export Excel
+                </>
+              )}
+            </button>
             <button type="button" onClick={() => exportOrders('csv')} className="inline-flex h-10 items-center gap-2 rounded-2xl border border-slate-700 bg-slate-800 px-4 text-sm font-semibold text-slate-100 transition hover:bg-slate-700"><FileText size={15} />Export CSV</button>
             <button type="button" onClick={() => exportOrders('pdf')} className="inline-flex h-10 items-center gap-2 rounded-2xl border border-slate-700 bg-slate-800 px-4 text-sm font-semibold text-slate-100 transition hover:bg-slate-700"><Printer size={15} />Export PDF</button>
           </div>

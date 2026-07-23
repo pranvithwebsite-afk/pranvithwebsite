@@ -430,6 +430,39 @@ export const downloadAdminOrdersExcelReport = async (params = {}) => {
   }
 };
 
+export const downloadAdminPaymentsExcelReport = async (params = {}) => {
+    const query = new URLSearchParams(Object.entries(params).filter(([, value]) => value !== '' && value != null)).toString();
+    const url = `${ADMIN_API}/admin/reports/payments/excel${query ? `?${query}` : ''}`;
+  
+    try {
+      const response = await adminApi.get(url, {
+        responseType: 'blob', // Important
+      });
+  
+      // Create a link and trigger the download
+      const link = document.createElement('a');
+      const blob = new Blob([response.data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      link.href = URL.createObjectURL(blob);
+      
+      const contentDisposition = response.headers['content-disposition'];
+      let filename = 'payments.xlsx'; // Default filename
+      if (contentDisposition) {
+          const filenameMatch = contentDisposition.match(/filename="?(.+)"?/);
+          if (filenameMatch && filenameMatch.length > 1) {
+              filename = filenameMatch[1];
+          }
+      }
+  
+      link.setAttribute('download', filename);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    } catch (error) {
+      logApiError('downloadAdminPaymentsExcelReport', error);
+      throw error;
+    }
+  };
+
 export const fetchAdminEnquiries = async () => {
   const { data } = await adminApi.get('/admin/enquiries');
   return data;

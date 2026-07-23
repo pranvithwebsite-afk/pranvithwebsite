@@ -53,6 +53,7 @@ const PaymentAttempts = () => {
   const [query, setQuery] = useState('');
   const [status, setStatus] = useState('all');
   const [archiving, setArchiving] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   const loadAttempts = useCallback(() => {
     setLoading(true);

@@ -3734,6 +3734,66 @@ async def admin_payment_attempts(status: Optional[str] = None, search: Optional[
         raise HTTPException(status_code=500, detail="Could not load payment attempts")
 
 
+@admin_router.get("/reports/payments/excel")
+async def admin_report_payments_excel(
+    status_filter: Optional[str] = None,
+    search: Optional[str] = None,
+    current_admin: AdminBase = Depends(get_current_active_admin),
+):
+    """
+    Exports a list of payment attempts to an Excel file.
+    """
+    if db is None:
+        raise HTTPException(status_code=500, detail="Database not configured")
+        
+    match: dict = {"payment_status": {"$in": list(PAYMENT_ATTEMPT_STATUSES)}}
+    if status_filter and status_filter != "all":
+        match["payment_status"] = status_filter
+    if search:
+        escaped = re.escape(search.strip())
+        match["$or"] = [{field: {"$regex": escaped, "$options": "i"}} for field in ["id", "razorpay_order_id", "razorpay_payment_id", "customer_name", "customer_email", "product_name", "product_slug"]]
+    
+    attempts = await db.payment_attempts.find(match, {"_id": 0}).sort([("created_at", -1)]).to_list(1000000)
+
+    report_data = []
+    for attempt in attempts:
+        report_data.append({
+            "Attempt ID": attempt.get("id"),
+            "Customer": attempt.get("customer_name"),
+            "Email": attempt.get("customer_email"),
+            "Phone": attempt.get("customer_phone"),
+            "Product": attempt.get("product_name"),
+            "Status": attempt.get("payment_status"),
+            "Reason": attempt.get("payment_failure_reason"),
+            "Gateway": "Razorpay",
+            "Created At": attempt.get("created_at"),
+            "Updated At": attempt.get("updated_at"),
+        })
+
+    # Summary
+    summary_data = {
+        "Pending": len([a for a in attempts if a.get("payment_status") == "pending"]),
+        "Failed": len([a for a in attempts if a.get("payment_status") == "failed"]),
+        "Cancelled": len([a for a in attempts if a.get("payment_status") == "cancelled"]),
+        "Expired": len([a for a in attempts if a.get("payment_status") == "expired"]),
+        "Recovery Rate": 0 # Not sure how to calculate this yet
+    }
+
+    file_buffer = create_excel_report(
+        title="Payment Attempts Report",
+        report_data=report_data,
+        summary_data=summary_data,
+        sheet_name="Payment Attempts"
+    )
+
+    return StreamingResponse(
+        io.BytesIO(file_buffer),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename=payments_{datetime.now().strftime('%Y-%m-%d')}.xlsx"}
+    )
+
+
+
 @admin_router.post("/payments/payment-attempts/archive-invalid")
 async def admin_archive_invalid_payment_attempts(days: int = 7, current_admin: AdminBase = Depends(get_current_active_admin)):
     if db is None:
@@ -5316,7 +5376,8 @@ async def synchronize_default_admin():
     default_name = DEFAULT_ADMIN_NAME
 
     if not default_email or not default_password:
-        raise ValueError("DEFAULT_ADMIN_EMAIL and DEFAULT_ADMIN_PASSWORD must be configured")
+        logger.warning("Default admin not configured: DEFAULT_ADMIN_EMAIL and DEFAULT_ADMIN_PASSWORD must be set for initial admin user synchronization.")
+        return {"action": "skipped", "reason": "default_admin_credentials_missing"}
 
     existing = await db.admins.find_one({"email": default_email})
     now = datetime.now(timezone.utc).isoformat()
@@ -5402,26 +5463,59 @@ async def initialize_default_products():
 
 @app.on_event("startup")
 async def on_startup():
+    """
+    Asynchronous startup event handler for the FastAPI application.
+    Initializes database connection, performs migrations, and other setup tasks.
+    Designed to be resilient, logging errors for optional components without crashing.
+    """
+    logger.info("Application startup sequence initiated.")
     logger.info("MongoDB configuration: %s", mongodb_config_summary())
     logger.info("Razorpay configured: %s", razorpay_client is not None)
     logger.info("SMTP configured: %s", smtp_configured())
-    if db is None:
-        logger.warning("MongoDB connection status: not_configured")
-        logger.warning("MONGO_URL and DB_NAME are not configured; using public seed-data fallbacks.")
-        return
-    try:
-        await db.command("ping")
-        logger.info("MongoDB connection status: connected db=%s", db_name)
-    except Exception as exc:
-        logger.exception("MongoDB connection status: failed category=%s", mongodb_error_category(exc))
-        if IS_DEVELOPMENT:
-            logger.warning("MongoDB development error detail: %s", exc)
-        return
-    await prepare_cms_collections()
-    await _migrate_non_paid_orders_to_payment_attempts()
-    await synchronize_default_admin()
-    # Seed default content in the background to keep startup responsive.
-    asyncio.create_task(_seed_db())
+
+    db_is_connected = False
+    if db is not None:
+        try:
+            await db.command("ping")
+            logger.info("MongoDB connection status: connected db=%s", db_name)
+            db_is_connected = True
+        except Exception as exc:
+            logger.exception("MongoDB connection status: failed. Category=%s", mongodb_error_category(exc))
+            if IS_DEVELOPMENT:
+                logger.warning("MongoDB development error detail: %s", exc)
+    else:
+        logger.warning("MongoDB connection status: not configured. Using public seed-data fallbacks.")
+
+    if db_is_connected:
+        # These tasks depend on a successful database connection.
+        # Each is wrapped in a try-except block to prevent a single failure from halting startup.
+        try:
+            await prepare_cms_collections()
+            logger.info("Startup task 'prepare_cms_collections' completed successfully.")
+        except Exception:
+            logger.exception("Startup task 'prepare_cms_collections' failed.")
+
+        try:
+            await _migrate_non_paid_orders_to_payment_attempts()
+            logger.info("Startup task '_migrate_non_paid_orders_to_payment_attempts' completed successfully.")
+        except Exception:
+            logger.exception("Startup task '_migrate_non_paid_orders_to_payment_attempts' failed.")
+
+        try:
+            await synchronize_default_admin()
+            logger.info("Startup task 'synchronize_default_admin' completed successfully.")
+        except Exception:
+            logger.exception("Startup task 'synchronize_default_admin' failed unexpectedly.")
+        
+        try:
+            # Schedule background tasks. The tasks themselves should handle exceptions.
+            asyncio.create_task(_seed_db())
+            logger.info("Background task '_seed_db' scheduled successfully.")
+        except Exception:
+            logger.exception("Failed to schedule background task '_seed_db'.")
+
+    logger.info("Application startup sequence completed.")
+
 
 
 api_router.include_router(admin_router)
