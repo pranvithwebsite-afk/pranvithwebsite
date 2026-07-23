@@ -84,9 +84,11 @@ const Assets = () => {
   usePublicPageLoading(cmsLoading || loading);
 
   useEffect(() => {
+    let active = true;
     (async () => {
       try {
         const data = await fetchProducts();
+        if (!active) return;
         if (Array.isArray(data)) {
           setProducts(dedupeCatalogItems(data.filter(Boolean)).map((p, idx) => normalize(p, idx)));
           setLoadError(false);
@@ -95,15 +97,17 @@ const Assets = () => {
           setLoadError(true);
         }
       } catch (e) {
+        if (!active) return;
         console.error('[assets] Product catalog failed to load', {
           status: e?.response?.status,
           detail: e?.response?.data?.detail || e?.message || e,
         });
         setLoadError(true);
       } finally {
-        setLoading(false);
+        if (active) setLoading(false);
       }
     })();
+    return () => { active = false; };
   }, []);
 
   const filtered = useMemo(() => {

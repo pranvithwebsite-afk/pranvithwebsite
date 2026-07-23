@@ -1,7 +1,6 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { ArrowRight, Sparkles } from 'lucide-react';
 import { handleImageError, safeImageSrc, safePublicHref } from '../lib/utils';
-import { fetchPublicSettings } from '../lib/api';
 import SafeVideoEmbed, { detectMediaType, getYouTubeThumbnail } from './SafeVideoEmbed';
 import OptimizedImage from './OptimizedImage';
 
@@ -25,36 +24,8 @@ const cleanText = (value) => (typeof value === 'string' && value.trim() ? value 
 const compactObject = (value) =>
   Object.fromEntries(Object.entries(value).filter(([, item]) => item !== undefined));
 
-const Hero = ({ pageData }) => {
-  const [settingsHero, setSettingsHero] = useState(null);
-  const [settingsLoaded, setSettingsLoaded] = useState(!!pageData);
+const Hero = ({ pageData, loading = false, fallbackAllowed = false }) => {
   const hasCmsHero = !!pageData;
-
-  useEffect(() => {
-    if (hasCmsHero) {
-      setSettingsHero(null);
-      setSettingsLoaded(true);
-      return undefined;
-    }
-
-    let mounted = true;
-    fetchPublicSettings()
-      .then((settings) => {
-        if (mounted) {
-          setSettingsHero(settings?.home_hero || null);
-          setSettingsLoaded(true);
-        }
-      })
-      .catch(() => {
-        if (mounted) {
-          setSettingsHero(null);
-          setSettingsLoaded(true);
-        }
-      });
-    return () => {
-      mounted = false;
-    };
-  }, [hasCmsHero]);
 
   const cmsHero = pageData ? compactObject({
     badge_text: cleanText(pageData.badgeText),
@@ -68,8 +39,10 @@ const Hero = ({ pageData }) => {
     hero_media_url: cleanText(pageData.videoUrl || pageData.image),
     hero_media_poster_url: cleanText(pageData.posterUrl || pageData.thumbnailUrl || pageData.imageUrl),
   }) : {};
-  const hero = { ...fallbackHero, ...(settingsHero || {}), ...cmsHero };
-  const isLoading = !hasCmsHero && !settingsLoaded;
+  // Do not merge defaults with CMS fields. A CMS hero is the source of truth
+  // and replacing an empty field with old marketing copy is misleading.
+  const hero = hasCmsHero ? cmsHero : (fallbackAllowed ? fallbackHero : {});
+  const isLoading = loading && !hasCmsHero;
   const rawMediaUrl = hero.hero_media_url || '';
   const explicitMediaType = hero.hero_media_type || 'auto';
   const detectedMediaType = explicitMediaType === 'auto' ? detectMediaType(rawMediaUrl) : explicitMediaType;
@@ -163,7 +136,7 @@ const Hero = ({ pageData }) => {
 
         <div className="hero-actions flex items-center justify-center gap-4 flex-wrap">
           <a
-            href={safePublicHref(hero.primary_button_link, '/assets')}
+            href={safePublicHref(hero.primary_button_link, '/')}
             className="hero-primary-cta group inline-flex items-center gap-3 bg-violet-600 hover:bg-violet-500 transition-colors text-white px-7 py-3.5 rounded-full text-sm font-semibold shadow-[0_8px_30px_rgba(139,92,246,0.45)]"
           >
             <span className={isLoading ? 'hero-skeleton hero-skeleton-button' : 'hero-fade-in'}>{isLoading ? '' : hero.primary_button_text}</span>
@@ -172,7 +145,7 @@ const Hero = ({ pageData }) => {
             </span>
           </a>
           <a
-            href={safePublicHref(hero.secondary_button_link, '/courses')}
+            href={safePublicHref(hero.secondary_button_link, '/')}
             className="hero-secondary-cta inline-flex items-center gap-3 bg-white/5 hover:bg-white/10 border border-white/15 text-white px-7 py-3.5 rounded-full text-sm font-semibold transition"
           >
             <span className={isLoading ? 'hero-skeleton hero-skeleton-button' : 'hero-fade-in'}>{isLoading ? '' : hero.secondary_button_text}</span>

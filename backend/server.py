@@ -381,12 +381,15 @@ async def add_security_headers(request: Request, call_next):
     if request.url.path.startswith("/api/admin"):
         response.headers["Cache-Control"] = "no-store"
     elif request.method == "GET" and request.url.path in {
-        "/api/services",
-        "/api/products",
+        "/api/services", "/api/products", "/api/settings", "/api/uploads",
     }:
-        response.headers.setdefault("Cache-Control", "public, max-age=60, stale-while-revalidate=300")
+        # Public catalogue/CMS data is editor-managed. Do not retain an old
+        # response in a browser or CDN after publishing.
+        response.headers["Cache-Control"] = "no-store, max-age=0"
     elif request.method == "GET" and request.url.path.startswith("/api/cms/pages/"):
-        response.headers.setdefault("Cache-Control", "public, max-age=60, stale-while-revalidate=300")
+        # A published page must be visible immediately; CDN stale-while-
+        # revalidate caused public visitors to see the previous hero.
+        response.headers["Cache-Control"] = "no-store, max-age=0"
     elif request.method == "GET" and request.url.path.startswith("/api/uploads/"):
         response.headers.setdefault("Cache-Control", "public, max-age=31536000, immutable")
     return response
@@ -1184,7 +1187,7 @@ async def root():
 async def get_courses():
     if db is None:
         return COURSES
-    rows = await db.courses.find({}, {"_id": 0}).sort("order", 1).to_list(100)
+    rows = await db.courses.find({"published": {"$ne": False}}, {"_id": 0}).sort("order", 1).to_list(None)
     return rows
 
 
@@ -1192,7 +1195,7 @@ async def get_courses():
 async def get_testimonials():
     if db is None:
         return TESTIMONIALS
-    rows = await db.testimonials.find({}, {"_id": 0}).to_list(200)
+    rows = await db.testimonials.find({"enabled": {"$ne": False}}, {"_id": 0}).to_list(None)
     return rows
 
 
@@ -1200,7 +1203,7 @@ async def get_testimonials():
 async def get_faqs():
     if db is None:
         return FAQS
-    rows = await db.faqs.find({}, {"_id": 0}).sort("order", 1).to_list(100)
+    rows = await db.faqs.find({"enabled": {"$ne": False}}, {"_id": 0}).sort("order", 1).to_list(None)
     return rows
 
 
@@ -2177,7 +2180,7 @@ async def _cms_page_response(page_key: str, public: bool = False) -> dict:
     section_query = {"page_key": page_key}
     if public:
         section_query["enabled"] = {"$ne": False}
-    sections = await db.cms_sections.find(section_query, {"_id": 0}).sort("sort_order", 1).to_list(200)
+    sections = await db.cms_sections.find(section_query, {"_id": 0}).sort("sort_order", 1).to_list(None)
     safe_page = _decode_html_entities({k: v for k, v in page.items() if k not in {"_id"}})
     if public:
         safe_page = {
@@ -2209,6 +2212,7 @@ async def _cms_page_response(page_key: str, public: bool = False) -> dict:
                 "data": section.get("data") or {},
             })
         safe_page["sections"] = public_sections
+        logger.info("CMS public response page_key=%s sections=%d", page_key, len(public_sections))
         return safe_page
     safe_page["sections"] = _decode_html_entities(sections)
     return safe_page
@@ -2467,7 +2471,7 @@ async def public_products():
                 "created_at": 1,
                 "published": 1,
             },
-        ).to_list(100)
+        ).sort("created_at", -1).to_list(None)
         logger.info(
             "Product fetch source=mongodb database=%s collection=products scope=public count=%d",
             db_name,
@@ -2515,7 +2519,7 @@ async def public_product_by_slug(slug: str):
 async def public_services():
     if db is None:
         return [_public_service(service) for service in DEFAULT_SERVICES if service.get("is_published", True)]
-    rows = await db.services.find({"is_published": True}, {"_id": 0}).sort("sort_order", 1).to_list(200)
+    rows = await db.services.find({"is_published": True}, {"_id": 0}).sort("sort_order", 1).to_list(None)
     return [_public_service(row) for row in rows]
 
 

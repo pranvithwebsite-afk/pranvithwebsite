@@ -132,10 +132,9 @@ export const fetchFAQs = async () => {
 };
 
 export const fetchPublicSettings = async () => {
-  return cachedRequest('public-settings', async () => {
-    const { data } = await api.get('/settings');
-    return data;
-  }, 10 * 60 * 1000);
+  const { data } = await api.get('/settings', { headers: { 'Cache-Control': 'no-cache' } });
+  console.debug('[public-api] settings response', { keys: Object.keys(data || {}).length });
+  return data;
 };
 
 const fetchDevelopmentCatalog = async (path) => {
@@ -149,13 +148,14 @@ const getFallbackProductBySlug = (slug) =>
   FALLBACK_PRODUCTS.find((product) => product.slug === slug);
 
 export const fetchProducts = async () => {
-  return cachedRequest('products:list', async () => {
   if (USE_DEVELOPMENT_CATALOG && !BACKEND_URL) {
     try {
-      return decodeCmsText(await fetchDevelopmentCatalog('/products'));
+      const data = decodeCmsText(await fetchDevelopmentCatalog('/products'));
+      console.debug('[public-api] products response', { source: 'development', count: Array.isArray(data) ? data.length : 0 });
+      return data;
     } catch (error) {
       logApiError('development catalog products fallback', error);
-      return decodeCmsText(FALLBACK_PRODUCTS);
+      throw error;
     }
   }
 
@@ -166,10 +166,12 @@ export const fetchProducts = async () => {
         return decodeCmsText(await fetchDevelopmentCatalog('/products'));
       } catch (error) {
         logApiError('development catalog products fallback', error);
-        return decodeCmsText(FALLBACK_PRODUCTS);
+        throw error;
       }
     }
-    return decodeCmsText(data);
+    const decoded = decodeCmsText(data);
+    console.debug('[public-api] products response', { source: 'api', count: Array.isArray(decoded) ? decoded.length : 0 });
+    return decoded;
   } catch (error) {
     logApiError('products request', error);
     if (USE_DEVELOPMENT_CATALOG) {
@@ -179,9 +181,8 @@ export const fetchProducts = async () => {
         logApiError('development catalog products fallback', fallbackError);
       }
     }
-    return decodeCmsText(FALLBACK_PRODUCTS);
+    throw error;
   }
-  }, 3 * 60 * 1000);
 };
 
 export const fetchPageBySlug = async (slug) => {
@@ -190,10 +191,9 @@ export const fetchPageBySlug = async (slug) => {
 };
 
 export const fetchServices = async () => {
-  return cachedRequest('services:list', async () => {
-    const { data } = await api.get('/services');
-    return data;
-  }, 5 * 60 * 1000);
+  const { data } = await api.get('/services', { headers: { 'Cache-Control': 'no-cache' } });
+  console.debug('[public-api] services response', { count: Array.isArray(data) ? data.length : 0 });
+  return data;
 };
 
 export const fetchServiceBySlug = async (slug) => {
@@ -204,10 +204,18 @@ export const fetchServiceBySlug = async (slug) => {
 };
 
 export const fetchCmsPage = async (pageKey) => {
-  return cachedRequest(`cms:${pageKey}`, async () => {
-    const { data } = await api.get(`/cms/pages/${encodeURIComponent(pageKey)}`);
-    return decodeCmsText(data);
-  }, 5 * 60 * 1000);
+  // CMS content is published data, not catalogue data. Never serve an older
+  // in-memory response after an editor publishes a page.
+  const { data } = await api.get(`/cms/pages/${encodeURIComponent(pageKey)}`, {
+    headers: { 'Cache-Control': 'no-cache' },
+  });
+  const decoded = decodeCmsText(data);
+  console.debug('[public-api] cms response', { pageKey, sections: Array.isArray(decoded?.sections) ? decoded.sections.length : 0 });
+  return decoded;
+};
+
+export const invalidateCmsPageCache = (pageKey) => {
+  sessionCache.delete(`cms:${pageKey}`);
 };
 
 export const fetchPages = async () => {

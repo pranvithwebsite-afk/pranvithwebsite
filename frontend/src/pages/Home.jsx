@@ -39,15 +39,15 @@ const firstText = (...values) =>
 
 const videoMediaTypes = new Set(['video_file', 'video_url', 'youtube', 'vimeo']);
 
-const homeOrderFromCms = (sections = []) => {
+const homeOrderFromCms = (sections = [], allowFallback = false) => {
   const order = sections
     .map((section) => sectionToHomeKey[section.section_id] || sectionToHomeKey[section.type])
     .filter(Boolean);
-  return order.length ? order : ['hero', 'featuredAssets', 'instagramProfile', 'services', 'showreel', 'cta', 'footerCta'];
+  return order.length || !allowFallback ? order : ['hero', 'featuredAssets', 'instagramProfile', 'services', 'showreel', 'cta', 'footerCta'];
 };
 
 const Home = () => {
-  const { page, loading } = useCmsPage('home');
+  const { page, loading, error } = useCmsPage('home');
   usePublicPageLoading(loading);
   const cmsSections = page?.sections || [];
   const findSection = sectionByKey(cmsSections);
@@ -58,7 +58,7 @@ const Home = () => {
   const servicesSection = findSection('services') || findSection('services_cards') || findSection('home_services');
   const showreelSection = findSection('showreel');
   const faqSection = findSection('faq');
-  const order = homeOrderFromCms(cmsSections);
+  const order = homeOrderFromCms(cmsSections, !loading && (!!error || !page));
   const deferredKeys = new Set(['featuredAssets', 'instagramProfile', 'services', 'showreel', 'footerCta']);
 
   const heroData = heroSection ? {
@@ -82,7 +82,7 @@ const Home = () => {
       <main className="home-page public-page page relative bg-transparent text-white">
         {order.map((sectionKey) => {
           const sections = {
-            hero: <Hero key="hero" pageData={heroData} />,
+            hero: <Hero key="hero" pageData={heroData} loading={loading} fallbackAllowed={!loading && (!!error || !heroSection)} />,
             featuredAssets: (
               <Suspense key="featuredAssets" fallback={<SectionSkeleton />}>
                 <OurWorks section={worksSection} />

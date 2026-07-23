@@ -8,6 +8,8 @@ export const useCmsPage = (pageKey) => {
 
   useEffect(() => {
     let mounted = true;
+    setLoading(true);
+    setError(null);
     fetchCmsPage(pageKey)
       .then((data) => {
         if (!mounted) return;
