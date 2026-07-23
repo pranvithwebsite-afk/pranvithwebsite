@@ -1,0 +1,77 @@
+
+> pranvithwebsite-vercel@1.0.0 build
+> npm --prefix frontend ci && npm --prefix frontend run build
+
+
+added 1425 packages, and audited 1426 packages in 26s
+
+277 packages are looking for funding
+  run `npm fund` for details
+
+37 vulnerabilities (10 low, 8 moderate, 19 high)
+
+To address issues that do not require attention, run:
+  npm audit fix
+
+To address all issues (including breaking changes), run:
+  npm audit fix --force
+
+Run `npm audit` for details.
+
+> frontend@0.1.0 build
+> craco build
+
+Creating an optimized production build...
+Compiled successfully.
+
+File sizes after gzip:
+
+  50.57 kB  build\static\js\admin.1d68e9b4.chunk.js
+  43.92 kB  build\static\js\vendor-react.c990c4d5.js
+  40.11 kB  build\static\js\vendor.fb7ffd7c.js
+  20.01 kB  build\static\css\main.7f2241b3.css
+  16.19 kB  build\static\js\vendor-router.1a30e390.js
+  15.87 kB  build\static\js\684.c565fe0a.chunk.js
+  12.25 kB  build\static\js\296.6a09a502.chunk.js
+  10.46 kB  build\static\js\569.f2b02c9e.chunk.js
+  9.96 kB   build\static\js\980.ecfee2df.chunk.js
+  9.05 kB   build\static\js\377.2f81acdc.chunk.js
+  8.29 kB   build\static\js\239.bf97a1e1.chunk.js
+  8.01 kB   build\static\js\667.abb5e996.chunk.js
+  7.81 kB   build\static\js\393.35c6db7b.chunk.js
+  7.51 kB   build\static\js\400.30b59781.chunk.js
+  7.36 kB   build\static\js\274.f0aefb5b.chunk.js
+  7.15 kB   build\static\js\34.21d15a0c.chunk.js
+  6.98 kB   build\static\js\418.a20fc79d.chunk.js
+  6.74 kB   build\static\js\vendor-icons.35b9e9d4.chunk.js
+  6.27 kB   build\static\js\408.411abb96.chunk.js
+  6.06 kB   build\static\js\44.7594f292.chunk.js
+  6.04 kB   build\static\js\755.e88ffa28.chunk.js
+  4.96 kB   build\static\js\634.095c09cc.chunk.js
+  4.47 kB   build\static\js\217.268b4637.chunk.js
+  4.47 kB   build\static\js\360.070b605b.chunk.js
+  4.47 kB   build\static\js\979.29053263.chunk.js
+  4.47 kB   build\static\js\598.14a1eed9.chunk.js
+  3.22 kB   build\static\js\434.8c041c2f.chunk.js
+  3.08 kB   build\static\js\771.392642f7.chunk.js
+  3.04 kB   build\static\js\963.6944aa0e.chunk.js
+  2.59 kB   build\static\js\279.c353520f.chunk.js
+  2.46 kB   build\static\js\110.41e7f3e2.chunk.js
+  2.25 kB   build\static\js\772.7412882f.chunk.js
+  2.01 kB   build\static\js\runtime.e2da79b4.js
+  1.83 kB   build\static\js\main.1b887add.js
+  1.48 kB   build\static\js\19.f9096d5d.chunk.js
+
+The project was built assuming it is hosted at /.
+You can control this with the homepage field in your package.json.
+
+The build folder is ready to be deployed.
+You may serve it with a static server:
+
+  npm install -g serve
+  serve -s build
+
+Find out more about deployment here:
+
+  https://cra.link/deployment
+

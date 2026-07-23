@@ -236,7 +236,8 @@ const Assets = () => {
               )}
             </div>
           </div>
-        </section>}
+        </section>
+      }
       </main>
       <Footer />
       <CheckoutModal
@@ -244,7 +245,7 @@ const Assets = () => {
         open={!!checkoutProduct}
         onClose={() => setCheckoutProduct(null)}
         onSuccess={(result) => {
-          setCheckoutp roduct(null);
+          setCheckoutProduct(null);
           if (result.customerAccessToken) localStorage.setItem('customer_access_token', result.customerAccessToken);
           if (result.orderId) { navigate(`/account/orders/${encodeURIComponent(result.orderId)}`); return; }
           const params = new URLSearchParams({

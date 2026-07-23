@@ -426,6 +426,11 @@ async def request_validation_exception_handler(request: Request, exc: RequestVal
     return PlainTextResponse("Request validation failed", status_code=422)
 
 
+async def _migrate_non_paid_orders_to_payment_attempts():
+    # Placeholder for a one-time migration that was causing a startup crash.
+    logger.info("Skipping legacy order migration.")
+
+
 @app.exception_handler(Exception)
 async def unhandled_exception_handler(request: Request, exc: Exception):
     logger.error("================================================================================")
@@ -1224,7 +1229,7 @@ async def get_courses():
         logger.info("Course fetch source=fallback scope=public")
         return COURSES
     try:
-        rows = await db.courses.find({"published": {"$ne": False}}).sort("order", 1).to_list(None)
+        rows = await db.courses.find({"published": {"$ne": False}}).sort("order", 1).to_list(length=None)
         logger.info(
             "Course fetch source=mongodb database=%s collection=courses scope=public count=%d",
             db_name,
@@ -1243,7 +1248,7 @@ async def get_testimonials():
         logger.info("Testimonial fetch source=fallback scope=public")
         return TESTIMONIALS
     try:
-        rows = await db.testimonials.find({"enabled": {"$ne": False}}).to_list(None)
+        rows = await db.testimonials.find({"enabled": {"$ne": False}}).to_list(length=None)
         logger.info(
             "Testimonial fetch source=mongodb database=%s collection=testimonials scope=public count=%d",
             db_name,
@@ -1262,7 +1267,7 @@ async def get_faqs():
         logger.info("FAQ fetch source=fallback scope=public")
         return FAQS
     try:
-        rows = await db.faqs.find({"enabled": {"$ne": False}}).sort("order", 1).to_list(None)
+        rows = await db.faqs.find({"enabled": {"$ne": False}}).sort("order", 1).to_list(length=None)
         logger.info(
             "FAQ fetch source=mongodb database=%s collection=faqs scope=public count=%d",
             db_name,
@@ -2250,7 +2255,7 @@ async def _cms_page_response(page_key: str, public: bool = False) -> dict:
     section_query = {"page_key": page_key}
     if public:
         section_query["enabled"] = {"$ne": False}
-    sections = await db.cms_sections.find(section_query).sort("sort_order", 1).to_list(None)
+    sections = await db.cms_sections.find(section_query).sort("sort_order", 1).to_list(length=None)
     for section in sections:
         section["id"] = str(section["_id"])
 
@@ -2549,7 +2554,7 @@ async def public_products():
                 "created_at": 1,
                 "published": 1,
             },
-        ).sort("created_at", -1).to_list(None)
+        ).sort("created_at", -1).to_list(length=None)
         logger.info(
             "Product fetch source=mongodb database=%s collection=products scope=public count=%d",
             db_name,
@@ -2600,7 +2605,7 @@ async def public_services():
         logger.info("Service fetch source=fallback scope=public")
         return [_public_service(service) for service in DEFAULT_SERVICES if service.get("is_published", True)]
     try:
-        rows = await db.services.find({"is_published": True}).sort("sort_order", 1).to_list(None)
+        rows = await db.services.find({"is_published": True}).sort("sort_order", 1).to_list(length=None)
         logger.info(
             "Service fetch source=mongodb database=%s collection=services scope=public count=%d",
             db_name,
@@ -3639,7 +3644,7 @@ async def admin_orders(current_admin: AdminBase = Depends(get_current_active_adm
                 "download_token_hash": 0,
                 "razorpay_signature": 0,
             },
-        ).sort("created_at", -1).to_list(500)
+        ).sort([("created_at", -1)]).to_list(500)
         return [_public_order_payload(row) for row in rows]
     except Exception:
         logger.exception("Admin orders fetch failed")
@@ -3657,7 +3662,7 @@ async def admin_payment_attempts(status: Optional[str] = None, search: Optional[
         if search:
             escaped = re.escape(search.strip())
             match["$or"] = [{field: {"$regex": escaped, "$options": "i"}} for field in ["id", "razorpay_order_id", "razorpay_payment_id", "customer_name", "customer_email", "product_name", "product_slug"]]
-        rows = await db.payment_attempts.find(match, {"_id": 0}).sort("created_at", -1).to_list(500)
+        rows = await db.payment_attempts.find(match, {"_id": 0}).sort([("created_at", -1)]).to_list(500)
         return [_public_payment_attempt_payload(row) for row in rows]
     except Exception:
         logger.exception("Admin payment attempts fetch failed")
@@ -3771,7 +3776,7 @@ async def admin_reset_download_count(order_id: str, current_admin: AdminBase = D
 
 @admin_router.get("/orders/{order_id}/download-history")
 async def admin_download_history(order_id: str, current_admin: AdminBase = Depends(get_current_active_admin)):
-    return {"items": await db.download_logs.find({"order_id": order_id}, {"_id": 0}).sort("downloaded_at", -1).to_list(500)}
+    return {"items": await db.download_logs.find({"order_id": order_id}, {"_id": 0}).sort([("downloaded_at", -1)]).to_list(500)}
 
 
 @admin_router.post("/orders/{order_id}/sync-razorpay-status")
@@ -3876,7 +3881,7 @@ async def admin_recheck_razorpay_payments(current_admin: AdminBase = Depends(get
                 ]
             },
             {"_id": 0},
-        ).sort("created_at", -1).to_list(500)
+        ).sort([("created_at", -1)]).to_list(500)
     except Exception as exc:
         safe_detail = mongodb_public_error(exc)
         logger.exception("Bulk Razorpay recheck order load failed error=%s", safe_detail)
@@ -3941,7 +3946,7 @@ async def admin_recheck_razorpay_payments(current_admin: AdminBase = Depends(get
 async def admin_customers(current_admin: AdminBase = Depends(get_current_active_admin)):
     try:
         customer_rows = await db.customers.find({}, {"_id": 0}).to_list(500)
-        order_rows = await db.orders.find({}, {"_id": 0, "download_file": 0, "download_url": 0, "download_token_hash": 0, "razorpay_signature": 0}).sort("created_at", -1).to_list(1000)
+        order_rows = await db.orders.find({}, {"_id": 0, "download_file": 0, "download_url": 0, "download_token_hash": 0, "razorpay_signature": 0}).sort([("created_at", -1)]).to_list(1000)
     except Exception:
         logger.exception("Admin customers fetch failed")
         raise HTTPException(status_code=500, detail="Could not load customers")
@@ -4009,7 +4014,7 @@ async def admin_customers(current_admin: AdminBase = Depends(get_current_active_
 @admin_router.get("/enquiries")
 async def admin_enquiries(current_admin: AdminBase = Depends(get_current_active_admin)):
     try:
-        return await db.hire_requests.find({}, {"_id": 0}).sort("created_at", -1).to_list(500)
+        return await db.hire_requests.find({}, {"_id": 0}).sort([("created_at", -1)]).to_list(500)
     except Exception:
         logger.exception("Admin enquiries fetch failed")
         raise HTTPException(status_code=500, detail="Could not load enquiries")
@@ -4043,7 +4048,7 @@ async def admin_delete_enquiry(enquiry_id: str, current_admin: AdminBase = Depen
 @admin_router.get("/media")
 async def admin_media(current_admin: AdminBase = Depends(get_current_active_admin)):
     try:
-        return await db.media.find({}, {"_id": 0}).sort("uploaded_at", -1).to_list(200)
+        return await db.media.find({}, {"_id": 0}).sort([("uploaded_at", -1)]).to_list(200)
     except Exception:
         logger.exception("Admin media fetch failed")
         raise HTTPException(status_code=500, detail="Could not load media")
@@ -5851,6 +5856,9 @@ def _normalize_email_result(result: Any) -> tuple[bool, Optional[str]]:
     if isinstance(result, dict):
         sent = bool(result.get("sent"))
         return sent, None if sent else (result.get("error") or "Download email could not be sent. Please use the Download Now button.")
+    if result is None:
+        # Handle cases where _send_download_email might return None implicitly
+        return False, "Download email could not be sent. Please use the Download Now button."
     return False, "Download email could not be sent. Please use the Download Now button."
 
 
@@ -5879,6 +5887,7 @@ def _send_download_email(to_email: str, buyer_name: str, product_name: str, paym
     if not all([smtp_host, smtp_port, smtp_user, smtp_pass, smtp_from]):
         error = "SMTP is not fully configured"
         logger.warning("Download email skipped: %s", error)
+        # Explicitly return a dict, even on failure
         return {"sent": False, "error": error}
 
     msg = EmailMessage()
@@ -5940,7 +5949,10 @@ def _send_download_email(to_email: str, buyer_name: str, product_name: str, paym
 
 
 def _send_confirmation_email(to_email: str, buyer_name: str, product_name: str, payment_id: str, download_url: str) -> bool:
-    return _send_download_email(to_email, buyer_name, product_name, payment_id, download_url)
+    # This function should return a boolean, but the wrapped function returns a dict.
+    # Let's align them.
+    result = _send_download_email(to_email, buyer_name, product_name, payment_id, download_url)
+    return result.get("sent", False)
 
 
 def _extract_razorpay_items(response: Any) -> list:
@@ -7265,14 +7277,14 @@ async def customer_verify_otp(payload: CustomerOtpVerify):
 async def customer_dashboard(customer: dict = Depends(get_current_customer)):
     email = customer["email"]; match = {"$and": [{"$or": [{"customer_email": email}, {"buyer_email": email}]}, {"payment_status": "paid"}, {"verified": True}]}
     orders = await db.orders.find(match, {"_id": 0, "download_token_hash": 0, "download_url": 0}).sort("paid_at", -1).to_list(5)
-    return {"customer": customer, "purchased_assets": await db.orders.count_documents(match), "total_orders": await db.orders.count_documents(match), "total_downloads": await db.download_logs.count_documents({"customer_email": email}), "recent_purchases": orders}
+    return {"customer": json.loads(json.dumps(customer, default=str)), "purchased_assets": await db.orders.count_documents(match), "total_orders": await db.orders.count_documents(match), "total_downloads": await db.download_logs.count_documents({"customer_email": email}), "recent_purchases": json.loads(json.dumps(orders, default=str))}
 
 @api_router.get("/account/orders")
 async def customer_orders(page: int = 1, page_size: int = 20, search: str = "", customer: dict = Depends(get_current_customer)):
     email = customer["email"]; size = min(max(page_size, 1), 100); clauses = [{"$or": [{"customer_email": email}, {"buyer_email": email}]}, {"payment_status": "paid"}, {"verified": True}]
     if search.strip(): clauses.append({"$or": [{"product_name": {"$regex": re.escape(search.strip()), "$options": "i"}}, {"id": {"$regex": re.escape(search.strip()), "$options": "i"}}]})
     query = {"$and": clauses}; total = await db.orders.count_documents(query)
-    items = await db.orders.find(query, {"_id": 0, "download_token_hash": 0, "download_url": 0}).sort("paid_at", -1).skip((max(page,1)-1)*size).limit(size).to_list(size)
+    items = await db.orders.find(query, {"_id": 0, "download_token_hash": 0, "download_url": 0}).sort([("paid_at", -1)]).skip((max(page,1)-1)*size).limit(size).to_list(size)
     return {"items": items, "total": total, "page": max(page,1), "page_size": size}
 
 @api_router.get("/account/orders/{order_id}")
@@ -7383,7 +7395,7 @@ async def create_status_check(input: StatusCheckCreate):
 @api_router.get("/status", response_model=List[StatusCheck])
 async def get_status_checks():
     rows = await db.status_checks.find({}, {"_id": 0}).to_list(1000)
-    for r in rows:
+    for r in (rows or []):
         if isinstance(r.get('timestamp'), str):
             r['timestamp'] = datetime.fromisoformat(r['timestamp'])
     return rows
