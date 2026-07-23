@@ -137,9 +137,10 @@ export const fetchPublicSettings = async () => {
   return data;
 };
 
-const fetchDevelopmentCatalog = async (path) => {
+const fetchDevelopmentCatalog = async (path, { signal } = {}) => {
   const { data } = await axios.get(`${DEVELOPMENT_CATALOG_API}${path}`, {
     timeout: 15000,
+    signal,
   });
   return data;
 };
@@ -147,10 +148,10 @@ const fetchDevelopmentCatalog = async (path) => {
 const getFallbackProductBySlug = (slug) =>
   FALLBACK_PRODUCTS.find((product) => product.slug === slug);
 
-export const fetchProducts = async () => {
+export const fetchProducts = async ({ signal } = {}) => {
   if (USE_DEVELOPMENT_CATALOG && !BACKEND_URL) {
     try {
-      const data = decodeCmsText(await fetchDevelopmentCatalog('/products'));
+      const data = decodeCmsText(await fetchDevelopmentCatalog('/products', { signal }));
       console.debug('[public-api] products response', { source: 'development', count: Array.isArray(data) ? data.length : 0 });
       return data;
     } catch (error) {
@@ -160,10 +161,10 @@ export const fetchProducts = async () => {
   }
 
   try {
-    const { data } = await api.get('/products');
+    const { data } = await api.get('/products', { signal });
     if (USE_DEVELOPMENT_CATALOG && Array.isArray(data) && data.length === 0) {
       try {
-        return decodeCmsText(await fetchDevelopmentCatalog('/products'));
+        return decodeCmsText(await fetchDevelopmentCatalog('/products', { signal }));
       } catch (error) {
         logApiError('development catalog products fallback', error);
         throw error;
@@ -176,7 +177,7 @@ export const fetchProducts = async () => {
     logApiError('products request', error);
     if (USE_DEVELOPMENT_CATALOG) {
       try {
-        return decodeCmsText(await fetchDevelopmentCatalog('/products'));
+        return decodeCmsText(await fetchDevelopmentCatalog('/products', { signal }));
       } catch (fallbackError) {
         logApiError('development catalog products fallback', fallbackError);
       }
@@ -190,8 +191,8 @@ export const fetchPageBySlug = async (slug) => {
   return data;
 };
 
-export const fetchServices = async () => {
-  const { data } = await api.get('/services', { headers: { 'Cache-Control': 'no-cache' } });
+export const fetchServices = async ({ signal } = {}) => {
+  const { data } = await api.get('/services', { signal });
   console.debug('[public-api] services response', { count: Array.isArray(data) ? data.length : 0 });
   return data;
 };

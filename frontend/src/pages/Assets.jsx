@@ -3,11 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
 import { ChevronDown, Filter, Search, Share2 } from 'lucide-react';
-import { fetchProducts } from '../lib/api';
 import { FALLBACK_IMAGE, dedupeCatalogItems, getCatalogItemKey, handleImageError, safeImageSrc, shareProduct, toProductDescriptionPreview } from '../lib/utils';
 import CheckoutModal from '../components/CheckoutModal';
 import { usePublicPageLoading } from '../components/PublicPageLoader';
 import { useCmsPage } from '../hooks/useCmsPage';
+import { useProducts } from '../hooks/useProducts';
 import OptimizedImage from '../components/OptimizedImage';
 
 const defaultBackgrounds = [
@@ -75,54 +75,16 @@ const Assets = () => {
   const [query, setQuery] = useState('');
   const [sort, setSort] = useState('newest');
   const [priceFilter, setPriceFilter] = useState('all');
-  const [products, setProducts] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState(false);
-  const [retryNonce, setRetryNonce] = useState(0);
-  const retryTimer = useRef(null);
+  const { products: rawProducts, loading, error: loadError, refetch } = useProducts();
   const [checkoutProduct, setCheckoutProduct] = useState(null);
   const [isMobileFilterOpen, setIsMobileFilterOpen] = useState(false);
   const mobileFilterRef = useRef(null);
   usePublicPageLoading(cmsLoading || loading);
 
-  useEffect(() => {
-    let active = true;
-    (async () => {
-      setLoading(true);
-      setLoadError(false);
-      try {
-        const data = await fetchProducts();
-        if (!active) return;
-        if (Array.isArray(data)) {
-          setProducts(dedupeCatalogItems(data.filter(Boolean)).map((p, idx) => normalize(p, idx)));
-          setLoadError(false);
-        } else {
-          console.error('[assets] Expected /products to return an array', { received: data });
-          setLoadError(true);
-        }
-      } catch (e) {
-        if (!active) return;
-        console.error('[assets] Product catalog failed to load', {
-          status: e?.response?.status,
-          detail: e?.response?.data?.detail || e?.message || e,
-        });
-        setLoadError(true);
-      } finally {
-        if (active) setLoading(false);
-      }
-    })();
-    return () => { active = false; };
-  }, [retryNonce]);
-
-  useEffect(() => () => {
-    if (retryTimer.current) window.clearTimeout(retryTimer.current);
-  }, []);
-
-  useEffect(() => {
-    if (!loadError || retryNonce > 0 || !navigator.onLine) return undefined;
-    retryTimer.current = window.setTimeout(() => setRetryNonce(1), 3000);
-    return () => window.clearTimeout(retryTimer.current);
-  }, [loadError, retryNonce]);
+  const products = useMemo(() => {
+    if (!rawProducts) return [];
+    return dedupeCatalogItems(rawProducts.filter(Boolean)).map((p, idx) => normalize(p, idx));
+  }, [rawProducts]);
 
   const filtered = useMemo(() => {
     let list = [...products];
@@ -251,8 +213,8 @@ const Assets = () => {
                 </div>
               ) : loadError ? (
                 <div className="rounded-2xl border border-rose-500/20 bg-rose-500/5 p-12 text-center text-white/70" data-testid="assets-error">
-                  <p>{navigator.onLine ? 'We could not reach the asset catalogue. Retrying automatically…' : 'You appear to be offline. Reconnect, then try again.'}</p>
-                  <button type="button" onClick={() => { setLoadError(false); setLoading(true); setRetryNonce((value) => value + 1); }} className="mt-5 rounded-full border border-white/20 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-white/10">
+                  <p>{navigator.onLine ? 'We could not reach the asset catalogue.' : 'You appear to be offline. Reconnect, then try again.'}</p>
+                  <button type="button" onClick={() => refetch()} className="mt-5 rounded-full border border-white/20 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-white/10">
                     Retry now
                   </button>
                 </div>
@@ -282,7 +244,7 @@ const Assets = () => {
         open={!!checkoutProduct}
         onClose={() => setCheckoutProduct(null)}
         onSuccess={(result) => {
-          setCheckoutProduct(null);
+          setCheckoutp roduct(null);
           if (result.customerAccessToken) localStorage.setItem('customer_access_token', result.customerAccessToken);
           if (result.orderId) { navigate(`/account/orders/${encodeURIComponent(result.orderId)}`); return; }
           const params = new URLSearchParams({

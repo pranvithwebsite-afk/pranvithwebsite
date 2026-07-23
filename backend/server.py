@@ -16,6 +16,7 @@ import hmac
 import hashlib
 import html
 import logging
+import traceback
 import math
 import re
 import secrets
@@ -427,9 +428,42 @@ async def request_validation_exception_handler(request: Request, exc: RequestVal
 
 @app.exception_handler(Exception)
 async def unhandled_exception_handler(request: Request, exc: Exception):
-    logger.exception("Unhandled application exception path=%s method=%s", request.url.path, request.method)
+    logger.error("================================================================================")
+    logger.error(f"UNHANDLED EXCEPTION: {type(exc).__name__} on {request.method} {request.url.path}")
+    
+    # Get traceback details
+    tb_str = traceback.format_exc()
+    
+    logger.error("--- TRACEBACK START ---")
+    logger.error(tb_str)
+    logger.error("--- TRACEBACK END ---")
+
+    # Also use logger.exception to ensure it's captured by structured logging if any
+    logger.exception("Detailed exception info for request to %s:", request.url.path)
+
+    # Check for DB connection issues specifically
+    db_conn_status = "Not configured"
+    if db is not None:
+        try:
+            await db.command("ping")
+            db_conn_status = "Healthy"
+        except Exception as db_exc:
+            db_conn_status = f"Unhealthy: {str(db_exc)}"
+            logger.error(f"Database connection check during exception handling failed: {db_exc}")
+
     if _is_api_request(request):
-        return _json_error_response(500, "Internal server error", code="INTERNAL_SERVER_ERROR")
+        return JSONResponse(
+            status_code=500,
+            content={
+                "success": False, 
+                "message": "An unexpected internal server error occurred.", 
+                "code": "UNHANDLED_EXCEPTION",
+                "error_type": type(exc).__name__,
+                "detail": str(exc),
+                "db_connection_status": db_conn_status,
+                "traceback": tb_str.splitlines()
+            }
+        )
     return PlainTextResponse("Internal server error", status_code=500)
 
 
@@ -1185,26 +1219,59 @@ async def root():
 
 @api_router.get("/courses", response_model=List[Course])
 async def get_courses():
+    """Returns a list of published courses, sorted by a predefined order."""
     if db is None:
+        logger.info("Course fetch source=fallback scope=public")
         return COURSES
-    rows = await db.courses.find({"published": {"$ne": False}}, {"_id": 0}).sort("order", 1).to_list(None)
-    return rows
+    try:
+        rows = await db.courses.find({"published": {"$ne": False}}).sort("order", 1).to_list(None)
+        logger.info(
+            "Course fetch source=mongodb database=%s collection=courses scope=public count=%d",
+            db_name,
+            len(rows),
+        )
+        return [{**r, "id": str(r["_id"])} for r in rows]
+    except Exception:
+        logger.exception("Public course fetch failed, returning fallback data")
+        return COURSES
 
 
 @api_router.get("/testimonials", response_model=List[Testimonial])
 async def get_testimonials():
+    """Returns a list of published testimonials."""
     if db is None:
+        logger.info("Testimonial fetch source=fallback scope=public")
         return TESTIMONIALS
-    rows = await db.testimonials.find({"enabled": {"$ne": False}}, {"_id": 0}).to_list(None)
-    return rows
+    try:
+        rows = await db.testimonials.find({"enabled": {"$ne": False}}).to_list(None)
+        logger.info(
+            "Testimonial fetch source=mongodb database=%s collection=testimonials scope=public count=%d",
+            db_name,
+            len(rows),
+        )
+        return [{**r, "id": str(r["_id"])} for r in rows]
+    except Exception:
+        logger.exception("Public testimonial fetch failed, returning fallback data")
+        return TESTIMONIALS
 
 
 @api_router.get("/faqs", response_model=List[FAQ])
 async def get_faqs():
+    """Returns a list of published FAQs, sorted by a predefined order."""
     if db is None:
+        logger.info("FAQ fetch source=fallback scope=public")
         return FAQS
-    rows = await db.faqs.find({"enabled": {"$ne": False}}, {"_id": 0}).sort("order", 1).to_list(None)
-    return rows
+    try:
+        rows = await db.faqs.find({"enabled": {"$ne": False}}).sort("order", 1).to_list(None)
+        logger.info(
+            "FAQ fetch source=mongodb database=%s collection=faqs scope=public count=%d",
+            db_name,
+            len(rows),
+        )
+        return [{**r, "id": str(r["_id"])} for r in rows]
+    except Exception:
+        logger.exception("Public FAQ fetch failed, returning fallback data")
+        return FAQS
 
 
 @api_router.get("/settings")
@@ -2152,7 +2219,10 @@ def _cms_section_doc(page_key: str, payload: CmsSectionIn, existing: Optional[di
 
 
 async def _cms_page_response(page_key: str, public: bool = False) -> dict:
-    page = await db.cms_pages.find_one({"page_key": page_key}, {"_id": 0})
+    page = await db.cms_pages.find_one({"page_key": page_key})
+    if page:
+        page["id"] = str(page["_id"])
+
     if not page:
         return {
             "page_key": page_key,
@@ -2180,10 +2250,14 @@ async def _cms_page_response(page_key: str, public: bool = False) -> dict:
     section_query = {"page_key": page_key}
     if public:
         section_query["enabled"] = {"$ne": False}
-    sections = await db.cms_sections.find(section_query, {"_id": 0}).sort("sort_order", 1).to_list(None)
+    sections = await db.cms_sections.find(section_query).sort("sort_order", 1).to_list(None)
+    for section in sections:
+        section["id"] = str(section["_id"])
+
     safe_page = _decode_html_entities({k: v for k, v in page.items() if k not in {"_id"}})
     if public:
         safe_page = {
+            "id": safe_page.get("id"),
             "page_key": page_key,
             "title": safe_page.get("title", ""),
             "subtitle": safe_page.get("subtitle", ""),
@@ -2196,6 +2270,7 @@ async def _cms_page_response(page_key: str, public: bool = False) -> dict:
         public_sections = []
         for section in sections:
             public_sections.append({
+                "id": section.get("id"),
                 "section_id": section.get("section_id", ""),
                 "type": section.get("type", "text"),
                 "title": section.get("title", ""),
@@ -2363,7 +2438,10 @@ def _normalize_service_doc(doc: dict, existing: Optional[dict] = None) -> dict:
 
 
 def _public_service(service: dict) -> dict:
-    return _normalize_service_doc({k: v for k, v in dict(service).items() if k != "_id"})
+    safe_service = service.copy()
+    if "_id" in safe_service and "id" not in safe_service:
+        safe_service["id"] = str(safe_service["_id"])
+    return _normalize_service_doc(safe_service)
 
 
 @api_router.get("/pages")
@@ -2517,10 +2595,21 @@ async def public_product_by_slug(slug: str):
 
 @api_router.get("/services", response_model=List[Service])
 async def public_services():
+    """Returns a list of published services, sorted by a predefined order."""
     if db is None:
+        logger.info("Service fetch source=fallback scope=public")
         return [_public_service(service) for service in DEFAULT_SERVICES if service.get("is_published", True)]
-    rows = await db.services.find({"is_published": True}, {"_id": 0}).sort("sort_order", 1).to_list(None)
-    return [_public_service(row) for row in rows]
+    try:
+        rows = await db.services.find({"is_published": True}).sort("sort_order", 1).to_list(None)
+        logger.info(
+            "Service fetch source=mongodb database=%s collection=services scope=public count=%d",
+            db_name,
+            len(rows),
+        )
+        return [_public_service(row) for row in rows]
+    except Exception:
+        logger.exception("Public service fetch failed, returning fallback data")
+        return [_public_service(service) for service in DEFAULT_SERVICES if service.get("is_published", True)]
 
 
 @api_router.get("/services/{slug}", response_model=Service)
@@ -2531,10 +2620,23 @@ async def public_service_by_slug(slug: str):
         if not service:
             raise HTTPException(status_code=404, detail="Service not found")
         return _public_service(service)
-    service = await db.services.find_one({"slug": normalized_slug, "is_published": True}, {"_id": 0})
-    if not service:
-        raise HTTPException(status_code=404, detail="Service not found")
-    return _public_service(service)
+    try:
+        service = await db.services.find_one({"slug": normalized_slug, "is_published": True})
+        if not service:
+            raise HTTPException(status_code=404, detail="Service not found")
+        return _public_service(service)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception(
+            "Public service detail endpoint failed; falling back to seeded data. slug=%s error_type=%s",
+            slug,
+            type(exc).__name__,
+        )
+        service = next((item for item in DEFAULT_SERVICES if item.get("slug") == normalized_slug and item.get("is_published", True)), None)
+        if not service:
+            raise HTTPException(status_code=404, detail="Service not found")
+        return _public_service(service)
 
 
 @api_router.get("/blog-posts")
