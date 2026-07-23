@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { CircleCheckBig, Clock3, FileSpreadsheet, FileText, Mail, Phone, RefreshCw, Search, User } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -54,7 +54,7 @@ const PaymentAttempts = () => {
   const [status, setStatus] = useState('all');
   const [archiving, setArchiving] = useState(false);
 
-  const loadAttempts = () => {
+  const loadAttempts = useCallback(() => {
     setLoading(true);
     return fetchAdminPaymentAttempts(status, query)
       .then((data) => {
@@ -67,11 +67,11 @@ const PaymentAttempts = () => {
         setError('Payment attempts could not be loaded.');
       })
       .finally(() => setLoading(false));
-  };
+  }, [status, query]);
 
   useEffect(() => {
     loadAttempts();
-  }, []);
+  }, [loadAttempts]);
 
   const stats = useMemo(() => {
     const pending = attempts.filter((attempt) => normalizeStatus(attempt) === 'pending').length;
