@@ -203,11 +203,11 @@ export const fetchServiceBySlug = async (slug) => {
   }, 5 * 60 * 1000);
 };
 
-export const fetchCmsPage = async (pageKey) => {
+export const fetchCmsPage = async (pageKey, { signal } = {}) => {
   // CMS content is published data, not catalogue data. Never serve an older
   // in-memory response after an editor publishes a page.
   const { data } = await api.get(`/cms/pages/${encodeURIComponent(pageKey)}`, {
-    headers: { 'Cache-Control': 'no-cache' },
+    headers: { 'Cache-Control': 'no-cache' }, signal,
   });
   const decoded = decodeCmsText(data);
   console.debug('[public-api] cms response', { pageKey, sections: Array.isArray(decoded?.sections) ? decoded.sections.length : 0 });

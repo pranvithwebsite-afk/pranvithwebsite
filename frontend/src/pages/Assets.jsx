@@ -78,6 +78,8 @@ const Assets = () => {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
+  const [retryNonce, setRetryNonce] = useState(0);
+  const retryTimer = useRef(null);
   const [checkoutProduct, setCheckoutProduct] = useState(null);
   const [isMobileFilterOpen, setIsMobileFilterOpen] = useState(false);
   const mobileFilterRef = useRef(null);
@@ -86,6 +88,8 @@ const Assets = () => {
   useEffect(() => {
     let active = true;
     (async () => {
+      setLoading(true);
+      setLoadError(false);
       try {
         const data = await fetchProducts();
         if (!active) return;
@@ -108,7 +112,17 @@ const Assets = () => {
       }
     })();
     return () => { active = false; };
+  }, [retryNonce]);
+
+  useEffect(() => () => {
+    if (retryTimer.current) window.clearTimeout(retryTimer.current);
   }, []);
+
+  useEffect(() => {
+    if (!loadError || retryNonce > 0 || !navigator.onLine) return undefined;
+    retryTimer.current = window.setTimeout(() => setRetryNonce(1), 3000);
+    return () => window.clearTimeout(retryTimer.current);
+  }, [loadError, retryNonce]);
 
   const filtered = useMemo(() => {
     let list = [...products];
@@ -237,7 +251,10 @@ const Assets = () => {
                 </div>
               ) : loadError ? (
                 <div className="rounded-2xl border border-rose-500/20 bg-rose-500/5 p-12 text-center text-white/70" data-testid="assets-error">
-                  Assets could not be loaded. Please refresh and try again.
+                  <p>{navigator.onLine ? 'We could not reach the asset catalogue. Retrying automatically…' : 'You appear to be offline. Reconnect, then try again.'}</p>
+                  <button type="button" onClick={() => { setLoadError(false); setLoading(true); setRetryNonce((value) => value + 1); }} className="mt-5 rounded-full border border-white/20 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-white/10">
+                    Retry now
+                  </button>
                 </div>
               ) : filtered.length === 0 ? (
                 <div className="cinematic-card p-12 text-center text-white/60" data-testid="assets-empty">

@@ -157,7 +157,7 @@ const SafeVideoEmbed = ({
 }) => {
   const [activated, setActivated] = useState(false);
   const [nearViewport, setNearViewport] = useState(false);
-  const [isMobile, setIsMobile] = useState(false);
+  const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.matchMedia?.('(max-width: 767px)').matches);
   const [posterFailed, setPosterFailed] = useState(false);
   const [youtubeMaxFailed, setYoutubeMaxFailed] = useState(false);
   const [thumbnailUnavailable, setThumbnailUnavailable] = useState(false);
@@ -172,7 +172,8 @@ const SafeVideoEmbed = ({
   const wrapperClass = `video-player-wrap group relative z-[2] ${aspectRatio || 'aspect-video'} overflow-hidden rounded-[inherit] bg-transparent ${className}`.trim();
   const frameRef = useRef(null);
   const shouldLoadPlayer = autoPlay || activated || (!loadOnInteractionOnly && loadWhenVisible && nearViewport);
-  const allowAutoplay = autoPlay || (autoplayOnClick && !isMobile);
+  // Autoplay is expensive and disruptive on mobile, including CMS hero media.
+  const allowAutoplay = !isMobile && (autoPlay || autoplayOnClick);
 
   useEffect(() => {
     setIsMobile(window.matchMedia?.('(max-width: 767px)').matches || false);
