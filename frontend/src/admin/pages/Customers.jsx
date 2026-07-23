@@ -199,36 +199,49 @@ const Customers = () => {
   );
 };
 
-const CustomerCard = ({ customer, onResend, onSync, resendingOrderId, syncingOrderId }) => (
-  <article className="rounded-3xl border border-slate-800 bg-slate-950 p-5">
-    <div className="flex flex-wrap items-start justify-between gap-4">
-      <div>
-        <h2 className="text-xl font-semibold text-white">{customer.name || 'Customer'}</h2>
-        <div className="mt-3 space-y-1 text-sm text-slate-400">
-          <p className="flex items-center gap-2"><Mail size={14} /> {customer.email || 'No email'}</p>
-          <p className="flex items-center gap-2"><Phone size={14} /> {customer.phone || 'No phone'}</p>
+const CustomerCard = ({ customer, onResend, onSync, resendingOrderId, syncingOrderId }) => {
+  const orders = customer.orders || [];
+  const paidCustomer = orders.some((order) => normalizeStatus(order.payment_status || order.status) === 'paid');
+  const repeatCustomer = orders.length > 1;
+  const firstPurchase = orders.length === 1;
+
+  return (
+    <article className="rounded-3xl border border-slate-800 bg-slate-950 p-5">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h2 className="text-xl font-semibold text-white">{customer.name || 'Customer'}</h2>
+          <div className="mt-3 space-y-1 text-sm text-slate-400">
+            <p className="flex items-center gap-2"><Mail size={14} /> {customer.email || 'No email'}</p>
+            <p className="flex items-center gap-2"><Phone size={14} /> {customer.phone || 'No phone'}</p>
+          </div>
+        </div>
+        <div className="rounded-2xl border border-slate-800 bg-slate-900 px-4 py-3 text-right">
+          <p className="text-xs uppercase tracking-wider text-slate-500">Total paid</p>
+          <p className="mt-1 text-lg font-semibold text-white">{formatAmount(customer.total_spend)}</p>
         </div>
       </div>
-      <div className="rounded-2xl border border-slate-800 bg-slate-900 px-4 py-3 text-right">
-        <p className="text-xs uppercase tracking-wider text-slate-500">Total paid</p>
-        <p className="mt-1 text-lg font-semibold text-white">{formatAmount(customer.total_spend)}</p>
-      </div>
-    </div>
 
-    <div className="mt-5 space-y-3">
-      {(customer.orders || []).map((order, index) => (
-        <OrderRow
-          key={`${order.razorpay_order_id || order.order_id || index}`}
-          order={order}
-          onResend={onResend}
-          onSync={onSync}
-          isResending={resendingOrderId === (order.razorpay_order_id || order.order_id)}
-          isSyncing={syncingOrderId === (order.razorpay_order_id || order.order_id)}
-        />
-      ))}
-    </div>
-  </article>
-);
+      <div className="mt-4 flex flex-wrap gap-2">
+        {paidCustomer && <span className="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-200">Paid Customer</span>}
+        {repeatCustomer && <span className="rounded-full border border-violet-500/20 bg-violet-500/10 px-3 py-1 text-xs font-semibold text-violet-100">Repeat Customer</span>}
+        {firstPurchase && <span className="rounded-full border border-sky-500/20 bg-sky-500/10 px-3 py-1 text-xs font-semibold text-sky-100">First Purchase</span>}
+      </div>
+
+      <div className="mt-5 space-y-3">
+        {(customer.orders || []).map((order, index) => (
+          <OrderRow
+            key={`${order.razorpay_order_id || order.order_id || index}`}
+            order={order}
+            onResend={onResend}
+            onSync={onSync}
+            isResending={resendingOrderId === (order.razorpay_order_id || order.order_id)}
+            isSyncing={syncingOrderId === (order.razorpay_order_id || order.order_id)}
+          />
+        ))}
+      </div>
+    </article>
+  );
+};
 
 const OrderRow = ({ order, onResend, onSync, isResending, isSyncing }) => {
   const paymentStatus = normalizeStatus(order.payment_status || order.status);

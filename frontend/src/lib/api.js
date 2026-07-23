@@ -358,6 +358,21 @@ export const fetchAdminOrders = async () => {
   return data;
 };
 
+export const fetchAdminPaymentAttempts = async (status = 'all', search = '') => {
+  const { data } = await adminApi.get('/admin/payments/payment-attempts', {
+    params: {
+      status,
+      search,
+    },
+  });
+  return data;
+};
+
+export const archiveInvalidPaymentAttempts = async (days = 7) => {
+  const { data } = await adminApi.post('/admin/payments/payment-attempts/archive-invalid', { days });
+  return data;
+};
+
 export const fetchAdminCustomers = async () => {
   const { data } = await adminApi.get('/admin/customers');
   return data;
@@ -772,3 +787,15 @@ export const fetchOrderAccess = async (orderId, token) => {
   });
   return data;
 };
+
+export const customerApi = axios.create({ baseURL: API, timeout: 15000 });
+export const setCustomerAuthToken = (token) => {
+  if (token) customerApi.defaults.headers.common.Authorization = `Bearer ${token}`;
+  else delete customerApi.defaults.headers.common.Authorization;
+};
+export const requestCustomerOtp = async (email) => (await api.post('/account/auth/request-otp', { email })).data;
+export const verifyCustomerOtp = async (email, code) => (await api.post('/account/auth/verify-otp', { email, code })).data;
+export const fetchCustomerDashboard = async () => (await customerApi.get('/account/dashboard')).data;
+export const fetchCustomerOrders = async (params) => (await customerApi.get('/account/orders', { params })).data;
+export const fetchCustomerOrder = async (id) => (await customerApi.get(`/account/orders/${encodeURIComponent(id)}`)).data;
+export const customerDownloadLink = async (id) => (await customerApi.post(`/account/orders/${encodeURIComponent(id)}/download-link`)).data;

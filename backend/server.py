@@ -110,6 +110,7 @@ RAZORPAY_KEY_SECRET = _first_env('RAZORPAY_KEY_SECRET', 'RAZORPAY_SECRET')
 RAZORPAY_AUTH_ERROR_MESSAGE = "Payment gateway authentication failed. Check Razorpay live keys in Vercel."
 RAZORPAY_CONFIG_ERROR_MESSAGE = "Razorpay credentials are missing or invalid"
 SUCCESSFUL_REVENUE_STATUSES = ("paid", "captured", "completed", "success")
+PAYMENT_ATTEMPT_STATUSES = ("pending", "created", "failed", "cancelled", "expired", "abandoned")
 razorpay_client = None
 if RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET:
     try:
@@ -2969,7 +2970,7 @@ async def admin_reset_user_password(admin_id: str, payload: AdminResetPasswordIn
 async def admin_dashboard(current_admin: AdminBase = Depends(get_current_active_admin)):
     pages_count = await db.pages.count_documents({})
     products_count = await db.products.count_documents({})
-    orders_count = await db.orders.count_documents({})
+    orders_count = await db.orders.count_documents({"payment_status": "paid", "verified": True})
     customers_count = await db.customers.count_documents({})
     revenue_result = await db.orders.aggregate([
         {"$match": successful_revenue_order_filter()},
@@ -3524,7 +3525,7 @@ async def admin_report_pdf(start: Optional[str] = None, end: Optional[str] = Non
 async def admin_orders(current_admin: AdminBase = Depends(get_current_active_admin)):
     try:
         rows = await db.orders.find(
-            {},
+            {"payment_status": "paid", "verified": True},
             {
                 "_id": 0,
                 "download_file": 0,
@@ -3537,6 +3538,39 @@ async def admin_orders(current_admin: AdminBase = Depends(get_current_active_adm
     except Exception:
         logger.exception("Admin orders fetch failed")
         raise HTTPException(status_code=500, detail="Could not load orders")
+
+
+@admin_router.get("/payments/payment-attempts")
+async def admin_payment_attempts(status: Optional[str] = None, search: Optional[str] = None, current_admin: AdminBase = Depends(get_current_active_admin)):
+    if db is None:
+        raise HTTPException(status_code=500, detail="Database not configured")
+    try:
+        match: dict = {"payment_status": {"$in": list(PAYMENT_ATTEMPT_STATUSES)}}
+        if status and status != "all":
+            match["payment_status"] = status
+        if search:
+            escaped = re.escape(search.strip())
+            match["$or"] = [{field: {"$regex": escaped, "$options": "i"}} for field in ["id", "razorpay_order_id", "razorpay_payment_id", "customer_name", "customer_email", "product_name", "product_slug"]]
+        rows = await db.payment_attempts.find(match, {"_id": 0}).sort("created_at", -1).to_list(500)
+        return [_public_payment_attempt_payload(row) for row in rows]
+    except Exception:
+        logger.exception("Admin payment attempts fetch failed")
+        raise HTTPException(status_code=500, detail="Could not load payment attempts")
+
+
+@admin_router.post("/payments/payment-attempts/archive-invalid")
+async def admin_archive_invalid_payment_attempts(days: int = 7, current_admin: AdminBase = Depends(get_current_active_admin)):
+    if db is None:
+        raise HTTPException(status_code=500, detail="Database not configured")
+    cutoff = datetime.now(timezone.utc) - timedelta(days=max(days, 1))
+    cutoff_iso = cutoff.isoformat()
+    result = await db.payment_attempts.delete_many(
+        {
+            "payment_status": {"$in": ["pending", "created", "failed", "cancelled", "expired", "abandoned"]},
+            "created_at": {"$lt": cutoff_iso},
+        }
+    )
+    return {"success": True, "deleted": result.deleted_count, "cutoff": cutoff_iso}
 
 
 @admin_router.post("/orders/{order_id}/resend-download-email")
@@ -3615,6 +3649,23 @@ async def admin_resend_download_email(order_id: str, current_admin: AdminBase = 
         "message": "Download email resent successfully.",
         "order": _public_order_payload(updated_order),
     }
+
+
+@admin_router.post("/orders/{order_id}/download-access")
+async def admin_set_download_access(order_id: str, enabled: bool = True, current_admin: AdminBase = Depends(get_current_active_admin)):
+    result = await db.orders.update_one({"$or": [{"id": order_id}, {"razorpay_order_id": order_id}]}, {"$set": {"download_disabled": not enabled, "download_access_updated_at": datetime.now(timezone.utc).isoformat(), "download_access_updated_by": current_admin.id}})
+    if not result.matched_count: raise HTTPException(status_code=404, detail="Order not found")
+    return {"success": True, "enabled": enabled}
+
+@admin_router.post("/orders/{order_id}/reset-download-count")
+async def admin_reset_download_count(order_id: str, current_admin: AdminBase = Depends(get_current_active_admin)):
+    result = await db.orders.update_one({"$or": [{"id": order_id}, {"razorpay_order_id": order_id}]}, {"$set": {"download_count": 0, "last_downloaded_at": None, "download_count_reset_at": datetime.now(timezone.utc).isoformat(), "download_count_reset_by": current_admin.id}})
+    if not result.matched_count: raise HTTPException(status_code=404, detail="Order not found")
+    return {"success": True}
+
+@admin_router.get("/orders/{order_id}/download-history")
+async def admin_download_history(order_id: str, current_admin: AdminBase = Depends(get_current_active_admin)):
+    return {"items": await db.download_logs.find({"order_id": order_id}, {"_id": 0}).sort("downloaded_at", -1).to_list(500)}
 
 
 @admin_router.post("/orders/{order_id}/sync-razorpay-status")
@@ -4993,6 +5044,7 @@ async def prepare_cms_collections():
         "pages",
         "products",
         "orders",
+        "payment_attempts",
         "customers",
         "media",
         "cms_pages",
@@ -5008,6 +5060,7 @@ async def prepare_cms_collections():
         "blog_categories",
         "webhook_events",
         "checkout_sessions",
+        "customer_otps",
     ]:
         if collection_name not in existing_collections:
             try:
@@ -5056,6 +5109,11 @@ async def prepare_cms_collections():
     try:
         await db.checkout_sessions.create_index([("customer_email", 1), ("product_id", 1)], unique=True)
         await db.checkout_sessions.create_index("expires_at", expireAfterSeconds=0)
+        await db.payment_attempts.create_index("razorpay_order_id", unique=True, sparse=True)
+        await db.payment_attempts.create_index("razorpay_payment_id", unique=True, sparse=True)
+        await db.payment_attempts.create_index([("customer_email", 1), ("product_id", 1), ("payment_status", 1)])
+        await db.payment_attempts.create_index([("created_at", -1), ("payment_status", 1)])
+        await db.payment_attempts.create_index("product_slug")
         await db.orders.create_index("razorpay_order_id", unique=True, sparse=True)
         await db.orders.create_index("razorpay_payment_id", unique=True, sparse=True)
         await db.orders.create_index([("customer_email", 1), ("product_id", 1), ("payment_status", 1)])
@@ -5063,6 +5121,8 @@ async def prepare_cms_collections():
         await db.orders.create_index("product_slug")
         await db.download_logs.create_index([("downloaded_at", -1)])
         await db.download_logs.create_index([("customer_email", 1), ("product_slug", 1)])
+        await db.customer_otps.create_index("expires_at", expireAfterSeconds=0)
+        await db.customer_otps.create_index([("email", 1), ("created_at", -1)])
     except Exception:
         logger.exception("Could not create checkout idempotency indexes")
     try:
@@ -5182,6 +5242,7 @@ async def on_startup():
             logger.warning("MongoDB development error detail: %s", exc)
         return
     await prepare_cms_collections()
+    await _migrate_non_paid_orders_to_payment_attempts()
     await synchronize_default_admin()
     # Seed default content in the background to keep startup responsive.
     asyncio.create_task(_seed_db())
@@ -5199,6 +5260,41 @@ def _normalize_phone(phone: str) -> str:
     if not re.fullmatch(r"\+?\d{7,15}", cleaned):
         raise HTTPException(status_code=422, detail="Enter a valid phone number")
     return cleaned
+
+
+async def _payment_attempt_collection():
+    if db is None:
+        return None
+    return getattr(db, "payment_attempts", db.orders)
+
+
+async def _checkout_session_collection():
+    if db is None:
+        return None
+    return getattr(db, "checkout_sessions", None)
+
+
+async def _find_payment_attempt(order_id: Optional[str] = None, razorpay_order_id: Optional[str] = None, razorpay_payment_id: Optional[str] = None) -> Optional[dict]:
+    collection = await _payment_attempt_collection()
+    if collection is None:
+        return None
+    filters = []
+    if order_id:
+        filters.append({"id": order_id})
+    if razorpay_order_id:
+        filters.append({"razorpay_order_id": razorpay_order_id})
+    if razorpay_payment_id:
+        filters.append({"razorpay_payment_id": razorpay_payment_id})
+    if not filters:
+        return None
+    if len(filters) == 1:
+        return await collection.find_one(filters[0], {"_id": 0})
+    return await collection.find_one({"$or": filters}, {"_id": 0})
+
+
+def _public_payment_attempt_payload(attempt: dict) -> dict:
+    hidden_fields = {"_id", "download_file", "download_url", "download_token_hash", "razorpay_signature"}
+    return {key: value for key, value in attempt.items() if key not in hidden_fields}
 
 
 def _hash_download_token(token: str) -> str:
@@ -6050,11 +6146,11 @@ async def _get_or_create_payment_link_order(
     order_entity: dict,
 ) -> Optional[dict]:
     if razorpay_order_id:
-        order = await db.orders.find_one({"razorpay_order_id": razorpay_order_id}, {"_id": 0})
+        order = await _find_payment_attempt(razorpay_order_id=razorpay_order_id)
         if order:
             return order
     if razorpay_payment_id:
-        order = await db.orders.find_one({"razorpay_payment_id": razorpay_payment_id}, {"_id": 0})
+        order = await _find_payment_attempt(razorpay_payment_id=razorpay_payment_id)
         if order:
             return order
 
@@ -6107,13 +6203,27 @@ async def _get_or_create_payment_link_order(
         "buyer_email": str(buyer_email).lower().strip() if buyer_email else "",
         "buyer_phone": str(buyer_phone).strip(),
         "created_at": now,
+        "updated_at": now,
         "source": "razorpay_payment_link",
+        "verified": False,
+        "payment_verified_at": None,
+        "timeline": {
+            "checkout_created": now,
+            "payment_started": None,
+            "payment_failed": None,
+            "payment_cancelled": None,
+            "payment_captured": None,
+            "webhook_received": None,
+            "email_sent": None,
+            "download_completed": None,
+        },
         "email_delivery_status": "pending",
         "email_delivery_error": None,
         "email_sent": False,
         "email_error": None,
     }
-    await db.orders.insert_one(order_doc)
+    payment_attempt_collection = await _payment_attempt_collection()
+    await payment_attempt_collection.insert_one(order_doc)
     await _upsert_checkout_customer(order_doc, product)
     return order_doc
 
@@ -6151,24 +6261,28 @@ async def _mark_order_not_paid(order: dict, payment_status: str, reason: str, pa
     }
     if payment_id:
         update_fields["razorpay_payment_id"] = payment_id
-    await db.orders.update_one(
-        order_filter,
-        {
-            "$set": update_fields,
-            "$unset": {
-                "paid_at": "",
-                "download_token_hash": "",
-                "download_url": "",
+    payment_attempt_collection = await _payment_attempt_collection()
+    if payment_attempt_collection is not None:
+        await payment_attempt_collection.update_one(
+            order_filter,
+            {
+                "$set": update_fields,
+                "$unset": {
+                    "paid_at": "",
+                    "download_token_hash": "",
+                    "download_url": "",
+                },
             },
-        },
-    )
+        )
     # Failed and dismissed attempts remain in the audit trail but immediately
     # release the active-checkout reservation for a valid retry.
-    await db.checkout_sessions.delete_one({
-        "customer_email": (order.get("customer_email") or order.get("buyer_email") or "").lower().strip(),
-        "product_id": order.get("product_id"),
-        "order_id": order.get("razorpay_order_id"),
-    })
+    checkout_sessions = await _checkout_session_collection()
+    if checkout_sessions is not None:
+        await checkout_sessions.delete_one({
+            "customer_email": (order.get("customer_email") or order.get("buyer_email") or "").lower().strip(),
+            "product_id": order.get("product_id"),
+            "order_id": order.get("razorpay_order_id"),
+        })
     logger.info("Checkout attempt closed order_id=%s status=%s reason=%s", order.get("razorpay_order_id"), payment_status, reason)
     corrected_order = {**order, **update_fields}
     corrected_order.pop("paid_at", None)
@@ -6252,6 +6366,7 @@ async def _sync_payment_with_razorpay(order: dict, send_email: bool = False) -> 
 
 async def _fulfill_paid_order(order: dict, product: dict, payment_id: str, send_email: bool = True) -> dict:
     now = datetime.now(timezone.utc).isoformat()
+    payment_attempt_collection = await _payment_attempt_collection()
     was_paid = order.get("status") == "paid" or order.get("payment_status") == "paid"
     download_url = order.get("download_url")
     download_token = None
@@ -6268,6 +6383,8 @@ async def _fulfill_paid_order(order: dict, product: dict, payment_id: str, send_
     paid_fields = {
         "status": "paid",
         "payment_status": "paid",
+        "verified": True,
+        "payment_verified_at": order.get("payment_verified_at") or now,
         "razorpay_payment_id": payment_id,
         "verified_at": order.get("verified_at") or now,
         "paid_at": order.get("paid_at") or now,
@@ -6278,8 +6395,6 @@ async def _fulfill_paid_order(order: dict, product: dict, payment_id: str, send_
     if order.get("razorpay_order_id"):
         paid_fields["razorpay_order_id"] = order.get("razorpay_order_id")
 
-    # A payment id is globally unique at Razorpay.  Refuse to attach it to a
-    # second local order even if two webhook/API requests race each other.
     other_payment = await db.orders.find_one({
         "razorpay_payment_id": payment_id,
         "razorpay_order_id": {"$ne": order.get("razorpay_order_id")},
@@ -6288,43 +6403,59 @@ async def _fulfill_paid_order(order: dict, product: dict, payment_id: str, send_
         logger.warning("Duplicate payment ignored payment_id=%s existing_order=%s", payment_id, other_payment.get("razorpay_order_id"))
         raise HTTPException(status_code=409, detail="Payment has already been processed")
 
-    await db.orders.update_one(
-        {"$or": [{"razorpay_order_id": order.get("razorpay_order_id")}, {"id": order.get("id")}]},
-        {"$set": paid_fields},
-    )
+    existing_order = await db.orders.find_one({"$or": [{"razorpay_order_id": order.get("razorpay_order_id")}, {"id": order.get("id")}]}, {"_id": 0})
+    order_filter = {"$or": [{"razorpay_order_id": order.get("razorpay_order_id")}, {"id": order.get("id")}]}
+    if existing_order:
+        await db.orders.update_one(order_filter, {"$set": paid_fields})
+        fulfilled_order = {**existing_order, **paid_fields}
+    else:
+        fulfilled_order = {
+            **order,
+            **paid_fields,
+            "id": order.get("id") or str(uuid.uuid4()),
+            "created_at": order.get("created_at") or now,
+            "updated_at": now,
+        }
+        await db.orders.insert_one(fulfilled_order)
+
+    if payment_attempt_collection is not None:
+        await payment_attempt_collection.update_one(order_filter, {"$set": {**paid_fields, "order_id": fulfilled_order.get("id"), "updated_at": now}})
+
     if not was_paid:
         await db.products.update_one({"id": product.get("id")}, {"$inc": {"sold_count": 1}})
 
-    await db.checkout_sessions.update_one(
-        {"customer_email": (order.get("customer_email") or order.get("buyer_email") or "").lower().strip(), "product_id": order.get("product_id")},
-        {"$set": {"state": "paid", "order_id": order.get("razorpay_order_id"), "updated_at": now}, "$unset": {"expires_at": ""}},
-    )
+    checkout_sessions = await _checkout_session_collection()
+    if checkout_sessions is not None:
+        await checkout_sessions.update_one(
+            {"customer_email": (order.get("customer_email") or order.get("buyer_email") or "").lower().strip(), "product_id": order.get("product_id")},
+            {"$set": {"state": "paid", "order_id": order.get("razorpay_order_id"), "updated_at": now}, "$unset": {"expires_at": ""}},
+        )
     email_delivery_status = order.get("email_delivery_status") or ("sent" if order.get("email_sent") else ("failed" if order.get("email_error") else "pending"))
     email_sent = email_delivery_status == "sent"
     email_error = order.get("email_delivery_error") if order.get("email_delivery_error") is not None else order.get("email_error")
     email_attempted_at = order.get("email_delivery_attempted_at") or order.get("email_attempted_at")
     buyer_email = (order.get("customer_email") or order.get("buyer_email") or "").lower().strip()
     if send_email and buyer_email and not email_sent:
-        # Only one concurrent webhook/verification request can claim delivery.
-        claim = await db.orders.update_one(
+        claim = await payment_attempt_collection.update_one(
             {"$or": [{"razorpay_order_id": order.get("razorpay_order_id")}, {"id": order.get("id")}], "email_delivery_status": {"$in": ["pending", "failed"]}},
             {"$set": {"email_delivery_status": "sending", "email_delivery_attempted_at": now}},
         )
-        if claim.modified_count:
+        claim_succeeded = getattr(claim, "modified_count", None)
+        if claim_succeeded is None or claim_succeeded:
             result = _send_download_email(
-            buyer_email,
-            order.get("customer_name") or order.get("buyer_name", "there"),
-            order.get("product_name") or product.get("name", "your asset"),
-            payment_id,
-            _public_download_url(download_url),
+                buyer_email,
+                order.get("customer_name") or order.get("buyer_name", "there"),
+                order.get("product_name") or product.get("name", "your asset"),
+                payment_id,
+                _public_download_url(download_url),
             )
             email_sent, email_error = _normalize_email_result(result)
             email_attempted_at = now
             email_update = _email_delivery_update(email_sent, email_error, email_attempted_at)
             if email_sent:
                 email_update["email_delivery_sent_at"] = now
-            await db.orders.update_one(
-                {"$or": [{"razorpay_order_id": order.get("razorpay_order_id")}, {"id": order.get("id")}]},
+            await payment_attempt_collection.update_one(
+                order_filter,
                 {"$set": email_update},
             )
             email_delivery_status = email_update["email_delivery_status"]
@@ -6387,34 +6518,37 @@ async def checkout_create_order(payload: PaymentCreateOrderIn):
         "updated_at": now_dt.isoformat(),
         "expires_at": expires_at,
     }
-    try:
-        await db.checkout_sessions.insert_one(session)
-        claimed_session = True
-    except DuplicateKeyError:
-        claimed_session = False
+    checkout_sessions = await _checkout_session_collection()
+    claimed_session = True
+    if checkout_sessions is not None:
+        try:
+            await checkout_sessions.insert_one(session)
+            claimed_session = True
+        except DuplicateKeyError:
+            claimed_session = False
 
-    if not claimed_session:
-        existing = await db.checkout_sessions.find_one(session_key, {"_id": 0})
-        # If an earlier process died before creating Razorpay's order, reclaim
-        # only after the bounded checkout window has elapsed.
-        if existing and existing.get("expires_at") and existing["expires_at"] <= now_dt:
-            await db.checkout_sessions.delete_one({**session_key, "expires_at": existing["expires_at"]})
-            try:
-                await db.checkout_sessions.insert_one(session)
-                claimed_session = True
-            except DuplicateKeyError:
-                existing = await db.checkout_sessions.find_one(session_key, {"_id": 0})
         if not claimed_session:
-            order_id = (existing or {}).get("order_id")
-            if order_id:
-                existing_order = await db.orders.find_one({"razorpay_order_id": order_id}, {"_id": 0})
-                if existing_order and existing_order.get("payment_status") == "paid":
-                    return {"already_owned": True, "message": "You already own this asset."}
-                if existing_order:
-                    logger.info("Duplicate checkout request reused order_id=%s", order_id)
-                    return {"order_id": order_id, "amount": existing_order.get("amount"), "currency": existing_order.get("currency", "INR"), "key_id": RAZORPAY_KEY_ID, "product_name": product.get("name"), "reused": True}
-            logger.info("Duplicate checkout request is waiting for order creation email=%s product=%s", customer_email, product.get("slug"))
-            raise HTTPException(status_code=409, detail="Checkout is being prepared. Please wait a moment and retry.")
+            existing = await checkout_sessions.find_one(session_key, {"_id": 0})
+            # If an earlier process died before creating Razorpay's order, reclaim
+            # only after the bounded checkout window has elapsed.
+            if existing and existing.get("expires_at") and existing["expires_at"] <= now_dt:
+                await checkout_sessions.delete_one({**session_key, "expires_at": existing["expires_at"]})
+                try:
+                    await checkout_sessions.insert_one(session)
+                    claimed_session = True
+                except DuplicateKeyError:
+                    existing = await checkout_sessions.find_one(session_key, {"_id": 0})
+            if not claimed_session:
+                order_id = (existing or {}).get("order_id")
+                if order_id:
+                    existing_order = await db.orders.find_one({"razorpay_order_id": order_id}, {"_id": 0})
+                    if existing_order and existing_order.get("payment_status") == "paid":
+                        return {"already_owned": True, "message": "You already own this asset."}
+                    if existing_order:
+                        logger.info("Duplicate checkout request reused order_id=%s", order_id)
+                        return {"order_id": order_id, "amount": existing_order.get("amount"), "currency": existing_order.get("currency", "INR"), "key_id": RAZORPAY_KEY_ID, "product_name": product.get("name"), "reused": True}
+                logger.info("Duplicate checkout request is waiting for order creation email=%s product=%s", customer_email, product.get("slug"))
+                raise HTTPException(status_code=409, detail="Checkout is being prepared. Please wait a moment and retry.")
 
     logger.info("Checkout session claimed email=%s product=%s", customer_email, product.get("slug"))
 
@@ -6435,25 +6569,28 @@ async def checkout_create_order(payload: PaymentCreateOrderIn):
             },
         })
     except razorpay.errors.BadRequestError as e:
-        await db.checkout_sessions.delete_one(session_key)
+        if checkout_sessions is not None:
+            await checkout_sessions.delete_one(session_key)
         if _is_razorpay_auth_error(e):
             logger.warning("Razorpay order create authentication failed config=%s error=%s", razorpay_config_summary(), _razorpay_error_summary(e))
             raise HTTPException(status_code=502, detail=RAZORPAY_AUTH_ERROR_MESSAGE)
         logger.exception("Razorpay bad request")
         raise HTTPException(status_code=400, detail=_razorpay_public_error(e))
     except razorpay.errors.ServerError:
-        await db.checkout_sessions.delete_one(session_key)
+        if checkout_sessions is not None:
+            await checkout_sessions.delete_one(session_key)
         logger.exception("Razorpay server error")
         raise HTTPException(status_code=502, detail="Payment gateway error")
     except Exception as exc:
-        await db.checkout_sessions.delete_one(session_key)
+        if checkout_sessions is not None:
+            await checkout_sessions.delete_one(session_key)
         if _is_razorpay_auth_error(exc):
             logger.warning("Razorpay order create authentication failed config=%s error=%s", razorpay_config_summary(), _razorpay_error_summary(exc))
             raise HTTPException(status_code=502, detail=RAZORPAY_AUTH_ERROR_MESSAGE)
         logger.exception("Razorpay order failure")
         raise HTTPException(status_code=500, detail="Could not create order")
 
-    order_doc = {
+    attempt_doc = {
         "id": local_order_id,
         "razorpay_order_id": razorpay_order.get("id"),
         "amount": razorpay_order.get("amount"),
@@ -6472,15 +6609,30 @@ async def checkout_create_order(payload: PaymentCreateOrderIn):
         "buyer_email": customer_email,
         "buyer_phone": phone,
         "created_at": datetime.now(timezone.utc).isoformat(),
+        "updated_at": datetime.now(timezone.utc).isoformat(),
         "source": "razorpay_checkout",
+        "verified": False,
+        "payment_verified_at": None,
+        "timeline": {
+            "checkout_created": datetime.now(timezone.utc).isoformat(),
+            "payment_started": None,
+            "payment_failed": None,
+            "payment_cancelled": None,
+            "payment_captured": None,
+            "webhook_received": None,
+            "email_sent": None,
+            "download_completed": None,
+        },
         "email_delivery_status": "pending",
         "email_delivery_error": None,
         "email_sent": False,
         "email_error": None,
     }
-    await db.orders.insert_one(order_doc)
-    await db.checkout_sessions.update_one(session_key, {"$set": {"state": "pending", "order_id": razorpay_order.get("id"), "updated_at": datetime.now(timezone.utc).isoformat()}})
-    await _upsert_checkout_customer(order_doc, product)
+    payment_attempt_collection = await _payment_attempt_collection()
+    await payment_attempt_collection.insert_one(attempt_doc)
+    if checkout_sessions is not None:
+        await checkout_sessions.update_one(session_key, {"$set": {"state": "pending", "order_id": razorpay_order.get("id"), "updated_at": datetime.now(timezone.utc).isoformat()}})
+    await _upsert_checkout_customer(attempt_doc, product)
 
     logger.info("Razorpay order created order_id=%s email=%s product=%s", razorpay_order.get("id"), customer_email, product.get("slug"))
 
@@ -6497,7 +6649,7 @@ async def checkout_create_order(payload: PaymentCreateOrderIn):
 async def checkout_cancel(order_id: str):
     if db is None:
         raise HTTPException(status_code=500, detail="Database not configured")
-    order = await db.orders.find_one({"razorpay_order_id": order_id}, {"_id": 0})
+    order = await _find_payment_attempt(razorpay_order_id=order_id)
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
     if order.get("payment_status") == "paid":
@@ -6517,7 +6669,8 @@ async def checkout_verify_payment(payload: PaymentVerifyIn):
         logger.warning("Razorpay payment verification unavailable summary=%s", razorpay_config_summary())
         raise HTTPException(status_code=502, detail=RAZORPAY_AUTH_ERROR_MESSAGE)
 
-    order = await db.orders.find_one({"razorpay_order_id": payload.razorpay_order_id}, {"_id": 0})
+    payment_attempt_collection = await _payment_attempt_collection()
+    order = await _find_payment_attempt(razorpay_order_id=payload.razorpay_order_id)
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
 
@@ -6540,10 +6693,11 @@ async def checkout_verify_payment(payload: PaymentVerifyIn):
             "email_error": "Payment not verified; download email blocked.",
             "verified_at": now,
         }
-        await db.orders.update_one(
-            {"razorpay_order_id": payload.razorpay_order_id},
-            {"$set": failed_fields},
-        )
+        if payment_attempt_collection is not None:
+            await payment_attempt_collection.update_one(
+                {"razorpay_order_id": payload.razorpay_order_id},
+                {"$set": failed_fields},
+            )
         try:
             failed_product = await _find_checkout_product(order.get("product_id"), order.get("product_slug"))
             await _upsert_checkout_customer({**order, **failed_fields}, failed_product)
@@ -6575,7 +6729,7 @@ async def checkout_verify_payment(payload: PaymentVerifyIn):
             "Razorpay checkout verification rejected order_id=%s payment_id=%s reason=%s",
             stored_razorpay_order_id,
             payload.razorpay_payment_id,
-            verification.get("error"),
+            verification.get("error") or "Payment was not captured",
         )
         return {
             "success": False,
@@ -6602,7 +6756,7 @@ async def checkout_verify_payment(payload: PaymentVerifyIn):
             email_update = _email_delivery_update(email_sent, email_error, now)
             if email_sent:
                 email_update["email_delivery_sent_at"] = now
-            await db.orders.update_one(
+            await payment_attempt_collection.update_one(
                 {"razorpay_order_id": payload.razorpay_order_id},
                 {"$set": email_update},
             )
@@ -6625,12 +6779,14 @@ async def checkout_verify_payment(payload: PaymentVerifyIn):
             "email_error": email_error,
             "email_delivery_status": email_delivery_status,
             "email_delivery_error": email_error,
+            "customer_access_token": _customer_token(buyer_email),
         }
 
-    await db.orders.update_one(
-        {"razorpay_order_id": payload.razorpay_order_id},
-        {"$set": {"razorpay_signature": payload.razorpay_signature}},
-    )
+    if payment_attempt_collection is not None:
+        await payment_attempt_collection.update_one(
+            {"razorpay_order_id": payload.razorpay_order_id},
+            {"$set": {"razorpay_signature": payload.razorpay_signature}},
+        )
     fulfillment = await _fulfill_paid_order(
         {**order, "razorpay_signature": payload.razorpay_signature},
         product,
@@ -6651,6 +6807,7 @@ async def checkout_verify_payment(payload: PaymentVerifyIn):
         "email_error": fulfillment["email_error"],
         "email_delivery_status": fulfillment["email_delivery_status"],
         "email_delivery_error": fulfillment["email_delivery_error"],
+        "customer_access_token": _customer_token(buyer_email),
     }
 
 
@@ -6866,7 +7023,7 @@ async def order_access(order_id: str, token: str):
 
 
 @api_router.get("/orders/{order_id}/download")
-async def order_download(order_id: str, token: str, request: Request):
+async def order_download(order_id: str, token: str, request: Request = None):
     if db is None:
         raise HTTPException(status_code=500, detail="Database not configured")
     order = await db.orders.find_one(
@@ -6884,7 +7041,10 @@ async def order_download(order_id: str, token: str, request: Request):
         {"$or": [{"razorpay_order_id": order_id}, {"id": order_id}]},
         {"$inc": {"download_count": 1}, "$set": {"last_downloaded_at": datetime.now(timezone.utc).isoformat()}},
     )
-    await db.download_logs.insert_one({"customer_email": order.get("customer_email") or order.get("buyer_email"), "customer_name": order.get("customer_name") or order.get("buyer_name"), "product_slug": order.get("product_slug"), "product_name": order.get("product_name"), "downloaded_at": datetime.now(timezone.utc).isoformat(), "ip_address": request.headers.get("x-forwarded-for", request.client.host if request.client else "").split(",")[0].strip(), "user_agent": request.headers.get("user-agent", ""), "browser": request.headers.get("user-agent", "")[:180], "os": request.headers.get("sec-ch-ua-platform", ""), "status": "success"})
+    headers = request.headers if request is not None else {}
+    client = request.client if request is not None else None
+    if hasattr(db, "download_logs"):
+        await db.download_logs.insert_one({"customer_email": order.get("customer_email") or order.get("buyer_email"), "customer_name": order.get("customer_name") or order.get("buyer_name"), "product_slug": order.get("product_slug"), "product_name": order.get("product_name"), "downloaded_at": datetime.now(timezone.utc).isoformat(), "ip_address": headers.get("x-forwarded-for", client.host if client else "").split(",")[0].strip(), "user_agent": headers.get("user-agent", ""), "browser": headers.get("user-agent", "")[:180], "os": headers.get("sec-ch-ua-platform", ""), "status": "success"})
     if download_fields.get("download_file_key"):
         download_url = _private_download_presigned_url(
             download_fields["download_file_key"],
@@ -6935,6 +7095,100 @@ async def protected_product_download(order_id: str, product_id: str, request: Re
         headers={"Cache-Control": "no-store", "Referrer-Policy": "strict-origin-when-cross-origin"},
     )
 
+
+# Customer accounts use their own passwordless JWT claims; they never share the
+# admin authentication flow.
+CUSTOMER_SESSION_MINUTES = int(os.environ.get("CUSTOMER_SESSION_MINUTES", "10080"))
+CUSTOMER_DOWNLOAD_MINUTES = int(os.environ.get("CUSTOMER_DOWNLOAD_MINUTES", "5"))
+
+class CustomerOtpRequest(BaseModel):
+    email: EmailStr
+
+class CustomerOtpVerify(CustomerOtpRequest):
+    code: str = Field(min_length=6, max_length=6)
+
+class CustomerProfileUpdate(BaseModel):
+    name: Optional[str] = Field(default=None, max_length=120)
+    phone: Optional[str] = Field(default=None, max_length=20)
+
+def _customer_token(email: str, purpose: str = "session", order_id: Optional[str] = None, minutes: int = CUSTOMER_SESSION_MINUTES) -> str:
+    body = {"sub": email.lower().strip(), "role": "customer", "purpose": purpose, "exp": datetime.now(timezone.utc) + timedelta(minutes=minutes)}
+    if order_id: body["order_id"] = order_id
+    return jwt.encode(body, _require_jwt_secret(), algorithm=JWT_ALGORITHM)
+
+async def get_current_customer(request: Request) -> dict:
+    auth = request.headers.get("authorization", "")
+    try:
+        payload = jwt.decode(auth.split(" ", 1)[1], _require_jwt_secret(), algorithms=[JWT_ALGORITHM])
+    except (IndexError, JWTError):
+        raise HTTPException(status_code=401, detail="Please sign in to your customer account")
+    if payload.get("role") != "customer" or payload.get("purpose") != "session":
+        raise HTTPException(status_code=401, detail="Invalid customer session")
+    customer = await db.customers.find_one({"email": payload.get("sub", "").lower(), "disabled": {"$ne": True}}, {"_id": 0})
+    if not customer: raise HTTPException(status_code=403, detail="Customer account is unavailable")
+    return customer
+
+async def _owned_paid_order(customer: dict, order_id: str) -> dict:
+    email = customer.get("email", "").lower()
+    order = await db.orders.find_one({"$and": [{"$or": [{"id": order_id}, {"razorpay_order_id": order_id}]}, {"$or": [{"customer_email": email}, {"buyer_email": email}]}, {"payment_status": "paid"}, {"verified": True}, {"download_disabled": {"$ne": True}}]}, {"_id": 0})
+    if not order: raise HTTPException(status_code=404, detail="Paid order not found in your account")
+    return order
+
+@api_router.post("/account/auth/request-otp")
+async def customer_request_otp(payload: CustomerOtpRequest):
+    email = str(payload.email).lower().strip(); now = datetime.now(timezone.utc)
+    recent = await db.customer_otps.find_one({"email": email, "created_at": {"$gte": (now-timedelta(minutes=1)).isoformat()}})
+    if recent: raise HTTPException(status_code=429, detail="Please wait before requesting another code")
+    code = f"{secrets.randbelow(1000000):06d}"
+    await db.customer_otps.insert_one({"email": email, "hash": hashlib.sha256(code.encode()).hexdigest(), "created_at": now.isoformat(), "expires_at": now + timedelta(minutes=10), "used": False})
+    # Best-effort email; account/download access is never gated on delivery.
+    _send_download_email(email, "there", "Your account sign-in code", "", f"Your one-time sign-in code is {code}")
+    return {"ok": True, "message": "If purchases exist for this address, a sign-in code has been sent."}
+
+@api_router.post("/account/auth/verify-otp")
+async def customer_verify_otp(payload: CustomerOtpVerify):
+    email = str(payload.email).lower().strip(); now = datetime.now(timezone.utc)
+    otp = await db.customer_otps.find_one({"email": email, "used": False}, sort=[("created_at", -1)])
+    if not otp or otp.get("expires_at", now) < now or not hmac.compare_digest(otp.get("hash", ""), hashlib.sha256(payload.code.encode()).hexdigest()): raise HTTPException(status_code=401, detail="Invalid or expired sign-in code")
+    customer = await db.customers.find_one({"email": email}, {"_id": 0})
+    if not customer: raise HTTPException(status_code=404, detail="No purchases found for this email yet")
+    await db.customer_otps.update_one({"_id": otp["_id"]}, {"$set": {"used": True}})
+    return {"access_token": _customer_token(email), "token_type": "bearer", "customer": customer}
+
+@api_router.get("/account/dashboard")
+async def customer_dashboard(customer: dict = Depends(get_current_customer)):
+    email = customer["email"]; match = {"$and": [{"$or": [{"customer_email": email}, {"buyer_email": email}]}, {"payment_status": "paid"}, {"verified": True}]}
+    orders = await db.orders.find(match, {"_id": 0, "download_token_hash": 0, "download_url": 0}).sort("paid_at", -1).to_list(5)
+    return {"customer": customer, "purchased_assets": await db.orders.count_documents(match), "total_orders": await db.orders.count_documents(match), "total_downloads": await db.download_logs.count_documents({"customer_email": email}), "recent_purchases": orders}
+
+@api_router.get("/account/orders")
+async def customer_orders(page: int = 1, page_size: int = 20, search: str = "", customer: dict = Depends(get_current_customer)):
+    email = customer["email"]; size = min(max(page_size, 1), 100); clauses = [{"$or": [{"customer_email": email}, {"buyer_email": email}]}, {"payment_status": "paid"}, {"verified": True}]
+    if search.strip(): clauses.append({"$or": [{"product_name": {"$regex": re.escape(search.strip()), "$options": "i"}}, {"id": {"$regex": re.escape(search.strip()), "$options": "i"}}]})
+    query = {"$and": clauses}; total = await db.orders.count_documents(query)
+    items = await db.orders.find(query, {"_id": 0, "download_token_hash": 0, "download_url": 0}).sort("paid_at", -1).skip((max(page,1)-1)*size).limit(size).to_list(size)
+    return {"items": items, "total": total, "page": max(page,1), "page_size": size}
+
+@api_router.get("/account/orders/{order_id}")
+async def customer_order(order_id: str, customer: dict = Depends(get_current_customer)):
+    order = await _owned_paid_order(customer, order_id); order.pop("download_token_hash", None); order.pop("download_url", None); return order
+
+@api_router.post("/account/orders/{order_id}/download-link")
+async def customer_download_link(order_id: str, customer: dict = Depends(get_current_customer)):
+    order = await _owned_paid_order(customer, order_id)
+    return {"url": f"/api/account/orders/{order['id']}/download?token={_customer_token(customer['email'], 'download', order['id'], CUSTOMER_DOWNLOAD_MINUTES)}", "expires_in": CUSTOMER_DOWNLOAD_MINUTES * 60}
+
+@api_router.get("/account/orders/{order_id}/download")
+async def customer_download(order_id: str, token: str, request: Request):
+    try: claims = jwt.decode(token, _require_jwt_secret(), algorithms=[JWT_ALGORITHM])
+    except JWTError: raise HTTPException(status_code=403, detail="Download link expired")
+    if claims.get("role") != "customer" or claims.get("purpose") != "download" or claims.get("order_id") != order_id: raise HTTPException(status_code=403, detail="Invalid download link")
+    customer = await db.customers.find_one({"email": claims.get("sub", "").lower(), "disabled": {"$ne": True}}, {"_id": 0}); order = await _owned_paid_order(customer or {}, order_id)
+    product = await _find_checkout_product(order.get("product_id"), order.get("product_slug")); fields = _product_download_fields(product, order)
+    await db.orders.update_one({"id": order["id"]}, {"$inc": {"download_count": 1}, "$set": {"last_downloaded_at": datetime.now(timezone.utc).isoformat()}})
+    await db.download_logs.insert_one({"order_id": order["id"], "customer_email": customer["email"], "product_name": order.get("product_name"), "downloaded_at": datetime.now(timezone.utc).isoformat(), "ip_address": request.headers.get("x-forwarded-for", "").split(",")[0], "browser": request.headers.get("user-agent", "")[:180], "status": "success"})
+    url = _private_download_presigned_url(fields["download_file_key"], fields.get("download_file_bucket")) if fields.get("download_file_key") else _validated_download_url(fields.get("download_file"))
+    return RedirectResponse(url, status_code=302, headers={"Cache-Control": "no-store"})
 
 @api_router.post("/payments/free-order")
 async def payment_free_order(payload: PaymentFreeOrderIn):

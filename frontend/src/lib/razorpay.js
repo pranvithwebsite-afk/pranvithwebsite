@@ -114,6 +114,7 @@ export async function payWithRazorpay({ amountRupees, itemId, itemName, productS
             downloadToken: verifiedPaid ? (data?.download_token || new URLSearchParams((data?.download_url || '').split('?')[1] || '').get('token')) : '',
             emailSent: !!data?.email_sent,
             emailError: data?.email_error,
+            customerAccessToken: data?.customer_access_token || '',
             failed: !verifiedPaid,
             error: verifiedPaid ? '' : (data?.error || 'Payment was not verified.'),
           });

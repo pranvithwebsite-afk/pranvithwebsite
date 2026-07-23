@@ -262,6 +262,8 @@ const Assets = () => {
         onClose={() => setCheckoutProduct(null)}
         onSuccess={(result) => {
           setCheckoutProduct(null);
+          if (result.customerAccessToken) localStorage.setItem('customer_access_token', result.customerAccessToken);
+          if (result.orderId) { navigate(`/account/orders/${encodeURIComponent(result.orderId)}`); return; }
           const params = new URLSearchParams({
             orderId: result.orderId || '',
             paymentId: result.paymentId || '',

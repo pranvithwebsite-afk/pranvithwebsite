@@ -10,6 +10,7 @@ const Website = lazy(() => import('./pages/Website'));
 const Products = lazy(() => import('./pages/Products'));
 const AdminServices = lazy(() => import('./pages/Services'));
 const Orders = lazy(() => import('./pages/Orders'));
+const PaymentAttempts = lazy(() => import('./pages/PaymentAttempts'));
 const Customers = lazy(() => import('./pages/Customers'));
 const Reports = lazy(() => import('./pages/Reports'));
 const Enquiries = lazy(() => import('./pages/Enquiries'));
@@ -39,6 +40,7 @@ const AdminApp = () => (
             <Route path="services" element={<AdminServices />} />
             <Route path="products" element={<Products />} />
             <Route path="orders" element={<Orders />} />
+            <Route path="payments/payment-attempts" element={<PaymentAttempts />} />
             <Route path="customers" element={<Customers />} />
             <Route path="reports" element={<Reports />} />
             <Route path="enquiries" element={<Enquiries />} />
