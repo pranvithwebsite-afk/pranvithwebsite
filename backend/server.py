@@ -38,8 +38,8 @@ try:
 except ImportError:  # pragma: no cover - optional unless R2 uploads are used
     boto3 = None
 
-from excel_export import create_excel_report
-from seed_data import (
+from .excel_export import create_excel_report
+from .seed_data import (
     COURSES,
     TESTIMONIALS,
     FAQS,
@@ -1648,11 +1648,13 @@ def _safe_works_page(works_page: Optional[dict]) -> dict:
 
     hero_media_type = str(hero_source.get("hero_media_type") or "image").strip().lower()
     if hero_media_type not in {"image", "video_file", "video_url"}:
-        raise ValueError("hero_media_type must be image, video_file, or video_url")
+        logger.warning("Invalid hero_media_type '%s' in works page settings, falling back to 'image'", hero_media_type)
+        hero_media_type = "image"
 
     showreel_video_type = str(showreel_source.get("video_type") or "video_url").strip().lower()
     if showreel_video_type not in WORKS_VIDEO_TYPES:
-        raise ValueError("video_type must be video_file, video_url, youtube, or vimeo")
+        logger.warning("Invalid video_type '%s' for showreel in works page settings, falling back to 'video_url'", showreel_video_type)
+        showreel_video_type = "video_url"
 
     projects = []
     for index, project in enumerate(source.get("projects") or []):
@@ -1663,7 +1665,8 @@ def _safe_works_page(works_page: Optional[dict]) -> dict:
             category = "Commercial"
         video_type = str(project.get("video_type") or "video_url").strip().lower()
         if video_type not in WORKS_VIDEO_TYPES:
-            raise ValueError("project video_type must be video_file, video_url, youtube, or vimeo")
+            logger.warning("Invalid video_type '%s' for project in works page settings, falling back to 'video_url'", video_type)
+            video_type = "video_url"
         projects.append({
             "title": str(project.get("title") or "").strip()[:160],
             "category": category,
@@ -1755,20 +1758,24 @@ def _safe_course_video_url(video_type: str, value: Optional[str]) -> str:
     path = (parsed.path or "").lower()
     if video_type == "video_file":
         if not path.endswith((".mp4", ".webm", ".mov")):
-            raise ValueError("video_file must be a direct mp4/webm/mov URL")
+            logger.warning("Invalid video_file URL for course: %s", cleaned)
+            return ""
     elif video_type == "youtube":
         if host not in {"youtube.com", "www.youtube.com", "m.youtube.com", "youtu.be", "www.youtu.be"}:
-            raise ValueError("youtube video URL must be a YouTube URL")
+            logger.warning("Invalid youtube URL for course: %s", cleaned)
+            return ""
     elif video_type == "vimeo":
         if host not in {"vimeo.com", "www.vimeo.com", "player.vimeo.com"}:
-            raise ValueError("vimeo video URL must be a Vimeo URL")
+            logger.warning("Invalid vimeo URL for course: %s", cleaned)
+            return ""
     elif video_type == "video_url":
         allowed = path.endswith((".mp4", ".webm", ".mov")) or host in {
             "youtube.com", "www.youtube.com", "m.youtube.com", "youtu.be", "www.youtu.be",
             "vimeo.com", "www.vimeo.com", "player.vimeo.com",
         }
         if not allowed:
-            raise ValueError("video_url must be YouTube, Vimeo, or a direct mp4/webm/mov URL")
+            logger.warning("Invalid video_url for course: %s", cleaned)
+            return ""
     return cleaned
 
 
@@ -1798,7 +1805,8 @@ def _safe_course_page(course_page: Optional[dict]) -> dict:
     def testimonial_video(item, index):
         video_type = str(item.get("video_type") or "video_url").strip().lower()
         if video_type not in {"video_file", "video_url", "youtube", "vimeo"}:
-            raise ValueError("video_type must be video_file, video_url, youtube, or vimeo")
+            logger.warning("Invalid video_type '%s' for testimonial video in course page settings, falling back to 'video_url'", video_type)
+            video_type = "video_url"
         return {
             "student_name": str(item.get("student_name") or "").strip()[:120],
             "course_name": str(item.get("course_name") or "").strip()[:120],
@@ -1893,13 +1901,17 @@ def _safe_hero_media_url(media_type: str, value: Optional[str]) -> str:
     is_image = path.endswith((".jpg", ".jpeg", ".png", ".webp", ".gif"))
 
     if media_type == "image" and not is_image:
-        raise ValueError("image hero media URL must be jpg, jpeg, png, webp, or gif")
+        logger.warning("Invalid media_type='image' for hero URL: %s", cleaned)
+        return ""
     if media_type == "video_file" and not is_direct_video:
-        raise ValueError("video_file hero media URL must be mp4, webm, or mov")
+        logger.warning("Invalid media_type='video_file' for hero URL: %s", cleaned)
+        return ""
     if media_type == "video_url" and not (is_youtube or is_vimeo or is_direct_video):
-        raise ValueError("video_url must be YouTube, Vimeo, or a direct mp4/webm/mov URL")
+        logger.warning("Invalid media_type='video_url' for hero URL: %s", cleaned)
+        return ""
     if media_type == "auto" and not (is_image or is_youtube or is_vimeo or is_direct_video):
-        raise ValueError("auto hero media URL must be an image, YouTube, Vimeo, or direct mp4/webm/mov URL")
+        logger.warning("Invalid media_type='auto' for hero URL: %s", cleaned)
+        return ""
     return cleaned
 
 
@@ -1976,13 +1988,15 @@ def _reject_unsafe_url(value: Optional[str]) -> Optional[str]:
         return cleaned
     parsed = urlparse(cleaned)
     if parsed.scheme.lower() in {"javascript", "data", "vbscript"}:
-        raise ValueError("javascript/data/vbscript URLs are not allowed")
+        logger.warning("Unsafe URL scheme rejected: %s", value)
+        return ""
     if parsed.scheme:
         allowed_schemes = {"https"}
         if IS_DEVELOPMENT:
             allowed_schemes.add("http")
         if parsed.scheme.lower() not in allowed_schemes:
-            raise ValueError("Only safe HTTPS URLs are allowed")
+            logger.warning("URL scheme not allowed: %s", value)
+            return ""
     return cleaned
 
 
@@ -2076,20 +2090,20 @@ def _sanitize_cms_media_reference(field_name: str, value: Any, media_type: Optio
 
     if normalized_field in {"poster_url", "thumbnail_url", "thumbnail_image_url", "student_image_url"}:
         if not _is_cms_image_url(cleaned):
-            raise HTTPException(
-                status_code=422,
-                detail="Poster/thumbnail must be an image URL. Leave it empty for videos or upload a thumbnail image.",
-            )
+            logger.warning("Poster/thumbnail must be an image URL. Leave it empty for videos or upload a thumbnail image. Value: %s", cleaned)
+            return ""
         return cleaned
 
     if normalized_field == "image_url":
         if not _is_cms_image_url(cleaned):
-            raise HTTPException(status_code=422, detail="Image URL must be jpg, jpeg, png, webp, or gif.")
+            logger.warning("Image URL must be jpg, jpeg, png, webp, or gif. Value: %s", cleaned)
+            return ""
         return cleaned
 
     if normalized_field == "video_url":
         if not (_is_cms_direct_video_url(cleaned) or _is_cms_youtube_url(cleaned) or _is_cms_vimeo_url(cleaned)):
-            raise HTTPException(status_code=422, detail="Video URL must be a YouTube URL, Vimeo URL, or direct mp4/webm/mov URL.")
+            logger.warning("Video URL must be a YouTube URL, Vimeo URL, or direct mp4/webm/mov URL. Value: %s", cleaned)
+            return ""
         return cleaned
 
     if normalized_field != "media_url":
@@ -2108,15 +2122,9 @@ def _sanitize_cms_media_reference(field_name: str, value: Any, media_type: Optio
         allowed = _is_cms_image_url(cleaned) or _is_cms_direct_video_url(cleaned) or _is_cms_youtube_url(cleaned) or _is_cms_vimeo_url(cleaned)
 
     if not allowed:
-        if normalized_media_type == "youtube":
-            raise HTTPException(status_code=422, detail="Media URL must be a YouTube URL.")
-        if normalized_media_type == "vimeo":
-            raise HTTPException(status_code=422, detail="Media URL must be a Vimeo URL.")
-        if normalized_media_type == "video_file":
-            raise HTTPException(status_code=422, detail="Media URL must be a direct mp4/webm/mov URL.")
-        if normalized_media_type == "image":
-            raise HTTPException(status_code=422, detail="Media URL must be an image URL.")
-        raise HTTPException(status_code=422, detail="Media URL must be an image URL, YouTube URL, Vimeo URL, or direct mp4/webm/mov URL.")
+        logger.warning("Media URL must be an image URL, YouTube URL, Vimeo URL, or direct mp4/webm/mov URL. Value: %s", cleaned)
+        return ""
+
     return cleaned
 
 
@@ -5522,7 +5530,7 @@ api_router.include_router(admin_router)
 
 # Customer Account Routes (Google OAuth + Dashboard)
 try:
-    from customer_account import router as customer_router
+    from .customer_account import router as customer_router
     api_router.include_router(customer_router)
     logger.info("Customer account routes loaded")
 except ImportError as e:
