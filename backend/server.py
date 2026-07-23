@@ -5361,6 +5361,14 @@ async def on_startup():
 
 api_router.include_router(admin_router)
 
+# Customer Account Routes (Google OAuth + Dashboard)
+try:
+    from customer_account import router as customer_router
+    api_router.include_router(customer_router)
+    logger.info("Customer account routes loaded")
+except ImportError as e:
+    logger.warning("Customer account routes not available: %s", e)
+
 
 # ---------- Razorpay ----------
 DEFAULT_PUBLIC_SITE_URL = "https://pranvithdop.com"
@@ -7537,6 +7545,27 @@ async def _seed_db():
             pass
         try:
             await db.blog_posts.create_index("slug", unique=True)
+        except Exception:
+            pass
+        # Customer account indexes
+        try:
+            await db.customers.create_index("id", unique=True)
+        except Exception:
+            pass
+        try:
+            await db.customers.create_index([("google_id", 1)], unique=True, sparse=True)
+        except Exception:
+            pass
+        try:
+            await db.customers.create_index("email")
+        except Exception:
+            pass
+        try:
+            await db.download_logs.create_index([("order_id", 1), ("downloaded_at", -1)])
+        except Exception:
+            pass
+        try:
+            await db.download_logs.create_index("customer_id")
         except Exception:
             pass
     except Exception as e:

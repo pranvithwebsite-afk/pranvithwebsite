@@ -119,6 +119,7 @@ export const navLinks = [
   { name: 'Assets', path: '/assets' },
   { name: 'Our Works', path: '/works' },
   { name: 'Hire From Us', path: '/hire' },
+  { name: 'Account', path: '/account' },
 ];
 
 export const audienceCards = [
@@ -275,4 +276,3 @@ export const footerLinks = {
     phone: '+91 9059867883',
   },
 };
-
