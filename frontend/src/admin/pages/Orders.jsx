@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { CircleCheckBig, Clock3, Download, FileSpreadsheet, FileText, Mail, Phone, Printer, RefreshCw, Search, User } from 'lucide-react';
 import { toast } from 'sonner';
-import { fetchAdminOrders, formatApiErrorDetail, resendDownloadEmail, syncRazorpayStatus } from '../../lib/api';
+import { downloadAdminOrdersExcelReport, fetchAdminOrders, formatApiErrorDetail, resendDownloadEmail, syncRazorpayStatus } from '../../lib/api';
 
 const statusOptions = ['all', 'paid', 'refunded'];
 const rangeOptions = ['today', 'yesterday', 'this_week', 'this_month', 'last_month', 'custom'];
@@ -94,6 +94,7 @@ const Orders = () => {
   const [range, setRange] = useState('this_month');
   const [resendingOrderId, setResendingOrderId] = useState('');
   const [syncingOrderId, setSyncingOrderId] = useState('');
+  const [exporting, setExporting] = useState(false);
 
   const loadOrders = () => {
     setLoading(true);

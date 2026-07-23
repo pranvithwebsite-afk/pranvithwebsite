@@ -38,6 +38,7 @@ try:
 except ImportError:  # pragma: no cover - optional unless R2 uploads are used
     boto3 = None
 
+from excel_export import create_excel_report
 from seed_data import (
     COURSES,
     TESTIMONIALS,
@@ -3586,6 +3587,70 @@ async def admin_report_products(start: Optional[str] = None, end: Optional[str] 
     match = _report_match(start, end, None, None)
     pipeline = [{"$match": match}, {"$group": {"_id": "$product_slug", "product": {"$last": "$product_name"}, "sales_count": {"$sum": {"$cond": [{"$eq": ["$payment_status", "paid"]}, 1, 0]}}, "revenue": {"$sum": {"$cond": [{"$eq": ["$payment_status", "paid"]}, "$amount", 0]}}, "unique_customers": {"$addToSet": "$customer_email"}, "downloads": {"$sum": {"$ifNull": ["$download_count", 0]}}}}, {"$project": {"_id": 0, "product_slug": "$_id", "product": 1, "sales_count": 1, "revenue": 1, "unique_customers": {"$size": "$unique_customers"}, "downloads": 1}}, {"$sort": {"revenue": -1}}]
     return {"items": await db.orders.aggregate(pipeline, allowDiskUse=True).to_list(10000)}
+
+
+@admin_router.get("/reports/orders/excel")
+async def admin_report_orders_excel(
+    start: Optional[str] = None,
+    end: Optional[str] = None,
+    status_filter: Optional[str] = None,
+    search: Optional[str] = None,
+    current_admin: AdminBase = Depends(get_current_active_admin),
+):
+    """
+    Exports a list of orders to an Excel file.
+    """
+    data = await _report_orders(start, end, status_filter, search, 0, 1000000)
+    orders = data.get("items", [])
+    summary = data.get("summary", {})
+
+    report_data = []
+    for order in orders:
+        report_data.append({
+            "Order ID": order.get("id"),
+            "Customer Name": order.get("customer_name"),
+            "Email": order.get("customer_email"),
+            "Phone": order.get("customer_phone"),
+            "Product": order.get("product_name"),
+            "Category": None,  # Not available in _report_orders
+            "Price": order.get("amount"),
+            "Discount": 0,  # Not available in _report_orders
+            "Tax": 0,  # Not available in _report_orders
+            "Total": order.get("amount"),
+            "Payment Method": "Razorpay", # Hardcoded for now
+            "Payment Status": order.get("payment_status"),
+            "Verified": order.get("payment_status") == "paid",
+            "Purchase Date": order.get("created_at"),
+            "Download Status": "Downloaded" if order.get("download_count", 0) > 0 else "Not Downloaded",
+            "Downloaded At": None, # Not available in _report_orders
+            "Country": None, # Not available in _report_orders
+            "State": None, # Not available in _report_orders
+            "City": None, # Not available in _report_orders
+        })
+
+    # Prepare summary data
+    total_orders = summary.get("total_orders", 0)
+    total_revenue = summary.get("total_revenue", 0)
+    summary_data = {
+        "Total Orders": total_orders,
+        "Revenue": total_revenue,
+        "Downloads": sum(o.get("download_count", 0) for o in orders),
+        "Average Order Value": total_revenue / total_orders if total_orders > 0 else 0,
+    }
+
+
+    file_buffer = create_excel_report(
+        title="Orders Report",
+        report_data=report_data,
+        summary_data=summary_data,
+        sheet_name="Orders"
+    )
+
+    return StreamingResponse(
+        io.BytesIO(file_buffer),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename=orders_{datetime.now().strftime('%Y-%m-%d')}.xlsx"}
+    )
 
 
 @admin_router.get("/reports/export/csv")

@@ -14,52 +14,40 @@ export function CustomerAuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
 
   // Initialize from URL parameter (from OAuth redirect)
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const urlToken = params.get('token');
-    if (urlToken) {
-      setToken(urlToken);
-      localStorage.setItem('customer_access_token', urlToken);
-      // Clean URL
-      window.history.replaceState({}, '', window.location.pathname);
-    }
-  }, []);
+ const login = useCallback((newToken, customerData) => {
+  setToken(newToken);
+  setCustomer(customerData);
+  localStorage.setItem('customer_access_token', newToken);
+  localStorage.setItem('customer_data', JSON.stringify(customerData));
+  setCustomerAuthToken(newToken);
+}, []);
 
-  useEffect(() => {
-    if (token) {
-      setCustomerAuthToken(token);
-      // Fetch customer profile
-      customerApi.get('/account/profile')
-        .then(res => {
-          const data = res.data?.customer || res.data;
-          setCustomer(data);
-          localStorage.setItem('customer_data', JSON.stringify(data));
-        })
-        .catch(() => {
-          // Token invalid - clear
-          logout();
-        })
-        .finally(() => setLoading(false));
-    } else {
-      setLoading(false);
-    }
-  }, [token]);
+const logout = useCallback(() => {
+  setToken('');
+  setCustomer(null);
+  localStorage.removeItem('customer_access_token');
+  localStorage.removeItem('customer_data');
+  setCustomerAuthToken('');
+}, []);
 
-  const login = useCallback((newToken, customerData) => {
-    setToken(newToken);
-    setCustomer(customerData);
-    localStorage.setItem('customer_access_token', newToken);
-    localStorage.setItem('customer_data', JSON.stringify(customerData));
-    setCustomerAuthToken(newToken);
-  }, []);
+useEffect(() => {
+  if (token) {
+    setCustomerAuthToken(token);
 
-  const logout = useCallback(() => {
-    setToken('');
-    setCustomer(null);
-    localStorage.removeItem('customer_access_token');
-    localStorage.removeItem('customer_data');
-    setCustomerAuthToken('');
-  }, []);
+    customerApi.get('/account/profile')
+      .then(res => {
+        const data = res.data?.customer || res.data;
+        setCustomer(data);
+        localStorage.setItem('customer_data', JSON.stringify(data));
+      })
+      .catch(() => {
+        logout();
+      })
+      .finally(() => setLoading(false));
+  } else {
+    setLoading(false);
+  }
+}, [token, logout]);
 
   return (
     <CustomerAuthContext.Provider value={{
