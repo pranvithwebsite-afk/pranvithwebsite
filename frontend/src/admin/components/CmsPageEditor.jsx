@@ -61,6 +61,7 @@ const PAGE_HELPERS = {
 
 const CmsPageEditor = ({ pageKey, title, path, mediaItems, onBack }) => {
   const [page, setPage] = useState(null);
+  const [loadError, setLoadError] = useState('');
   const [selected, setSelected] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -76,17 +77,25 @@ const CmsPageEditor = ({ pageKey, title, path, mediaItems, onBack }) => {
   );
 
   const load = useCallback(async ({ showToast = true } = {}) => {
+    console.info('[admin/cms] Loading page', { pageKey });
     setLoading(true);
+    setLoadError('');
     try {
       const data = await fetchAdminCmsPage(pageKey);
       const normalizedPage = normalizePageSections(data);
       setPage(normalizedPage);
       setSelected((current) => current ? normalizedPage.sections?.find((section) => section.id === current.id) || null : current);
       setSectionDirty(false);
+      console.info('[admin/cms] Page loaded', { pageKey });
     } catch (error) {
-      if (showToast) toast.error(error?.response?.data?.detail || 'Could not load CMS page');
+      const message = error?.response?.data?.detail || error?.response?.data?.message || 'Could not load CMS page';
+      console.error('[admin/cms] Page load failed', { pageKey, error });
+      setPage(null);
+      setLoadError(message);
+      if (showToast) toast.error(message);
     } finally {
       setLoading(false);
+      console.info('[admin/cms] Page loading finished', { pageKey });
     }
   }, [pageKey]);
 
@@ -217,7 +226,20 @@ const CmsPageEditor = ({ pageKey, title, path, mediaItems, onBack }) => {
     await load();
   };
 
-  if (loading || !page) return <div className="text-slate-400">Loading page editor...</div>;
+  if (loading) return <div className="text-slate-400">Loading page editor...</div>;
+
+  if (loadError || !page) {
+    return (
+      <section className="rounded-2xl border border-rose-500/30 bg-rose-500/10 p-6 text-rose-100">
+        <h1 className="text-xl font-semibold">Could not load page editor</h1>
+        <p className="mt-2 text-sm">{loadError || 'The CMS page response was empty or invalid.'}</p>
+        <div className="mt-5 flex gap-3">
+          <button type="button" onClick={() => load()} className="rounded-lg bg-violet-600 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-500">Retry</button>
+          <button type="button" onClick={onBack} className="rounded-lg border border-slate-600 px-4 py-2 text-sm font-semibold text-white hover:border-slate-400">Back</button>
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section className="space-y-6">

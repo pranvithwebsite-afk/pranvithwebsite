@@ -13,6 +13,7 @@ const statusOptions = ['new', 'contacted', 'completed'];
 const Enquiries = () => {
   const [enquiries, setEnquiries] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
   const confirm = useAdminConfirm();
 
   const loadEnquiries = async () => {
@@ -20,8 +21,12 @@ const Enquiries = () => {
       setLoading(true);
       const data = await fetchAdminEnquiries();
       setEnquiries(Array.isArray(data) ? data : []);
+      setLoadError('');
     } catch (err) {
-      toast.error('Could not load enquiries');
+      const message = err?.response?.data?.detail || err?.response?.data?.message || 'Could not load enquiries';
+      console.error('[admin/enquiries] Failed to load enquiries', err);
+      setLoadError(message);
+      toast.error(message);
     } finally {
       setLoading(false);
     }
@@ -74,6 +79,11 @@ const Enquiries = () => {
       {loading ? (
         <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-8 text-white/60">
           Loading enquiries...
+        </div>
+      ) : loadError ? (
+        <div className="rounded-2xl border border-rose-500/30 bg-rose-500/10 p-8 text-rose-100">
+          <p>{loadError}</p>
+          <button type="button" onClick={loadEnquiries} className="mt-4 rounded-lg bg-violet-600 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-500">Retry</button>
         </div>
       ) : enquiries.length === 0 ? (
         <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-8 text-white/60">

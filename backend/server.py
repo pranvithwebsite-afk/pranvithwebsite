@@ -106,6 +106,13 @@ def mongodb_public_error(exc: Exception) -> str:
     return "Database is temporarily unavailable. Please try again shortly."
 
 
+async def require_database() -> None:
+    """Return a useful JSON error instead of letting admin handlers dereference None."""
+    if db is None:
+        logger.error("Admin request rejected because MongoDB is not configured")
+        raise HTTPException(status_code=503, detail="Database is not configured. Set MONGO_URL (or DATABASE_URL) and DB_NAME in Vercel.")
+
+
 # Razorpay client (lazy / safe-init)
 RAZORPAY_KEY_ID = os.environ.get('RAZORPAY_KEY_ID', '')
 RAZORPAY_KEY_SECRET = _first_env('RAZORPAY_KEY_SECRET', 'RAZORPAY_SECRET')
@@ -368,6 +375,7 @@ logger = logging.getLogger(__name__)
 
 @app.middleware("http")
 async def add_security_headers(request: Request, call_next):
+    logger.info("API request started method=%s path=%s", request.method, request.url.path)
     try:
         response = await call_next(request)
     except Exception:
@@ -394,6 +402,7 @@ async def add_security_headers(request: Request, call_next):
         response.headers["Cache-Control"] = "no-store, max-age=0"
     elif request.method == "GET" and request.url.path.startswith("/api/uploads/"):
         response.headers.setdefault("Cache-Control", "public, max-age=31536000, immutable")
+    logger.info("API request finished method=%s path=%s status=%s", request.method, request.url.path, response.status_code)
     return response
 
 
@@ -447,16 +456,6 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
     # Also use logger.exception to ensure it's captured by structured logging if any
     logger.exception("Detailed exception info for request to %s:", request.url.path)
 
-    # Check for DB connection issues specifically
-    db_conn_status = "Not configured"
-    if db is not None:
-        try:
-            await db.command("ping")
-            db_conn_status = "Healthy"
-        except Exception as db_exc:
-            db_conn_status = f"Unhealthy: {str(db_exc)}"
-            logger.error(f"Database connection check during exception handling failed: {db_exc}")
-
     if _is_api_request(request):
         return JSONResponse(
             status_code=500,
@@ -465,9 +464,7 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
                 "message": "An unexpected internal server error occurred.", 
                 "code": "UNHANDLED_EXCEPTION",
                 "error_type": type(exc).__name__,
-                "detail": str(exc),
-                "db_connection_status": db_conn_status,
-                "traceback": tb_str.splitlines()
+                "detail": "See server logs for the exception trace."
             }
         )
     return PlainTextResponse("Internal server error", status_code=500)
@@ -2234,7 +2231,10 @@ def _cms_section_doc(page_key: str, payload: CmsSectionIn, existing: Optional[di
 
 async def _cms_page_response(page_key: str, public: bool = False) -> dict:
     page = await db.cms_pages.find_one({"page_key": page_key})
-    if page:
+    if page and page.get("_id") is not None:
+        # Test fixtures and migrated documents may already have a public id
+        # and no Mongo ObjectId.  Do not turn that valid CMS response into a
+        # server error.
         page["id"] = str(page["_id"])
 
     if not page:
@@ -2266,7 +2266,8 @@ async def _cms_page_response(page_key: str, public: bool = False) -> dict:
         section_query["enabled"] = {"$ne": False}
     sections = await db.cms_sections.find(section_query).sort("sort_order", 1).to_list(length=None)
     for section in sections:
-        section["id"] = str(section["_id"])
+        if section.get("_id") is not None:
+            section["id"] = str(section["_id"])
 
     safe_page = _decode_html_entities({k: v for k, v in page.items() if k not in {"_id"}})
     if public:
@@ -2906,6 +2907,7 @@ async def get_current_admin(token: str = Depends(oauth2_scheme)) -> AdminBase:
     if not admin_id:
         logger.warning("Admin token rejected: missing admin id/sub claim")
         raise credentials_exception
+    await require_database()
     admin = await get_admin_by_id(admin_id)
     if admin is None:
         logger.warning("Admin token rejected: admin id %s not found", admin_id)
@@ -3177,7 +3179,7 @@ async def admin_cms_pages(current_admin: AdminBase = Depends(get_current_active_
     rows = await db.cms_pages.find({}, {"_id": 0}).sort("page_key", 1).to_list(100)
     by_key = {row.get("page_key"): row for row in rows}
     result = []
-    for page_key in ["home", "courses", "about", "assets", "works", "hire"]:
+    for page_key in ["home", "courses", "about", "assets", "works", "hire", "privacy", "terms"]:
         result.append(by_key.get(page_key) or _cms_page_doc(page_key))
     return result
 

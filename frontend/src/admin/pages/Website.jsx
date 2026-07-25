@@ -23,6 +23,7 @@ const Website = () => {
   const [pages, setPages] = useState([]);
   const [mediaItems, setMediaItems] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
   const [editingPage, setEditingPage] = useState(null);
 
   useEffect(() => {
@@ -30,19 +31,26 @@ const Website = () => {
   }, []);
 
   const loadData = async () => {
+    console.info('[admin/website] Loading CMS pages and media');
     try {
       setLoading(true);
+      setLoadError('');
       const [pagesData, mediaData] = await Promise.all([
         fetchAdminCmsPages(),
         fetchAdminMedia().catch(() => []),
       ]);
       setPages(mergeRequiredPages(Array.isArray(pagesData) ? pagesData : []));
       setMediaItems(Array.isArray(mediaData) ? mediaData : []);
+      console.info('[admin/website] CMS pages loaded');
     } catch (error) {
-      toast.error(error?.response?.data?.detail || 'Failed to load website pages');
-      setPages(mergeRequiredPages([]));
+      const message = error?.response?.data?.detail || error?.response?.data?.message || 'Failed to load website pages';
+      console.error('[admin/website] CMS page load failed', error);
+      toast.error(message);
+      setLoadError(message);
+      setPages([]);
     } finally {
       setLoading(false);
+      console.info('[admin/website] CMS page loading finished');
     }
   };
 
@@ -70,6 +78,11 @@ const Website = () => {
 
       {loading ? (
         <div className="text-center text-slate-400">Loading pages...</div>
+      ) : loadError ? (
+        <div className="rounded-2xl border border-rose-500/30 bg-rose-500/10 p-6 text-rose-100">
+          <p>{loadError}</p>
+          <button type="button" onClick={loadData} className="mt-4 rounded-lg bg-violet-600 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-500">Retry</button>
+        </div>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {pages.map((page) => (
