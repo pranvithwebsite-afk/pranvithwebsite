@@ -17,24 +17,6 @@ const DEVELOPMENT_CATALOG_API = 'https://pranvithdop.com/api';
 const USE_DEVELOPMENT_CATALOG = process.env.NODE_ENV === 'development';
 const sessionCache = new Map();
 
-const catalogRequestUrl = () => api.getUri({ url: '/products' });
-
-const debugCatalogRequest = (message, details) => {
-  if (USE_DEVELOPMENT_CATALOG) console.debug(`[public-api] products ${message}`, details);
-};
-
-const extractProducts = (payload) => {
-  const decoded = decodeCmsText(payload);
-  const candidates = [
-    decoded,
-    decoded?.data,
-    decoded?.assets,
-    decoded?.data?.data,
-    decoded?.data?.assets,
-  ];
-  return candidates.find(Array.isArray) || [];
-};
-
 const cachedRequest = async (key, request, ttlMs = 5 * 60 * 1000) => {
   const now = Date.now();
   const cached = sessionCache.get(key);
@@ -106,20 +88,12 @@ const FALLBACK_PRODUCTS = [
 
 const logApiError = (label, error) => {
   const status = error?.response?.status;
-  const response = error?.response?.data;
-  const detail = response?.detail || response?.message || error?.message || error;
+  const detail = error?.response?.data?.detail || error?.message || error;
   console.error(`[api] ${label} failed`, {
     baseURL: API || '/api',
     status,
     detail,
   });
-  if (USE_DEVELOPMENT_CATALOG) {
-    console.debug('[public-api] products error response', {
-      url: catalogRequestUrl(),
-      status,
-      response,
-    });
-  }
 };
 
 export const api = axios.create({
@@ -177,36 +151,65 @@ const getFallbackProductBySlug = (slug) =>
 export const fetchProducts = async ({ signal } = {}) => {
   if (USE_DEVELOPMENT_CATALOG && !BACKEND_URL) {
     try {
-      debugCatalogRequest('request', { url: `${DEVELOPMENT_CATALOG_API}/products` });
-      const products = extractProducts(await fetchDevelopmentCatalog('/products', { signal }));
-      debugCatalogRequest('response', { url: `${DEVELOPMENT_CATALOG_API}/products`, status: 200, count: products.length });
-      return products;
+      const requestUrl = `${DEVELOPMENT_CATALOG_API}/products`;
+      if (USE_DEVELOPMENT_CATALOG) {
+        console.log('[Assets] API base URL:', BACKEND_URL || '(same-origin /api)');
+        console.log('[Assets] Request URL:', requestUrl);
+      }
+      const data = decodeCmsText(await fetchDevelopmentCatalog('/products', { signal }));
+      console.debug('[public-api] products response', { source: 'development', count: Array.isArray(data) ? data.length : 0 });
+      return data;
     } catch (error) {
+      if (USE_DEVELOPMENT_CATALOG) {
+        console.error('[Assets] Fetch failed:', error);
+        console.error({
+          message: error.message,
+          code: error.code,
+          status: error.response?.status,
+          response: error.response?.data,
+          requestUrl: error.config?.url,
+          baseURL: error.config?.baseURL,
+        });
+      }
       logApiError('development catalog products fallback', error);
       throw error;
     }
   }
 
   try {
-    const url = catalogRequestUrl();
-    debugCatalogRequest('request', { url });
-    const response = await api.get('/products', { signal });
-    const products = extractProducts(response.data);
-    debugCatalogRequest('response', { url, status: response.status, count: products.length });
-    if (USE_DEVELOPMENT_CATALOG && products.length === 0) {
+    const requestUrl = api.getUri({ url: '/products' });
+    if (USE_DEVELOPMENT_CATALOG) {
+      console.log('[Assets] API base URL:', BACKEND_URL || '(same-origin /api)');
+      console.log('[Assets] Request URL:', requestUrl);
+    }
+    const { data } = await api.get('/products', { signal });
+    if (USE_DEVELOPMENT_CATALOG && Array.isArray(data) && data.length === 0) {
       try {
-        return extractProducts(await fetchDevelopmentCatalog('/products', { signal }));
+        return decodeCmsText(await fetchDevelopmentCatalog('/products', { signal }));
       } catch (error) {
         logApiError('development catalog products fallback', error);
         throw error;
       }
     }
-    return products;
+    const decoded = decodeCmsText(data);
+    console.debug('[public-api] products response', { source: 'api', count: Array.isArray(decoded) ? decoded.length : 0 });
+    return decoded;
   } catch (error) {
+    if (USE_DEVELOPMENT_CATALOG) {
+      console.error('[Assets] Fetch failed:', error);
+      console.error({
+        message: error.message,
+        code: error.code,
+        status: error.response?.status,
+        response: error.response?.data,
+        requestUrl: error.config?.url,
+        baseURL: error.config?.baseURL,
+      });
+    }
     logApiError('products request', error);
     if (USE_DEVELOPMENT_CATALOG) {
       try {
-        return extractProducts(await fetchDevelopmentCatalog('/products', { signal }));
+        return decodeCmsText(await fetchDevelopmentCatalog('/products', { signal }));
       } catch (fallbackError) {
         logApiError('development catalog products fallback', fallbackError);
       }

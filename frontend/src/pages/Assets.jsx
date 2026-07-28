@@ -138,6 +138,9 @@ const Assets = () => {
       );
   }, [products, query, selectedCategory, sort, priceFilter]);
   const settings = cmsPage?.settings || {};
+  const isDevelopment = process.env.NODE_ENV === 'development';
+  const fetchErrorMessage = loadError?.message || 'Unknown request error';
+  const fetchErrorStatus = loadError?.response?.status;
   const pageHidden = cmsPage?.status === 'hidden';
   const showProductListing = !pageHidden && settings.show_product_listing !== false;
   const showFilters = settings.show_filters !== false;
@@ -264,6 +267,11 @@ const Assets = () => {
               ) : loadError ? (
                 <div className="rounded-2xl border border-rose-500/20 bg-rose-500/5 p-12 text-center text-white/70" data-testid="assets-error">
                   <p>{navigator.onLine ? 'We could not reach the asset catalogue.' : 'You appear to be offline. Reconnect, then try again.'}</p>
+                  {isDevelopment && (
+                    <p className="mt-2 text-xs text-rose-200/80">
+                      {fetchErrorStatus ? `HTTP ${fetchErrorStatus}: ` : ''}{fetchErrorMessage}
+                    </p>
+                  )}
                   <button type="button" onClick={() => refetch()} className="mt-5 rounded-full border border-white/20 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-white/10">
                     Retry now
                   </button>
