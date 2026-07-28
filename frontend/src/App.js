@@ -1,10 +1,11 @@
-import React, { Suspense, lazy } from 'react';
+import React, { Suspense, lazy, useEffect, useRef } from 'react';
 import './App.css';
 import { BrowserRouter, useLocation } from 'react-router-dom';
 import ScrollToTop from './components/ScrollToTop';
 import PublicPageLoaderProvider from './components/PublicPageLoader';
 import { Toaster } from 'sonner';
 import PublicApp from './PublicApp';
+import { initializeMetaPixel, trackPageView } from './utils/metaPixel';
 
 const AdminApp = lazy(() => import('./admin/AdminApp'));
 
@@ -28,12 +29,27 @@ const AppRouter = () => {
   );
 };
 
+const MetaPixelTracker = () => {
+  const location = useLocation();
+  const trackedLocationKeys = useRef(new Set());
+
+  useEffect(() => {
+    initializeMetaPixel();
+    if (trackedLocationKeys.current.has(location.key)) return;
+    trackedLocationKeys.current.add(location.key);
+    trackPageView();
+  }, [location.key]);
+
+  return null;
+};
+
 function App() {
   return (
     <div className="App min-h-screen text-white">
       <BrowserRouter>
         <PublicPageLoaderProvider>
           <ScrollToTop />
+          <MetaPixelTracker />
           <AppRouter />
         </PublicPageLoaderProvider>
       </BrowserRouter>

@@ -24,6 +24,7 @@ import SafeVideoEmbed, { getSafeVideoEmbedUrl, isDirectVideoUrl } from '../compo
 import OptimizedImage from '../components/OptimizedImage';
 import ProductDescription from '../components/ProductDescription';
 import ViewportGate from '../components/ViewportGate';
+import { trackViewContent } from '../utils/metaPixel';
 
 const toStringList = (value) => (
   Array.isArray(value)
@@ -140,6 +141,7 @@ const AssetLanding = () => {
   const [notFound, setNotFound] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [checkoutOpen, setCheckoutOpen] = useState(false);
+  const viewedProductIds = useRef(new Set());
   usePublicPageLoading(loading);
 
   useEffect(() => {
@@ -198,6 +200,13 @@ const AssetLanding = () => {
     beforeImageUrl,
     afterImageUrl,
   } = asset;
+
+  useEffect(() => {
+    const productId = product?.id ?? product?.slug;
+    if (!productId || viewedProductIds.current.has(productId)) return;
+    viewedProductIds.current.add(productId);
+    trackViewContent(product);
+  }, [product]);
 
   const heroHeadline = String(landing.hero?.headline || landing.headline || name || 'Asset').trim() || 'Asset';
   const heroSubhead = String(landing.hero?.subhead || landing.subhead || description || 'Product details will be available soon.').trim();

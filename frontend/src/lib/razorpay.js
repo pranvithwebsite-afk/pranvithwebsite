@@ -105,7 +105,10 @@ export async function payWithRazorpay({ amountRupees, itemId, itemName, productS
             success: !!data?.success && verifiedPaid,
             verifiedPaid,
             paymentId: response.razorpay_payment_id,
+            // Preserve the existing Razorpay order ID for the checkout flow,
+            // while exposing the backend-confirmed order ID for analytics.
             orderId: response.razorpay_order_id,
+            verifiedOrderId: data?.orderId || response.razorpay_order_id,
             productSlug: data?.productSlug,
             courseAccessUrl: data?.courseAccessUrl || '',
             downloadToken: verifiedPaid ? (data?.downloadToken || new URLSearchParams((data?.downloadUrl || '').split('?')[1] || '').get('token')) : '',

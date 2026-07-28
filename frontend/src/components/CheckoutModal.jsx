@@ -1,7 +1,8 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { X, Loader2 } from 'lucide-react';
 import { payWithRazorpay } from '../lib/razorpay';
 import { createFreeOrder } from '../lib/api';
+import { trackInitiateCheckout, trackPurchase, trackViewContent } from '../utils/metaPixel';
 
 const initialForm = {
   name: '',
@@ -30,7 +31,15 @@ const CheckoutModal = ({ product, open, onClose, onSuccess, onFailure }) => {
   const [errors, setErrors] = useState({});
   const [busy, setBusy] = useState(false);
   const submitLock = useRef(false);
+  const viewedProductIds = useRef(new Set());
   const [message, setMessage] = useState('');
+
+  useEffect(() => {
+    const productId = product?.id ?? product?.slug;
+    if (!open || !productId || viewedProductIds.current.has(productId)) return;
+    viewedProductIds.current.add(productId);
+    trackViewContent(product);
+  }, [open, product]);
 
   if (!open || !product) return null;
 
@@ -77,6 +86,8 @@ const CheckoutModal = ({ product, open, onClose, onSuccess, onFailure }) => {
         result = { success: false, error: typeof msg === 'string' ? msg : 'Could not create free order' };
       }
     } else {
+      // This happens after the buyer submits checkout and before Razorpay opens.
+      trackInitiateCheckout(product);
       result = await payWithRazorpay({
         amountRupees: price,
         itemId: product.id,
@@ -94,6 +105,11 @@ const CheckoutModal = ({ product, open, onClose, onSuccess, onFailure }) => {
     submitLock.current = false;
 
     if (result.success) {
+      // payWithRazorpay sets success only after /orders/verify returns both
+      // success and verifiedPaid. Do not move this before that response.
+      if (result.verifiedPaid) {
+        trackPurchase(product, result.verifiedOrderId || result.orderId);
+      }
       setForm(initialForm);
       onSuccess?.(result);
       return;
