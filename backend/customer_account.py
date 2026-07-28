@@ -27,7 +27,7 @@ router = APIRouter(prefix="/api/account")
 
 # ── Helpers for lazy server access ──────────────────────────────────────────
 def _server():
-    import server as s
+    from backend import server as s
     return s
 
 def _db():

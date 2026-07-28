@@ -373,6 +373,18 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(level
 logger = logging.getLogger(__name__)
 
 
+def log_route_failure(route_name: str, error: Exception) -> None:
+    """Record the original route exception without exposing it to public clients."""
+    logger.error(
+        "[%s] failed name=%s message=%s cause=%r stack=",
+        route_name,
+        type(error).__name__,
+        str(error),
+        error.__cause__,
+        exc_info=(type(error), error, error.__traceback__),
+    )
+
+
 @app.middleware("http")
 async def add_security_headers(request: Request, call_next):
     logger.info("API request started method=%s path=%s", request.method, request.url.path)
@@ -1281,7 +1293,11 @@ async def get_faqs():
 async def public_settings():
     if db is None:
         return _safe_settings(SETTINGS)
-    settings_doc = await db.settings.find_one({}, {"_id": 0})
+    try:
+        settings_doc = await db.settings.find_one({}, {"_id": 0})
+    except Exception as exc:
+        log_route_failure("public_settings", exc)
+        raise HTTPException(status_code=500, detail="Could not load public settings") from exc
     if not settings_doc:
         return {
             "site_name": "PranvithDOP",
@@ -2491,7 +2507,13 @@ async def public_cms_page(page_key: str):
             "seo_description": "",
             "sections": [],
         }
-    return await _cms_page_response(page_key, public=True)
+    try:
+        return await _cms_page_response(page_key, public=True)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        log_route_failure("public_cms_page", exc)
+        raise HTTPException(status_code=500, detail="Could not load CMS page") from exc
 
 
 def _public_product(product: dict) -> dict:
@@ -2572,13 +2594,8 @@ async def public_products():
         )
         return [_public_product_summary(row) for row in rows]
     except Exception as exc:
-        logger.exception(
-            "Public products endpoint failed; falling back to seeded catalog. database=%s collection=products error_type=%s",
-            db_name,
-            type(exc).__name__,
-        )
-        products = [_public_product_summary(product) for product in ASSET_PRODUCTS if product.get("published", True)]
-        return products
+        log_route_failure("public_products", exc)
+        raise HTTPException(status_code=500, detail="Could not load public products") from exc
 
 
 @api_router.get("/products/{slug}")

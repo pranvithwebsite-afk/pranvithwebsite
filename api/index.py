@@ -1,86 +1,78 @@
-"""Vercel serverless entrypoint for the FastAPI backend."""
+"""Vercel serverless entrypoint for the FastAPI backend.
+
+The diagnostic routes below intentionally stay available if the backend package
+cannot be imported.  This makes a Vercel startup failure observable without
+exposing exception details or secrets in HTTP responses.
+"""
 import logging
 import os
-from pathlib import Path
-import sys
+import traceback
+
+from fastapi import FastAPI
 
 
 logging.basicConfig(level=os.environ.get("LOG_LEVEL", "INFO").upper())
 logger = logging.getLogger("vercel.startup")
 
-ROOT_DIR = Path(__file__).resolve().parents[1]
-BACKEND_DIR = Path(__file__).resolve().parents[1] / "backend"
-if str(BACKEND_DIR) not in sys.path:
-    sys.path.insert(0, str(BACKEND_DIR))
-if str(ROOT_DIR) not in sys.path:
-    sys.path.insert(0, str(ROOT_DIR))
+app = FastAPI(title="PranvithDOP Vercel Entrypoint")
+startup_error_type = None
+startup_error_message = None
+startup_error_traceback = None
 
 
-def _env_state(name: str) -> str:
-    return "SET" if os.environ.get(name) else "MISSING"
+def _env_state(*names: str) -> bool:
+    return any(bool(os.environ.get(name)) for name in names)
 
 
 def _startup_env_report() -> None:
-    required_groups = {
-        "database_url": ("MONGO_URL", "DATABASE_URL"),
-        "database_name": ("DB_NAME",),
-        "jwt_secret": ("JWT_SECRET",),
-        "razorpay_key_id": ("RAZORPAY_KEY_ID",),
-        "razorpay_secret": ("RAZORPAY_KEY_SECRET", "RAZORPAY_SECRET"),
-        "public_origin": ("PUBLIC_SITE_URL", "FRONTEND_URL", "PUBLIC_BASE_URL"),
+    states = {
+        "MONGO_URL_OR_DATABASE_URL": _env_state("MONGO_URL", "DATABASE_URL"),
+        "DB_NAME": _env_state("DB_NAME"),
+        "JWT_SECRET": _env_state("JWT_SECRET"),
+        "RAZORPAY_KEY_ID": _env_state("RAZORPAY_KEY_ID"),
+        "RAZORPAY_KEY_SECRET_OR_RAZORPAY_SECRET": _env_state("RAZORPAY_KEY_SECRET", "RAZORPAY_SECRET"),
+        "PUBLIC_SITE_URL_OR_FRONTEND_URL": _env_state("PUBLIC_SITE_URL", "FRONTEND_URL", "PUBLIC_BASE_URL"),
     }
-    missing = [
-        label
-        for label, names in required_groups.items()
-        if not any(os.environ.get(name) for name in names)
-    ]
-    if missing:
-        logger.warning(
-            "Vercel backend environment incomplete missing_groups=%s required_names=%s",
-            missing,
-            required_groups,
-        )
-    else:
-        logger.info("Vercel backend required environment variables are present.")
-
-    logger.info(
-        "Vercel backend env snapshot %s",
-        {
-            "MONGO_URL_OR_DATABASE_URL": "SET" if os.environ.get("MONGO_URL") or os.environ.get("DATABASE_URL") else "MISSING",
-            "DB_NAME": _env_state("DB_NAME"),
-            "JWT_SECRET": _env_state("JWT_SECRET"),
-            "RAZORPAY_KEY_ID": _env_state("RAZORPAY_KEY_ID"),
-            "RAZORPAY_KEY_SECRET_OR_RAZORPAY_SECRET": "SET" if os.environ.get("RAZORPAY_KEY_SECRET") or os.environ.get("RAZORPAY_SECRET") else "MISSING",
-            "RAZORPAY_WEBHOOK_SECRET": _env_state("RAZORPAY_WEBHOOK_SECRET"),
-            "PUBLIC_SITE_URL": _env_state("PUBLIC_SITE_URL"),
-            "FRONTEND_URL": _env_state("FRONTEND_URL"),
-            "SMTP_HOST": _env_state("SMTP_HOST"),
-            "CLOUDFLARE_R2_PUBLIC_BASE_URL": _env_state("CLOUDFLARE_R2_PUBLIC_BASE_URL"),
-        },
-    )
+    missing = [name for name, configured in states.items() if not configured]
+    logger.info("Vercel backend environment configured=%s missing=%s", states, missing)
 
 
-def _load_app():
-    try:
-        _startup_env_report()
-        # Import through the backend package so relative imports in
-        # backend.server (for example .seed_data and .excel_export) keep
-        # their package context in Vercel's Python runtime.
-        from backend.server import app as fastapi_app  # noqa: E402
-
-        logger.info("FastAPI app imported successfully from %s", BACKEND_DIR)
-        return fastapi_app
-    except ModuleNotFoundError as exc:
-        logger.exception(
-            "FastAPI startup failed because a Python module is missing. "
-            "Check root/api requirements files and the import path. missing_module=%s backend_dir=%s",
-            exc.name,
-            BACKEND_DIR,
-        )
-        raise
-    except Exception:
-        logger.exception("FastAPI startup failed while importing backend.server.")
-        raise
+@app.get("/api/health")
+async def health():
+    return {
+        "status": "ok",
+        "mongo_configured": _env_state("MONGO_URL", "DATABASE_URL"),
+        "db_name_configured": _env_state("DB_NAME"),
+        "jwt_secret_configured": _env_state("JWT_SECRET"),
+    }
 
 
-app = _load_app()
+@app.get("/api/startup-error")
+async def startup_error():
+    if startup_error_type is None:
+        return {"status": "ok", "message": "backend.server imported successfully"}
+    return {
+        "status": "backend_import_failed",
+        "exception": startup_error_type,
+        "message": startup_error_message,
+    }
+
+
+try:
+    _startup_env_report()
+    logger.info("Importing backend.server")
+    from backend.server import app as backend_app
+
+    # backend_app already registers the /api-prefixed router. Mounting at the
+    # root preserves public URLs such as /api/products without duplication.
+    app.mount("/", backend_app)
+    logger.info("backend.server imported successfully")
+except Exception as exc:  # Keep diagnostic routes alive if application import fails.
+    startup_error_type = type(exc).__name__
+    startup_error_message = str(exc)
+    startup_error_traceback = traceback.format_exc()
+    logger.error("BACKEND IMPORT FAILED")
+    logger.error("Type: %s", startup_error_type)
+    logger.error("Message: %s", startup_error_message)
+    logger.error("Cause: %r", exc.__cause__)
+    logger.error("Traceback:\n%s", startup_error_traceback)
