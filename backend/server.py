@@ -5,6 +5,7 @@ from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from starlette.responses import JSONResponse, RedirectResponse, PlainTextResponse, StreamingResponse
 from motor.motor_asyncio import AsyncIOMotorClient
+from bson import ObjectId
 from pymongo.errors import DuplicateKeyError, OperationFailure, ServerSelectionTimeoutError
 from passlib.context import CryptContext
 from jose import JWTError, jwt
@@ -1174,6 +1175,7 @@ class PaymentCreateOrderIn(BaseModel):
     name: str = Field(min_length=2, max_length=120)
     email: EmailStr
     phone: str = Field(min_length=7, max_length=20)
+    guest_checkout: bool = False
 
 
 class PaymentVerifyIn(BaseModel):
@@ -1184,12 +1186,26 @@ class PaymentVerifyIn(BaseModel):
     asset_slug: Optional[str] = None
 
 
+class GuestCreateOrderRequest(BaseModel):
+    productId: str = Field(min_length=1, max_length=160)
+    name: str = Field(min_length=2, max_length=120)
+    email: EmailStr
+    phone: str = Field(min_length=7, max_length=20)
+
+
+class GuestVerifyPaymentRequest(BaseModel):
+    razorpay_order_id: str = Field(min_length=1)
+    razorpay_payment_id: str = Field(min_length=1)
+    razorpay_signature: str = Field(min_length=1)
+
+
 class PaymentFreeOrderIn(BaseModel):
     product_id: Optional[str] = None
     product_slug: Optional[str] = None
     name: Optional[str] = Field(default=None, min_length=2, max_length=120)
     email: Optional[EmailStr] = None
     phone: Optional[str] = Field(default=None, min_length=7, max_length=20)
+    guest_checkout: bool = False
 
 
 class CheckoutOrder(BaseModel):
@@ -5562,9 +5578,11 @@ DEFAULT_PUBLIC_SITE_URL = "https://pranvithdop.com"
 
 def _normalize_phone(phone: str) -> str:
     cleaned = re.sub(r"[\s().-]+", "", phone or "")
-    if not re.fullmatch(r"\+?\d{7,15}", cleaned):
-        raise HTTPException(status_code=422, detail="Enter a valid phone number")
-    return cleaned
+    digits = re.sub(r"\D", "", cleaned)
+    local_number = digits[2:] if digits.startswith("91") else digits
+    if not re.fullmatch(r"[6-9]\d{9}", local_number):
+        raise HTTPException(status_code=422, detail="Enter a valid 10-digit Indian phone number")
+    return f"+91{local_number}"
 
 
 async def _payment_attempt_collection():
@@ -5696,6 +5714,25 @@ async def _find_checkout_product(product_id: Optional[str], product_slug: Option
             ),
             None,
         )
+    if product:
+        return {**product, "catalog_type": "product"}
+
+    course = None
+    if db is not None and product_id:
+        course_query = {"published": {"$ne": False}}
+        course = await db.courses.find_one({**course_query, "id": product_id})
+        if not course and ObjectId.is_valid(product_id):
+            course = await db.courses.find_one({**course_query, "_id": ObjectId(product_id)})
+    if not course and product_id:
+        course = next((item for item in COURSES if item.get("id") == product_id), None)
+    if course:
+        course_id = str(course.get("id") or course.get("_id"))
+        return {
+            **course,
+            "id": course_id,
+            "name": course.get("title") or course.get("name") or "Course",
+            "catalog_type": "course",
+        }
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
     return product
@@ -5935,6 +5972,10 @@ def _customer_order_summary(order: dict, product: dict) -> dict:
 
 
 async def _upsert_checkout_customer(order: dict, product: dict) -> None:
+    # Guest purchasers are stored with their order only; they do not receive a
+    # customer profile or an account as a side effect of paying.
+    if order.get("guest_checkout"):
+        return
     if db is None:
         return
     now = datetime.now(timezone.utc).isoformat()
@@ -6066,7 +6107,15 @@ def _smtp_error_message(exc: Exception) -> str:
     return f"{type(exc).__name__}: {detail}" if detail else type(exc).__name__
 
 
-def _send_download_email(to_email: str, buyer_name: str, product_name: str, payment_id: str, download_url: str) -> dict:
+def _send_download_email(
+    to_email: str,
+    buyer_name: str,
+    product_name: str,
+    payment_id: str,
+    download_url: str,
+    *,
+    link_label: str = "Your download is ready",
+) -> dict:
     smtp_host = os.environ.get("SMTP_HOST")
     smtp_port_value = os.environ.get("SMTP_PORT", "587") or "587"
     try:
@@ -6085,7 +6134,7 @@ def _send_download_email(to_email: str, buyer_name: str, product_name: str, paym
         return {"sent": False, "error": error}
 
     msg = EmailMessage()
-    msg["Subject"] = "Your download is ready - PranvithDOP"
+    msg["Subject"] = f"{link_label} - PranvithDOP"
     msg["From"] = smtp_from
     msg["To"] = to_email
     safe_buyer_name = html.escape(buyer_name)
@@ -6097,7 +6146,7 @@ def _send_download_email(to_email: str, buyer_name: str, product_name: str, paym
             "",
             "Thank you for your purchase.",
             "",
-            "Your download is ready:",
+            f"{link_label}:",
             download_url,
             "",
             "Product:",
@@ -6114,7 +6163,7 @@ def _send_download_email(to_email: str, buyer_name: str, product_name: str, paym
             "  <body>",
             f"    <p>Hi {safe_buyer_name},</p>",
             "    <p>Thank you for your purchase.</p>",
-            f"    <p>Your download is ready: <a href=\"{safe_download_url}\">{safe_download_url}</a></p>",
+            f"    <p>{html.escape(link_label)}: <a href=\"{safe_download_url}\">{safe_download_url}</a></p>",
             f"    <p><strong>Product:</strong> {safe_product_name}</p>",
             "    <p>Regards,<br>PranvithDOP</p>",
             "  </body>",
@@ -6680,16 +6729,17 @@ async def _fulfill_paid_order(order: dict, product: dict, payment_id: str, send_
     now = datetime.now(timezone.utc).isoformat()
     payment_attempt_collection = await _payment_attempt_collection()
     was_paid = order.get("status") == "paid" or order.get("payment_status") == "paid"
+    is_course = product.get("catalog_type") == "course"
     download_url = order.get("download_url")
     download_token = None
     download_token_hash = order.get("download_token_hash")
     if not download_url or not download_token_hash:
         download_token = secrets.token_urlsafe(32)
-        download_url = _paid_download_url(order.get("razorpay_order_id") or order.get("id"), download_token)
+        download_url = _paid_download_url(order.get("razorpay_order_id") or order.get("id"), download_token) if not is_course else None
         download_token_hash = _hash_download_token(download_token)
 
     download_fields = _product_download_fields(product, order)
-    if not download_fields.get("download_file_key") and not download_fields.get("download_file"):
+    if not is_course and not download_fields.get("download_file_key") and not download_fields.get("download_file"):
         raise HTTPException(status_code=404, detail="Download file not configured")
 
     paid_fields = {
@@ -6701,8 +6751,8 @@ async def _fulfill_paid_order(order: dict, product: dict, payment_id: str, send_
         "verified_at": order.get("verified_at") or now,
         "paid_at": order.get("paid_at") or now,
         "download_token_hash": download_token_hash,
-        "download_url": download_url,
-        **download_fields,
+        "catalog_type": product.get("catalog_type", "product"),
+        **({"course_access_url": product.get("access_url") or "/courses"} if is_course else {"download_url": download_url, **download_fields}),
     }
     if order.get("razorpay_order_id"):
         paid_fields["razorpay_order_id"] = order.get("razorpay_order_id")
@@ -6733,8 +6783,10 @@ async def _fulfill_paid_order(order: dict, product: dict, payment_id: str, send_
     if payment_attempt_collection is not None:
         await payment_attempt_collection.update_one(order_filter, {"$set": {**paid_fields, "order_id": fulfilled_order.get("id"), "updated_at": now}})
 
-    if not was_paid:
+    if not was_paid and not is_course:
         await db.products.update_one({"id": product.get("id")}, {"$inc": {"sold_count": 1}})
+    elif not was_paid and is_course:
+        await db.courses.update_one({"id": product.get("id")}, {"$inc": {"enrollment_count": 1}})
 
     checkout_sessions = await _checkout_session_collection()
     if checkout_sessions is not None:
@@ -6759,7 +6811,8 @@ async def _fulfill_paid_order(order: dict, product: dict, payment_id: str, send_
                 order.get("customer_name") or order.get("buyer_name", "there"),
                 order.get("product_name") or product.get("name", "your asset"),
                 payment_id,
-                _public_download_url(download_url),
+                _public_download_url(download_url) if download_url else _public_download_url(product.get("access_url") or "/courses"),
+                link_label="Your course access is ready" if is_course else "Your download is ready",
             )
             email_sent, email_error = _normalize_email_result(result)
             email_attempted_at = now
@@ -6790,6 +6843,7 @@ async def _fulfill_paid_order(order: dict, product: dict, payment_id: str, send_
         "order": fulfilled_order,
         "download_token": download_token,
         "download_url": download_url,
+        "course_access_url": product.get("access_url") or "/courses" if is_course else None,
         "email_sent": email_sent,
         "email_error": email_error,
         "email_delivery_status": email_delivery_status,
@@ -6912,6 +6966,7 @@ async def checkout_create_order(payload: PaymentCreateOrderIn):
         "product_slug": product.get("slug"),
         "product_name": product.get("name"),
         "product_title": product.get("name"),
+        "catalog_type": product.get("catalog_type", "product"),
         "status": "pending",
         "payment_status": "pending",
         "customer_name": customer_name,
@@ -6923,6 +6978,7 @@ async def checkout_create_order(payload: PaymentCreateOrderIn):
         "created_at": datetime.now(timezone.utc).isoformat(),
         "updated_at": datetime.now(timezone.utc).isoformat(),
         "source": "razorpay_checkout",
+        "guest_checkout": payload.guest_checkout,
         "verified": False,
         "payment_verified_at": None,
         "timeline": {
@@ -7120,6 +7176,66 @@ async def checkout_verify_payment(payload: PaymentVerifyIn):
         "email_delivery_status": fulfillment["email_delivery_status"],
         "email_delivery_error": fulfillment["email_delivery_error"],
         "customer_access_token": _customer_token(buyer_email),
+    }
+
+
+@api_router.post("/orders/create")
+async def create_guest_order(payload: GuestCreateOrderRequest):
+    """Guest checkout entry point. The legacy checkout service owns all pricing and Razorpay work."""
+    try:
+        result = await checkout_create_order(PaymentCreateOrderIn(
+            product_id=payload.productId,
+            name=payload.name,
+            email=payload.email,
+            phone=payload.phone,
+            guest_checkout=True,
+        ))
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception("[POST /api/orders/create] failed")
+        raise HTTPException(status_code=500, detail="Could not create order") from exc
+
+    if result.get("already_owned"):
+        return {"success": False, "alreadyOwned": True, "message": result.get("message", "You already own this item.")}
+    return {
+        "success": True,
+        "orderId": result["order_id"],
+        "amount": result["amount"],
+        "currency": result["currency"],
+        "keyId": result["key_id"],
+        "productName": result["product_name"],
+    }
+
+
+@api_router.post("/orders/verify")
+async def verify_guest_order(payload: GuestVerifyPaymentRequest):
+    """Verify a Razorpay signature server-side before granting any guest access."""
+    try:
+        result = await checkout_verify_payment(PaymentVerifyIn(
+            razorpay_order_id=payload.razorpay_order_id,
+            razorpay_payment_id=payload.razorpay_payment_id,
+            razorpay_signature=payload.razorpay_signature,
+        ))
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception("[POST /api/orders/verify] failed")
+        raise HTTPException(status_code=500, detail="Could not verify payment") from exc
+
+    return {
+        "success": bool(result.get("success")),
+        "verifiedPaid": bool(result.get("verified_paid")),
+        "orderId": result.get("order_id"),
+        "paymentId": result.get("payment_id"),
+        "productSlug": result.get("product_slug"),
+        "productName": result.get("product_name"),
+        "downloadUrl": result.get("download_url"),
+        "downloadToken": result.get("download_token"),
+        "courseAccessUrl": result.get("course_access_url"),
+        "emailSent": bool(result.get("email_sent")),
+        "emailError": result.get("email_error"),
+        "error": result.get("error"),
     }
 
 
@@ -7537,6 +7653,7 @@ async def payment_free_order(payload: PaymentFreeOrderIn):
         "verified_at": datetime.now(timezone.utc).isoformat(),
         "paid_at": datetime.now(timezone.utc).isoformat(),
         "source": "free_download",
+        "guest_checkout": payload.guest_checkout,
         "download_token_hash": _hash_download_token(download_token),
         "download_url": download_url,
         **download_fields,

@@ -17,8 +17,10 @@ const validate = (values) => {
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(values.email.trim())) {
     errors.email = 'Enter a valid email';
   }
-  if (!/^\+?[\d\s().-]{7,20}$/.test(values.phone.trim())) {
-    errors.phone = 'Enter a valid phone number';
+  const digits = values.phone.replace(/\D/g, '');
+  const indianNumber = digits.startsWith('91') ? digits.slice(2) : digits;
+  if (!/^[6-9]\d{9}$/.test(indianNumber)) {
+    errors.phone = 'Enter a valid 10-digit Indian phone number';
   }
   return errors;
 };
@@ -62,6 +64,7 @@ const CheckoutModal = ({ product, open, onClose, onSuccess, onFailure }) => {
           name: form.name.trim(),
           email: form.email.trim(),
           phone: form.phone.trim(),
+          guest_checkout: true,
         });
         result = {
           success: true,
@@ -108,7 +111,7 @@ const CheckoutModal = ({ product, open, onClose, onSuccess, onFailure }) => {
           <div>
             <p className="text-xs uppercase tracking-[0.3em] text-violet-300">Checkout</p>
             <h2 className="mt-2 text-2xl font-bold text-white">{product.name || product.title}</h2>
-            <p className="mt-1 text-sm text-white/60">Pay Rs {Number(price).toLocaleString('en-IN')} and unlock the download.</p>
+            <p className="mt-1 text-sm text-white/60">Pay Rs {Number(price).toLocaleString('en-IN')} to continue.</p>
           </div>
           <button
             type="button"
@@ -122,7 +125,7 @@ const CheckoutModal = ({ product, open, onClose, onSuccess, onFailure }) => {
         </div>
 
         <form onSubmit={submit} className="mt-6 space-y-4" noValidate>
-          <Field label="Name" error={errors.name}>
+          <Field label="Full Name" error={errors.name}>
             <input
               value={form.name}
               onChange={(e) => update('name', e.target.value)}
@@ -132,7 +135,7 @@ const CheckoutModal = ({ product, open, onClose, onSuccess, onFailure }) => {
               required
             />
           </Field>
-          <Field label="Email" error={errors.email}>
+          <Field label="Email Address" error={errors.email}>
             <input
               value={form.email}
               onChange={(e) => update('email', e.target.value)}
@@ -167,11 +170,11 @@ const CheckoutModal = ({ product, open, onClose, onSuccess, onFailure }) => {
             className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-violet-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-violet-500 disabled:opacity-60"
           >
             {busy ? (
-              <><Loader2 size={16} className="animate-spin" /> Processing...</>
+              <><Loader2 size={16} className="animate-spin" /> Opening payment…</>
             ) : product?.is_free || price <= 0 ? (
               'Continue to download'
             ) : (
-              'Continue to payment'
+              'Continue to Payment'
             )}
           </button>
         </form>

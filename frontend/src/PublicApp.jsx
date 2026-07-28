@@ -14,7 +14,6 @@ const Services = lazy(() => import('./pages/Services'));
 const ServiceDetail = lazy(() => import('./pages/ServiceDetail'));
 const PaymentSuccess = lazy(() => import('./pages/PaymentSuccess'));
 const PaymentFailed = lazy(() => import('./pages/PaymentFailed'));
-const Account = lazy(() => import('./pages/Account'));
 const NotFound = lazy(() => import('./pages/NotFound'));
 
 const RouteFallback = () => (
@@ -39,8 +38,6 @@ const PublicApp = () => (
       <Route path="/services/:slug" element={<ServiceDetail />} />
       <Route path="/payment-success" element={<PaymentSuccess />} />
       <Route path="/payment-failed" element={<PaymentFailed />} />
-      <Route path="/account" element={<Account />} />
-      <Route path="/account/orders/:orderId" element={<Account />} />
       <Route path="/works" element={<Works />} />
       <Route path="/hire" element={<Hire />} />
       <Route path="/contact" element={<Hire />} />

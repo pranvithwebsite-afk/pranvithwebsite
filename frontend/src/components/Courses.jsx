@@ -1,15 +1,16 @@
 import React, { useEffect, useState } from 'react';
-import { ChevronRight, CheckCircle2, Loader2 } from 'lucide-react';
+import { ChevronRight, CheckCircle2 } from 'lucide-react';
 import { courses as mockCourses } from '../data/mock';
 import { fetchCourses } from '../lib/api';
-import { payWithRazorpay } from '../lib/razorpay';
 import { dedupeCatalogItems, getCatalogItemKey, handleImageError, safeImageSrc } from '../lib/utils';
 import { toast } from 'sonner';
+import CheckoutModal from './CheckoutModal';
 
 const Courses = ({ section }) => {
   const [courses, setCourses] = useState(() => dedupeCatalogItems(mockCourses));
   const [loading, setLoading] = useState(true);
-  const [buyingId, setBuyingId] = useState(null);
+  const [checkoutCourse, setCheckoutCourse] = useState(null);
+  const [completedPurchase, setCompletedPurchase] = useState(null);
 
   useEffect(() => {
     (async () => {
@@ -26,25 +27,11 @@ const Courses = ({ section }) => {
     })();
   }, []);
 
-  const handleBuy = async (course) => {
-    try {
-      setBuyingId(course.id);
-      const res = await payWithRazorpay({
-        amountRupees: course.price,
-        itemId: String(course.id),
-        itemName: course.title,
-      });
-      if (res.success) {
-        toast.success(`Enrolled! Payment ID: ${res.paymentId}`);
-      } else if (res.error === 'cancelled') {
-        toast.message('Payment cancelled');
-      } else {
-        toast.error(res.error || 'Payment failed');
-      }
-    } finally {
-      setBuyingId(null);
-    }
-  };
+  const handleBuy = (course) => setCheckoutCourse({
+    ...course,
+    name: course.title,
+    productType: 'course',
+  });
 
   return (
     <section className="relative py-24">
@@ -100,11 +87,10 @@ const Courses = ({ section }) => {
                   </div>
                   <button
                     onClick={() => handleBuy(c)}
-                    disabled={buyingId === c.id}
                     aria-label={`Buy ${c.title}`}
                     className="w-10 h-10 rounded-full bg-violet-600 hover:bg-violet-500 disabled:opacity-60 flex items-center justify-center text-white transition"
                   >
-                    {buyingId === c.id ? <Loader2 size={16} className="animate-spin" /> : <ChevronRight size={18} />}
+                    <ChevronRight size={18} />
                   </button>
                 </div>
               </div>
@@ -113,6 +99,41 @@ const Courses = ({ section }) => {
         </div>
         {loading && <p className="text-center text-white/30 text-xs mt-6">Loading latest catalog...</p>}
       </div>
+      <CheckoutModal
+        product={checkoutCourse}
+        open={!!checkoutCourse}
+        onClose={() => setCheckoutCourse(null)}
+        onSuccess={(result) => {
+          setCompletedPurchase({ course: checkoutCourse, result });
+          setCheckoutCourse(null);
+        }}
+        onFailure={(message) => toast.error(message)}
+      />
+      {completedPurchase && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4 py-6">
+          <div className="w-full max-w-md rounded-[24px] border border-emerald-500/20 bg-[var(--bg-elevated)] p-6 text-center shadow-2xl">
+            <CheckCircle2 className="mx-auto text-emerald-300" size={34} />
+            <p className="mt-4 text-xs uppercase tracking-[0.3em] text-emerald-300">Payment successful</p>
+            <h2 className="mt-2 text-2xl font-bold text-white">{completedPurchase.course.title}</h2>
+            <p className="mt-3 text-sm text-white/65">Order ID: {completedPurchase.result.orderId}</p>
+            <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-center">
+              <a
+                href={completedPurchase.result.courseAccessUrl || '/courses'}
+                className="rounded-xl bg-violet-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-violet-500"
+              >
+                Course Access
+              </a>
+              <button
+                type="button"
+                onClick={() => setCompletedPurchase(null)}
+                className="rounded-xl border border-white/15 px-5 py-3 text-sm font-semibold text-white/85 transition hover:bg-white/5"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </section>
   );
 };

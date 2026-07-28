@@ -35,9 +35,6 @@ const loadScript = () =>
  * @returns {Promise<{success: boolean, paymentId?: string, orderId?: string, downloadToken?: string, productSlug?: string, emailSent?: boolean, emailError?: string, error?: string}>}
  */
 export async function payWithRazorpay({ amountRupees, itemId, itemName, productSlug, prefill = {} }) {
-  if (!RAZORPAY_KEY_ID) {
-    return { success: false, error: 'Razorpay key missing on client' };
-  }
   const ok = await loadScript();
   if (!ok) {
     return { success: false, error: 'Failed to load Razorpay SDK' };
@@ -46,15 +43,14 @@ export async function payWithRazorpay({ amountRupees, itemId, itemName, productS
   // 1. Create order on backend. The backend calculates the final amount from the product.
   let order;
   try {
-    const { data } = await api.post('/checkout/create-order', {
-      product_id: itemId || '',
-      product_slug: productSlug || '',
+    const { data } = await api.post('/orders/create', {
+      productId: itemId || '',
       name: prefill.name || '',
       email: prefill.email || '',
       phone: prefill.contact || '',
     });
     order = data;
-    if (order?.already_owned) {
+    if (order?.alreadyOwned) {
       return { success: false, alreadyOwned: true, error: order.message || 'You already own this asset.' };
     }
   } catch (err) {
@@ -75,46 +71,46 @@ export async function payWithRazorpay({ amountRupees, itemId, itemName, productS
     };
     const markCancelled = async () => {
       try {
-        await api.post(`/checkout/${encodeURIComponent(order.order_id)}/cancel`);
+        await api.post(`/checkout/${encodeURIComponent(order.orderId)}/cancel`);
       } catch (_) {
         // Cancellation tracking is best-effort; payment verification remains server-side.
       }
     };
     const rzp = new window.Razorpay({
-      key: order.key_id || RAZORPAY_KEY_ID,
+      key: order.keyId || RAZORPAY_KEY_ID,
       amount: order.amount,
       currency: order.currency,
       name: 'PranvithDOP',
       description: itemName || 'Purchase',
-      order_id: order.order_id,
+      order_id: order.orderId,
       prefill,
       theme: { color: '#7c3aed' },
       modal: {
         ondismiss: async () => {
           await markCancelled();
-          settle({ success: false, error: 'cancelled', cancelled: true, orderId: order.order_id });
+          settle({ success: false, error: 'cancelled', cancelled: true, orderId: order.orderId });
         },
       },
       handler: async (response) => {
         try {
-          const { data } = await api.post('/checkout/verify-payment', {
+          const { data } = await api.post('/orders/verify', {
             razorpay_order_id: response.razorpay_order_id,
             razorpay_payment_id: response.razorpay_payment_id,
             razorpay_signature: response.razorpay_signature,
             buyer_email: prefill.email || '',
             asset_slug: productSlug || '',
           });
-          const verifiedPaid = data?.verified_paid === true;
+          const verifiedPaid = data?.verifiedPaid === true;
           settle({
             success: !!data?.success && verifiedPaid,
             verifiedPaid,
             paymentId: response.razorpay_payment_id,
             orderId: response.razorpay_order_id,
-            productSlug: data?.product_slug,
-            downloadToken: verifiedPaid ? (data?.download_token || new URLSearchParams((data?.download_url || '').split('?')[1] || '').get('token')) : '',
-            emailSent: !!data?.email_sent,
-            emailError: data?.email_error,
-            customerAccessToken: data?.customer_access_token || '',
+            productSlug: data?.productSlug,
+            courseAccessUrl: data?.courseAccessUrl || '',
+            downloadToken: verifiedPaid ? (data?.downloadToken || new URLSearchParams((data?.downloadUrl || '').split('?')[1] || '').get('token')) : '',
+            emailSent: !!data?.emailSent,
+            emailError: data?.emailError,
             failed: !verifiedPaid,
             error: verifiedPaid ? '' : (data?.error || 'Payment was not verified.'),
           });
@@ -134,7 +130,7 @@ export async function payWithRazorpay({ amountRupees, itemId, itemName, productS
     rzp.on('payment.failed', (resp) => {
       const reason = resp?.error?.description || 'Payment failed';
       const safeReason = String(reason).toLowerCase().includes('authentication failed') ? RAZORPAY_AUTH_ERROR : reason;
-      settle({ success: false, verifiedPaid: false, error: safeReason, failed: true, orderId: order.order_id });
+      settle({ success: false, verifiedPaid: false, error: safeReason, failed: true, orderId: order.orderId });
     });
 
     rzp.open();
