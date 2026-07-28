@@ -9,6 +9,18 @@ import { usePublicPageLoading } from '../components/PublicPageLoader';
 import { useCmsPage } from '../hooks/useCmsPage';
 import { useProducts } from '../hooks/useProducts';
 import OptimizedImage from '../components/OptimizedImage';
+import AssetCategoryFilter from '../components/AssetCategoryFilter';
+
+const assetCategories = [
+  'All Assets',
+  'PSD',
+  'Wedding Invitation',
+  'After Effects',
+  'Premiere Pro',
+  'Photoshop',
+  'LUTs',
+  'Sound Packs',
+];
 
 const defaultBackgrounds = [
   'linear-gradient(135deg, #2e1065 0%, #1a102d 60%, #05000d 100%)',
@@ -25,6 +37,22 @@ const findSection = (sections = [], idOrType) =>
   sections.find((section) => section.section_id === idOrType)
   || sections.find((section) => section.type === idOrType);
 
+const getAssetCategory = (item, name) => {
+  const source = `${item.category || ''} ${name} ${item.description || ''}`.toLowerCase();
+  if (source.includes('lut')) return 'LUTs';
+  if (source.includes('sound') || source.includes('sfx') || source.includes('sound fx')) return 'Sound Packs';
+  if (source.includes('after effects') || source.includes(' after effect') || source.includes(' ae ')) return 'After Effects';
+  if (source.includes('premiere pro')) return 'Premiere Pro';
+  if (source.includes('photoshop')) return 'Photoshop';
+  if (source.includes('psd')) return 'PSD';
+  return item.category || 'Asset';
+};
+
+const getAssetSubcategory = (item, name) => {
+  const source = `${item.subcategory || item.sub_category || ''} ${name} ${item.description || ''}`.toLowerCase();
+  return source.includes('wedding') && source.includes('invitation') ? 'Wedding Invitation' : (item.subcategory || item.sub_category || '');
+};
+
 const normalize = (item = {}, index) => {
   const numericPrice = Number(item.price ?? 0);
   const numericSalePrice = item.sale_price == null ? null : Number(item.sale_price);
@@ -33,7 +61,8 @@ const normalize = (item = {}, index) => {
     : (Number.isFinite(numericPrice) && numericPrice >= 0 ? numericPrice : 0);
   const original = Number.isFinite(numericPrice) && Number.isFinite(numericSalePrice) && numericPrice > numericSalePrice ? numericPrice : null;
   const name = item.name || item.title || 'Asset';
-  const category = item.category || 'Asset';
+  const category = getAssetCategory(item, name);
+  const subcategory = getAssetSubcategory(item, name);
   const slug = item.slug || item.id || `asset-${index}`;
   const heroImage = safeImageSrc(
     item.thumbnail_url
@@ -54,6 +83,7 @@ const normalize = (item = {}, index) => {
     name,
     title: name,
     category,
+    subcategory,
     sale_price: Number.isFinite(numericSalePrice) ? numericSalePrice : undefined,
     price,
     original,
@@ -75,6 +105,7 @@ const Assets = () => {
   const [query, setQuery] = useState('');
   const [sort, setSort] = useState('newest');
   const [priceFilter, setPriceFilter] = useState('all');
+  const [selectedCategory, setSelectedCategory] = useState('All Assets');
   const { products: rawProducts, loading, error: loadError, refetch } = useProducts();
   const [checkoutProduct, setCheckoutProduct] = useState(null);
   const [isMobileFilterOpen, setIsMobileFilterOpen] = useState(false);
@@ -86,33 +117,45 @@ const Assets = () => {
     return dedupeCatalogItems(rawProducts.filter(Boolean)).map((p, idx) => normalize(p, idx));
   }, [rawProducts]);
 
-  const filtered = useMemo(() => {
-    let list = [...products];
-    if (query.trim()) {
-      const q = query.toLowerCase();
-      list = list.filter((p) => p.title.toLowerCase().includes(q));
-    }
-    if (priceFilter === 'free') list = list.filter((p) => p.isFree);
-    if (priceFilter === 'paid') list = list.filter((p) => p.isPaid);
-    list.sort((a, b) =>
+  const filteredAssets = useMemo(() => {
+    const normalizedQuery = query.trim().toLowerCase();
+    return products
+      .filter((asset) => {
+        const matchesCategory = selectedCategory === 'All Assets'
+          || asset.category === selectedCategory
+          || asset.subcategory === selectedCategory;
+        const matchesSearch = !normalizedQuery || asset.title.toLowerCase().includes(normalizedQuery);
+        const matchesPrice = priceFilter === 'all'
+          || (priceFilter === 'free' && asset.isFree)
+          || (priceFilter === 'paid' && asset.isPaid);
+
+        return matchesCategory && matchesSearch && matchesPrice;
+      })
+      .sort((a, b) =>
       sort === 'newest'
         ? new Date(b.createdAt) - new Date(a.createdAt)
         : new Date(a.createdAt) - new Date(b.createdAt)
-    );
-    return list;
-  }, [products, query, sort, priceFilter]);
+      );
+  }, [products, query, selectedCategory, sort, priceFilter]);
   const settings = cmsPage?.settings || {};
   const pageHidden = cmsPage?.status === 'hidden';
   const showProductListing = !pageHidden && settings.show_product_listing !== false;
   const showFilters = settings.show_filters !== false;
   const heroSection = findSection(cmsPage?.sections || [], 'hero');
-  const activeFilterCount = (query.trim() ? 1 : 0) + (sort !== 'newest' ? 1 : 0) + (priceFilter !== 'all' ? 1 : 0);
+  const activeFilterCount = (query.trim() ? 1 : 0) + (sort !== 'newest' ? 1 : 0) + (priceFilter !== 'all' ? 1 : 0) + (selectedCategory !== 'All Assets' ? 1 : 0);
   const mobileFilterPanelId = 'assets-mobile-filters';
 
   const closeMobileFilters = () => setIsMobileFilterOpen(false);
 
   const closeMobileFiltersIfNeeded = () => {
     if (window.matchMedia?.('(max-width: 1023px)').matches) closeMobileFilters();
+  };
+
+  const resetFilters = () => {
+    setQuery('');
+    setSort('newest');
+    setPriceFilter('all');
+    setSelectedCategory('All Assets');
   };
 
   useEffect(() => {
@@ -146,7 +189,14 @@ const Assets = () => {
         )}
 
         {showProductListing && <section className={`pb-20 ${heroSection?.section_id ? '' : 'pt-28 md:pt-32'}`}>
-          <div className={`site-container grid min-w-0 grid-cols-1 gap-5 ${showFilters ? 'lg:grid-cols-[240px_minmax(0,1fr)]' : ''}`}>
+          <div className="site-container min-w-0">
+            <AssetCategoryFilter
+              categories={assetCategories}
+              selectedCategory={selectedCategory}
+              onCategoryChange={setSelectedCategory}
+            />
+          </div>
+          <div className={`site-container mt-5 grid min-w-0 grid-cols-1 gap-5 ${showFilters ? 'lg:grid-cols-[240px_minmax(0,1fr)]' : ''}`}>
             {showFilters && (
               <div ref={mobileFilterRef} className="lg:hidden">
                 <button
@@ -218,13 +268,21 @@ const Assets = () => {
                     Retry now
                   </button>
                 </div>
-              ) : filtered.length === 0 ? (
+              ) : filteredAssets.length === 0 ? (
                 <div className="cinematic-card p-12 text-center text-white/60" data-testid="assets-empty">
-                  No assets match your filters.
+                  <h2 className="text-xl font-semibold text-white">No assets found</h2>
+                  <p className="mt-2">Try changing your category or filters.</p>
+                  <button
+                    type="button"
+                    onClick={resetFilters}
+                    className="mt-5 rounded-full border border-white/15 bg-white/[0.03] px-5 py-2.5 text-sm font-semibold text-white transition hover:border-purple-500/60 hover:bg-purple-500/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-300 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0a0518]"
+                  >
+                    Reset all filters
+                  </button>
                 </div>
               ) : (
                 <div className="grid grid-cols-2 items-stretch gap-3 min-[768px]:gap-5 min-[1100px]:grid-cols-3 min-[1440px]:grid-cols-4 max-[374px]:grid-cols-1" data-testid="assets-grid">
-                  {filtered.map((p, index) => (
+                  {filteredAssets.map((p, index) => (
                     <ProductCard
                       key={getCatalogItemKey(p, index)}
                       p={p}
