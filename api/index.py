@@ -63,7 +63,10 @@ def _startup_env_report() -> None:
 def _load_app():
     try:
         _startup_env_report()
-        from server import app as fastapi_app  # noqa: E402
+        # Import through the backend package so relative imports in
+        # backend.server (for example .seed_data and .excel_export) keep
+        # their package context in Vercel's Python runtime.
+        from backend.server import app as fastapi_app  # noqa: E402
 
         logger.info("FastAPI app imported successfully from %s", BACKEND_DIR)
         return fastapi_app
