@@ -3444,13 +3444,13 @@ async def admin_reorder_services(payload: ServiceReorderIn, current_admin: Admin
 
 @admin_router.get("/products")
 async def admin_products(current_admin: AdminBase = Depends(get_current_active_admin)):
-    rows = await db.products.find({}, {"_id": 0}).to_list(100)
+    rows = await db.products.find({}).to_list(100)
     logger.info(
         "Product fetch source=mongodb database=%s collection=products scope=admin count=%d",
         db_name,
         len(rows),
     )
-    return [_normalize_product_media_fields(row) for row in rows]
+    return [{**{key: value for key, value in _normalize_product_media_fields(row).items() if key != "_id"}, "mongoId": str(row["_id"])} for row in rows]
 
 
 @admin_router.get("/products/{product_id}")
@@ -5841,6 +5841,7 @@ def _coupon_datetime(value: Any) -> Optional[datetime]:
 def _coupon_public(doc: dict) -> dict:
     result = {k: v for k, v in doc.items() if k != "_id"}
     result["id"] = str(doc.get("_id") or doc.get("id") or "")
+    result["productIds"] = [str(value) for value in (doc.get("productIds") or [])]
     for key in ("startsAt", "expiresAt", "createdAt", "updatedAt"):
         if isinstance(result.get(key), datetime): result[key] = result[key].isoformat()
     return result
@@ -5856,7 +5857,24 @@ async def _coupon_products(product_ids: List[str]) -> List[dict]:
     products = await db.products.find({"_id": {"$in": object_ids}, "published": True}).to_list(length=len(object_ids))
     if len(products) != len(object_ids):
         raise HTTPException(status_code=404, detail="Product not found")
-    return [{**product, "id": product.get("id") or str(product["_id"]), "catalog_type": "product"} for product in products]
+    return [{**product, "id": str(product["_id"]), "productId": product.get("id"), "catalog_type": "product"} for product in products]
+
+
+async def _validate_coupon_product_selection(applies_to: str, product_ids: List[str]) -> List[str]:
+    normalized = list(dict.fromkeys(str(value) for value in (product_ids or []) if value))
+    if applies_to == "all_products":
+        return []
+    if applies_to != "selected_products":
+        return normalized
+    if not normalized:
+        raise HTTPException(status_code=422, detail="Select at least one product")
+    invalid = [value for value in normalized if not ObjectId.is_valid(value)]
+    if invalid:
+        raise HTTPException(status_code=422, detail="One or more selected product IDs are invalid")
+    count = await db.products.count_documents({"_id": {"$in": [ObjectId(value) for value in normalized]}})
+    if count != len(normalized):
+        raise HTTPException(status_code=422, detail="One or more selected products do not exist")
+    return normalized
 
 
 async def _evaluate_coupon(code: str, product_ids: List[str], email: str = "", phone: str = "", *, reserve: bool = False, order_id: Optional[str] = None) -> dict:
@@ -5877,9 +5895,9 @@ async def _evaluate_coupon(code: str, product_ids: List[str], email: str = "", p
     if coupon.get("minimumOrderAmount") and amount < int(round(float(coupon["minimumOrderAmount"]) * 100)): raise HTTPException(status_code=400, detail=f"Minimum order amount is ₹{int(coupon['minimumOrderAmount'])}")
     if coupon.get("maximumOrderAmount") and amount > int(round(float(coupon["maximumOrderAmount"]) * 100)): raise HTTPException(status_code=400, detail="Maximum order amount exceeded for this coupon")
     if qty < int(coupon.get("minimumQuantity") or 1): raise HTTPException(status_code=400, detail="Minimum product quantity is not reached")
-    selected = set(coupon.get("productIds") or [])
+    selected = {str(value) for value in (coupon.get("productIds") or [])}
     categories = set(coupon.get("categoryIds") or [])
-    if coupon.get("appliesTo") == "selected_products" and not any(p.get("id") in selected for p in products): raise HTTPException(status_code=400, detail="Coupon is not applicable to this product")
+    if coupon.get("appliesTo") == "selected_products" and not any(str(p.get("_id") or p.get("id")) in selected for p in products): raise HTTPException(status_code=400, detail="Coupon is not applicable to this product")
     if coupon.get("appliesTo") == "selected_categories" and not any(str(p.get("category") or p.get("categoryId") or "") in categories for p in products): raise HTTPException(status_code=400, detail="Coupon is not applicable to this product")
     if coupon.get("coursesOnly") and any(p.get("catalog_type") != "course" for p in products): raise HTTPException(status_code=400, detail="Coupon is valid only for courses")
     if coupon.get("assetsOnly") and any(p.get("catalog_type") == "course" for p in products): raise HTTPException(status_code=400, detail="Coupon is valid only for assets")
@@ -5963,7 +5981,9 @@ async def admin_create_coupon(payload: CouponIn, current_admin: AdminBase = Depe
     if payload.discountType not in {"percentage", "fixed"}: raise HTTPException(status_code=422, detail="Only percentage and fixed discounts are currently supported")
     if payload.discountType == "percentage" and not 0 <= payload.discountValue <= 100: raise HTTPException(status_code=422, detail="Percentage discount must be between 0 and 100")
     now = datetime.now(timezone.utc)
-    doc = payload.model_dump(); doc.update({"code": code, "usageCount": 0, "reservedUsageCount": 0, "createdAt": now, "updatedAt": now, "createdBy": current_admin.id})
+    data = payload.model_dump()
+    data["productIds"] = await _validate_coupon_product_selection(data.get("appliesTo", "all_products"), data.get("productIds", []))
+    doc = data; doc.update({"code": code, "usageCount": 0, "reservedUsageCount": 0, "createdAt": now, "updatedAt": now, "createdBy": current_admin.id})
     try: result = await db.coupons.insert_one(doc)
     except DuplicateKeyError: raise HTTPException(status_code=409, detail="Coupon code already exists")
     doc["_id"] = result.inserted_id
@@ -5982,6 +6002,11 @@ async def admin_get_coupon(coupon_id: str, current_admin: AdminBase = Depends(ge
 async def admin_update_coupon(coupon_id: str, payload: Dict[str, Any], current_admin: AdminBase = Depends(get_current_active_admin)):
     if not ObjectId.is_valid(coupon_id): raise HTTPException(status_code=422, detail="Invalid coupon id")
     allowed = set(CouponIn.model_fields.keys()); changes = {k: v for k, v in payload.items() if k in allowed}
+    existing = await db.coupons.find_one({"_id": ObjectId(coupon_id)})
+    if not existing: raise HTTPException(status_code=404, detail="Coupon not found")
+    effective_applies_to = changes.get("appliesTo", existing.get("appliesTo", "all_products"))
+    effective_product_ids = changes.get("productIds", existing.get("productIds", []))
+    changes["productIds"] = await _validate_coupon_product_selection(effective_applies_to, effective_product_ids)
     if "code" in changes: changes["code"] = _coupon_code(changes["code"])
     if changes.get("discountType") == "percentage" and not 0 <= float(changes.get("discountValue", 0)) <= 100: raise HTTPException(status_code=422, detail="Percentage discount must be between 0 and 100")
     changes["updatedAt"] = datetime.now(timezone.utc)
