@@ -1199,9 +1199,19 @@ class GuestCreateOrderRequest(BaseModel):
 class CouponValidateRequest(BaseModel):
     code: str = Field(min_length=1, max_length=64)
     productIds: List[str] = Field(min_length=1, max_length=50)
-    customerName: Optional[str] = Field(default=None, max_length=120)
-    customerEmail: Optional[EmailStr] = None
-    customerPhone: Optional[str] = Field(default=None, max_length=20)
+    customerName: str = Field(min_length=2, max_length=120)
+    customerEmail: EmailStr
+    customerPhone: str = Field(min_length=7, max_length=20)
+
+    @field_validator("code")
+    @classmethod
+    def normalize_coupon_code(cls, value: str) -> str:
+        return _coupon_code(value)
+
+    @field_validator("customerPhone")
+    @classmethod
+    def normalize_customer_phone(cls, value: str) -> str:
+        return _normalize_phone(value)[3:]
 
 
 class CouponIn(BaseModel):
@@ -2606,6 +2616,8 @@ def _public_product_summary(product: dict) -> dict:
     )
     return {
         "id": safe.get("id"),
+        # Public opaque identifier used by checkout; no pricing or private data is exposed.
+        "mongoId": str(product["_id"]) if product.get("_id") else None,
         "title": safe.get("name") or safe.get("title"),
         "name": safe.get("name") or safe.get("title"),
         "slug": safe.get("slug"),
@@ -2631,7 +2643,7 @@ async def public_products():
         rows = await db.products.find(
             {"published": True},
             {
-                "_id": 0,
+                "_id": 1,
                 "id": 1,
                 "slug": 1,
                 "name": 1,
@@ -5745,6 +5757,10 @@ async def _find_checkout_product(product_id: Optional[str], product_slug: Option
         query = {"published": True}
         if product_id:
             product = await db.products.find_one({**query, "id": product_id}, {"_id": 0})
+        if not product and product_id and ObjectId.is_valid(product_id):
+            product = await db.products.find_one({**query, "_id": ObjectId(product_id)}, {"_id": 0})
+            if product:
+                product["mongoId"] = product_id
         if not product and product_slug:
             product = await db.products.find_one({**query, "slug": product_slug}, {"_id": 0})
     if not product:
@@ -5808,6 +5824,16 @@ def _coupon_price_paise(product: dict) -> int:
         return 0
 
 
+def _coupon_datetime(value: Any) -> Optional[datetime]:
+    if not value:
+        return None
+    if isinstance(value, str):
+        value = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc)
+
+
 def _coupon_public(doc: dict) -> dict:
     result = {k: v for k, v in doc.items() if k != "_id"}
     result["id"] = str(doc.get("_id") or doc.get("id") or "")
@@ -5817,10 +5843,16 @@ def _coupon_public(doc: dict) -> dict:
 
 
 async def _coupon_products(product_ids: List[str]) -> List[dict]:
-    products = []
-    for product_id in dict.fromkeys(product_ids):
-        products.append(await _find_checkout_product(product_id, None))
-    return products
+    if not product_ids or any(not str(product_id).strip() for product_id in product_ids):
+        raise HTTPException(status_code=400, detail="Invalid product ID")
+    try:
+        object_ids = [ObjectId(str(product_id)) for product_id in dict.fromkeys(product_ids)]
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid product ID")
+    products = await db.products.find({"_id": {"$in": object_ids}, "published": True}).to_list(length=len(object_ids))
+    if len(products) != len(object_ids):
+        raise HTTPException(status_code=404, detail="Product not found")
+    return [{**product, "id": product.get("id") or str(product["_id"]), "catalog_type": "product"} for product in products]
 
 
 async def _evaluate_coupon(code: str, product_ids: List[str], email: str = "", phone: str = "", *, reserve: bool = False, order_id: Optional[str] = None) -> dict:
@@ -5830,8 +5862,9 @@ async def _evaluate_coupon(code: str, product_ids: List[str], email: str = "", p
     if not coupon: raise HTTPException(status_code=400, detail="Invalid coupon code")
     now = datetime.now(timezone.utc)
     if not coupon.get("isActive", True): raise HTTPException(status_code=400, detail="Coupon is not active")
-    if coupon.get("startsAt") and coupon["startsAt"] > now: raise HTTPException(status_code=400, detail="Coupon has not started yet")
-    if coupon.get("expiresAt") and coupon["expiresAt"] <= now: raise HTTPException(status_code=400, detail="This coupon has expired")
+    starts_at = _coupon_datetime(coupon.get("startsAt")); expires_at = _coupon_datetime(coupon.get("expiresAt"))
+    if starts_at and starts_at > now: raise HTTPException(status_code=400, detail="Coupon has not started yet")
+    if expires_at and expires_at <= now: raise HTTPException(status_code=400, detail="This coupon has expired")
     products = await _coupon_products(product_ids)
     amount = sum(_coupon_price_paise(p) for p in products)
     qty = len(products)
@@ -5904,10 +5937,13 @@ async def validate_coupon(payload: CouponValidateRequest, request: Request):
     if len(hits) >= 20: raise HTTPException(status_code=429, detail="Too many coupon attempts. Please try again shortly.")
     history[key] = hits + [now]; validate_coupon._history = history
     try:
-        result = await _evaluate_coupon(payload.code, payload.productIds, str(payload.customerEmail or ""), payload.customerPhone or "")
+        result = await _evaluate_coupon(payload.code, payload.productIds, str(payload.customerEmail), payload.customerPhone)
         return {"success": True, "couponCode": _coupon_code(payload.code), "discountType": result["coupon"]["discountType"], "originalAmount": result["originalAmount"], "discountAmount": result["discountAmount"], "finalAmount": result["finalAmount"], "message": "Coupon applied successfully"}
     except HTTPException as exc:
         return JSONResponse(status_code=exc.status_code if exc.status_code != 400 else 200, content={"success": False, "message": str(exc.detail)})
+    except Exception as exc:
+        logger.exception("[POST /api/coupons/validate] failed | type=%s | message=%s", type(exc).__name__, str(exc))
+        raise HTTPException(status_code=500, detail="Unable to validate coupon") from exc
 
 
 @api_router.get("/admin/coupons")
@@ -7090,7 +7126,7 @@ async def checkout_create_order(payload: PaymentCreateOrderIn):
     customer_email = str(payload.email).lower().strip()
     coupon_result = None
     if payload.coupon_code:
-        coupon_result = await _evaluate_coupon(payload.coupon_code, [product.get("id")], customer_email, phone, reserve=True, order_id=local_order_id)
+        coupon_result = await _evaluate_coupon(payload.coupon_code, [product.get("mongoId") or product.get("id")], customer_email, phone, reserve=True, order_id=local_order_id)
         amount = coupon_result["finalAmount"]
         if amount <= 0:
             await _release_coupon_reservation(local_order_id)
@@ -7884,7 +7920,7 @@ async def payment_free_order(payload: PaymentFreeOrderIn):
     coupon_result = None
     if payload.coupon_code:
         if not payload.email or not payload.phone or not payload.name: raise HTTPException(status_code=422, detail="Customer details are required")
-        coupon_result = await _evaluate_coupon(payload.coupon_code, [product.get("id")], str(payload.email), payload.phone, reserve=True, order_id=order_id)
+        coupon_result = await _evaluate_coupon(payload.coupon_code, [product.get("mongoId") or product.get("id")], str(payload.email), payload.phone, reserve=True, order_id=order_id)
     if (not product.get("is_free") and raw_amount > 0) and (not coupon_result or coupon_result["finalAmount"] != 0):
         raise HTTPException(status_code=400, detail="This product is not free")
 

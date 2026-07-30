@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { X, Loader2 } from 'lucide-react';
 import { payWithRazorpay } from '../lib/razorpay';
-import { createFreeOrder, validateCoupon } from '../lib/api';
+import { createFreeOrder } from '../lib/api';
 import { trackInitiateCheckout, trackPurchase, trackViewContent } from '../utils/metaPixel';
 
 const initialForm = {
@@ -9,6 +9,10 @@ const initialForm = {
   email: '',
   phone: '',
 };
+
+const formatINR = (paise) => new Intl.NumberFormat('en-IN', {
+  style: 'currency', currency: 'INR', minimumFractionDigits: 0, maximumFractionDigits: 2,
+}).format(Number(paise || 0) / 100);
 
 const validate = (values) => {
   const errors = {};
@@ -36,6 +40,7 @@ const CheckoutModal = ({ product, open, onClose, onSuccess, onFailure }) => {
   const [couponCode, setCouponCode] = useState('');
   const [coupon, setCoupon] = useState(null);
   const [couponBusy, setCouponBusy] = useState(false);
+  const [couponError, setCouponError] = useState('');
 
   useEffect(() => {
     const productId = product?.id ?? product?.slug;
@@ -52,17 +57,26 @@ const CheckoutModal = ({ product, open, onClose, onSuccess, onFailure }) => {
     setForm((current) => ({ ...current, [field]: value }));
     setErrors((current) => ({ ...current, [field]: '' }));
     setMessage('');
+    setCouponError('');
   };
 
   const applyCoupon = async () => {
-    const nextErrors = validate(form); setErrors(nextErrors);
+    const nextErrors = validate(form); setErrors(nextErrors); setCouponError('');
     if (Object.keys(nextErrors).length || !couponCode.trim() || couponBusy) return;
+    const productId = product.mongoId || product._id || product.id;
+    if (!productId) { setCouponError('This product cannot be checked out right now.'); return; }
+    const payload = { code: couponCode.trim().toUpperCase(), productIds: [productId], customerName: form.name.trim(), customerEmail: form.email.trim().toLowerCase(), customerPhone: form.phone.replace(/\D/g, '') };
+    console.log('[Coupon] request payload', { code: couponCode, productId, name: form.name, email: form.email, phone: form.phone });
     setCouponBusy(true); setMessage('');
     try {
-      const result = await validateCoupon({ code: couponCode, productIds: [product.id], customerName: form.name, customerEmail: form.email, customerPhone: form.phone });
-      if (!result.success) { setCoupon(null); setMessage(result.message || 'Could not apply coupon'); }
-      else setCoupon(result);
-    } catch (err) { setCoupon(null); setMessage(err?.response?.data?.detail || 'Could not validate coupon'); }
+      const response = await fetch('/api/coupons/validate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      const rawText = await response.text(); let data = null;
+      try { data = rawText ? JSON.parse(rawText) : null; } catch { console.error('[Coupon] Invalid JSON response:', rawText); }
+      console.log('[Coupon] validation response', { status: response.status, data, rawText });
+      if (!response.ok) { const detail = data?.message || data?.detail || `Coupon validation failed (${response.status})`; const error = typeof detail === 'string' ? detail : JSON.stringify(detail); setCoupon(null); setCouponError(error); setMessage(error); return; }
+      if (!data?.success) { const error = data?.message || 'This coupon cannot be applied'; setCoupon(null); setCouponError(error); setMessage(error); return; }
+      setCoupon({ code: data.couponCode, ...data });
+    } catch (err) { console.error('[Coupon] network failure', err); setCoupon(null); setCouponError('Could not validate coupon'); setMessage('Could not validate coupon'); }
     finally { setCouponBusy(false); }
   };
 
@@ -83,7 +97,7 @@ const CheckoutModal = ({ product, open, onClose, onSuccess, onFailure }) => {
     if (price <= 0 || product?.is_free || coupon?.finalAmount === 0) {
       try {
         const data = await createFreeOrder({
-          product_id: product.id,
+          product_id: product.mongoId || product._id || product.id,
           product_slug: product.slug,
           name: form.name.trim(),
           email: form.email.trim(),
@@ -106,7 +120,7 @@ const CheckoutModal = ({ product, open, onClose, onSuccess, onFailure }) => {
       trackInitiateCheckout(product);
       result = await payWithRazorpay({
         amountRupees: price,
-        itemId: product.id,
+        itemId: product.mongoId || product._id || product.id,
         productSlug: product.slug,
         itemName: product.name || product.title,
         couponCode: coupon?.couponCode,
@@ -144,7 +158,7 @@ const CheckoutModal = ({ product, open, onClose, onSuccess, onFailure }) => {
           <div>
             <p className="text-xs uppercase tracking-[0.3em] text-violet-300">Checkout</p>
             <h2 className="mt-2 text-2xl font-bold text-white">{product.name || product.title}</h2>
-            <p className="mt-1 text-sm text-white/60">Pay Rs {Number(price).toLocaleString('en-IN')} to continue.</p>
+            <p className="mt-1 text-sm text-white/60">Pay {formatINR(price * 100)} to continue.</p>
           </div>
           <button
             type="button"
