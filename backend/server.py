@@ -2591,6 +2591,11 @@ async def public_cms_page(page_key: str):
 
 def _public_product(product: dict) -> dict:
     safe = _decode_html_entities(_normalize_product_media_fields(dict(product)))
+    legacy_id = safe.get("id")
+    mongo_id = safe.pop("_id", None)
+    if mongo_id is not None:
+        safe["id"] = str(mongo_id)
+        safe["productId"] = legacy_id
     safe.pop("download_file", None)
     safe.pop("download_file_url", None)
     safe.pop("download_file_key", None)
@@ -2615,9 +2620,8 @@ def _public_product_summary(product: dict) -> dict:
         or ""
     )
     return {
-        "id": safe.get("id"),
-        # Public opaque identifier used by checkout; no pricing or private data is exposed.
-        "mongoId": str(product["_id"]) if product.get("_id") else None,
+        "id": str(product["_id"]) if product.get("_id") else safe.get("id"),
+        "productId": safe.get("productId"),
         "title": safe.get("name") or safe.get("title"),
         "name": safe.get("name") or safe.get("title"),
         "slug": safe.get("slug"),
@@ -2681,7 +2685,7 @@ async def public_product_by_slug(slug: str):
             raise HTTPException(status_code=404, detail="Product not found")
         return _public_product(product)
     try:
-        product = await db.products.find_one({"slug": slug, "published": True}, {"_id": 0, "download_file": 0, "download_file_url": 0, "download_file_key": 0, "download_file_name": 0, "download_file_bucket": 0, "payment_link": 0, "razorpay_payment_link_id": 0, "razorpay_payment_link_url": 0, "razorpay_payment_link_status": 0})
+        product = await db.products.find_one({"slug": slug, "published": True}, {"download_file": 0, "download_file_url": 0, "download_file_key": 0, "download_file_name": 0, "download_file_bucket": 0, "payment_link": 0, "razorpay_payment_link_id": 0, "razorpay_payment_link_url": 0, "razorpay_payment_link_status": 0})
         if not product:
             raise HTTPException(status_code=404, detail="Product not found")
         return _public_product(product)
@@ -5937,6 +5941,7 @@ async def validate_coupon(payload: CouponValidateRequest, request: Request):
     if len(hits) >= 20: raise HTTPException(status_code=429, detail="Too many coupon attempts. Please try again shortly.")
     history[key] = hits + [now]; validate_coupon._history = history
     try:
+        logger.info("[coupon validate] product_ids=%s", payload.productIds)
         result = await _evaluate_coupon(payload.code, payload.productIds, str(payload.customerEmail), payload.customerPhone)
         return {"success": True, "couponCode": _coupon_code(payload.code), "discountType": result["coupon"]["discountType"], "originalAmount": result["originalAmount"], "discountAmount": result["discountAmount"], "finalAmount": result["finalAmount"], "message": "Coupon applied successfully"}
     except HTTPException as exc:

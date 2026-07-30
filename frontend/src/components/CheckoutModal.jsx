@@ -14,6 +14,11 @@ const formatINR = (paise) => new Intl.NumberFormat('en-IN', {
   style: 'currency', currency: 'INR', minimumFractionDigits: 0, maximumFractionDigits: 2,
 }).format(Number(paise || 0) / 100);
 
+const getProductMongoId = (product) => {
+  const value = product?.id || product?._id || product?.productId;
+  return typeof value === 'string' && /^[a-f\d]{24}$/i.test(value) ? value : null;
+};
+
 const validate = (values) => {
   const errors = {};
   if (!values.name.trim() || values.name.trim().length < 2) {
@@ -43,6 +48,7 @@ const CheckoutModal = ({ product, open, onClose, onSuccess, onFailure }) => {
   const [couponError, setCouponError] = useState('');
 
   useEffect(() => {
+    if (process.env.NODE_ENV !== 'production' && product) console.log('[Checkout] product object:', product);
     const productId = product?.id ?? product?.slug;
     if (!open || !productId || viewedProductIds.current.has(productId)) return;
     viewedProductIds.current.add(productId);
@@ -63,10 +69,10 @@ const CheckoutModal = ({ product, open, onClose, onSuccess, onFailure }) => {
   const applyCoupon = async () => {
     const nextErrors = validate(form); setErrors(nextErrors); setCouponError('');
     if (Object.keys(nextErrors).length || !couponCode.trim() || couponBusy) return;
-    const productId = product.mongoId || product._id || product.id;
-    if (!productId) { setCouponError('This product cannot be checked out right now.'); return; }
+    const productId = getProductMongoId(product);
+    if (!productId) { console.error('[Coupon] Invalid product identifier', { productId, product }); setCouponError('Unable to identify this product. Please refresh and try again.'); return; }
     const payload = { code: couponCode.trim().toUpperCase(), productIds: [productId], customerName: form.name.trim(), customerEmail: form.email.trim().toLowerCase(), customerPhone: form.phone.replace(/\D/g, '') };
-    console.log('[Coupon] request payload', { code: couponCode, productId, name: form.name, email: form.email, phone: form.phone });
+    console.log('[Coupon] submitting', { productId, productIdLength: productId.length, productSlug: product.slug, productTitle: product.title });
     setCouponBusy(true); setMessage('');
     try {
       const response = await fetch('/api/coupons/validate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
@@ -97,7 +103,7 @@ const CheckoutModal = ({ product, open, onClose, onSuccess, onFailure }) => {
     if (price <= 0 || product?.is_free || coupon?.finalAmount === 0) {
       try {
         const data = await createFreeOrder({
-          product_id: product.mongoId || product._id || product.id,
+          product_id: getProductMongoId(product),
           product_slug: product.slug,
           name: form.name.trim(),
           email: form.email.trim(),
@@ -120,7 +126,7 @@ const CheckoutModal = ({ product, open, onClose, onSuccess, onFailure }) => {
       trackInitiateCheckout(product);
       result = await payWithRazorpay({
         amountRupees: price,
-        itemId: product.mongoId || product._id || product.id,
+        itemId: getProductMongoId(product),
         productSlug: product.slug,
         itemName: product.name || product.title,
         couponCode: coupon?.couponCode,
