@@ -1176,6 +1176,7 @@ class PaymentCreateOrderIn(BaseModel):
     email: EmailStr
     phone: str = Field(min_length=7, max_length=20)
     guest_checkout: bool = False
+    coupon_code: Optional[str] = None
 
 
 class PaymentVerifyIn(BaseModel):
@@ -1188,9 +1189,54 @@ class PaymentVerifyIn(BaseModel):
 
 class GuestCreateOrderRequest(BaseModel):
     productId: str = Field(min_length=1, max_length=160)
+    productIds: List[str] = []
     name: str = Field(min_length=2, max_length=120)
     email: EmailStr
     phone: str = Field(min_length=7, max_length=20)
+    couponCode: Optional[str] = Field(default=None, max_length=64)
+
+
+class CouponValidateRequest(BaseModel):
+    code: str = Field(min_length=1, max_length=64)
+    productIds: List[str] = Field(min_length=1, max_length=50)
+    customerName: Optional[str] = Field(default=None, max_length=120)
+    customerEmail: Optional[EmailStr] = None
+    customerPhone: Optional[str] = Field(default=None, max_length=20)
+
+
+class CouponIn(BaseModel):
+    name: str = Field(min_length=1, max_length=160)
+    code: str = Field(min_length=3, max_length=64)
+    description: str = Field(default="", max_length=2000)
+    internalNotes: str = Field(default="", max_length=4000)
+    discountType: str = "percentage"
+    discountValue: float = 0
+    maximumDiscount: Optional[int] = None
+    minimumOrderAmount: Optional[int] = None
+    maximumOrderAmount: Optional[int] = None
+    minimumQuantity: int = 1
+    appliesTo: str = "all_products"
+    productIds: List[str] = []
+    categoryIds: List[str] = []
+    coursesOnly: bool = False
+    assetsOnly: bool = False
+    excludeFreeProducts: bool = False
+    excludeSaleProducts: bool = False
+    firstPurchaseOnly: bool = False
+    newCustomersOnly: bool = False
+    existingCustomersOnly: bool = False
+    specificEmails: List[str] = []
+    specificPhones: List[str] = []
+    totalUsageLimit: Optional[int] = None
+    usageLimitPerCustomer: Optional[int] = None
+    usageLimitPerEmail: Optional[int] = None
+    usageLimitPerPhone: Optional[int] = None
+    oneUsePerOrder: bool = True
+    stackable: bool = False
+    startsAt: Optional[datetime] = None
+    expiresAt: Optional[datetime] = None
+    timezone: str = "Asia/Kolkata"
+    isActive: bool = True
 
 
 class GuestVerifyPaymentRequest(BaseModel):
@@ -1206,6 +1252,7 @@ class PaymentFreeOrderIn(BaseModel):
     email: Optional[EmailStr] = None
     phone: Optional[str] = Field(default=None, min_length=7, max_length=20)
     guest_checkout: bool = False
+    coupon_code: Optional[str] = None
 
 
 class CheckoutOrder(BaseModel):
@@ -4599,19 +4646,6 @@ async def admin_delete_blog_post(post_id: str, current_admin: AdminBase = Depend
     return {"success": True}
 
 
-@admin_router.post("/coupons")
-async def admin_create_coupon(payload: CouponIn, current_admin: AdminBase = Depends(get_current_active_admin)):
-    doc = payload.model_dump()
-    doc.update({"id": str(uuid.uuid4()), "used_count": 0})
-    await db.coupons.insert_one(doc)
-    return {"success": True, "coupon": doc}
-
-
-@admin_router.get("/coupons")
-async def admin_coupons(current_admin: AdminBase = Depends(get_current_active_admin)):
-    return await db.coupons.find({}, {"_id": 0}).to_list(100)
-
-
 # Vercel serverless functions can only write to /tmp at runtime.
 UPLOAD_DIR = Path(os.environ.get("UPLOAD_DIR", "/tmp/uploads" if os.environ.get("VERCEL") else str(ROOT_DIR / "uploads")))
 UPLOAD_DIR.mkdir(exist_ok=True)
@@ -5333,6 +5367,7 @@ async def prepare_cms_collections():
         "downloads",
         "download_logs",
         "coupons",
+        "coupon_usages",
         "hire_requests",
         "testimonials",
         "blog_posts",
@@ -5355,7 +5390,14 @@ async def prepare_cms_collections():
     except Exception:
         pass
     try:
-        await db.coupons.create_index("code", unique=True)
+        await db.coupons.create_index("code", unique=True, name="unique_coupon_code")
+        await db.coupons.create_index("isActive")
+        await db.coupons.create_index("startsAt")
+        await db.coupons.create_index("expiresAt")
+        await db.coupon_usages.create_index("customerEmail")
+        await db.coupon_usages.create_index("customerPhone")
+        await db.coupon_usages.create_index("couponId")
+        await db.coupon_usages.create_index("orderId", unique=True, sparse=True)
     except Exception:
         pass
     try:
@@ -5748,6 +5790,188 @@ def _product_price_paise(product: dict) -> int:
     if amount < 100:
         raise HTTPException(status_code=400, detail="Amount must be at least 100 paise")
     return amount
+
+
+# ---------- Coupons ----------
+def _coupon_code(value: str) -> str:
+    code = re.sub(r"\s+", "", str(value or "").upper())
+    if not re.fullmatch(r"[A-Z0-9_-]{3,64}", code):
+        raise HTTPException(status_code=422, detail="Coupon code may contain only letters, numbers, hyphens, and underscores")
+    return code
+
+
+def _coupon_price_paise(product: dict) -> int:
+    raw = product.get("sale_price") if product.get("sale_price") is not None else product.get("price", 0)
+    try:
+        return max(0, int(round(float(raw or 0) * 100)))
+    except (TypeError, ValueError):
+        return 0
+
+
+def _coupon_public(doc: dict) -> dict:
+    result = {k: v for k, v in doc.items() if k != "_id"}
+    result["id"] = str(doc.get("_id") or doc.get("id") or "")
+    for key in ("startsAt", "expiresAt", "createdAt", "updatedAt"):
+        if isinstance(result.get(key), datetime): result[key] = result[key].isoformat()
+    return result
+
+
+async def _coupon_products(product_ids: List[str]) -> List[dict]:
+    products = []
+    for product_id in dict.fromkeys(product_ids):
+        products.append(await _find_checkout_product(product_id, None))
+    return products
+
+
+async def _evaluate_coupon(code: str, product_ids: List[str], email: str = "", phone: str = "", *, reserve: bool = False, order_id: Optional[str] = None) -> dict:
+    if db is None: raise HTTPException(status_code=503, detail="Database not configured")
+    code = _coupon_code(code)
+    coupon = await db.coupons.find_one({"code": code})
+    if not coupon: raise HTTPException(status_code=400, detail="Invalid coupon code")
+    now = datetime.now(timezone.utc)
+    if not coupon.get("isActive", True): raise HTTPException(status_code=400, detail="Coupon is not active")
+    if coupon.get("startsAt") and coupon["startsAt"] > now: raise HTTPException(status_code=400, detail="Coupon has not started yet")
+    if coupon.get("expiresAt") and coupon["expiresAt"] <= now: raise HTTPException(status_code=400, detail="This coupon has expired")
+    products = await _coupon_products(product_ids)
+    amount = sum(_coupon_price_paise(p) for p in products)
+    qty = len(products)
+    email = email.lower().strip()
+    phone = _normalize_phone(phone) if phone else ""
+    if coupon.get("minimumOrderAmount") and amount < int(round(float(coupon["minimumOrderAmount"]) * 100)): raise HTTPException(status_code=400, detail=f"Minimum order amount is ₹{int(coupon['minimumOrderAmount'])}")
+    if coupon.get("maximumOrderAmount") and amount > int(round(float(coupon["maximumOrderAmount"]) * 100)): raise HTTPException(status_code=400, detail="Maximum order amount exceeded for this coupon")
+    if qty < int(coupon.get("minimumQuantity") or 1): raise HTTPException(status_code=400, detail="Minimum product quantity is not reached")
+    selected = set(coupon.get("productIds") or [])
+    categories = set(coupon.get("categoryIds") or [])
+    if coupon.get("appliesTo") == "selected_products" and not any(p.get("id") in selected for p in products): raise HTTPException(status_code=400, detail="Coupon is not applicable to this product")
+    if coupon.get("appliesTo") == "selected_categories" and not any(str(p.get("category") or p.get("categoryId") or "") in categories for p in products): raise HTTPException(status_code=400, detail="Coupon is not applicable to this product")
+    if coupon.get("coursesOnly") and any(p.get("catalog_type") != "course" for p in products): raise HTTPException(status_code=400, detail="Coupon is valid only for courses")
+    if coupon.get("assetsOnly") and any(p.get("catalog_type") == "course" for p in products): raise HTTPException(status_code=400, detail="Coupon is valid only for assets")
+    if coupon.get("excludeFreeProducts") and any(_coupon_price_paise(p) == 0 or p.get("is_free") for p in products): raise HTTPException(status_code=400, detail="Coupon is not applicable to free products")
+    if coupon.get("excludeSaleProducts") and any(p.get("sale_price") is not None for p in products): raise HTTPException(status_code=400, detail="Coupon is not applicable to sale products")
+    if coupon.get("specificEmails") and email not in {str(x).lower().strip() for x in coupon["specificEmails"]}: raise HTTPException(status_code=400, detail="Coupon is not available for this email")
+    if coupon.get("specificPhones") and phone not in {_normalize_phone(str(x)) for x in coupon["specificPhones"]}: raise HTTPException(status_code=400, detail="Coupon is not available for this phone number")
+    paid_query = {"payment_status": "paid", "$or": [{"customer_email": email}, {"buyer_email": email}, {"customer_phone": phone}, {"buyer_phone": phone}]}
+    has_paid = bool(email or phone) and await db.orders.find_one(paid_query, {"_id": 1})
+    if coupon.get("firstPurchaseOnly") or coupon.get("newCustomersOnly"):
+        if has_paid: raise HTTPException(status_code=400, detail="Coupon is valid only for first-time customers")
+    if coupon.get("existingCustomersOnly") and not has_paid: raise HTTPException(status_code=400, detail="Coupon is valid only for existing customers")
+    usage_query = {"couponId": coupon["_id"], "status": {"$in": ["reserved", "confirmed"]}}
+    if email: usage_query["customerEmail"] = email
+    if phone: usage_query["customerPhone"] = phone
+    personal_count = await db.coupon_usages.count_documents(usage_query)
+    personal_limit = coupon.get("usageLimitPerCustomer") or coupon.get("usageLimitPerEmail") or coupon.get("usageLimitPerPhone")
+    if personal_limit and personal_count >= int(personal_limit): raise HTTPException(status_code=400, detail="You have already used this coupon")
+    dtype = coupon.get("discountType")
+    if dtype == "percentage":
+        value = float(coupon.get("discountValue") or 0)
+        if value < 0 or value > 100: raise HTTPException(status_code=400, detail="Coupon configuration is invalid")
+        discount = int(round(amount * value / 100))
+        if coupon.get("maximumDiscount") is not None: discount = min(discount, int(round(float(coupon["maximumDiscount"]) * 100)))
+    elif dtype == "fixed":
+        discount = int(round(float(coupon.get("discountValue") or 0) * 100))
+    else:
+        raise HTTPException(status_code=400, detail="This offer type is not available yet")
+    discount = max(0, min(discount, amount)); final = amount - discount
+    if reserve:
+        limit = coupon.get("totalUsageLimit")
+        reserve_filter = {"_id": coupon["_id"]}
+        if limit is not None: reserve_filter["$expr"] = {"$lt": [{"$add": [{"$ifNull": ["$usageCount", 0]}, {"$ifNull": ["$reservedUsageCount", 0]}]}, int(limit)]}
+        claimed = await db.coupons.find_one_and_update(reserve_filter, {"$inc": {"reservedUsageCount": 1}, "$set": {"updatedAt": now}}, return_document=True)
+        if not claimed: raise HTTPException(status_code=400, detail="Coupon usage limit has been reached")
+        await db.coupon_usages.insert_one({"couponId": coupon["_id"], "couponCode": code, "orderId": order_id, "customerEmail": email, "customerPhone": phone, "originalAmount": amount, "discountAmount": discount, "finalAmount": final, "status": "reserved", "createdAt": now, "expiresAt": now + timedelta(minutes=15), "confirmedAt": None})
+    return {"coupon": coupon, "products": products, "originalAmount": amount, "discountAmount": discount, "finalAmount": final, "customerEmail": email, "customerPhone": phone}
+
+
+async def _release_coupon_reservation(order_id: Optional[str]) -> None:
+    if not order_id or db is None: return
+    usage = await db.coupon_usages.find_one_and_update({"orderId": order_id, "status": "reserved"}, {"$set": {"status": "released", "releasedAt": datetime.now(timezone.utc)}})
+    if usage: await db.coupons.update_one({"_id": usage["couponId"]}, {"$inc": {"reservedUsageCount": -1}, "$set": {"updatedAt": datetime.now(timezone.utc)}})
+
+
+async def _confirm_coupon_reservation(order: dict) -> None:
+    if not order.get("couponCode") or db is None: return
+    usage = await db.coupon_usages.find_one_and_update({"orderId": order.get("razorpay_order_id") or order.get("id"), "status": "reserved"}, {"$set": {"status": "confirmed", "confirmedAt": datetime.now(timezone.utc)}})
+    if usage: await db.coupons.update_one({"_id": usage["couponId"]}, {"$inc": {"reservedUsageCount": -1, "usageCount": 1}, "$set": {"updatedAt": datetime.now(timezone.utc)}})
+
+
+@api_router.post("/coupons/validate")
+async def validate_coupon(payload: CouponValidateRequest, request: Request):
+    # Lightweight process-local guard; deployments can additionally enforce this at the edge.
+    now = datetime.now(timezone.utc)
+    key = request.client.host if request.client else "unknown"
+    history = getattr(validate_coupon, "_history", {})
+    hits = [t for t in history.get(key, []) if (now - t).total_seconds() < 60]
+    if len(hits) >= 20: raise HTTPException(status_code=429, detail="Too many coupon attempts. Please try again shortly.")
+    history[key] = hits + [now]; validate_coupon._history = history
+    try:
+        result = await _evaluate_coupon(payload.code, payload.productIds, str(payload.customerEmail or ""), payload.customerPhone or "")
+        return {"success": True, "couponCode": _coupon_code(payload.code), "discountType": result["coupon"]["discountType"], "originalAmount": result["originalAmount"], "discountAmount": result["discountAmount"], "finalAmount": result["finalAmount"], "message": "Coupon applied successfully"}
+    except HTTPException as exc:
+        return JSONResponse(status_code=exc.status_code if exc.status_code != 400 else 200, content={"success": False, "message": str(exc.detail)})
+
+
+@api_router.get("/admin/coupons")
+async def admin_list_coupons(current_admin: AdminBase = Depends(get_current_active_admin)):
+    rows = await db.coupons.find({}).sort("createdAt", -1).to_list(500)
+    return [_coupon_public(row) for row in rows]
+
+
+@api_router.post("/admin/coupons", status_code=201)
+async def admin_create_coupon(payload: CouponIn, current_admin: AdminBase = Depends(get_current_active_admin)):
+    code = _coupon_code(payload.code)
+    if payload.discountType not in {"percentage", "fixed"}: raise HTTPException(status_code=422, detail="Only percentage and fixed discounts are currently supported")
+    if payload.discountType == "percentage" and not 0 <= payload.discountValue <= 100: raise HTTPException(status_code=422, detail="Percentage discount must be between 0 and 100")
+    now = datetime.now(timezone.utc)
+    doc = payload.model_dump(); doc.update({"code": code, "usageCount": 0, "reservedUsageCount": 0, "createdAt": now, "updatedAt": now, "createdBy": current_admin.id})
+    try: result = await db.coupons.insert_one(doc)
+    except DuplicateKeyError: raise HTTPException(status_code=409, detail="Coupon code already exists")
+    doc["_id"] = result.inserted_id
+    return _coupon_public(doc)
+
+
+@api_router.get("/admin/coupons/{coupon_id}")
+async def admin_get_coupon(coupon_id: str, current_admin: AdminBase = Depends(get_current_active_admin)):
+    if not ObjectId.is_valid(coupon_id): raise HTTPException(status_code=422, detail="Invalid coupon id")
+    coupon = await db.coupons.find_one({"_id": ObjectId(coupon_id)})
+    if not coupon: raise HTTPException(status_code=404, detail="Coupon not found")
+    return _coupon_public(coupon)
+
+
+@api_router.patch("/admin/coupons/{coupon_id}")
+async def admin_update_coupon(coupon_id: str, payload: Dict[str, Any], current_admin: AdminBase = Depends(get_current_active_admin)):
+    if not ObjectId.is_valid(coupon_id): raise HTTPException(status_code=422, detail="Invalid coupon id")
+    allowed = set(CouponIn.model_fields.keys()); changes = {k: v for k, v in payload.items() if k in allowed}
+    if "code" in changes: changes["code"] = _coupon_code(changes["code"])
+    if changes.get("discountType") == "percentage" and not 0 <= float(changes.get("discountValue", 0)) <= 100: raise HTTPException(status_code=422, detail="Percentage discount must be between 0 and 100")
+    changes["updatedAt"] = datetime.now(timezone.utc)
+    try: updated = await db.coupons.find_one_and_update({"_id": ObjectId(coupon_id)}, {"$set": changes}, return_document=True)
+    except DuplicateKeyError: raise HTTPException(status_code=409, detail="Coupon code already exists")
+    if not updated: raise HTTPException(status_code=404, detail="Coupon not found")
+    return _coupon_public(updated)
+
+
+@api_router.patch("/admin/coupons/{coupon_id}/status")
+async def admin_coupon_status(coupon_id: str, payload: Dict[str, Any], current_admin: AdminBase = Depends(get_current_active_admin)):
+    return await admin_update_coupon(coupon_id, {"isActive": bool(payload.get("isActive"))}, current_admin)
+
+
+@api_router.delete("/admin/coupons/{coupon_id}")
+async def admin_delete_coupon(coupon_id: str, current_admin: AdminBase = Depends(get_current_active_admin)):
+    if not ObjectId.is_valid(coupon_id): raise HTTPException(status_code=422, detail="Invalid coupon id")
+    oid = ObjectId(coupon_id)
+    if await db.coupon_usages.count_documents({"couponId": oid}):
+        await db.coupons.update_one({"_id": oid}, {"$set": {"isActive": False, "archivedAt": datetime.now(timezone.utc)}})
+        return {"success": True, "archived": True}
+    result = await db.coupons.delete_one({"_id": oid})
+    if not result.deleted_count: raise HTTPException(status_code=404, detail="Coupon not found")
+    return {"success": True}
+
+
+@api_router.get("/admin/coupons/{coupon_id}/usages")
+async def admin_coupon_usages(coupon_id: str, current_admin: AdminBase = Depends(get_current_active_admin)):
+    if not ObjectId.is_valid(coupon_id): raise HTTPException(status_code=422, detail="Invalid coupon id")
+    rows = await db.coupon_usages.find({"couponId": ObjectId(coupon_id)}).sort("createdAt", -1).to_list(1000)
+    return [{**{k: v for k, v in row.items() if k != "_id"}, "id": str(row["_id"]), **{k: v.isoformat() for k, v in row.items() if k in {"createdAt", "confirmedAt", "releasedAt", "expiresAt"} and isinstance(v, datetime)}} for row in rows]
 
 
 def _payment_link_amount_paise(product: dict) -> int:
@@ -6608,6 +6832,7 @@ async def _mark_order_not_paid(order: dict, payment_status: str, reason: str, pa
     if order.get("payment_status") == "paid" or order.get("status") == "paid":
         logger.info("Ignoring non-paid transition for already-paid order_id=%s incoming_status=%s", order.get("razorpay_order_id"), payment_status)
         return order
+    await _release_coupon_reservation(order.get("razorpay_order_id") or order.get("id"))
     now = datetime.now(timezone.utc).isoformat()
     order_filter = {"$or": [{"razorpay_order_id": order.get("razorpay_order_id")}, {"id": order.get("id")}]}
     update_fields = {
@@ -6782,6 +7007,7 @@ async def _fulfill_paid_order(order: dict, product: dict, payment_id: str, send_
 
     if payment_attempt_collection is not None:
         await payment_attempt_collection.update_one(order_filter, {"$set": {**paid_fields, "order_id": fulfilled_order.get("id"), "updated_at": now}})
+    await _confirm_coupon_reservation(fulfilled_order)
 
     if not was_paid and not is_course:
         await db.products.update_one({"id": product.get("id")}, {"$inc": {"sold_count": 1}})
@@ -6855,8 +7081,6 @@ async def _fulfill_paid_order(order: dict, product: dict, payment_id: str, send_
 async def checkout_create_order(payload: PaymentCreateOrderIn):
     if db is None:
         raise HTTPException(status_code=500, detail="Database not configured")
-    client = _require_razorpay_client()
-
     phone = _normalize_phone(payload.phone)
     product = await _find_checkout_product(payload.product_id, payload.product_slug)
     amount = _product_price_paise(product)
@@ -6864,6 +7088,14 @@ async def checkout_create_order(payload: PaymentCreateOrderIn):
     receipt = f"asset_{uuid.uuid4().hex[:24]}"
     customer_name = payload.name.strip()
     customer_email = str(payload.email).lower().strip()
+    coupon_result = None
+    if payload.coupon_code:
+        coupon_result = await _evaluate_coupon(payload.coupon_code, [product.get("id")], customer_email, phone, reserve=True, order_id=local_order_id)
+        amount = coupon_result["finalAmount"]
+        if amount <= 0:
+            await _release_coupon_reservation(local_order_id)
+            raise HTTPException(status_code=400, detail="Use the zero-value checkout flow")
+    client = _require_razorpay_client()
 
     # Claim the customer/asset pair *before* calling Razorpay.  This makes
     # repeated HTTP requests (including separate browser tabs) converge on one
@@ -6873,6 +7105,7 @@ async def checkout_create_order(payload: PaymentCreateOrderIn):
     session_key = {"customer_email": customer_email, "product_id": product.get("id")}
     paid_order = await db.orders.find_one({**session_key, "payment_status": "paid"}, {"_id": 0, "razorpay_order_id": 1})
     if paid_order:
+        await _release_coupon_reservation(local_order_id)
         logger.info("Duplicate checkout blocked: customer already owns asset email=%s product=%s", customer_email, product.get("slug"))
         return {"already_owned": True, "message": "You already own this asset."}
 
@@ -6909,11 +7142,14 @@ async def checkout_create_order(payload: PaymentCreateOrderIn):
                 if order_id:
                     existing_order = await db.orders.find_one({"razorpay_order_id": order_id}, {"_id": 0})
                     if existing_order and existing_order.get("payment_status") == "paid":
+                        await _release_coupon_reservation(local_order_id)
                         return {"already_owned": True, "message": "You already own this asset."}
                     if existing_order:
+                        await _release_coupon_reservation(local_order_id)
                         logger.info("Duplicate checkout request reused order_id=%s", order_id)
                         return {"order_id": order_id, "amount": existing_order.get("amount"), "currency": existing_order.get("currency", "INR"), "key_id": RAZORPAY_KEY_ID, "product_name": product.get("name"), "reused": True}
                 logger.info("Duplicate checkout request is waiting for order creation email=%s product=%s", customer_email, product.get("slug"))
+                await _release_coupon_reservation(local_order_id)
                 raise HTTPException(status_code=409, detail="Checkout is being prepared. Please wait a moment and retry.")
 
     logger.info("Checkout session claimed email=%s product=%s", customer_email, product.get("slug"))
@@ -6935,6 +7171,7 @@ async def checkout_create_order(payload: PaymentCreateOrderIn):
             },
         })
     except razorpay.errors.BadRequestError as e:
+        await _release_coupon_reservation(local_order_id)
         if checkout_sessions is not None:
             await checkout_sessions.delete_one(session_key)
         if _is_razorpay_auth_error(e):
@@ -6943,11 +7180,13 @@ async def checkout_create_order(payload: PaymentCreateOrderIn):
         logger.exception("Razorpay bad request")
         raise HTTPException(status_code=400, detail=_razorpay_public_error(e))
     except razorpay.errors.ServerError:
+        await _release_coupon_reservation(local_order_id)
         if checkout_sessions is not None:
             await checkout_sessions.delete_one(session_key)
         logger.exception("Razorpay server error")
         raise HTTPException(status_code=502, detail="Payment gateway error")
     except Exception as exc:
+        await _release_coupon_reservation(local_order_id)
         if checkout_sessions is not None:
             await checkout_sessions.delete_one(session_key)
         if _is_razorpay_auth_error(exc):
@@ -6960,6 +7199,11 @@ async def checkout_create_order(payload: PaymentCreateOrderIn):
         "id": local_order_id,
         "razorpay_order_id": razorpay_order.get("id"),
         "amount": razorpay_order.get("amount"),
+        "originalAmount": coupon_result["originalAmount"] if coupon_result else amount,
+        "couponCode": _coupon_code(payload.coupon_code) if payload.coupon_code else None,
+        "couponId": coupon_result["coupon"]["_id"] if coupon_result else None,
+        "discountAmount": coupon_result["discountAmount"] if coupon_result else 0,
+        "finalAmount": amount,
         "currency": razorpay_order.get("currency", "INR"),
         "receipt": receipt,
         "product_id": product.get("id"),
@@ -6998,6 +7242,8 @@ async def checkout_create_order(payload: PaymentCreateOrderIn):
     }
     payment_attempt_collection = await _payment_attempt_collection()
     await payment_attempt_collection.insert_one(attempt_doc)
+    if coupon_result:
+        await db.coupon_usages.update_one({"orderId": local_order_id, "status": "reserved"}, {"$set": {"orderId": razorpay_order.get("id")}})
     if checkout_sessions is not None:
         await checkout_sessions.update_one(session_key, {"$set": {"state": "pending", "order_id": razorpay_order.get("id"), "updated_at": datetime.now(timezone.utc).isoformat()}})
     await _upsert_checkout_customer(attempt_doc, product)
@@ -7183,12 +7429,21 @@ async def checkout_verify_payment(payload: PaymentVerifyIn):
 async def create_guest_order(payload: GuestCreateOrderRequest):
     """Guest checkout entry point. The legacy checkout service owns all pricing and Razorpay work."""
     try:
+        product_ids = payload.productIds or [payload.productId]
+        if len(product_ids) != 1 or product_ids[0] != payload.productId:
+            raise HTTPException(status_code=400, detail="Multi-product checkout is not available yet")
+        if payload.couponCode:
+            preview = await _evaluate_coupon(payload.couponCode, product_ids, str(payload.email), payload.phone)
+            if preview["finalAmount"] == 0:
+                free = await payment_free_order(PaymentFreeOrderIn(product_id=payload.productId, name=payload.name, email=payload.email, phone=payload.phone, guest_checkout=True, coupon_code=payload.couponCode))
+                return {"success": True, "zeroValue": True, "orderId": free["order_id"], "productName": free["product_name"], "productSlug": free["product_slug"], "downloadToken": free.get("download_token")}
         result = await checkout_create_order(PaymentCreateOrderIn(
             product_id=payload.productId,
             name=payload.name,
             email=payload.email,
             phone=payload.phone,
             guest_checkout=True,
+            coupon_code=payload.couponCode,
         ))
     except HTTPException:
         raise
@@ -7624,7 +7879,13 @@ async def payment_free_order(payload: PaymentFreeOrderIn):
         raise HTTPException(status_code=500, detail="Database not configured")
 
     product = await _find_checkout_product(payload.product_id, payload.product_slug)
-    if not product.get("is_free") and int(round(float(product.get("sale_price") or product.get("price") or 0) * 100)) > 0:
+    raw_amount = _coupon_price_paise(product)
+    order_id = str(uuid.uuid4())
+    coupon_result = None
+    if payload.coupon_code:
+        if not payload.email or not payload.phone or not payload.name: raise HTTPException(status_code=422, detail="Customer details are required")
+        coupon_result = await _evaluate_coupon(payload.coupon_code, [product.get("id")], str(payload.email), payload.phone, reserve=True, order_id=order_id)
+    if (not product.get("is_free") and raw_amount > 0) and (not coupon_result or coupon_result["finalAmount"] != 0):
         raise HTTPException(status_code=400, detail="This product is not free")
 
     download_fields = _product_download_fields(product)
@@ -7632,12 +7893,16 @@ async def payment_free_order(payload: PaymentFreeOrderIn):
         raise HTTPException(status_code=404, detail="Download file not configured")
 
     download_token = secrets.token_urlsafe(32)
-    order_id = str(uuid.uuid4())
     download_url = _paid_download_url(order_id, download_token)
     order_doc = {
         "id": order_id,
         "razorpay_order_id": None,
         "amount": 0,
+        "originalAmount": coupon_result["originalAmount"] if coupon_result else raw_amount,
+        "couponCode": _coupon_code(payload.coupon_code) if payload.coupon_code else None,
+        "couponId": coupon_result["coupon"]["_id"] if coupon_result else None,
+        "discountAmount": coupon_result["discountAmount"] if coupon_result else 0,
+        "finalAmount": 0,
         "currency": "INR",
         "receipt": f"free_{uuid.uuid4().hex[:24]}",
         "product_id": product.get("id"),
@@ -7677,6 +7942,7 @@ async def payment_free_order(payload: PaymentFreeOrderIn):
         if email_sent:
             order_doc["email_delivery_sent_at"] = now
     await db.orders.insert_one(order_doc)
+    await _confirm_coupon_reservation(order_doc)
     await _upsert_checkout_customer(order_doc, product)
 
     return {
@@ -7871,6 +8137,17 @@ async def _seed_db():
             await db.download_logs.create_index("customer_id")
         except Exception:
             pass
+        try:
+            await db.coupons.create_index("code", unique=True, name="unique_coupon_code")
+            await db.coupons.create_index("isActive")
+            await db.coupons.create_index("startsAt")
+            await db.coupons.create_index("expiresAt")
+            await db.coupon_usages.create_index("customerEmail")
+            await db.coupon_usages.create_index("customerPhone")
+            await db.coupon_usages.create_index("couponId")
+            await db.coupon_usages.create_index("orderId", unique=True, sparse=True)
+        except Exception as ie:
+            logger.warning("coupon indexes skipped: %s", ie)
     except Exception as e:
         logger.exception("Seed failed: %s", e)
 

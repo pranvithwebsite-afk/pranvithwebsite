@@ -34,7 +34,7 @@ const loadScript = () =>
  * @param {string} [opts.productSlug]
  * @returns {Promise<{success: boolean, paymentId?: string, orderId?: string, downloadToken?: string, productSlug?: string, emailSent?: boolean, emailError?: string, error?: string}>}
  */
-export async function payWithRazorpay({ amountRupees, itemId, itemName, productSlug, prefill = {} }) {
+export async function payWithRazorpay({ amountRupees, itemId, itemName, productSlug, couponCode, prefill = {} }) {
   const ok = await loadScript();
   if (!ok) {
     return { success: false, error: 'Failed to load Razorpay SDK' };
@@ -48,10 +48,14 @@ export async function payWithRazorpay({ amountRupees, itemId, itemName, productS
       name: prefill.name || '',
       email: prefill.email || '',
       phone: prefill.contact || '',
+      couponCode: couponCode || undefined,
     });
     order = data;
     if (order?.alreadyOwned) {
       return { success: false, alreadyOwned: true, error: order.message || 'You already own this asset.' };
+    }
+    if (order?.zeroValue) {
+      return { success: true, verifiedPaid: true, orderId: order.orderId, verifiedOrderId: order.orderId, productSlug: order.productSlug, downloadToken: order.downloadToken };
     }
   } catch (err) {
     const msg = err?.response?.data?.detail || 'Could not create order';

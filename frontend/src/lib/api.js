@@ -364,6 +364,13 @@ export const fetchAdminProducts = async () => {
   return decodeCmsText(data);
 };
 
+export const fetchAdminCoupons = async () => (await adminApi.get('/admin/coupons')).data;
+export const createAdminCoupon = async (payload) => (await adminApi.post('/admin/coupons', payload)).data;
+export const updateAdminCoupon = async (id, payload) => (await adminApi.patch(`/admin/coupons/${encodeURIComponent(id)}`, payload)).data;
+export const deleteAdminCoupon = async (id) => (await adminApi.delete(`/admin/coupons/${encodeURIComponent(id)}`)).data;
+export const fetchAdminCouponUsages = async (id) => (await adminApi.get(`/admin/coupons/${encodeURIComponent(id)}/usages`)).data;
+export const validateCoupon = async (payload) => (await api.post('/coupons/validate', payload)).data;
+
 export const fetchAdminServices = async () => {
   const { data } = await adminApi.get('/admin/services');
   return data;

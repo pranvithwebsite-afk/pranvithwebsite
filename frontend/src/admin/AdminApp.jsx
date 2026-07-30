@@ -8,6 +8,7 @@ const AdminLogin = lazy(() => import('./pages/Login'));
 const AdminDashboard = lazy(() => import('./pages/Dashboard'));
 const Website = lazy(() => import('./pages/Website'));
 const Products = lazy(() => import('./pages/Products'));
+const Coupons = lazy(() => import('./pages/Coupons'));
 const AdminServices = lazy(() => import('./pages/Services'));
 const Orders = lazy(() => import('./pages/Orders'));
 const PaymentAttempts = lazy(() => import('./pages/PaymentAttempts'));
@@ -39,6 +40,7 @@ const AdminApp = () => (
             <Route path="website" element={<Website />} />
             <Route path="services" element={<AdminServices />} />
             <Route path="products" element={<Products />} />
+            <Route path="coupons" element={<Coupons />} />
             <Route path="orders" element={<Orders />} />
             <Route path="payments/payment-attempts" element={<PaymentAttempts />} />
             <Route path="customers" element={<Customers />} />

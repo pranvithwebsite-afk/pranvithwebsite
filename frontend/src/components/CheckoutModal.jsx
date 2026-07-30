@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { X, Loader2 } from 'lucide-react';
 import { payWithRazorpay } from '../lib/razorpay';
-import { createFreeOrder } from '../lib/api';
+import { createFreeOrder, validateCoupon } from '../lib/api';
 import { trackInitiateCheckout, trackPurchase, trackViewContent } from '../utils/metaPixel';
 
 const initialForm = {
@@ -33,6 +33,9 @@ const CheckoutModal = ({ product, open, onClose, onSuccess, onFailure }) => {
   const submitLock = useRef(false);
   const viewedProductIds = useRef(new Set());
   const [message, setMessage] = useState('');
+  const [couponCode, setCouponCode] = useState('');
+  const [coupon, setCoupon] = useState(null);
+  const [couponBusy, setCouponBusy] = useState(false);
 
   useEffect(() => {
     const productId = product?.id ?? product?.slug;
@@ -51,6 +54,18 @@ const CheckoutModal = ({ product, open, onClose, onSuccess, onFailure }) => {
     setMessage('');
   };
 
+  const applyCoupon = async () => {
+    const nextErrors = validate(form); setErrors(nextErrors);
+    if (Object.keys(nextErrors).length || !couponCode.trim() || couponBusy) return;
+    setCouponBusy(true); setMessage('');
+    try {
+      const result = await validateCoupon({ code: couponCode, productIds: [product.id], customerName: form.name, customerEmail: form.email, customerPhone: form.phone });
+      if (!result.success) { setCoupon(null); setMessage(result.message || 'Could not apply coupon'); }
+      else setCoupon(result);
+    } catch (err) { setCoupon(null); setMessage(err?.response?.data?.detail || 'Could not validate coupon'); }
+    finally { setCouponBusy(false); }
+  };
+
   const submit = async (e) => {
     e.preventDefault();
     // State updates are asynchronous; the ref closes the small window in
@@ -65,7 +80,7 @@ const CheckoutModal = ({ product, open, onClose, onSuccess, onFailure }) => {
     setMessage('');
 
     let result;
-    if (price <= 0 || product?.is_free) {
+    if (price <= 0 || product?.is_free || coupon?.finalAmount === 0) {
       try {
         const data = await createFreeOrder({
           product_id: product.id,
@@ -74,6 +89,7 @@ const CheckoutModal = ({ product, open, onClose, onSuccess, onFailure }) => {
           email: form.email.trim(),
           phone: form.phone.trim(),
           guest_checkout: true,
+          coupon_code: coupon?.couponCode,
         });
         result = {
           success: true,
@@ -93,6 +109,7 @@ const CheckoutModal = ({ product, open, onClose, onSuccess, onFailure }) => {
         itemId: product.id,
         productSlug: product.slug,
         itemName: product.name || product.title,
+        couponCode: coupon?.couponCode,
         prefill: {
           name: form.name.trim(),
           email: form.email.trim(),
@@ -174,6 +191,13 @@ const CheckoutModal = ({ product, open, onClose, onSuccess, onFailure }) => {
             />
           </Field>
 
+          <div>
+            <label className="mb-2 block text-sm font-medium text-white/80">Coupon Code</label>
+            {coupon ? <div className="flex items-center justify-between rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100"><span>{coupon.couponCode} applied — save ₹{(coupon.discountAmount / 100).toLocaleString('en-IN')}</span><button type="button" onClick={() => setCoupon(null)} className="font-semibold text-emerald-300">Remove</button></div> : <div className="flex gap-2"><input value={couponCode} onChange={(e) => setCouponCode(e.target.value.toUpperCase().replace(/\s/g, ''))} placeholder="ENTER CODE" className="min-w-0 flex-1 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-white/35 focus:border-violet-500/60 focus:outline-none" /><button type="button" onClick={applyCoupon} disabled={couponBusy} className="rounded-xl bg-violet-700 px-4 text-sm font-semibold text-white disabled:opacity-60">{couponBusy ? 'Applying…' : 'Apply'}</button></div>}
+          </div>
+
+          <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4 text-sm"><div className="flex justify-between text-white/70"><span>Product price</span><span>₹{Number(price).toLocaleString('en-IN')}</span></div>{coupon && <div className="mt-2 flex justify-between text-emerald-300"><span>Coupon discount</span><span>-₹{(coupon.discountAmount / 100).toLocaleString('en-IN')}</span></div>}<div className="mt-3 flex justify-between border-t border-white/10 pt-3 font-semibold text-white"><span>Total payable</span><span>₹{((coupon ? coupon.finalAmount : price * 100) / 100).toLocaleString('en-IN')}</span></div></div>
+
           {message && (
             <p className="rounded-xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-100">
               {message}
@@ -187,7 +211,7 @@ const CheckoutModal = ({ product, open, onClose, onSuccess, onFailure }) => {
           >
             {busy ? (
               <><Loader2 size={16} className="animate-spin" /> Opening payment…</>
-            ) : product?.is_free || price <= 0 ? (
+            ) : product?.is_free || price <= 0 || coupon?.finalAmount === 0 ? (
               'Continue to download'
             ) : (
               'Continue to Payment'
