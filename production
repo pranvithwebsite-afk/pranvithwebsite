@@ -1,0 +1,41 @@
+[35mVERCEL_DEPLOYMENT.md[m[36m:[m[32m15[m[36m:[m[1;31mMONGO_URL[m=your_mongodb_connection_string
+[35mapi/index.py[m[36m:[m[32m29[m[36m:[m        "[1;31mMONGO_URL[m_OR_DATABASE_URL": _env_state("[1;31mMONGO_URL[m", "DATABASE_URL"),
+[35mapi/index.py[m[36m:[m[32m44[m[36m:[m        "mongo_configured": _env_state("[1;31mMONGO_URL[m", "DATABASE_URL"),
+[35mbackend/.env.example[m[36m:[m[32m1[m[36m:[m[1;31mMONGO_URL[m=mongodb+srv://username:password@cluster.example.mongodb.net
+[35mbackend/core/config.py[m[36m:[m[32m18[m[36m:[m    def [1;31mMONGO_URL[m(self) -> str:
+[35mbackend/core/config.py[m[36m:[m[32m19[m[36m:[m        return self._first_env('[1;31mMONGO_URL[m', 'DATABASE_URL')
+[35mbackend/database.py[m[36m:[m[32m12[m[36m:[m    if not settings.[1;31mMONGO_URL[m or not settings.DB_NAME:
+[35mbackend/database.py[m[36m:[m[32m14[m[36m:[m            "MongoDB connection not started [1;31mmongo_url[m_configured=%s db_name_configured=%s",
+[35mbackend/database.py[m[36m:[m[32m15[m[36m:[m            bool(settings.[1;31mMONGO_URL[m),
+[35mbackend/database.py[m[36m:[m[32m18[m[36m:[m        raise RuntimeError("MongoDB requires [1;31mMONGO_URL[m (or DATABASE_URL) and DB_NAME")
+[35mbackend/database.py[m[36m:[m[32m22[m[36m:[m            settings.[1;31mMONGO_URL[m,
+[35mbackend/main.py[m[36m:[m[32m68[m[36m:[m[1;31mmongo_url[m = _first_env('[1;31mMONGO_URL[m', 'DATABASE_URL')
+[35mbackend/main.py[m[36m:[m[32m72[m[36m:[m    [1;31mmongo_url[m,
+[35mbackend/main.py[m[36m:[m[32m75[m[36m:[m) if [1;31mmongo_url[m and db_name else None
+[35mbackend/main.py[m[36m:[m[32m80[m[36m:[m    hostname_match = re.search(r"@([^/?]+)", [1;31mmongo_url[m or "")
+[35mbackend/main.py[m[36m:[m[32m82[m[36m:[m        "configured": bool([1;31mmongo_url[m and db_name),
+[35mbackend/main.py[m[36m:[m[32m83[m[36m:[m        "scheme": "mongodb+srv" if ([1;31mmongo_url[m or "").startswith("mongodb+srv://") else "other",
+[35mbackend/main.py[m[36m:[m[32m103[m[36m:[m        return "Database authentication failed. Check the production [1;31mMONGO_URL[m credentials."
+[35mbackend/main.py[m[36m:[m[32m151[m[36m:[m        "database_url_present": bool([1;31mmongo_url[m),
+[35mbackend/main.py[m[36m:[m[32m168[m[36m:[m        missing.append("[1;31mMONGO_URL[m or DATABASE_URL")
+[35mbackend/main.py[m[36m:[m[32m223[m[36m:[m        "[1;31mMONGO_URL[m_OR_DATABASE_URL": "SET" if [1;31mmongo_url[m else "MISSING",
+[35mbackend/main.py[m[36m:[m[32m3002[m[36m:[m            detail="Database is not configured. Check [1;31mMONGO_URL[m and DB_NAME.",
+[35mbackend/routes/admin.py[m[36m:[m[32m94[m[36m:[m            detail="Database is not configured. Check [1;31mMONGO_URL[m and DB_NAME.",
+[35mbackend/server.py[m[36m:[m[32m69[m[36m:[m[1;31mmongo_url[m = _first_env('[1;31mMONGO_URL[m', 'DATABASE_URL')
+[35mbackend/server.py[m[36m:[m[32m73[m[36m:[m    [1;31mmongo_url[m,
+[35mbackend/server.py[m[36m:[m[32m76[m[36m:[m) if [1;31mmongo_url[m and db_name else None
+[35mbackend/server.py[m[36m:[m[32m81[m[36m:[m    hostname_match = re.search(r"@([^/?]+)", [1;31mmongo_url[m or "")
+[35mbackend/server.py[m[36m:[m[32m83[m[36m:[m        "configured": bool([1;31mmongo_url[m and db_name),
+[35mbackend/server.py[m[36m:[m[32m84[m[36m:[m        "scheme": "mongodb+srv" if ([1;31mmongo_url[m or "").startswith("mongodb+srv://") else "other",
+[35mbackend/server.py[m[36m:[m[32m104[m[36m:[m        return "Database authentication failed. Check the production [1;31mMONGO_URL[m credentials."
+[35mbackend/server.py[m[36m:[m[32m114[m[36m:[m        raise HTTPException(status_code=503, detail="Database is not configured. Set [1;31mMONGO_URL[m (or DATABASE_URL) and DB_NAME in Vercel.")
+[35mbackend/server.py[m[36m:[m[32m159[m[36m:[m        "database_url_present": bool([1;31mmongo_url[m),
+[35mbackend/server.py[m[36m:[m[32m176[m[36m:[m        missing.append("[1;31mMONGO_URL[m or DATABASE_URL")
+[35mbackend/server.py[m[36m:[m[32m231[m[36m:[m        "[1;31mMONGO_URL[m_OR_DATABASE_URL": "SET" if [1;31mmongo_url[m else "MISSING",
+[35mbackend/server.py[m[36m:[m[32m3115[m[36m:[m            detail="Database is not configured. Check [1;31mMONGO_URL[m and DB_NAME.",
+[35mbackend/tests/test_admin_login_errors.py[m[36m:[m[32m20[m[36m:[m        "Database authentication failed. Check the production [1;31mMONGO_URL[m credentials."
+[35mbackend/tests/test_admin_login_errors.py[m[36m:[m[32m35[m[36m:[m        "Database authentication failed. Check the production [1;31mMONGO_URL[m credentials."
+[35mbackend/tests/test_admin_product_payment_links.py[m[36m:[m[32m144[m[36m:[m            "[1;31mMONGO_URL[m or DATABASE_URL",
+[35mbackend/tests/test_admin_product_payment_links.py[m[36m:[m[32m338[m[36m:[m    monkeypatch.setattr(server, "[1;31mmongo_url[m", "mongodb+srv://example")
+[35mbackend/tests/test_admin_product_payment_links.py[m[36m:[m[32m350[m[36m:[m            "[1;31mMONGO_URL[m_OR_DATABASE_URL": "SET",
+[35mfrontend/README.md[m[36m:[m[32m14[m[36m:[m`[1;31mMONGO_URL[m` and `DB_NAME`, then point the frontend backend URL at that local

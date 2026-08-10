@@ -7210,12 +7210,19 @@ async def _fulfill_paid_order(order: dict, product: dict, payment_id: str, send_
 
 @api_router.post("/checkout/create-order")
 async def checkout_create_order(payload: PaymentCreateOrderIn):
+    logger.info(
+        "[CHECKOUT] request received product_id_present=%s coupon_present=%s",
+        bool(payload.product_id), bool(payload.coupon_code),
+    )
     if db is None:
-        logger.error("[PAYMENT] database unavailable while creating checkout order")
+        logger.error("[CHECKOUT ERROR] database unavailable")
         raise HTTPException(status_code=500, detail="Database not configured")
+    logger.info("[CHECKOUT] database available")
     phone = _normalize_phone(payload.phone)
     product = await _find_checkout_product(payload.product_id, payload.product_slug)
+    logger.info("[CHECKOUT] asset found slug=%s", product.get("slug"))
     amount = _product_price_paise(product)
+    logger.info("[CHECKOUT] authoritative price calculated amount_paise=%d", amount)
     local_order_id = str(uuid.uuid4())
     receipt = f"asset_{uuid.uuid4().hex[:24]}"
     customer_name = payload.name.strip()
@@ -7224,10 +7231,12 @@ async def checkout_create_order(payload: PaymentCreateOrderIn):
     if payload.coupon_code:
         coupon_result = await _evaluate_coupon(payload.coupon_code, [product.get("mongoId") or product.get("id")], customer_email, phone, reserve=True, order_id=local_order_id)
         amount = coupon_result["finalAmount"]
+        logger.info("[CHECKOUT] coupon processed amount_paise=%d", amount)
         if amount <= 0:
             await _release_coupon_reservation(local_order_id)
             raise HTTPException(status_code=400, detail="Use the zero-value checkout flow")
     client = _require_razorpay_client()
+    logger.info("[CHECKOUT] Razorpay configured mode=%s", razorpay_key_mode())
     logger.info(
         "[PAYMENT] creating Razorpay order product=%s amount_paise=%d currency=INR",
         product.get("slug"), amount,
@@ -7306,6 +7315,7 @@ async def checkout_create_order(payload: PaymentCreateOrderIn):
                 "customer_phone": phone,
             },
         })
+        logger.info("[CHECKOUT] Razorpay order created amount_paise=%d", amount)
     except razorpay.errors.BadRequestError as e:
         await _release_coupon_reservation(local_order_id)
         if checkout_sessions is not None:
