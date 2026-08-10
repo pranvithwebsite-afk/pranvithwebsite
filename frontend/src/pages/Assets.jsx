@@ -137,14 +137,18 @@ const Assets = () => {
         : new Date(a.createdAt) - new Date(b.createdAt)
       );
   }, [products, query, selectedCategory, sort, priceFilter]);
-  const settings = cmsPage?.settings || {};
+  // Public CMS responses use `hidden` with no sections when the page is
+  // unpublished or absent. That response is not Assets page content: the
+  // catalogue route must keep its local listing available in that case.
+  const hasPublishedCmsPage = cmsPage?.status === 'published';
+  const settings = hasPublishedCmsPage ? (cmsPage.settings || {}) : {};
   const isDevelopment = process.env.NODE_ENV === 'development';
   const fetchErrorMessage = loadError?.message || 'Unknown request error';
   const fetchErrorStatus = loadError?.response?.status;
-  const pageHidden = cmsPage?.status === 'hidden';
-  const showProductListing = !pageHidden && settings.show_product_listing !== false;
+  const showProductListing = settings.show_product_listing !== false;
   const showFilters = settings.show_filters !== false;
-  const heroSection = findSection(cmsPage?.sections || [], 'hero');
+  const heroSection = hasPublishedCmsPage ? findSection(cmsPage.sections || [], 'hero') : null;
+  const showHero = !hasPublishedCmsPage || !!heroSection?.section_id;
   const activeFilterCount = (query.trim() ? 1 : 0) + (sort !== 'newest' ? 1 : 0) + (priceFilter !== 'all' ? 1 : 0) + (selectedCategory !== 'All Assets' ? 1 : 0);
   const mobileFilterPanelId = 'assets-mobile-filters';
 
@@ -178,7 +182,7 @@ const Assets = () => {
     <>
       <Header />
       <main className="assets-page page min-h-screen bg-transparent text-white">
-        {!pageHidden && heroSection?.section_id && (
+        {showHero && (
           <section className="pb-8 pt-28 md:pt-32">
             <div className="site-container">
               <div className="cinematic-card rounded-[18px] px-5 py-6 sm:px-[34px] sm:py-7">
