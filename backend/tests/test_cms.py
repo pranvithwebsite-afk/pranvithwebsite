@@ -106,6 +106,16 @@ def test_public_cms_hidden_or_draft_page_returns_safe_empty(monkeypatch):
     assert result["sections"] == []
 
 
+def test_public_cms_uses_tracked_seed_when_database_is_unavailable(monkeypatch):
+    monkeypatch.setattr(server, "db", None)
+
+    result = asyncio.run(server.public_cms_page("home"))
+
+    assert result["status"] == "published"
+    assert result["sections"]
+    assert any(section["section_id"] == "hero" for section in result["sections"])
+
+
 def test_admin_can_create_update_delete_and_reorder_section(monkeypatch):
     fake_db = FakeDb()
     monkeypatch.setattr(server, "db", fake_db)

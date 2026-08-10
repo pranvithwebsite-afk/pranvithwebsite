@@ -2232,6 +2232,62 @@ def _cms_section_doc(page_key: str, payload: CmsSectionIn, existing: Optional[di
     return base
 
 
+def _seed_cms_page_response(page_key: str) -> dict:
+    """Return the tracked public CMS seed when MongoDB is unavailable.
+
+    This is intentionally limited to the public read path.  Admin mutations
+    and authentication still require MongoDB, but visitors should not receive
+    a successful-looking hidden/empty page merely because the database is
+    temporarily unavailable.
+    """
+    page = next((item for item in CMS_PAGES if item.get("page_key") == page_key), None)
+    if not page:
+        return {
+            "page_key": page_key,
+            "title": page_key.title(),
+            "status": "hidden",
+            "seo_title": "",
+            "seo_description": "",
+            "settings": {},
+            "sections": [],
+        }
+
+    public_sections = []
+    for section in CMS_SECTIONS:
+        if section.get("page_key") != page_key or section.get("enabled") is False:
+            continue
+        public_sections.append({
+            "id": section.get("id"),
+            "section_id": section.get("section_id", ""),
+            "type": section.get("type", "text"),
+            "title": section.get("title", ""),
+            "subtitle": section.get("subtitle", ""),
+            "description": section.get("description", ""),
+            "button_text": section.get("button_text", ""),
+            "button_link": section.get("button_link", ""),
+            "media_type": section.get("media_type", "auto"),
+            "media_url": section.get("media_url", ""),
+            "poster_url": section.get("poster_url", ""),
+            "video_url": section.get("video_url", ""),
+            "image_url": section.get("image_url", ""),
+            "thumbnail_url": section.get("thumbnail_url", ""),
+            "data": section.get("data") or {},
+        })
+    public_sections.sort(key=lambda section: section.get("sort_order", 0))
+    return _decode_html_entities({
+        "id": page.get("id"),
+        "page_key": page_key,
+        "title": page.get("title", ""),
+        "subtitle": page.get("subtitle", ""),
+        "path": page.get("path", CMS_PAGE_PATHS.get(page_key, f"/{page_key}")),
+        "status": "published",
+        "seo_title": page.get("seo_title", ""),
+        "seo_description": page.get("seo_description", ""),
+        "settings": page.get("settings") or {},
+        "sections": public_sections,
+    })
+
+
 async def _cms_page_response(page_key: str, public: bool = False) -> dict:
     page = await db.cms_pages.find_one({"page_key": page_key})
     if page:
@@ -2482,14 +2538,8 @@ async def public_page_by_slug(slug: str):
 async def public_cms_page(page_key: str):
     page_key = _normalize_cms_page_key(page_key)
     if db is None:
-        return {
-            "page_key": page_key,
-            "title": page_key.title(),
-            "status": "hidden",
-            "seo_title": "",
-            "seo_description": "",
-            "sections": [],
-        }
+        logger.warning("MongoDB is unavailable; serving tracked CMS seed for page_key=%s", page_key)
+        return _seed_cms_page_response(page_key)
     return await _cms_page_response(page_key, public=True)
 
 
