@@ -15,8 +15,21 @@ const formatINR = (paise) => new Intl.NumberFormat('en-IN', {
 }).format(Number(paise || 0) / 100);
 
 const getProductMongoId = (product) => {
-  const value = product?.id || product?._id || product?.productId;
+  const value = product?.mongoId || product?._id || product?.id || product?.productId;
   return typeof value === 'string' && /^[a-f\d]{24}$/i.test(value) ? value : null;
+};
+
+// Checkout accepts the product's application ID as well as a Mongo ObjectId.
+// The backend resolves the reference against its published catalogue and
+// calculates the price itself, so the client never supplies an amount.
+const getCheckoutProductReference = (product) => {
+  const value = product?.mongoId || product?._id || product?.id || product?.productId || product?.slug;
+  return typeof value === 'string' ? value.trim() : '';
+};
+
+const normalizeIndianPhone = (value) => {
+  const digits = String(value || '').replace(/\D/g, '');
+  return digits.startsWith('91') ? digits.slice(2) : digits;
 };
 
 const validate = (values) => {
@@ -95,6 +108,12 @@ const CheckoutModal = ({ product, open, onClose, onSuccess, onFailure }) => {
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) return;
 
+    const productReference = getCheckoutProductReference(product);
+    if (!productReference) {
+      setMessage('This asset is unavailable for checkout. Please refresh and try again.');
+      return;
+    }
+
     submitLock.current = true;
     setBusy(true);
     setMessage('');
@@ -103,11 +122,11 @@ const CheckoutModal = ({ product, open, onClose, onSuccess, onFailure }) => {
     if (price <= 0 || product?.is_free || coupon?.finalAmount === 0) {
       try {
         const data = await createFreeOrder({
-          product_id: getProductMongoId(product),
+          product_id: productReference,
           product_slug: product.slug,
           name: form.name.trim(),
-          email: form.email.trim(),
-          phone: form.phone.trim(),
+          email: form.email.trim().toLowerCase(),
+          phone: normalizeIndianPhone(form.phone),
           guest_checkout: true,
           coupon_code: coupon?.couponCode,
         });
@@ -126,14 +145,14 @@ const CheckoutModal = ({ product, open, onClose, onSuccess, onFailure }) => {
       trackInitiateCheckout(product);
       result = await payWithRazorpay({
         amountRupees: price,
-        itemId: getProductMongoId(product),
+        itemId: productReference,
         productSlug: product.slug,
         itemName: product.name || product.title,
         couponCode: coupon?.couponCode,
         prefill: {
           name: form.name.trim(),
-          email: form.email.trim(),
-          contact: form.phone.trim(),
+          email: form.email.trim().toLowerCase(),
+          contact: normalizeIndianPhone(form.phone),
         },
       });
     }

@@ -4,6 +4,17 @@ import { api } from './api';
 const RAZORPAY_KEY_ID = process.env.VITE_RAZORPAY_KEY_ID || process.env.REACT_APP_RAZORPAY_KEY_ID;
 const RAZORPAY_AUTH_ERROR = 'Razorpay authentication failed. Check live keys in Vercel and redeploy.';
 
+const checkoutValidationMessage = (error) => {
+  const payload = error?.response?.data;
+  const validationError = Array.isArray(payload?.errors) ? payload.errors[0] : null;
+  const field = validationError?.loc?.at(-1);
+  if (field === 'productId') return 'This asset is unavailable for checkout. Please refresh and try again.';
+  if (field === 'name') return 'Please enter your full name.';
+  if (field === 'email') return 'Please enter a valid email address.';
+  if (field === 'phone') return 'Please enter a valid 10-digit Indian phone number.';
+  return payload?.message || payload?.detail || 'Could not create order';
+};
+
 const SCRIPT_SRC = 'https://checkout.razorpay.com/v1/checkout.js';
 
 const loadScript = () =>
@@ -43,13 +54,25 @@ export async function payWithRazorpay({ amountRupees, itemId, itemName, productS
   // 1. Create order on backend. The backend calculates the final amount from the product.
   let order;
   try {
-    const { data } = await api.post('/orders/create', {
-      productId: itemId || '',
+    const productId = String(itemId || productSlug || '').trim();
+    if (!productId) return { success: false, error: 'This asset is unavailable for checkout. Please refresh and try again.' };
+    const payload = {
+      productId,
       name: prefill.name || '',
       email: prefill.email || '',
       phone: prefill.contact || '',
-      couponCode: couponCode || undefined,
-    });
+      ...(couponCode ? { couponCode } : {}),
+    };
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('[Checkout] create-order payload', {
+        productId: payload.productId,
+        hasName: Boolean(payload.name),
+        hasEmail: Boolean(payload.email),
+        hasPhone: Boolean(payload.phone),
+        hasCoupon: Boolean(payload.couponCode),
+      });
+    }
+    const { data } = await api.post('/orders/create', payload);
     order = data;
     if (order?.alreadyOwned) {
       return { success: false, alreadyOwned: true, error: order.message || 'You already own this asset.' };
@@ -58,7 +81,13 @@ export async function payWithRazorpay({ amountRupees, itemId, itemName, productS
       return { success: true, verifiedPaid: true, orderId: order.orderId, verifiedOrderId: order.orderId, productSlug: order.productSlug, downloadToken: order.downloadToken };
     }
   } catch (err) {
-    const msg = err?.response?.data?.detail || 'Could not create order';
+    if (process.env.NODE_ENV !== 'production') {
+      console.error('[Checkout] create-order failed', {
+        status: err?.response?.status,
+        validationErrors: err?.response?.data?.errors || null,
+      });
+    }
+    const msg = checkoutValidationMessage(err);
     const safeMessage = typeof msg === 'string' && msg.toLowerCase().includes('authentication failed')
       ? RAZORPAY_AUTH_ERROR
       : msg;
