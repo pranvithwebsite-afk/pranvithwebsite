@@ -90,4 +90,6 @@ credentials.json
 .credentials
 .env*
 .env.local
+!.env.example
+!backend/.env.example
 

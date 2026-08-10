@@ -1,4 +1,4 @@
-import React, { Suspense, lazy } from 'react';
+import React, { Suspense, lazy, useEffect } from 'react';
 import { ArrowRight } from 'lucide-react';
 import Header from '../components/Header';
 import Hero from '../components/Hero';
@@ -49,7 +49,27 @@ const homeOrderFromCms = (sections = [], allowFallback = false) => {
 const Home = () => {
   const { page, loading, error } = useCmsPage('home');
   usePublicPageLoading(loading);
-  const cmsSections = page?.sections || [];
+  const cmsSections = Array.isArray(page?.sections) ? page.sections : [];
+  // A public CMS endpoint deliberately returns an empty, hidden page for an
+  // unpublished page. That is not usable Home content, so keep the public
+  // landing page available with its existing local fallback instead of
+  // deriving an empty render order.
+  const cmsContentUnavailable = !loading && (
+    !!error
+    || !page
+    || page.status !== 'published'
+    || cmsSections.length === 0
+  );
+
+  useEffect(() => {
+    if (!cmsContentUnavailable) return;
+    console.error('[Home] CMS content unavailable; rendering the local Home fallback.', {
+      status: page?.status,
+      sectionCount: cmsSections.length,
+      error: error?.message || null,
+    });
+  }, [cmsContentUnavailable, cmsSections.length, error, page?.status]);
+
   const findSection = sectionByKey(cmsSections);
   const heroSection = findSection('hero');
   const ctaSection = findSection('cta');
@@ -58,7 +78,12 @@ const Home = () => {
   const servicesSection = findSection('services') || findSection('services_cards') || findSection('home_services');
   const showreelSection = findSection('showreel');
   const faqSection = findSection('faq');
-  const order = homeOrderFromCms(cmsSections, !loading && (!!error || !page));
+  // Render the existing Hero loading state immediately. Previously the route
+  // had no children until the CMS request settled, which made a slow request
+  // indistinguishable from a blank Home page.
+  const order = loading && cmsSections.length === 0
+    ? ['hero']
+    : homeOrderFromCms(cmsSections, cmsContentUnavailable);
   const deferredKeys = new Set(['featuredAssets', 'instagramProfile', 'services', 'showreel', 'footerCta']);
 
   const heroData = heroSection ? {
@@ -82,7 +107,7 @@ const Home = () => {
       <main className="home-page public-page page relative bg-transparent text-white">
         {order.map((sectionKey) => {
           const sections = {
-            hero: <Hero key="hero" pageData={heroData} loading={loading} fallbackAllowed={!loading && (!!error || !heroSection)} />,
+            hero: <Hero key="hero" pageData={heroData} loading={loading} fallbackAllowed={cmsContentUnavailable || (!loading && !heroSection)} />,
             featuredAssets: (
               <Suspense key="featuredAssets" fallback={<SectionSkeleton />}>
                 <OurWorks section={worksSection} />

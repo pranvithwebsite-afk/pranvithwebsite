@@ -5,7 +5,8 @@ from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from starlette.responses import JSONResponse, RedirectResponse, PlainTextResponse, StreamingResponse
 from motor.motor_asyncio import AsyncIOMotorClient
-from bson import ObjectId
+from bson import ObjectId, Decimal128
+from bson.binary import Binary
 from pymongo.errors import DuplicateKeyError, OperationFailure, ServerSelectionTimeoutError
 from passlib.context import CryptContext
 from jose import JWTError, jwt
@@ -13,6 +14,7 @@ from email.message import EmailMessage
 import os
 import json
 import asyncio
+import base64
 import hmac
 import hashlib
 import html
@@ -40,6 +42,8 @@ except ImportError:  # pragma: no cover - optional unless R2 uploads are used
     boto3 = None
 
 from .excel_export import create_excel_report
+from .camera_ai.router import router as camera_ai_router
+from .camera_ai.config import camera_ai_config_summary
 from .seed_data import (
     COURSES,
     TESTIMONIALS,
@@ -369,9 +373,11 @@ def smtp_configured() -> bool:
 
 app = FastAPI(title='PranvithDOP API')
 api_router = APIRouter(prefix="/api")
+api_router.include_router(camera_ai_router)
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
+logger.info("Camera AI configuration summary=%s", camera_ai_config_summary())
 
 
 def log_route_failure(route_name: str, error: Exception) -> None:
@@ -2136,6 +2142,23 @@ def _decode_html_entities(value: Any) -> Any:
     return value
 
 
+def _json_safe_mongo_value(value: Any) -> Any:
+    """Recursively convert BSON values stored in flexible CMS content."""
+    if isinstance(value, ObjectId):
+        return str(value)
+    if isinstance(value, datetime):
+        return value.isoformat()
+    if isinstance(value, Decimal128):
+        return str(value)
+    if isinstance(value, (Binary, bytes, bytearray)):
+        return base64.b64encode(bytes(value)).decode("ascii")
+    if isinstance(value, dict):
+        return {str(key): _json_safe_mongo_value(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple, set)):
+        return [_json_safe_mongo_value(item) for item in value]
+    return value
+
+
 def _normalize_text_value(value: Any, max_length: int = 10000) -> str:
     cleaned = _decode_html_entities(value)
     cleaned = str(cleaned if cleaned is not None else "").strip()
@@ -2358,7 +2381,9 @@ async def _cms_page_response(page_key: str, public: bool = False) -> dict:
         if section.get("_id") is not None:
             section["id"] = str(section["_id"])
 
-    safe_page = _decode_html_entities({k: v for k, v in page.items() if k not in {"_id"}})
+    safe_page = _decode_html_entities(
+        _json_safe_mongo_value({k: v for k, v in page.items() if k not in {"_id"}})
+    )
     if public:
         safe_page = {
             "id": safe_page.get("id"),
@@ -2390,10 +2415,10 @@ async def _cms_page_response(page_key: str, public: bool = False) -> dict:
                 "thumbnail_url": section.get("thumbnail_url", ""),
                 "data": section.get("data") or {},
             })
-        safe_page["sections"] = public_sections
+        safe_page["sections"] = _json_safe_mongo_value(public_sections)
         logger.info("CMS public response page_key=%s sections=%d", page_key, len(public_sections))
         return safe_page
-    safe_page["sections"] = _decode_html_entities(sections)
+    safe_page["sections"] = _decode_html_entities(_json_safe_mongo_value(sections))
     return safe_page
 
 
@@ -3273,7 +3298,7 @@ async def admin_get_page(page_id: str, current_admin: AdminBase = Depends(get_cu
 @admin_router.get("/cms/pages")
 async def admin_cms_pages(current_admin: AdminBase = Depends(get_current_active_admin)):
     rows = await db.cms_pages.find({}, {"_id": 0}).sort("page_key", 1).to_list(100)
-    by_key = {row.get("page_key"): row for row in rows}
+    by_key = {row.get("page_key"): _json_safe_mongo_value(row) for row in rows}
     result = []
     for page_key in ["home", "courses", "about", "assets", "works", "hire", "privacy", "terms"]:
         result.append(by_key.get(page_key) or _cms_page_doc(page_key))

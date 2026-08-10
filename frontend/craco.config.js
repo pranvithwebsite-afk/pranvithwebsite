@@ -69,6 +69,14 @@ let webpackConfig = {
               priority: 25,
               enforce: true,
             },
+            // React Three Fiber is only requested by the lazy Camera AI widget.
+            // Keep its renderer and helpers out of the public app entry bundle.
+            cameraAi3d: {
+              test: /[\\/]node_modules[\\/](three|@react-three|three-stdlib|three-mesh-bvh|camera-controls|meshline|stats-gl)[\\/]/,
+              name: 'camera-ai-3d',
+              priority: 22,
+              enforce: true,
+            },
             vendors: {
               test: /[\\/]node_modules[\\/]/,
               name: 'vendor',

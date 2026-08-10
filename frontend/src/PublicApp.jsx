@@ -1,5 +1,6 @@
 import React, { Suspense, lazy } from 'react';
 import { Routes, Route } from 'react-router-dom';
+const CameraAIWidget = lazy(() => import('./components/camera-ai/CameraAIWidget'));
 
 const Home = lazy(() => import('./pages/Home'));
 const Courses = lazy(() => import('./pages/Courses'));
@@ -50,6 +51,7 @@ const PublicApp = () => (
       <Route path="*" element={<NotFound />} />
       </Routes>
     </Suspense>
+    <Suspense fallback={null}><CameraAIWidget /></Suspense>
   </div>
 );
 
