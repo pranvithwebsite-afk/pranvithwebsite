@@ -26,7 +26,7 @@ def _env_state(*names: str) -> bool:
 
 def _startup_env_report() -> None:
     states = {
-        "MONGO_URL_OR_DATABASE_URL": _env_state("MONGO_URL", "DATABASE_URL"),
+        "MONGO_URL_OR_DATABASE_URL_OR_MONGODB_URI": _env_state("MONGO_URL", "DATABASE_URL", "MONGODB_URI"),
         "DB_NAME": _env_state("DB_NAME"),
         "JWT_SECRET": _env_state("JWT_SECRET"),
         "RAZORPAY_KEY_ID": _env_state("RAZORPAY_KEY_ID"),
@@ -41,7 +41,7 @@ def _startup_env_report() -> None:
 async def health():
     return {
         "status": "ok",
-        "mongo_configured": _env_state("MONGO_URL", "DATABASE_URL"),
+        "mongo_configured": _env_state("MONGO_URL", "DATABASE_URL", "MONGODB_URI"),
         "db_name_configured": _env_state("DB_NAME"),
         "jwt_secret_configured": _env_state("JWT_SECRET"),
     }

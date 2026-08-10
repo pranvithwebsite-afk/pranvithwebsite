@@ -70,8 +70,20 @@ def _first_env(*names: str) -> str:
     return ""
 
 
-mongo_url = _first_env('MONGO_URL', 'DATABASE_URL')
-db_name = os.environ.get('DB_NAME')
+def _database_name_from_uri(uri: str) -> str:
+    """Use an explicit DB_NAME when possible; an Atlas URI path is a safe fallback."""
+    try:
+        return (urlparse(uri).path or "").strip("/").split("/", 1)[0]
+    except ValueError:
+        return ""
+
+
+# MONGODB_URI is retained solely for the existing Vercel deployment, where it
+# was already configured before the backend standardized on MONGO_URL.
+mongo_url = _first_env('MONGO_URL', 'DATABASE_URL', 'MONGODB_URI')
+mongo_url_source = next((name for name in ('MONGO_URL', 'DATABASE_URL', 'MONGODB_URI') if os.environ.get(name)), None)
+db_name = os.environ.get('DB_NAME') or _database_name_from_uri(mongo_url)
+db_name_source = 'DB_NAME' if os.environ.get('DB_NAME') else ('connection URI path' if db_name else None)
 mongo_timeout_ms = int(os.environ.get("MONGO_SERVER_SELECTION_TIMEOUT_MS", "8000"))
 client = AsyncIOMotorClient(
     mongo_url,
@@ -91,7 +103,9 @@ def mongodb_config_summary() -> dict:
     return {
         "configured": bool(mongo_url and db_name),
         "url_configured": bool(mongo_url),
+        "url_source": mongo_url_source,
         "database_configured": bool(db_name),
+        "database_source": db_name_source,
         "missing": missing,
         "scheme": "mongodb+srv" if (mongo_url or "").startswith("mongodb+srv://") else "other",
         "hostname": hostname_match.group(1) if hostname_match else None,
@@ -7184,7 +7198,8 @@ async def _fulfill_paid_order(order: dict, product: dict, payment_id: str, send_
 @api_router.post("/checkout/create-order")
 async def checkout_create_order(payload: PaymentCreateOrderIn):
     if db is None:
-        raise HTTPException(status_code=500, detail="Database not configured")
+        logger.error("Checkout unavailable: MongoDB is not configured summary=%s", mongodb_config_summary())
+        raise HTTPException(status_code=503, detail="Unable to start payment right now. Please try again.")
     phone = _normalize_phone(payload.phone)
     product = await _find_checkout_product(payload.product_id, payload.product_slug)
     amount = _product_price_paise(product)

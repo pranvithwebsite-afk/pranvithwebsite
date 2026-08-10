@@ -34,7 +34,7 @@ CORS_ORIGINS=https://pranvithdop.com
 JWT_EXPIRATION_MINUTES=180
 ```
 
-`VITE_BACKEND_URL` is optional for public pages, but for this architecture leave it unset on Vercel so the deployed frontend stays same-origin and the admin always calls `/api` on the same Vercel domain. The existing `REACT_APP_BACKEND_URL` and `REACT_APP_RAZORPAY_KEY_ID` names remain supported as local compatibility aliases.
+`MONGO_URL` is the canonical database variable. `DATABASE_URL` and the existing production `MONGODB_URI` are accepted only as backward-compatible aliases; set `DB_NAME` explicitly even when the URI includes a database path. `VITE_BACKEND_URL` is optional for public pages, but for this architecture leave it unset on Vercel so the deployed frontend stays same-origin and the admin always calls `/api` on the same Vercel domain. The existing `REACT_APP_BACKEND_URL` and `REACT_APP_RAZORPAY_KEY_ID` names remain supported as local compatibility aliases.
 
 `RAZORPAY_KEY_SECRET` must only be set for the backend environment. The frontend receives only `VITE_RAZORPAY_KEY_ID`. `PUBLIC_SITE_URL` is preferred for absolute protected download links in confirmation emails and other backend-generated absolute URLs; `FRONTEND_URL` is the compatibility fallback. `CLOUDFLARE_R2_PUBLIC_BASE_URL` must point only to the asset host `https://assets.pranvithdop.com` and must not be reused for API or admin traffic.
 

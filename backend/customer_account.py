@@ -129,7 +129,7 @@ async def _get_download_stats(email: str) -> dict:
 
 async def _get_product_images(slugs: list) -> dict:
     db = _db()
-    if not db or not slugs:
+    if db is None or not slugs:
         return {}
     result = {}
     cursor = db.products.find({"slug": {"$in": slugs}}, {"slug": 1, "hero_image": 1, "images": 1, "_id": 0})
