@@ -90,4 +90,5 @@ credentials.json
 .credentials
 .env*
 .env.local
+*rzp-key.csv*
 

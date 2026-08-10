@@ -1,0 +1,209 @@
+warning: in the working copy of 'backend/server.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'backend/tests/test_guest_checkout.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'frontend/src/components/CheckoutModal.jsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'frontend/src/lib/razorpay.js', LF will be replaced by CRLF the next time Git touches it
+[1mdiff --git a/backend/server.py b/backend/server.py[m
+[1mindex 5437432..adbc61b 100644[m
+[1m--- a/backend/server.py[m
+[1m+++ b/backend/server.py[m
+[36m@@ -1178,6 +1178,11 @@[m [mclass PaymentCreateOrderIn(BaseModel):[m
+     guest_checkout: bool = False[m
+     coupon_code: Optional[str] = None[m
+ [m
+[32m+[m[32m    @field_validator("phone")[m
+[32m+[m[32m    @classmethod[m
+[32m+[m[32m    def normalize_phone(cls, value: str) -> str:[m
+[32m+[m[32m        return _normalize_phone(value)[3:][m
+[32m+[m
+ [m
+ class PaymentVerifyIn(BaseModel):[m
+     razorpay_order_id: str[m
+[36m@@ -1195,6 +1200,11 @@[m [mclass GuestCreateOrderRequest(BaseModel):[m
+     phone: str = Field(min_length=7, max_length=20)[m
+     couponCode: Optional[str] = Field(default=None, max_length=64)[m
+ [m
+[32m+[m[32m    @field_validator("phone")[m
+[32m+[m[32m    @classmethod[m
+[32m+[m[32m    def normalize_phone(cls, value: str) -> str:[m
+[32m+[m[32m        return _normalize_phone(value)[3:][m
+[32m+[m
+ [m
+ class CouponValidateRequest(BaseModel):[m
+     code: str = Field(min_length=1, max_length=64)[m
+[36m@@ -1264,6 +1274,11 @@[m [mclass PaymentFreeOrderIn(BaseModel):[m
+     guest_checkout: bool = False[m
+     coupon_code: Optional[str] = None[m
+ [m
+[32m+[m[32m    @field_validator("phone")[m
+[32m+[m[32m    @classmethod[m
+[32m+[m[32m    def normalize_phone(cls, value: Optional[str]) -> Optional[str]:[m
+[32m+[m[32m        return _normalize_phone(value)[3:] if value else None[m
+[32m+[m
+ [m
+ class CheckoutOrder(BaseModel):[m
+     model_config = ConfigDict(extra="ignore")[m
+[36m@@ -5687,7 +5702,7 @@[m [mDEFAULT_PUBLIC_SITE_URL = "https://pranvithdop.com"[m
+ def _normalize_phone(phone: str) -> str:[m
+     cleaned = re.sub(r"[\s().-]+", "", phone or "")[m
+     digits = re.sub(r"\D", "", cleaned)[m
+[31m-    local_number = digits[2:] if digits.startswith("91") else digits[m
+[32m+[m[32m    local_number = digits[2:] if len(digits) == 12 and digits.startswith("91") else digits[m
+     if not re.fullmatch(r"[6-9]\d{9}", local_number):[m
+         raise HTTPException(status_code=422, detail="Enter a valid 10-digit Indian phone number")[m
+     return f"+91{local_number}"[m
+[1mdiff --git a/backend/tests/test_guest_checkout.py b/backend/tests/test_guest_checkout.py[m
+[1mindex 0fc4e79..bac4223 100644[m
+[1m--- a/backend/tests/test_guest_checkout.py[m
+[1m+++ b/backend/tests/test_guest_checkout.py[m
+[36m@@ -170,6 +170,16 @@[m [mdef test_guest_checkout_verification_and_download(monkeypatch):[m
+     assert response.headers["location"] == product["download_file"][m
+ [m
+ [m
+[32m+[m[32mdef test_checkout_phone_normalization_accepts_indian_input_formats():[m
+[32m+[m[32m    for value in ("9133258431", "+919133258431", "919133258431"):[m
+[32m+[m[32m        assert server.PaymentCreateOrderIn([m
+[32m+[m[32m            product_id="asset-1",[m
+[32m+[m[32m            name="Sai Buyer",[m
+[32m+[m[32m            email="buyer@example.com",[m
+[32m+[m[32m            phone=value,[m
+[32m+[m[32m        ).phone == "9133258431"[m
+[32m+[m
+[32m+[m
+ def test_paid_download_url_falls_back_to_public_domain(monkeypatch):[m
+     monkeypatch.delenv("PUBLIC_SITE_URL", raising=False)[m
+     monkeypatch.delenv("FRONTEND_URL", raising=False)[m
+[1mdiff --git a/frontend/src/components/CheckoutModal.jsx b/frontend/src/components/CheckoutModal.jsx[m
+[1mindex 07c5e07..f59553e 100644[m
+[1m--- a/frontend/src/components/CheckoutModal.jsx[m
+[1m+++ b/frontend/src/components/CheckoutModal.jsx[m
+[36m@@ -14,9 +14,15 @@[m [mconst formatINR = (paise) => new Intl.NumberFormat('en-IN', {[m
+   style: 'currency', currency: 'INR', minimumFractionDigits: 0, maximumFractionDigits: 2,[m
+ }).format(Number(paise || 0) / 100);[m
+ [m
+[31m-const getProductMongoId = (product) => {[m
+[32m+[m[32mconst getCheckoutProductId = (product) => {[m
+   const value = product?.id || product?._id || product?.productId;[m
+[31m-  return typeof value === 'string' && /^[a-f\d]{24}$/i.test(value) ? value : null;[m
+[32m+[m[32m  return typeof value === 'string' && value.trim() ? value.trim() : null;[m
+[32m+[m[32m};[m
+[32m+[m
+[32m+[m[32mexport const normalizeIndianPhone = (value) => {[m
+[32m+[m[32m  const digits = String(value || '').replace(/\D/g, '');[m
+[32m+[m[32m  if (digits.length === 12 && digits.startsWith('91')) return digits.slice(2);[m
+[32m+[m[32m  return digits.length === 10 ? digits : '';[m
+ };[m
+ [m
+ const validate = (values) => {[m
+[36m@@ -27,9 +33,7 @@[m [mconst validate = (values) => {[m
+   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(values.email.trim())) {[m
+     errors.email = 'Enter a valid email';[m
+   }[m
+[31m-  const digits = values.phone.replace(/\D/g, '');[m
+[31m-  const indianNumber = digits.startsWith('91') ? digits.slice(2) : digits;[m
+[31m-  if (!/^[6-9]\d{9}$/.test(indianNumber)) {[m
+[32m+[m[32m  if (!/^[6-9]\d{9}$/.test(normalizeIndianPhone(values.phone))) {[m
+     errors.phone = 'Enter a valid 10-digit Indian phone number';[m
+   }[m
+   return errors;[m
+[36m@@ -69,9 +73,9 @@[m [mconst CheckoutModal = ({ product, open, onClose, onSuccess, onFailure }) => {[m
+   const applyCoupon = async () => {[m
+     const nextErrors = validate(form); setErrors(nextErrors); setCouponError('');[m
+     if (Object.keys(nextErrors).length || !couponCode.trim() || couponBusy) return;[m
+[31m-    const productId = getProductMongoId(product);[m
+[32m+[m[32m    const productId = getCheckoutProductId(product);[m
+     if (!productId) { console.error('[Coupon] Invalid product identifier', { productId, product }); setCouponError('Unable to identify this product. Please refresh and try again.'); return; }[m
+[31m-    const payload = { code: couponCode.trim().toUpperCase(), productIds: [productId], customerName: form.name.trim(), customerEmail: form.email.trim().toLowerCase(), customerPhone: form.phone.replace(/\D/g, '') };[m
+[32m+[m[32m    const payload = { code: couponCode.trim().toUpperCase(), productIds: [productId], customerName: form.name.trim(), customerEmail: form.email.trim().toLowerCase(), customerPhone: normalizeIndianPhone(form.phone) };[m
+     console.log('[Coupon] submitting', { productId, productIdLength: productId.length, productSlug: product.slug, productTitle: product.title });[m
+     setCouponBusy(true); setMessage('');[m
+     try {[m
+[36m@@ -98,16 +102,17 @@[m [mconst CheckoutModal = ({ product, open, onClose, onSuccess, onFailure }) => {[m
+     submitLock.current = true;[m
+     setBusy(true);[m
+     setMessage('');[m
+[32m+[m[32m    const phone = normalizeIndianPhone(form.phone);[m
+ [m
+     let result;[m
+     if (price <= 0 || product?.is_free || coupon?.finalAmount === 0) {[m
+       try {[m
+         const data = await createFreeOrder({[m
+[31m-          product_id: getProductMongoId(product),[m
+[32m+[m[32m          product_id: getCheckoutProductId(product),[m
+           product_slug: product.slug,[m
+           name: form.name.trim(),[m
+           email: form.email.trim(),[m
+[31m-          phone: form.phone.trim(),[m
+[32m+[m[32m          phone,[m
+           guest_checkout: true,[m
+           coupon_code: coupon?.couponCode,[m
+         });[m
+[36m@@ -126,14 +131,14 @@[m [mconst CheckoutModal = ({ product, open, onClose, onSuccess, onFailure }) => {[m
+       trackInitiateCheckout(product);[m
+       result = await payWithRazorpay({[m
+         amountRupees: price,[m
+[31m-        itemId: getProductMongoId(product),[m
+[32m+[m[32m        itemId: getCheckoutProductId(product),[m
+         productSlug: product.slug,[m
+         itemName: product.name || product.title,[m
+         couponCode: coupon?.couponCode,[m
+         prefill: {[m
+           name: form.name.trim(),[m
+           email: form.email.trim(),[m
+[31m-          contact: form.phone.trim(),[m
+[32m+[m[32m          contact: phone,[m
+         },[m
+       });[m
+     }[m
+[1mdiff --git a/frontend/src/lib/razorpay.js b/frontend/src/lib/razorpay.js[m
+[1mindex f1aacfe..6369eb1 100644[m
+[1m--- a/frontend/src/lib/razorpay.js[m
+[1m+++ b/frontend/src/lib/razorpay.js[m
+[36m@@ -6,6 +6,16 @@[m [mconst RAZORPAY_AUTH_ERROR = 'Razorpay authentication failed. Check live keys in[m
+ [m
+ const SCRIPT_SRC = 'https://checkout.razorpay.com/v1/checkout.js';[m
+ [m
+[32m+[m[32mconst checkoutValidationMessage = (error) => {[m
+[32m+[m[32m  const detail = error?.response?.data?.detail;[m
+[32m+[m[32m  const errors = error?.response?.data?.errors || (Array.isArray(detail) ? detail : []);[m
+[32m+[m[32m  const field = errors?.[0]?.loc?.at?.(-1);[m
+[32m+[m[32m  if (field === 'phone') return 'Enter a valid 10-digit Indian phone number.';[m
+[32m+[m[32m  if (field === 'email') return 'Enter a valid email address.';[m
+[32m+[m[32m  if (field === 'productId') return 'This asset is unavailable. Please refresh and try again.';[m
+[32m+[m[32m  return typeof detail === 'string' ? detail : 'Unable to start payment. Please try again.';[m
+[32m+[m[32m};[m
+[32m+[m
+ const loadScript = () =>[m
+   new Promise((resolve) => {[m
+     if (typeof window === 'undefined') return resolve(false);[m
+[36m@@ -43,13 +53,17 @@[m [mexport async function payWithRazorpay({ amountRupees, itemId, itemName, productS[m
+   // 1. Create order on backend. The backend calculates the final amount from the product.[m
+   let order;[m
+   try {[m
+[31m-    const { data } = await api.post('/orders/create', {[m
+[32m+[m[32m    const payload = {[m
+       productId: itemId || '',[m
+       name: prefill.name || '',[m
+       email: prefill.email || '',[m
+       phone: prefill.contact || '',[m
+       couponCode: couponCode || undefined,[m
+[31m-    });[m
+[32m+[m[32m    };[m
+[32m+[m[32m    if (process.env.NODE_ENV !== 'production') {[m
+[32m+[m[32m      console.log('[Checkout] create-order payload', payload);[m
+[32m+[m[32m    }[m
+[32m+[m[32m    const { data } = await api.post('/orders/create', payload);[m
+     order = data;[m
+     if (order?.alreadyOwned) {[m
+       return { success: false, alreadyOwned: true, error: order.message || 'You already own this asset.' };[m
+[36m@@ -58,7 +72,10 @@[m [mexport async function payWithRazorpay({ amountRupees, itemId, itemName, productS[m
+       return { success: true, verifiedPaid: true, orderId: order.orderId, verifiedOrderId: order.orderId, productSlug: order.productSlug, downloadToken: order.downloadToken };[m
+     }[m
+   } catch (err) {[m
+[31m-    const msg = err?.response?.data?.detail || 'Could not create order';[m
+[32m+[m[32m    if (process.env.NODE_ENV !== 'production') {[m
+[32m+[m[32m      console.error('[Checkout] create-order failed', err?.response?.status, err?.response?.data);[m
+[32m+[m[32m    }[m
+[32m+[m[32m    const msg = checkoutValidationMessage(err);[m
+     const safeMessage = typeof msg === 'string' && msg.toLowerCase().includes('authentication failed')[m
+       ? RAZORPAY_AUTH_ERROR[m
+       : msg;[m

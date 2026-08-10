@@ -353,7 +353,7 @@ def _razorpay_not_found_error(exc: Exception) -> bool:
 
 def _require_razorpay_client():
     if not RAZORPAY_KEY_ID or not RAZORPAY_KEY_SECRET or razorpay_client is None:
-        logger.warning("Razorpay credentials unavailable or incomplete summary=%s", razorpay_config_summary())
+        logger.warning("[PAYMENT] Razorpay credentials missing or unusable summary=%s", razorpay_config_summary())
         raise HTTPException(status_code=502, detail=RAZORPAY_AUTH_ERROR_MESSAGE)
     return razorpay_client
 
@@ -7211,6 +7211,7 @@ async def _fulfill_paid_order(order: dict, product: dict, payment_id: str, send_
 @api_router.post("/checkout/create-order")
 async def checkout_create_order(payload: PaymentCreateOrderIn):
     if db is None:
+        logger.error("[PAYMENT] database unavailable while creating checkout order")
         raise HTTPException(status_code=500, detail="Database not configured")
     phone = _normalize_phone(payload.phone)
     product = await _find_checkout_product(payload.product_id, payload.product_slug)
@@ -7227,6 +7228,10 @@ async def checkout_create_order(payload: PaymentCreateOrderIn):
             await _release_coupon_reservation(local_order_id)
             raise HTTPException(status_code=400, detail="Use the zero-value checkout flow")
     client = _require_razorpay_client()
+    logger.info(
+        "[PAYMENT] creating Razorpay order product=%s amount_paise=%d currency=INR",
+        product.get("slug"), amount,
+    )
 
     # Claim the customer/asset pair *before* calling Razorpay.  This makes
     # repeated HTTP requests (including separate browser tabs) converge on one
@@ -7308,13 +7313,13 @@ async def checkout_create_order(payload: PaymentCreateOrderIn):
         if _is_razorpay_auth_error(e):
             logger.warning("Razorpay order create authentication failed config=%s error=%s", razorpay_config_summary(), _razorpay_error_summary(e))
             raise HTTPException(status_code=502, detail=RAZORPAY_AUTH_ERROR_MESSAGE)
-        logger.exception("Razorpay bad request")
+        logger.error("[PAYMENT] Razorpay order creation rejected details=%s", _razorpay_error_summary(e))
         raise HTTPException(status_code=400, detail=_razorpay_public_error(e))
     except razorpay.errors.ServerError:
         await _release_coupon_reservation(local_order_id)
         if checkout_sessions is not None:
             await checkout_sessions.delete_one(session_key)
-        logger.exception("Razorpay server error")
+        logger.error("[PAYMENT] Razorpay order creation failed: gateway server error")
         raise HTTPException(status_code=502, detail="Payment gateway error")
     except Exception as exc:
         await _release_coupon_reservation(local_order_id)
@@ -7323,7 +7328,7 @@ async def checkout_create_order(payload: PaymentCreateOrderIn):
         if _is_razorpay_auth_error(exc):
             logger.warning("Razorpay order create authentication failed config=%s error=%s", razorpay_config_summary(), _razorpay_error_summary(exc))
             raise HTTPException(status_code=502, detail=RAZORPAY_AUTH_ERROR_MESSAGE)
-        logger.exception("Razorpay order failure")
+        logger.error("[PAYMENT] Razorpay order creation failed details=%s", _razorpay_error_summary(exc))
         raise HTTPException(status_code=500, detail="Could not create order")
 
     attempt_doc = {

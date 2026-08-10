@@ -13,7 +13,7 @@ const checkoutValidationMessage = (error) => {
   if (field === 'phone') return 'Enter a valid 10-digit Indian phone number.';
   if (field === 'email') return 'Enter a valid email address.';
   if (field === 'productId') return 'This asset is unavailable. Please refresh and try again.';
-  return typeof detail === 'string' ? detail : 'Unable to start payment. Please try again.';
+  return 'Unable to start payment. Please try again.';
 };
 
 const loadScript = () =>
