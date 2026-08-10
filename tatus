@@ -1,0 +1,149 @@
+[1mdiff --git a/.gitignore b/.gitignore[m
+[1mindex 5e5daa9..74d4f6d 100644[m
+[1m--- a/.gitignore[m
+[1m+++ b/.gitignore[m
+[36m@@ -90,4 +90,6 @@[m [mcredentials.json[m
+ .credentials[m
+ .env*[m
+ .env.local[m
+[32m+[m[32m!.env.example[m
+[32m+[m[32m!backend/.env.example[m
+ [m
+[1mdiff --git a/backend/.env.example b/backend/.env.example[m
+[1mindex 77c63b0..14ecc82 100644[m
+[1m--- a/backend/.env.example[m
+[1m+++ b/backend/.env.example[m
+[36m@@ -1,22 +1,11 @@[m
+[31m-MONGO_URL=mongodb+srv://username:password@cluster.example.mongodb.net[m
+[31m-DB_NAME=pranvithdop[m
+[31m-PUBLIC_SITE_URL=https://pranvithdop.com[m
+[31m-FRONTEND_URL=https://pranvithdop.com[m
+[31m-CLOUDFLARE_R2_PUBLIC_BASE_URL=https://assets.pranvithdop.com[m
+[31m-[m
+[31m-RAZORPAY_KEY_ID=rzp_test_replace_me[m
+[31m-RAZORPAY_KEY_SECRET=replace_me[m
+[31m-[m
+[31m-JWT_SECRET=replace_with_a_long_random_admin_secret[m
+[31m-DEFAULT_ADMIN_EMAIL=admin@example.com[m
+[31m-DEFAULT_ADMIN_PASSWORD=replace_me[m
+[31m-DEFAULT_ADMIN_NAME=Pranvith[m
+[31m-[m
+[31m-CORS_ORIGINS=https://pranvithdop.com,http://localhost:3000[m
+[31m-[m
+[31m-# Optional: enables paid-order confirmation emails with the protected download link.[m
+[31m-SMTP_HOST=smtp.example.com[m
+[31m-SMTP_PORT=587[m
+[31m-SMTP_USER=replace_me[m
+[31m-SMTP_PASS=replace_me[m
+[31m-FROM_EMAIL=PranvithDOP <no-reply@example.com>[m
+[32m+[m[32m# Camera AI (server-side only; never use a VITE_/REACT_APP_ prefix for this key)[m
+[32m+[m[32mCAMERA_AI_ENABLED=true[m
+[32m+[m[32mAI_PROVIDER=openai[m
+[32m+[m[32mOPENAI_API_KEY=[m
+[32m+[m[32mCAMERA_AI_MODEL=gpt-5.6-luna[m
+[32m+[m[32mCAMERA_AI_MAX_HISTORY=10[m
+[32m+[m[32mCAMERA_AI_MAX_TOKENS=700[m
+[32m+[m[32mCAMERA_AI_TIMEOUT_SECONDS=25[m
+[32m+[m[32mCAMERA_AI_RATE_LIMIT_PER_MINUTE=12[m
+[32m+[m[32m# Use only for local testing; production must remain false.[m
+[32m+[m[32mCAMERA_AI_MOCK=false[m
+[1mdiff --git a/backend/camera_ai/__init__.py b/backend/camera_ai/__init__.py[m
+[1mnew file mode 100644[m
+[1mindex 0000000..8ef4469[m
+[1m--- /dev/null[m
+[1m+++ b/backend/camera_ai/__init__.py[m
+[36m@@ -0,0 +1 @@[m
+[32m+[m[32m"""Camera AI HTTP and provider-agnostic service layer."""[m
+[1mdiff --git a/backend/camera_ai/config.py b/backend/camera_ai/config.py[m
+[1mnew file mode 100644[m
+[1mindex 0000000..4939429[m
+[1m--- /dev/null[m
+[1m+++ b/backend/camera_ai/config.py[m
+[36m@@ -0,0 +1,42 @@[m
+[32m+[m[32mimport os[m
+[32m+[m[32mfrom dataclasses import dataclass[m
+[32m+[m
+[32m+[m
+[32m+[m[32mdef _bounded_int(name: str, default: int, minimum: int, maximum: int) -> int:[m
+[32m+[m[32m    try:[m
+[32m+[m[32m        value = int(os.environ.get(name, default))[m
+[32m+[m[32m    except (TypeError, ValueError):[m
+[32m+[m[32m        value = default[m
+[32m+[m[32m    return min(max(value, minimum), maximum)[m
+[32m+[m
+[32m+[m
+[32m+[m[32m@dataclass(frozen=True)[m
+[32m+[m[32mclass CameraAiConfig:[m
+[32m+[m[32m    enabled: bool[m
+[32m+[m[32m    provider: str[m
+[32m+[m[32m    model: str[m
+[32m+[m[32m    api_key: str[m
+[32m+[m[32m    max_history: int[m
+[32m+[m[32m    max_tokens: int[m
+[32m+[m[32m    timeout_seconds: int[m
+[32m+[m[32m    rate_limit_per_minute: int[m
+[32m+[m[32m    mock_enabled: bool[m
+[32m+[m
+[32m+[m[32m    @classmethod[m
+[32m+[m[32m    def from_env(cls) -> "CameraAiConfig":[m
+[32m+[m[32m        return cls([m
+[32m+[m[32m            enabled=os.environ.get("CAMERA_AI_ENABLED", "true").lower() == "true",[m
+[32m+[m[32m            provider=os.environ.get("AI_PROVIDER", "openai").strip().lower(),[m
+[32m+[m[32m            model=os.environ.get("CAMERA_AI_MODEL", "gpt-5.6-luna").strip(),[m
+[32m+[m[32m            api_key=os.environ.get("OPENAI_API_KEY", "").strip(),[m
+[32m+[m[32m            max_history=_bounded_int("CAMERA_AI_MAX_HISTORY", 10, 0, 16),[m
+[32m+[m[32m            max_tokens=_bounded_int("CAMERA_AI_MAX_TOKENS", 700, 100, 1600),[m
+[32m+[m[32m            timeout_seconds=_bounded_int("CAMERA_AI_TIMEOUT_SECONDS", 25, 5, 55),[m
+[32m+[m[32m            rate_limit_per_minute=_bounded_int("CAMERA_AI_RATE_LIMIT_PER_MINUTE", 12, 1, 60),[m
+[32m+[m[32m            mock_enabled=os.environ.get("CAMERA_AI_MOCK", "false").lower() == "true",[m
+[32m+[m[32m        )[m
+[32m+[m
+[32m+[m
+[32m+[m[32mdef camera_ai_config_summary() -> dict:[m
+[32m+[m[32m    config = CameraAiConfig.from_env()[m
+[32m+[m[32m    return {"enabled": config.enabled, "provider": config.provider, "model": config.model, "api_key_configured": bool(config.api_key), "mock_enabled": config.mock_enabled, "max_history": config.max_history}[m
+[1mdiff --git a/backend/camera_ai/prompt.py b/backend/camera_ai/prompt.py[m
+[1mnew file mode 100644[m
+[1mindex 0000000..779b31c[m
+[1m--- /dev/null[m
+[1m+++ b/backend/camera_ai/prompt.py[m
+[36m@@ -0,0 +1,16 @@[m
+[32m+[m[32mfrom .schemas import CameraAiHistoryMessage[m
+[32m+[m
+[32m+[m
+[32m+[m[32mCAMERA_AI_SYSTEM_PROMPT = """You are PranvithDOP Camera AI, a friendly professional photography and cinematography mentor. Help beginners through experienced creators with concise, technically accurate, practical advice about exposure, aperture, ISO, shutter speed and shutter angle, histogram, zebras, dynamic range, frame rates, codecs, bit depth, picture profiles, focus, white balance, lenses, filters, accessories, lighting, photography, cinematography, composition and creative shot ideas.[m
+[32m+[m
+[32m+[m[32mSupport Sony, Canon, Nikon, Fujifilm, Panasonic/Lumix, Blackmagic, DJI, GoPro, Insta360, RED, ARRI and future brands equally. Never assume a Sony workflow. Explain why recommendations work. Give strong starting settings, never claim they are universally perfect: actual exposure depends on available light, subject movement, lens, sensor and creative intent. For model-specific menus or capabilities that are uncertain, say menu labels can vary by firmware/version instead of inventing details.[m
+[32m+[m
+[32m+[m[32mDifferentiate photo from video. For video, use frame-rate-aware shutter guidance: 24fps about 1/48-1/50, 25fps 1/50, 30fps 1/60, 50fps 1/100, 60fps 1/120-1/125, 120fps 1/240-1/250. Do not apply photo shutter speeds to every video request. If details are incomplete, still give useful general guidance and ask only follow-ups that materially improve the answer.[m
+[32m+[m
+[32m+[m[32mReturn valid JSON matching the supplied schema. Use settings only when the user clearly asks for recommended camera or exposure settings. Keep irrelevant settings fields null. Creative ideas and educational explanations should have settings set to null."""[m
+[32m+[m
+[32m+[m
+[32m+[m[32mdef build_camera_ai_prompt(message: str, history: list[CameraAiHistoryMessage]) -> list[dict[str, str]]:[m
+[32m+[m[32m    messages = [{"role": item.role, "content": item.content} for item in history[-16:]][m
+[32m+[m[32m    messages.append({"role": "user", "content": message})[m
+[32m+[m[32m    return messages[m
+[1mdiff --git a/backend/camera_ai/router.py b/backend/camera_ai/router.py[m
+[1mnew file mode 100644[m
+[1mindex 0000000..26f2701[m
+[1m--- /dev/null[m
+[1m+++ b/backend/camera_ai/router.py[m
+[36m@@ -0,0 +1,48 @@[m
+[32m+[m[32mimport logging[m
+[32m+[m[32mimport time[m
+[32m+[m[32mfrom collections import defaultdict, deque[m
+[32m+[m
+[32m+[m[32mfrom fastapi import APIRouter, HTTPException, Request[m
+[32m+[m
+[32m+[m[32mfrom .config import CameraAiConfig[m
+[32m+[m[32mfrom .schemas import CameraAiChatRequest, CameraAiChatResponse[m
+[32m+[m[32mfrom .service import CameraAiProviderFailure, CameraAiProviderRateLimited, CameraAiProviderUnavailable, create_camera_ai_reply[m
+[32m+[m
+[32m+[m[32mlogger = logging.getLogger(__name__)[m
+[32m+[m[32mrouter = APIRouter(prefix="/camera-ai", tags=["camera-ai"])[m
+[32m+[m[32m_recent_requests: dict[str, deque[float]] = defaultdict(deque)[m
+[32m+[m
+[32m+[m
+[32m+[m[32mdef _request_ip(request: Request) -> str:[m
+[32m+[m[32m    forwarded = request.headers.g

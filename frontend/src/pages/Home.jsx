@@ -1,4 +1,4 @@
-import React, { Suspense, lazy, useEffect } from 'react';
+import React, { Suspense, lazy } from 'react';
 import { ArrowRight } from 'lucide-react';
 import Header from '../components/Header';
 import Hero from '../components/Hero';
@@ -39,36 +39,28 @@ const firstText = (...values) =>
 
 const videoMediaTypes = new Set(['video_file', 'video_url', 'youtube', 'vimeo']);
 
-const homeOrderFromCms = (sections = [], allowFallback = false) => {
-  const order = sections
+const homeOrderFromCms = (sections = []) =>
+  sections
     .map((section) => sectionToHomeKey[section.section_id] || sectionToHomeKey[section.type])
     .filter(Boolean);
-  return order.length || !allowFallback ? order : ['hero', 'featuredAssets', 'instagramProfile', 'services', 'showreel', 'cta', 'footerCta'];
-};
+
+const localFallbackOrder = ['hero', 'featuredAssets', 'instagramProfile', 'services', 'showreel', 'cta', 'footerCta'];
 
 const Home = () => {
   const { page, loading, error } = useCmsPage('home');
   usePublicPageLoading(loading);
   const cmsSections = Array.isArray(page?.sections) ? page.sections : [];
+  const cmsOrder = homeOrderFromCms(cmsSections);
   // A public CMS endpoint deliberately returns an empty, hidden page for an
   // unpublished page. That is not usable Home content, so keep the public
-  // landing page available with its existing local fallback instead of
-  // deriving an empty render order.
+  // landing page available with its existing local fallback. The same applies
+  // to malformed CMS sections that do not map to a homepage component.
   const cmsContentUnavailable = !loading && (
     !!error
     || !page
     || page.status !== 'published'
-    || cmsSections.length === 0
+    || cmsOrder.length === 0
   );
-
-  useEffect(() => {
-    if (!cmsContentUnavailable) return;
-    console.error('[Home] CMS content unavailable; rendering the local Home fallback.', {
-      status: page?.status,
-      sectionCount: cmsSections.length,
-      error: error?.message || null,
-    });
-  }, [cmsContentUnavailable, cmsSections.length, error, page?.status]);
 
   const findSection = sectionByKey(cmsSections);
   const heroSection = findSection('hero');
@@ -83,7 +75,7 @@ const Home = () => {
   // indistinguishable from a blank Home page.
   const order = loading && cmsSections.length === 0
     ? ['hero']
-    : homeOrderFromCms(cmsSections, cmsContentUnavailable);
+    : (cmsContentUnavailable ? localFallbackOrder : cmsOrder);
   const deferredKeys = new Set(['featuredAssets', 'instagramProfile', 'services', 'showreel', 'footerCta']);
 
   const heroData = heroSection ? {
