@@ -6,7 +6,12 @@ import { formatApiErrorDetail } from '../../lib/api';
 
 const getLoginErrorMessage = (err) => {
   const status = err?.response?.status;
-  const backendMessage = formatApiErrorDetail(err?.response?.data?.detail);
+  // FastAPI's API exception handler returns string failures in `message`.
+  // Prefer it before `detail` so configuration and connection failures are
+  // actionable instead of being replaced by a generic client-side message.
+  const backendMessage = formatApiErrorDetail(
+    err?.response?.data?.message ?? err?.response?.data?.detail
+  );
 
   if (status === 401 || status === 403) {
     return 'Incorrect email or password';
@@ -43,7 +48,9 @@ const Login = () => {
       await login({ email, password });
       navigate(from, { replace: true });
     } catch (err) {
-      const backendMessage = formatApiErrorDetail(err?.response?.data?.detail) || err?.message || 'Unknown login error';
+      const backendMessage = formatApiErrorDetail(
+        err?.response?.data?.message ?? err?.response?.data?.detail
+      ) || err?.message || 'Unknown login error';
       console.warn('Admin login failed', {
         requestEmail: email,
         status: err?.response?.status || null,

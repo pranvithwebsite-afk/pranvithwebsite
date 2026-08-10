@@ -78,8 +78,16 @@ db = client[db_name] if client is not None else None
 
 def mongodb_config_summary() -> dict:
     hostname_match = re.search(r"@([^/?]+)", mongo_url or "")
+    missing = []
+    if not mongo_url:
+        missing.append("MONGO_URL or DATABASE_URL")
+    if not db_name:
+        missing.append("DB_NAME")
     return {
         "configured": bool(mongo_url and db_name),
+        "url_configured": bool(mongo_url),
+        "database_configured": bool(db_name),
+        "missing": missing,
         "scheme": "mongodb+srv" if (mongo_url or "").startswith("mongodb+srv://") else "other",
         "hostname": hostname_match.group(1) if hostname_match else None,
         "database": db_name,
@@ -5477,7 +5485,8 @@ async def on_startup():
     Designed to be resilient, logging errors for optional components without crashing.
     """
     logger.info("Application startup sequence initiated.")
-    logger.info("MongoDB configuration: %s", mongodb_config_summary())
+    mongo_summary = mongodb_config_summary()
+    logger.info("MongoDB configuration: %s", mongo_summary)
     logger.info("Razorpay configured: %s", razorpay_client is not None)
     logger.info("SMTP configured: %s", smtp_configured())
 
@@ -5492,7 +5501,11 @@ async def on_startup():
             if IS_DEVELOPMENT:
                 logger.warning("MongoDB development error detail: %s", exc)
     else:
-        logger.warning("MongoDB connection status: not configured. Using public seed-data fallbacks.")
+        logger.warning(
+            "MongoDB connection status: not configured; missing=%s. "
+            "CMS authentication and database-backed admin features are unavailable.",
+            mongo_summary["missing"],
+        )
 
     if db_is_connected:
         # These tasks depend on a successful database connection.
