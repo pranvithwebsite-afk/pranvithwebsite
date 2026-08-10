@@ -170,6 +170,16 @@ def test_guest_checkout_verification_and_download(monkeypatch):
     assert response.headers["location"] == product["download_file"]
 
 
+def test_checkout_phone_normalization_accepts_indian_input_formats():
+    for value in ("9133258431", "+919133258431", "919133258431"):
+        assert server.PaymentCreateOrderIn(
+            product_id="asset-1",
+            name="Sai Buyer",
+            email="buyer@example.com",
+            phone=value,
+        ).phone == "9133258431"
+
+
 def test_paid_download_url_falls_back_to_public_domain(monkeypatch):
     monkeypatch.delenv("PUBLIC_SITE_URL", raising=False)
     monkeypatch.delenv("FRONTEND_URL", raising=False)

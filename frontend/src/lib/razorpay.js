@@ -6,6 +6,16 @@ const RAZORPAY_AUTH_ERROR = 'Razorpay authentication failed. Check live keys in 
 
 const SCRIPT_SRC = 'https://checkout.razorpay.com/v1/checkout.js';
 
+const checkoutValidationMessage = (error) => {
+  const detail = error?.response?.data?.detail;
+  const errors = error?.response?.data?.errors || (Array.isArray(detail) ? detail : []);
+  const field = errors?.[0]?.loc?.at?.(-1);
+  if (field === 'phone') return 'Enter a valid 10-digit Indian phone number.';
+  if (field === 'email') return 'Enter a valid email address.';
+  if (field === 'productId') return 'This asset is unavailable. Please refresh and try again.';
+  return typeof detail === 'string' ? detail : 'Unable to start payment. Please try again.';
+};
+
 const loadScript = () =>
   new Promise((resolve) => {
     if (typeof window === 'undefined') return resolve(false);
@@ -43,13 +53,17 @@ export async function payWithRazorpay({ amountRupees, itemId, itemName, productS
   // 1. Create order on backend. The backend calculates the final amount from the product.
   let order;
   try {
-    const { data } = await api.post('/orders/create', {
+    const payload = {
       productId: itemId || '',
       name: prefill.name || '',
       email: prefill.email || '',
       phone: prefill.contact || '',
       couponCode: couponCode || undefined,
-    });
+    };
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('[Checkout] create-order payload', payload);
+    }
+    const { data } = await api.post('/orders/create', payload);
     order = data;
     if (order?.alreadyOwned) {
       return { success: false, alreadyOwned: true, error: order.message || 'You already own this asset.' };
@@ -58,7 +72,10 @@ export async function payWithRazorpay({ amountRupees, itemId, itemName, productS
       return { success: true, verifiedPaid: true, orderId: order.orderId, verifiedOrderId: order.orderId, productSlug: order.productSlug, downloadToken: order.downloadToken };
     }
   } catch (err) {
-    const msg = err?.response?.data?.detail || 'Could not create order';
+    if (process.env.NODE_ENV !== 'production') {
+      console.error('[Checkout] create-order failed', err?.response?.status, err?.response?.data);
+    }
+    const msg = checkoutValidationMessage(err);
     const safeMessage = typeof msg === 'string' && msg.toLowerCase().includes('authentication failed')
       ? RAZORPAY_AUTH_ERROR
       : msg;

@@ -1178,6 +1178,11 @@ class PaymentCreateOrderIn(BaseModel):
     guest_checkout: bool = False
     coupon_code: Optional[str] = None
 
+    @field_validator("phone")
+    @classmethod
+    def normalize_phone(cls, value: str) -> str:
+        return _normalize_phone(value)[3:]
+
 
 class PaymentVerifyIn(BaseModel):
     razorpay_order_id: str
@@ -1194,6 +1199,11 @@ class GuestCreateOrderRequest(BaseModel):
     email: EmailStr
     phone: str = Field(min_length=7, max_length=20)
     couponCode: Optional[str] = Field(default=None, max_length=64)
+
+    @field_validator("phone")
+    @classmethod
+    def normalize_phone(cls, value: str) -> str:
+        return _normalize_phone(value)[3:]
 
 
 class CouponValidateRequest(BaseModel):
@@ -1263,6 +1273,11 @@ class PaymentFreeOrderIn(BaseModel):
     phone: Optional[str] = Field(default=None, min_length=7, max_length=20)
     guest_checkout: bool = False
     coupon_code: Optional[str] = None
+
+    @field_validator("phone")
+    @classmethod
+    def normalize_phone(cls, value: Optional[str]) -> Optional[str]:
+        return _normalize_phone(value)[3:] if value else None
 
 
 class CheckoutOrder(BaseModel):
@@ -5687,7 +5702,7 @@ DEFAULT_PUBLIC_SITE_URL = "https://pranvithdop.com"
 def _normalize_phone(phone: str) -> str:
     cleaned = re.sub(r"[\s().-]+", "", phone or "")
     digits = re.sub(r"\D", "", cleaned)
-    local_number = digits[2:] if digits.startswith("91") else digits
+    local_number = digits[2:] if len(digits) == 12 and digits.startswith("91") else digits
     if not re.fullmatch(r"[6-9]\d{9}", local_number):
         raise HTTPException(status_code=422, detail="Enter a valid 10-digit Indian phone number")
     return f"+91{local_number}"

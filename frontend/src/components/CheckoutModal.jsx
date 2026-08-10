@@ -14,9 +14,15 @@ const formatINR = (paise) => new Intl.NumberFormat('en-IN', {
   style: 'currency', currency: 'INR', minimumFractionDigits: 0, maximumFractionDigits: 2,
 }).format(Number(paise || 0) / 100);
 
-const getProductMongoId = (product) => {
+const getCheckoutProductId = (product) => {
   const value = product?.id || product?._id || product?.productId;
-  return typeof value === 'string' && /^[a-f\d]{24}$/i.test(value) ? value : null;
+  return typeof value === 'string' && value.trim() ? value.trim() : null;
+};
+
+export const normalizeIndianPhone = (value) => {
+  const digits = String(value || '').replace(/\D/g, '');
+  if (digits.length === 12 && digits.startsWith('91')) return digits.slice(2);
+  return digits.length === 10 ? digits : '';
 };
 
 const validate = (values) => {
@@ -27,9 +33,7 @@ const validate = (values) => {
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(values.email.trim())) {
     errors.email = 'Enter a valid email';
   }
-  const digits = values.phone.replace(/\D/g, '');
-  const indianNumber = digits.startsWith('91') ? digits.slice(2) : digits;
-  if (!/^[6-9]\d{9}$/.test(indianNumber)) {
+  if (!/^[6-9]\d{9}$/.test(normalizeIndianPhone(values.phone))) {
     errors.phone = 'Enter a valid 10-digit Indian phone number';
   }
   return errors;
@@ -69,9 +73,9 @@ const CheckoutModal = ({ product, open, onClose, onSuccess, onFailure }) => {
   const applyCoupon = async () => {
     const nextErrors = validate(form); setErrors(nextErrors); setCouponError('');
     if (Object.keys(nextErrors).length || !couponCode.trim() || couponBusy) return;
-    const productId = getProductMongoId(product);
+    const productId = getCheckoutProductId(product);
     if (!productId) { console.error('[Coupon] Invalid product identifier', { productId, product }); setCouponError('Unable to identify this product. Please refresh and try again.'); return; }
-    const payload = { code: couponCode.trim().toUpperCase(), productIds: [productId], customerName: form.name.trim(), customerEmail: form.email.trim().toLowerCase(), customerPhone: form.phone.replace(/\D/g, '') };
+    const payload = { code: couponCode.trim().toUpperCase(), productIds: [productId], customerName: form.name.trim(), customerEmail: form.email.trim().toLowerCase(), customerPhone: normalizeIndianPhone(form.phone) };
     console.log('[Coupon] submitting', { productId, productIdLength: productId.length, productSlug: product.slug, productTitle: product.title });
     setCouponBusy(true); setMessage('');
     try {
@@ -98,16 +102,17 @@ const CheckoutModal = ({ product, open, onClose, onSuccess, onFailure }) => {
     submitLock.current = true;
     setBusy(true);
     setMessage('');
+    const phone = normalizeIndianPhone(form.phone);
 
     let result;
     if (price <= 0 || product?.is_free || coupon?.finalAmount === 0) {
       try {
         const data = await createFreeOrder({
-          product_id: getProductMongoId(product),
+          product_id: getCheckoutProductId(product),
           product_slug: product.slug,
           name: form.name.trim(),
           email: form.email.trim(),
-          phone: form.phone.trim(),
+          phone,
           guest_checkout: true,
           coupon_code: coupon?.couponCode,
         });
@@ -126,14 +131,14 @@ const CheckoutModal = ({ product, open, onClose, onSuccess, onFailure }) => {
       trackInitiateCheckout(product);
       result = await payWithRazorpay({
         amountRupees: price,
-        itemId: getProductMongoId(product),
+        itemId: getCheckoutProductId(product),
         productSlug: product.slug,
         itemName: product.name || product.title,
         couponCode: coupon?.couponCode,
         prefill: {
           name: form.name.trim(),
           email: form.email.trim(),
-          contact: form.phone.trim(),
+          contact: phone,
         },
       });
     }
