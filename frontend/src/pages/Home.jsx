@@ -39,29 +39,17 @@ const firstText = (...values) =>
 
 const videoMediaTypes = new Set(['video_file', 'video_url', 'youtube', 'vimeo']);
 
-const homeOrderFromCms = (sections = []) =>
-  sections
+const homeOrderFromCms = (sections = [], allowFallback = false) => {
+  const order = sections
     .map((section) => sectionToHomeKey[section.section_id] || sectionToHomeKey[section.type])
     .filter(Boolean);
-
-const localFallbackOrder = ['hero', 'featuredAssets', 'instagramProfile', 'services', 'showreel', 'cta', 'footerCta'];
+  return order.length || !allowFallback ? order : ['hero', 'featuredAssets', 'instagramProfile', 'services', 'showreel', 'cta', 'footerCta'];
+};
 
 const Home = () => {
   const { page, loading, error } = useCmsPage('home');
   usePublicPageLoading(loading);
-  const cmsSections = Array.isArray(page?.sections) ? page.sections : [];
-  const cmsOrder = homeOrderFromCms(cmsSections);
-  // A public CMS endpoint deliberately returns an empty, hidden page for an
-  // unpublished page. That is not usable Home content, so keep the public
-  // landing page available with its existing local fallback. The same applies
-  // to malformed CMS sections that do not map to a homepage component.
-  const cmsContentUnavailable = !loading && (
-    !!error
-    || !page
-    || page.status !== 'published'
-    || cmsOrder.length === 0
-  );
-
+  const cmsSections = page?.sections || [];
   const findSection = sectionByKey(cmsSections);
   const heroSection = findSection('hero');
   const ctaSection = findSection('cta');
@@ -70,12 +58,7 @@ const Home = () => {
   const servicesSection = findSection('services') || findSection('services_cards') || findSection('home_services');
   const showreelSection = findSection('showreel');
   const faqSection = findSection('faq');
-  // Render the existing Hero loading state immediately. Previously the route
-  // had no children until the CMS request settled, which made a slow request
-  // indistinguishable from a blank Home page.
-  const order = loading && cmsSections.length === 0
-    ? ['hero']
-    : (cmsContentUnavailable ? localFallbackOrder : cmsOrder);
+  const order = homeOrderFromCms(cmsSections, !loading && (!!error || !page));
   const deferredKeys = new Set(['featuredAssets', 'instagramProfile', 'services', 'showreel', 'footerCta']);
 
   const heroData = heroSection ? {
@@ -99,7 +82,7 @@ const Home = () => {
       <main className="home-page public-page page relative bg-transparent text-white">
         {order.map((sectionKey) => {
           const sections = {
-            hero: <Hero key="hero" pageData={heroData} loading={loading} fallbackAllowed={cmsContentUnavailable || (!loading && !heroSection)} />,
+            hero: <Hero key="hero" pageData={heroData} loading={loading} fallbackAllowed={!loading && (!!error || !heroSection)} />,
             featuredAssets: (
               <Suspense key="featuredAssets" fallback={<SectionSkeleton />}>
                 <OurWorks section={worksSection} />

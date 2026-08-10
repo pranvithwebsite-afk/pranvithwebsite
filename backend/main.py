@@ -65,20 +65,8 @@ def _first_env(*names: str) -> str:
     return ""
 
 
-def _database_name_from_uri(uri: str) -> str:
-    """Use an explicit DB_NAME when possible; an Atlas URI path is a safe fallback."""
-    try:
-        return (urlparse(uri).path or "").strip("/").split("/", 1)[0]
-    except ValueError:
-        return ""
-
-
-# MONGODB_URI is retained solely for the existing Vercel deployment, where it
-# was already configured before the backend standardized on MONGO_URL.
-mongo_url = _first_env('MONGO_URL', 'DATABASE_URL', 'MONGODB_URI')
-mongo_url_source = next((name for name in ('MONGO_URL', 'DATABASE_URL', 'MONGODB_URI') if os.environ.get(name)), None)
-db_name = os.environ.get('DB_NAME') or _database_name_from_uri(mongo_url)
-db_name_source = 'DB_NAME' if os.environ.get('DB_NAME') else ('connection URI path' if db_name else None)
+mongo_url = _first_env('MONGO_URL', 'DATABASE_URL')
+db_name = os.environ.get('DB_NAME')
 mongo_timeout_ms = int(os.environ.get("MONGO_SERVER_SELECTION_TIMEOUT_MS", "8000"))
 client = AsyncIOMotorClient(
     mongo_url,
@@ -90,18 +78,8 @@ db = client[db_name] if client is not None else None
 
 def mongodb_config_summary() -> dict:
     hostname_match = re.search(r"@([^/?]+)", mongo_url or "")
-    missing = []
-    if not mongo_url:
-        missing.append("MONGO_URL or DATABASE_URL")
-    if not db_name:
-        missing.append("DB_NAME")
     return {
         "configured": bool(mongo_url and db_name),
-        "url_configured": bool(mongo_url),
-        "url_source": mongo_url_source,
-        "database_configured": bool(db_name),
-        "database_source": db_name_source,
-        "missing": missing,
         "scheme": "mongodb+srv" if (mongo_url or "").startswith("mongodb+srv://") else "other",
         "hostname": hostname_match.group(1) if hostname_match else None,
         "database": db_name,
@@ -5499,8 +5477,7 @@ async def on_startup():
     Designed to be resilient, logging errors for optional components without crashing.
     """
     logger.info("Application startup sequence initiated.")
-    mongo_summary = mongodb_config_summary()
-    logger.info("MongoDB configuration: %s", mongo_summary)
+    logger.info("MongoDB configuration: %s", mongodb_config_summary())
     logger.info("Razorpay configured: %s", razorpay_client is not None)
     logger.info("SMTP configured: %s", smtp_configured())
 
@@ -5515,11 +5492,7 @@ async def on_startup():
             if IS_DEVELOPMENT:
                 logger.warning("MongoDB development error detail: %s", exc)
     else:
-        logger.warning(
-            "MongoDB connection status: not configured; missing=%s. "
-            "CMS authentication and database-backed admin features are unavailable.",
-            mongo_summary["missing"],
-        )
+        logger.warning("MongoDB connection status: not configured. Using public seed-data fallbacks.")
 
     if db_is_connected:
         # These tasks depend on a successful database connection.
@@ -6808,8 +6781,7 @@ async def _fulfill_paid_order(order: dict, product: dict, payment_id: str, send_
 @api_router.post("/checkout/create-order")
 async def checkout_create_order(payload: PaymentCreateOrderIn):
     if db is None:
-        logger.error("Checkout unavailable: MongoDB is not configured summary=%s", mongodb_config_summary())
-        raise HTTPException(status_code=503, detail="Unable to start payment right now. Please try again.")
+        raise HTTPException(status_code=500, detail="Database not configured")
     client = _require_razorpay_client()
 
     phone = _normalize_phone(payload.phone)

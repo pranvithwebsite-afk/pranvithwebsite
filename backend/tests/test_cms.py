@@ -2,9 +2,9 @@ import asyncio
 from types import SimpleNamespace
 
 import pytest
-from bson import ObjectId
+from fastapi.testclient import TestClient
 
-from backend import server
+import server
 
 
 class FakeCursor:
@@ -15,7 +15,7 @@ class FakeCursor:
         self.rows.sort(key=lambda row: row.get("sort_order", 0))
         return self
 
-    async def to_list(self, _limit=None, length=None):
+    async def to_list(self, _limit):
         return list(self.rows)
 
 
@@ -106,18 +106,6 @@ def test_public_cms_hidden_or_draft_page_returns_safe_empty(monkeypatch):
     assert result["sections"] == []
 
 
-def test_admin_cms_page_serializes_nested_object_ids(monkeypatch):
-    fake_db = FakeDb()
-    fake_db.cms_pages.rows[0]["settings"] = {"featured_product_id": ObjectId("64b64c1f8f3c2e8c8a7e1234")}
-    fake_db.cms_sections.rows[0]["data"] = {"product_id": ObjectId("64b64c1f8f3c2e8c8a7e5678")}
-    monkeypatch.setattr(server, "db", fake_db)
-
-    result = asyncio.run(server._cms_page_response("home", public=False))
-
-    assert result["settings"]["featured_product_id"] == "64b64c1f8f3c2e8c8a7e1234"
-    assert result["sections"][0]["data"]["product_id"] == "64b64c1f8f3c2e8c8a7e5678"
-
-
 def test_admin_can_create_update_delete_and_reorder_section(monkeypatch):
     fake_db = FakeDb()
     monkeypatch.setattr(server, "db", fake_db)
@@ -135,8 +123,6 @@ def test_admin_can_create_update_delete_and_reorder_section(monkeypatch):
 
 
 def test_media_upload_requires_admin_auth():
-    from fastapi.testclient import TestClient
-
     client = TestClient(server.app)
 
     response = client.post("/api/admin/media/upload")

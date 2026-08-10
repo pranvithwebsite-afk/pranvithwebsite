@@ -1,7 +1,6 @@
 import os
 from dotenv import load_dotenv
 from pathlib import Path
-from urllib.parse import urlparse
 
 # Load .env file from the backend directory
 env_path = Path(__file__).parent.parent / '.env'
@@ -17,17 +16,11 @@ class Settings:
 
     @property
     def MONGO_URL(self) -> str:
-        return self._first_env('MONGO_URL', 'DATABASE_URL', 'MONGODB_URI')
+        return self._first_env('MONGO_URL', 'DATABASE_URL')
 
     @property
     def DB_NAME(self) -> str:
-        explicit_name = os.environ.get('DB_NAME')
-        if explicit_name:
-            return explicit_name
-        try:
-            return (urlparse(self.MONGO_URL).path or '').strip('/').split('/', 1)[0]
-        except ValueError:
-            return ''
+        return os.environ.get('DB_NAME')
 
     @property
     def MONGO_SERVER_SELECTION_TIMEOUT_MS(self) -> int:

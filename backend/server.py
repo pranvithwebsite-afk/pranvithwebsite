@@ -5,8 +5,7 @@ from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from starlette.responses import JSONResponse, RedirectResponse, PlainTextResponse, StreamingResponse
 from motor.motor_asyncio import AsyncIOMotorClient
-from bson import ObjectId, Decimal128
-from bson.binary import Binary
+from bson import ObjectId
 from pymongo.errors import DuplicateKeyError, OperationFailure, ServerSelectionTimeoutError
 from passlib.context import CryptContext
 from jose import JWTError, jwt
@@ -14,7 +13,6 @@ from email.message import EmailMessage
 import os
 import json
 import asyncio
-import base64
 import hmac
 import hashlib
 import html
@@ -42,8 +40,6 @@ except ImportError:  # pragma: no cover - optional unless R2 uploads are used
     boto3 = None
 
 from .excel_export import create_excel_report
-from .camera_ai.router import router as camera_ai_router
-from .camera_ai.config import camera_ai_config_summary
 from .seed_data import (
     COURSES,
     TESTIMONIALS,
@@ -70,20 +66,8 @@ def _first_env(*names: str) -> str:
     return ""
 
 
-def _database_name_from_uri(uri: str) -> str:
-    """Use an explicit DB_NAME when possible; an Atlas URI path is a safe fallback."""
-    try:
-        return (urlparse(uri).path or "").strip("/").split("/", 1)[0]
-    except ValueError:
-        return ""
-
-
-# MONGODB_URI is retained solely for the existing Vercel deployment, where it
-# was already configured before the backend standardized on MONGO_URL.
-mongo_url = _first_env('MONGO_URL', 'DATABASE_URL', 'MONGODB_URI')
-mongo_url_source = next((name for name in ('MONGO_URL', 'DATABASE_URL', 'MONGODB_URI') if os.environ.get(name)), None)
-db_name = os.environ.get('DB_NAME') or _database_name_from_uri(mongo_url)
-db_name_source = 'DB_NAME' if os.environ.get('DB_NAME') else ('connection URI path' if db_name else None)
+mongo_url = _first_env('MONGO_URL', 'DATABASE_URL')
+db_name = os.environ.get('DB_NAME')
 mongo_timeout_ms = int(os.environ.get("MONGO_SERVER_SELECTION_TIMEOUT_MS", "8000"))
 client = AsyncIOMotorClient(
     mongo_url,
@@ -95,18 +79,8 @@ db = client[db_name] if client is not None else None
 
 def mongodb_config_summary() -> dict:
     hostname_match = re.search(r"@([^/?]+)", mongo_url or "")
-    missing = []
-    if not mongo_url:
-        missing.append("MONGO_URL or DATABASE_URL")
-    if not db_name:
-        missing.append("DB_NAME")
     return {
         "configured": bool(mongo_url and db_name),
-        "url_configured": bool(mongo_url),
-        "url_source": mongo_url_source,
-        "database_configured": bool(db_name),
-        "database_source": db_name_source,
-        "missing": missing,
         "scheme": "mongodb+srv" if (mongo_url or "").startswith("mongodb+srv://") else "other",
         "hostname": hostname_match.group(1) if hostname_match else None,
         "database": db_name,
@@ -395,11 +369,9 @@ def smtp_configured() -> bool:
 
 app = FastAPI(title='PranvithDOP API')
 api_router = APIRouter(prefix="/api")
-api_router.include_router(camera_ai_router)
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
-logger.info("Camera AI configuration summary=%s", camera_ai_config_summary())
 
 
 def log_route_failure(route_name: str, error: Exception) -> None:
@@ -2164,23 +2136,6 @@ def _decode_html_entities(value: Any) -> Any:
     return value
 
 
-def _json_safe_mongo_value(value: Any) -> Any:
-    """Recursively convert BSON values stored in flexible CMS content."""
-    if isinstance(value, ObjectId):
-        return str(value)
-    if isinstance(value, datetime):
-        return value.isoformat()
-    if isinstance(value, Decimal128):
-        return str(value)
-    if isinstance(value, (Binary, bytes, bytearray)):
-        return base64.b64encode(bytes(value)).decode("ascii")
-    if isinstance(value, dict):
-        return {str(key): _json_safe_mongo_value(item) for key, item in value.items()}
-    if isinstance(value, (list, tuple, set)):
-        return [_json_safe_mongo_value(item) for item in value]
-    return value
-
-
 def _normalize_text_value(value: Any, max_length: int = 10000) -> str:
     cleaned = _decode_html_entities(value)
     cleaned = str(cleaned if cleaned is not None else "").strip()
@@ -2403,9 +2358,7 @@ async def _cms_page_response(page_key: str, public: bool = False) -> dict:
         if section.get("_id") is not None:
             section["id"] = str(section["_id"])
 
-    safe_page = _decode_html_entities(
-        _json_safe_mongo_value({k: v for k, v in page.items() if k not in {"_id"}})
-    )
+    safe_page = _decode_html_entities({k: v for k, v in page.items() if k not in {"_id"}})
     if public:
         safe_page = {
             "id": safe_page.get("id"),
@@ -2437,10 +2390,10 @@ async def _cms_page_response(page_key: str, public: bool = False) -> dict:
                 "thumbnail_url": section.get("thumbnail_url", ""),
                 "data": section.get("data") or {},
             })
-        safe_page["sections"] = _json_safe_mongo_value(public_sections)
+        safe_page["sections"] = public_sections
         logger.info("CMS public response page_key=%s sections=%d", page_key, len(public_sections))
         return safe_page
-    safe_page["sections"] = _decode_html_entities(_json_safe_mongo_value(sections))
+    safe_page["sections"] = _decode_html_entities(sections)
     return safe_page
 
 
@@ -3320,7 +3273,7 @@ async def admin_get_page(page_id: str, current_admin: AdminBase = Depends(get_cu
 @admin_router.get("/cms/pages")
 async def admin_cms_pages(current_admin: AdminBase = Depends(get_current_active_admin)):
     rows = await db.cms_pages.find({}, {"_id": 0}).sort("page_key", 1).to_list(100)
-    by_key = {row.get("page_key"): _json_safe_mongo_value(row) for row in rows}
+    by_key = {row.get("page_key"): row for row in rows}
     result = []
     for page_key in ["home", "courses", "about", "assets", "works", "hire", "privacy", "terms"]:
         result.append(by_key.get(page_key) or _cms_page_doc(page_key))
@@ -5617,8 +5570,7 @@ async def on_startup():
     Designed to be resilient, logging errors for optional components without crashing.
     """
     logger.info("Application startup sequence initiated.")
-    mongo_summary = mongodb_config_summary()
-    logger.info("MongoDB configuration: %s", mongo_summary)
+    logger.info("MongoDB configuration: %s", mongodb_config_summary())
     logger.info("Razorpay configured: %s", razorpay_client is not None)
     logger.info("SMTP configured: %s", smtp_configured())
 
@@ -5633,11 +5585,7 @@ async def on_startup():
             if IS_DEVELOPMENT:
                 logger.warning("MongoDB development error detail: %s", exc)
     else:
-        logger.warning(
-            "MongoDB connection status: not configured; missing=%s. "
-            "CMS authentication and database-backed admin features are unavailable.",
-            mongo_summary["missing"],
-        )
+        logger.warning("MongoDB connection status: not configured. Using public seed-data fallbacks.")
 
     if db_is_connected:
         # These tasks depend on a successful database connection.
@@ -7198,8 +7146,7 @@ async def _fulfill_paid_order(order: dict, product: dict, payment_id: str, send_
 @api_router.post("/checkout/create-order")
 async def checkout_create_order(payload: PaymentCreateOrderIn):
     if db is None:
-        logger.error("Checkout unavailable: MongoDB is not configured summary=%s", mongodb_config_summary())
-        raise HTTPException(status_code=503, detail="Unable to start payment right now. Please try again.")
+        raise HTTPException(status_code=500, detail="Database not configured")
     phone = _normalize_phone(payload.phone)
     product = await _find_checkout_product(payload.product_id, payload.product_slug)
     amount = _product_price_paise(product)
