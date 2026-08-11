@@ -39,20 +39,36 @@ try:
 except ImportError:  # pragma: no cover - optional unless R2 uploads are used
     boto3 = None
 
-from .excel_export import create_excel_report
-from .seed_data import (
-    COURSES,
-    TESTIMONIALS,
-    FAQS,
-    PAGES,
-    CMS_PAGES,
-    CMS_SECTIONS,
-    ASSET_PRODUCTS,
-    BLOG_CATEGORIES,
-    BLOG_POSTS,
-    SETTINGS,
-    DEFAULT_SERVICES,
-)
+try:
+    from .excel_export import create_excel_report
+    from .seed_data import (
+        COURSES,
+        TESTIMONIALS,
+        FAQS,
+        PAGES,
+        CMS_PAGES,
+        CMS_SECTIONS,
+        ASSET_PRODUCTS,
+        BLOG_CATEGORIES,
+        BLOG_POSTS,
+        SETTINGS,
+        DEFAULT_SERVICES,
+    )
+except ImportError:
+    from excel_export import create_excel_report
+    from seed_data import (
+        COURSES,
+        TESTIMONIALS,
+        FAQS,
+        PAGES,
+        CMS_PAGES,
+        CMS_SECTIONS,
+        ASSET_PRODUCTS,
+        BLOG_CATEGORIES,
+        BLOG_POSTS,
+        SETTINGS,
+        DEFAULT_SERVICES,
+    )
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -2428,6 +2444,7 @@ async def _cms_page_response(page_key: str, public: bool = False) -> dict:
     for section in sections:
         if section.get("_id") is not None:
             section["id"] = str(section["_id"])
+            section.pop("_id", None)
 
     safe_page = _decode_html_entities({k: v for k, v in page.items() if k not in {"_id"}})
     if public:
@@ -5692,7 +5709,12 @@ try:
     api_router.include_router(customer_router)
     logger.info("Customer account routes loaded")
 except ImportError as e:
-    logger.warning("Customer account routes not available: %s", e)
+    try:
+        from customer_account import router as customer_router
+        api_router.include_router(customer_router)
+        logger.info("Customer account routes loaded")
+    except ImportError:
+        logger.warning("Customer account routes not available: %s", e)
 
 
 # ---------- Razorpay ----------

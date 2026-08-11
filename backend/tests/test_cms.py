@@ -2,6 +2,7 @@ import asyncio
 from types import SimpleNamespace
 
 import pytest
+from bson import ObjectId
 from fastapi.testclient import TestClient
 
 import server
@@ -15,7 +16,7 @@ class FakeCursor:
         self.rows.sort(key=lambda row: row.get("sort_order", 0))
         return self
 
-    async def to_list(self, _limit):
+    async def to_list(self, _limit=None, **_kwargs):
         return list(self.rows)
 
 
@@ -104,6 +105,20 @@ def test_public_cms_hidden_or_draft_page_returns_safe_empty(monkeypatch):
 
     assert result["status"] == "hidden"
     assert result["sections"] == []
+
+
+def test_admin_cms_page_strips_mongo_object_ids(monkeypatch):
+    fake_db = FakeDb()
+    fake_db.cms_pages.rows[0]["_id"] = ObjectId()
+    fake_db.cms_sections.rows[0]["_id"] = ObjectId()
+    monkeypatch.setattr(server, "db", fake_db)
+    admin = SimpleNamespace(role="admin")
+
+    result = asyncio.run(server.admin_cms_page("home", admin))
+
+    assert "_id" not in result
+    assert "_id" not in result["sections"][0]
+    assert result["sections"][0]["id"]
 
 
 def test_public_cms_uses_tracked_seed_when_database_is_unavailable(monkeypatch):
