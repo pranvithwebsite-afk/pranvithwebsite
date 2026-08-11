@@ -99,7 +99,7 @@ const Hero = ({ pageData, loading = false, fallbackAllowed = false }) => {
     }
     if (!hasMedia) {
       return (
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_20%,rgba(124,58,237,0.35),transparent_42%),linear-gradient(135deg,#1a0a3a,#0f0625_48%,var(--bg-main))]" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_20%,rgba(15,164,175,0.35),transparent_42%),linear-gradient(135deg,#024950,#003135_48%,var(--bg-main))]" />
       );
     }
     return (
@@ -137,7 +137,7 @@ const Hero = ({ pageData, loading = false, fallbackAllowed = false }) => {
         <div className="hero-actions flex items-center justify-center gap-4 flex-wrap">
           <a
             href={safePublicHref(hero.primary_button_link, '/')}
-            className="hero-primary-cta group inline-flex items-center gap-3 bg-violet-600 hover:bg-violet-500 transition-colors text-white px-7 py-3.5 rounded-full text-sm font-semibold shadow-[0_8px_30px_rgba(139,92,246,0.45)]"
+            className="hero-primary-cta group inline-flex items-center gap-3 bg-violet-600 hover:bg-violet-500 transition-colors text-white px-7 py-3.5 rounded-full text-sm font-semibold shadow-[0_8px_30px_rgba(150,71,52,0.45)]"
           >
             <span className={isLoading ? 'hero-skeleton hero-skeleton-button' : 'hero-fade-in'}>{isLoading ? '' : hero.primary_button_text}</span>
             <span className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center group-hover:translate-x-0.5 transition-transform">
@@ -153,11 +153,11 @@ const Hero = ({ pageData, loading = false, fallbackAllowed = false }) => {
         </div>
 
         <div className="relative mx-auto mt-16 max-w-5xl">
-          <div className="absolute -inset-6 bg-violet-600/20 blur-3xl rounded-3xl" />
-          <div className="relative rounded-3xl border border-violet-500/30 bg-gradient-to-br from-[#1a0a3a] via-[#0f0625] to-[#0a0518] p-1 overflow-hidden">
-            <div className="relative aspect-[16/8] rounded-[20px] overflow-hidden bg-gradient-to-br from-[#1e0a45] to-[#0a0518]">
+          <div className="absolute -inset-6 bg-violet-500/20 blur-3xl rounded-3xl" />
+          <div className="relative rounded-3xl border border-violet-500/30 bg-gradient-to-br from-[#024950] via-[#04383c] to-[#003135] p-1 overflow-hidden">
+            <div className="relative aspect-[16/8] rounded-[20px] overflow-hidden bg-gradient-to-br from-[#024950] to-[#003135]">
               {media}
-              <div className="absolute inset-0 bg-gradient-to-r from-[#1a0a3a]/90 via-transparent to-[#1a0a3a]/90 pointer-events-none" />
+              <div className="absolute inset-0 bg-gradient-to-r from-[#003135]/90 via-transparent to-[#003135]/90 pointer-events-none" />
             </div>
           </div>
         </div>

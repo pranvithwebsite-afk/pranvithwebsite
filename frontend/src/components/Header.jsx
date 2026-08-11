@@ -23,10 +23,10 @@ const Header = () => {
   return (
     <header className="site-header fixed left-0 right-0 top-0 z-[80] bg-transparent pt-4 md:pt-5">
       <nav
-        className="site-container flex items-center justify-between gap-3 rounded-full border border-[var(--border-soft)] bg-[rgba(12,4,27,0.72)] px-3 py-2 backdrop-blur-[18px] transition-all duration-300 md:gap-8 md:px-5"
+        className="site-container flex items-center justify-between gap-3 rounded-full border border-[var(--border-soft)] bg-[rgba(0,49,53,0.78)] px-3 py-2 backdrop-blur-[18px] transition-all duration-300 md:gap-8 md:px-5"
       >
         <Link to="/" onClick={refreshHomeIfActive} className="flex items-center gap-2 shrink-0" data-testid="header-brand">
-          <div className="h-9 w-9 overflow-hidden rounded-full bg-gradient-to-br from-rose-500 to-orange-500 ring-2 ring-violet-400/45 shadow-[0_0_26px_rgba(139,92,246,0.32)]">
+          <div className="h-9 w-9 overflow-hidden rounded-full bg-gradient-to-br from-[#964734] to-[#0FA4AF] ring-2 ring-[#0FA4AF]/45 shadow-[0_0_26px_rgba(15,164,175,0.35)]">
             <img
               src={FALLBACK_IMAGE}
               alt="PranvithDOP"
@@ -52,7 +52,7 @@ const Header = () => {
                   data-testid={`nav-${l.name.toLowerCase().replace(/\s+/g, '-')}`}
                   className={`rounded-full px-4 py-2 text-sm font-medium transition-all duration-200 ${
                     active
-                      ? 'bg-[rgba(124,58,237,0.18)] text-accent-purple-strong'
+                      ? 'bg-[rgba(15,164,175,0.22)] text-accent-purple-strong font-semibold'
                       : 'text-white/78 hover:bg-white/5 hover:text-white'
                   }`}
                 >
@@ -64,7 +64,7 @@ const Header = () => {
         </ul>
 
         <button
-          className="rounded-full border border-white/10 bg-white/5 p-2 text-white shadow-[0_0_20px_rgba(124,58,237,0.12)] transition hover:bg-white/10 md:hidden"
+          className="rounded-full border border-white/10 bg-white/5 p-2 text-white shadow-[0_0_20px_rgba(15,164,175,0.15)] transition hover:bg-white/10 md:hidden"
           onClick={() => setOpen(!open)}
           aria-label="menu"
         >
@@ -73,7 +73,7 @@ const Header = () => {
       </nav>
 
       {open && (
-        <div className="absolute left-4 right-4 top-[4.75rem] rounded-3xl border border-[var(--border-soft)] bg-[var(--bg-elevated)] p-3 shadow-[0_22px_70px_rgba(124,58,237,0.28)] backdrop-blur-xl md:hidden">
+        <div className="absolute left-4 right-4 top-[4.75rem] rounded-3xl border border-[var(--border-soft)] bg-[var(--bg-elevated)] p-3 shadow-[0_22px_70px_rgba(0,49,53,0.85)] backdrop-blur-xl md:hidden">
           <ul className="flex flex-col gap-1">
             {navLinks.map((l) => {
               const active = isActive(l.path);
@@ -88,7 +88,7 @@ const Header = () => {
                     data-testid={`mobile-nav-${l.name.toLowerCase().replace(/\s+/g, '-')}`}
                     className={`block rounded-2xl px-4 py-3 text-sm font-medium transition-all ${
                       active
-                        ? 'bg-[rgba(124,58,237,0.18)] text-accent-purple-strong'
+                        ? 'bg-[rgba(15,164,175,0.22)] text-accent-purple-strong font-semibold'
                         : 'text-white/86 hover:bg-white/6 hover:text-white'
                     }`}
                   >
