@@ -63,80 +63,73 @@ const Footer = () => {
   };
 
   return (
-    <footer className="site-footer relative w-full shrink-0 bg-transparent">
-      <div className="site-footer__inner site-container relative">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-10">
-          <div>
-            <h4 className="text-2xl font-bold text-white">{footer.brand_title}</h4>
-            <p className="mt-4 whitespace-pre-line text-sm text-white/65 leading-relaxed max-w-xs">{footer.description}</p>
-            <div className="mt-6 flex items-center gap-3">
-              <a href={footer.youtube_link || '#'} aria-label="YouTube" className="flex h-9 w-9 items-center justify-center rounded-full border border-[var(--border-subtle)] bg-purple-500/10 text-[var(--accent-purple)] transition hover:bg-purple-500/20">
-                <Youtube size={16} />
-              </a>
-              <a href={footer.instagram_link || '#'} aria-label="Instagram" className="flex h-9 w-9 items-center justify-center rounded-full border border-[var(--border-subtle)] bg-purple-500/10 text-[var(--accent-purple)] transition hover:bg-purple-500/20">
-                <Instagram size={16} />
-              </a>
+    <footer className="site-footer footer-spectrum relative w-full shrink-0 pt-24 pb-12 bg-transparent overflow-hidden">
+      <div className="mx-auto max-w-7xl px-6">
+        <div className="relative z-10 rounded-2xl border border-white/15 bg-[linear-gradient(120deg,rgba(42,13,5,.78),rgba(7,9,14,.72)_48%,rgba(4,28,65,.78))] p-8 md:p-12 backdrop-blur-2xl shadow-2xl">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-10">
+            {/* Brand Info */}
+            <div className="lg:col-span-2 space-y-4">
+              <div className="flex items-center gap-2.5">
+                <div className="brand-orbit h-9 w-9 rounded-full flex items-center justify-center text-white font-extrabold text-[10px]">
+                  PD
+                </div>
+                <span className="text-2xl font-bold tracking-tight text-white font-[Space_Grotesk]">
+                  PRANVITH <span className="text-[#ff5a1f]">DOP</span>
+                </span>
+              </div>
+              <p className="text-sm text-white/60 leading-relaxed max-w-sm">
+                Cinematic Assets • LUTs • Wedding Films • Editing Tools. Empowering editors and cinematographers around the world.
+              </p>
+              <div className="flex items-center gap-3 pt-2">
+                <a href="#" aria-label="YouTube" className="flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/5 text-[#60a5fa] transition hover:bg-[#3b82f6] hover:text-white">
+                  <Youtube size={16} />
+                </a>
+                <a href="#" aria-label="Instagram" className="flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/5 text-[#60a5fa] transition hover:bg-[#3b82f6] hover:text-white">
+                  <Instagram size={16} />
+                </a>
+              </div>
+            </div>
+
+            {/* Products */}
+            <div>
+              <h4 className="text-sm font-bold uppercase tracking-wider text-white font-[Space_Grotesk] mb-4">Products</h4>
+              <ul className="space-y-2.5 text-sm text-white/60">
+                <li><Link to="/assets" className="hover:text-[#60a5fa] transition">Wedding LUTs</Link></li>
+                <li><Link to="/assets" className="hover:text-[#60a5fa] transition">SFX Bundles</Link></li>
+                <li><Link to="/assets" className="hover:text-[#60a5fa] transition">Transitions</Link></li>
+                <li><Link to="/assets" className="hover:text-[#60a5fa] transition">Album PSDs</Link></li>
+              </ul>
+            </div>
+
+            {/* Company */}
+            <div>
+              <h4 className="text-sm font-bold uppercase tracking-wider text-white font-[Space_Grotesk] mb-4">Company</h4>
+              <ul className="space-y-2.5 text-sm text-white/60">
+                <li><Link to="/about" className="hover:text-[#60a5fa] transition">About Us</Link></li>
+                <li><Link to="/works" className="hover:text-[#60a5fa] transition">Our Works</Link></li>
+                <li><Link to="/services" className="hover:text-[#60a5fa] transition">Services</Link></li>
+                <li><Link to="/courses" className="hover:text-[#60a5fa] transition">Courses</Link></li>
+                <li><Link to="/hire" className="hover:text-[#60a5fa] transition">Contact</Link></li>
+              </ul>
+            </div>
+
+            {/* Support */}
+            <div>
+              <h4 className="text-sm font-bold uppercase tracking-wider text-white font-[Space_Grotesk] mb-4">Support</h4>
+              <ul className="space-y-2.5 text-sm text-white/60">
+                <li><Link to="/privacy#faq" className="hover:text-[#60a5fa] transition">Help Center & FAQ</Link></li>
+                <li><Link to="/privacy#terms" className="hover:text-[#60a5fa] transition">Commercial License</Link></li>
+                <li><Link to="/privacy#privacy" className="hover:text-[#60a5fa] transition">Privacy Policy</Link></li>
+              </ul>
             </div>
           </div>
 
-          <div>
-            <h4 className="text-base font-semibold text-white mb-5">Explore</h4>
-            <ul className="space-y-3">
-              {exploreLinks.map((l) => (
-                <li key={`${l.name}-${l.path}`}>
-                  <Link to={l.path || '#'} className="text-sm text-white/65 hover:text-[#c4b5fd] transition">
-                    {l.name}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          <div>
-            <h4 className="text-base font-semibold text-white mb-5">Contact</h4>
-            <ul className="space-y-3 text-sm text-white/65">
-              <li className="flex items-center gap-3">
-                <MapPin size={16} className="text-[var(--accent-purple)]" />
-                {footer.contact_location}
-              </li>
-              <li className="flex items-center gap-3">
-                <Mail size={16} className="text-[var(--accent-purple)]" />
-                {footer.contact_email}
-              </li>
-              <li className="flex items-center gap-3">
-                <Phone size={16} className="text-[var(--accent-purple)]" />
-                {footer.contact_phone}
-              </li>
-            </ul>
-          </div>
-
-          <div>
-            <h4 className="text-base font-semibold text-white mb-5">{footer.newsletter_heading}</h4>
-            <p className="text-sm text-white/65 mb-4">{footer.newsletter_description}</p>
-            <form onSubmit={onSubscribe} className="space-y-3">
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="Enter your email"
-                className="w-full px-4 py-2.5 rounded-lg bg-purple-500/10 border border-purple-300/20 text-white placeholder:text-white/40 text-sm focus:outline-none focus:border-purple-300/35"
-              />
-              <button
-                type="submit"
-                disabled={busy}
-                className="w-full py-2.5 rounded-lg bg-violet-600 hover:bg-violet-500 disabled:opacity-60 transition-colors text-white text-sm font-semibold"
-              >
-                {busy ? 'Subscribing...' : footer.subscribe_button_text}
-              </button>
-            </form>
-          </div>
-        </div>
-
-        <div className="mt-14 flex flex-col items-center justify-between gap-3 pt-6 md:flex-row">
-          <p className="text-xs text-white/55">© {new Date().getFullYear()} {footer.brand_title}. All rights reserved.</p>
-          <div className="flex items-center gap-6 text-xs text-white/55">
-            <Link to="/privacy#terms" className="hover:text-white">Terms</Link>
-            <Link to="/privacy#privacy" className="hover:text-white">Privacy</Link>
+          <div className="mt-12 flex flex-col items-center justify-between gap-4 border-t border-white/10 pt-6 md:flex-row text-xs text-white/50">
+            <p>© 2026 PRANVITH DOP. All rights reserved.</p>
+            <div className="flex items-center gap-6">
+              <Link to="/privacy#terms" className="hover:text-white transition">Terms of Service</Link>
+              <Link to="/privacy#privacy" className="hover:text-white transition">Privacy Policy</Link>
+            </div>
           </div>
         </div>
       </div>

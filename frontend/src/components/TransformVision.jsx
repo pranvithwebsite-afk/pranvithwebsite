@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Instagram, ArrowRight } from 'lucide-react';
 import { FALLBACK_IMAGE, handleImageError, safePublicHref } from '../lib/utils';
 import { fetchPublicSettings } from '../lib/api';
@@ -28,7 +28,7 @@ const defaultInstagramCards = [
     title: 'Cinematic editing reel',
     type: 'Reel',
     coverText: 'EDIT REEL',
-    background: 'linear-gradient(145deg, #7c3aed 0%, #312e81 50%, #090516 100%)',
+    background: 'linear-gradient(145deg, #0d1322 0%, #131c2e 50%, #070a13 100%)',
     link_url: instagramProfileUrl,
     enabled: true,
     sort_order: 0,
@@ -37,7 +37,7 @@ const defaultInstagramCards = [
     title: 'Behind the scenes',
     type: 'Post',
     coverText: 'BTS',
-    background: 'linear-gradient(145deg, #db2777 0%, #7e22ce 48%, #12051f 100%)',
+    background: 'linear-gradient(145deg, #1e40af 0%, #0d1322 48%, #070a13 100%)',
     link_url: instagramProfileUrl,
     enabled: true,
     sort_order: 1,
@@ -46,7 +46,7 @@ const defaultInstagramCards = [
     title: 'Drone shot preview',
     type: 'Video',
     coverText: 'DRONE',
-    background: 'linear-gradient(135deg, #111827 0%, #111827 49%, #7c3aed 50%, #c026d3 100%)',
+    background: 'linear-gradient(135deg, #070a13 0%, #0d1322 50%, #3b82f6 100%)',
     link_url: instagramProfileUrl,
     enabled: true,
     sort_order: 2,
@@ -55,7 +55,7 @@ const defaultInstagramCards = [
     title: 'Commercial frame',
     type: 'Reel',
     coverText: 'COMMERCIAL',
-    background: 'radial-gradient(circle at 30% 25%, #f472b6 0%, #7c3aed 35%, #111827 78%)',
+    background: 'radial-gradient(circle at 30% 25%, #3b82f6 0%, #0d1322 35%, #070a13 78%)',
     link_url: instagramProfileUrl,
     enabled: true,
     sort_order: 3,
@@ -73,7 +73,7 @@ const defaultInstagramCards = [
     title: 'Graphic design post',
     type: 'Video',
     coverText: 'DESIGN',
-    background: 'linear-gradient(145deg, #020617 0%, #312e81 48%, #9333ea 100%)',
+    background: 'linear-gradient(145deg, #020617 0%, #312e81 48%, #0877ff 100%)',
     link_url: instagramProfileUrl,
     enabled: true,
     sort_order: 5,
@@ -82,6 +82,8 @@ const defaultInstagramCards = [
 
 const TransformVision = ({ section }) => {
   const [instagramProfile, setInstagramProfile] = useState(defaultInstagramProfile);
+  const sectionRef = useRef(null);
+  const phoneRef = useRef(null);
 
   useEffect(() => {
     if (section) {
@@ -112,6 +114,69 @@ const TransformVision = ({ section }) => {
     };
   }, [section]);
 
+  useEffect(() => {
+    const sectionEl = sectionRef.current;
+    const phoneEl = phoneRef.current;
+    if (!sectionEl || !phoneEl) return undefined;
+
+    const prefersReducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    if (prefersReducedMotion) return undefined;
+
+    let rafId = 0;
+    const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
+
+    const updatePhoneMotion = () => {
+      const rect = sectionEl.getBoundingClientRect();
+      const viewportHeight = window.innerHeight || 1;
+      const progress = clamp((viewportHeight - rect.top) / (viewportHeight + rect.height), 0, 1);
+      const centered = (progress - 0.5) * 2;
+      const zoomWave = Math.sin(progress * Math.PI);
+
+      phoneEl.style.setProperty('--phone-y', `${-28 + progress * 56}px`);
+      phoneEl.style.setProperty('--phone-rotate-x', `${7 - progress * 12}deg`);
+      phoneEl.style.setProperty('--phone-rotate-y', `${-20 + progress * 34}deg`);
+      phoneEl.style.setProperty('--phone-rotate-z', `${-3 + progress * 5}deg`);
+      phoneEl.style.setProperty('--phone-scale', String(0.88 + zoomWave * 0.24));
+      phoneEl.style.setProperty('--phone-z', `${zoomWave * 140}px`);
+      phoneEl.style.setProperty('--phone-glow', String(0.55 + Math.abs(centered) * 0.2));
+      rafId = 0;
+    };
+
+    const updatePointerMotion = (event) => {
+      const rect = sectionEl.getBoundingClientRect();
+      const x = clamp(((event.clientX - rect.left) / rect.width - 0.5) * 2, -1, 1);
+      const y = clamp(((event.clientY - rect.top) / rect.height - 0.5) * 2, -1, 1);
+      phoneEl.style.setProperty('--phone-pointer-x', `${x * 7}deg`);
+      phoneEl.style.setProperty('--phone-pointer-y', `${y * -5}deg`);
+      phoneEl.style.setProperty('--phone-float-x', `${x * 14}px`);
+      phoneEl.style.setProperty('--phone-float-y', `${y * 10}px`);
+    };
+
+    const resetPointerMotion = () => {
+      phoneEl.style.setProperty('--phone-pointer-x', '0deg');
+      phoneEl.style.setProperty('--phone-pointer-y', '0deg');
+      phoneEl.style.setProperty('--phone-float-x', '0px');
+      phoneEl.style.setProperty('--phone-float-y', '0px');
+    };
+
+    const requestUpdate = () => {
+      if (!rafId) rafId = window.requestAnimationFrame(updatePhoneMotion);
+    };
+
+    requestUpdate();
+    window.addEventListener('scroll', requestUpdate, { passive: true });
+    window.addEventListener('resize', requestUpdate);
+    sectionEl.addEventListener('pointermove', updatePointerMotion, { passive: true });
+    sectionEl.addEventListener('pointerleave', resetPointerMotion);
+    return () => {
+      if (rafId) window.cancelAnimationFrame(rafId);
+      window.removeEventListener('scroll', requestUpdate);
+      window.removeEventListener('resize', requestUpdate);
+      sectionEl.removeEventListener('pointermove', updatePointerMotion);
+      sectionEl.removeEventListener('pointerleave', resetPointerMotion);
+    };
+  }, []);
+
   const cards = useMemo(() => {
     const configuredCards = Array.isArray(instagramProfile.cards) && (instagramProfile.cards.length > 0 || section)
       ? instagramProfile.cards
@@ -137,7 +202,7 @@ const TransformVision = ({ section }) => {
   ].filter(Boolean);
 
   return (
-    <section className="section-block relative overflow-hidden px-6">
+    <section ref={sectionRef} className="transform-vision-section section-block relative overflow-hidden px-6">
       <div className="max-w-7xl mx-auto">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
           <div>
@@ -175,17 +240,28 @@ const TransformVision = ({ section }) => {
           </div>
 
           {/* Mobile mockup */}
-          <div className="flex justify-center md:justify-end">
-            <div className="relative">
-              <div className="absolute -inset-10 bg-violet-600/20 blur-3xl rounded-full" />
-              <div className="relative w-[260px] md:w-[300px] h-[540px] md:h-[620px] rounded-[42px] bg-gradient-to-b from-[#1a0c4f] to-[#0a0518] border-[10px] border-[#0a0518] shadow-[0_30px_80px_rgba(139,92,246,0.25)] overflow-hidden">
+          <div className="transform-phone-stage flex justify-center md:justify-end">
+            <div ref={phoneRef} className="transform-phone-3d relative">
+              <div className="transform-phone-orbit absolute -inset-10 rounded-full" />
+              <div className="transform-phone-shadow" />
+              <div className="phone-floating-chip phone-floating-chip--top">
+                <span className="phone-chip-dot" />
+                5.3K audience
+              </div>
+              <div className="phone-floating-chip phone-floating-chip--bottom">
+                <span className="phone-chip-spark">✦</span>
+                New reel live
+              </div>
+              <div className="phone-mockup relative h-[540px] w-[260px] overflow-hidden rounded-[42px] border-[10px] border-[#0a0518] bg-gradient-to-b from-[#1a0c4f] to-[#0a0518] md:h-[620px] md:w-[300px]">
+                <div className="phone-screen-shine" />
                 <div className="absolute top-0 left-1/2 -translate-x-1/2 w-28 h-6 bg-black rounded-b-2xl z-20" />
+                <div className="phone-camera-lens" />
                 <div className="absolute inset-0 p-4 pt-10 text-white">
                   <div className="flex items-center justify-between mb-4 text-xs">
                     <span className="font-semibold">{instagramProfile.username}</span>
                   </div>
                   <div className="flex items-center gap-3 mb-3">
-                    <div className="w-14 h-14 rounded-full overflow-hidden bg-gradient-to-br from-orange-500 to-rose-500">
+                    <div className="phone-profile-avatar w-14 h-14 rounded-full overflow-hidden bg-gradient-to-br from-orange-500 to-rose-500">
                       <OptimizedImage
                         src={instagramProfile.profile_image_url || FALLBACK_IMAGE}
                         alt={instagramProfile.display_name}
@@ -224,7 +300,7 @@ const TransformVision = ({ section }) => {
                         href={instagramProfile.link_url || '#'}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="block text-violet-300 mt-1 hover:text-violet-200"
+                        className="block text-[#93c5fd] mt-1 hover:text-[#60a5fa]"
                       >
                         {instagramProfile.link_text}
                       </a>
@@ -234,7 +310,7 @@ const TransformVision = ({ section }) => {
                     href={followUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="mt-3 block w-full py-2 rounded-lg bg-violet-600 text-center text-xs font-semibold"
+                    className="mt-3 block w-full py-2 rounded-lg bg-gradient-to-r from-[#3b82f6] to-[#2563eb] hover:from-[#2563eb] hover:to-[#1d4ed8] text-center text-xs font-semibold text-white transition-all duration-300 shadow-[0_4px_16px_rgba(59,130,246,0.3)]"
                   >
                     Follow
                   </a>
@@ -246,7 +322,7 @@ const TransformVision = ({ section }) => {
                         target="_blank"
                         rel="noopener noreferrer"
                         aria-label={`Open ${card.title} ${card.type} on Instagram`}
-                        className="group relative aspect-square overflow-hidden rounded border border-white/5 bg-violet-950"
+                        className="phone-content-card group relative aspect-square overflow-hidden rounded border border-white/5 bg-violet-950"
                         style={{ background: card.background }}
                       >
                         {card.thumbnail_image_url && (
@@ -275,6 +351,7 @@ const TransformVision = ({ section }) => {
                   </div>
                 </div>
               </div>
+              <div className="phone-side-edge" />
             </div>
           </div>
         </div>

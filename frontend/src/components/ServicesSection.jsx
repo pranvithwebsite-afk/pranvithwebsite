@@ -19,7 +19,7 @@ const ServicesSection = ({ section }) => {
   return (
     <section className="section-block site-section--base px-6">
       {/* Subtle background glow */}
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_10%,rgba(124,58,237,0.1),transparent_40%)]" />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_10%,rgba(8,119,255,0.1),transparent_40%)]" />
       <div className="relative mx-auto max-w-7xl">
         <div className="mb-12 max-w-3xl">
           <p className="section-eyebrow text-xs">{section?.data?.eyebrow || 'Services'}</p>

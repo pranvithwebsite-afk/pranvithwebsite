@@ -74,7 +74,7 @@ const CmsSectionRenderer = ({ section, children }) => {
   if (section.type === 'hero') {
     return (
       <section className="relative overflow-hidden px-6 py-16 text-center">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(124,58,237,0.22),transparent_45%)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(255,77,0,0.16),transparent_45%)]" />
         <div className="relative mx-auto max-w-5xl">
           {section.subtitle && <p className="section-eyebrow text-xs">{section.subtitle}</p>}
           <h1 className="mt-5 text-4xl font-bold tracking-tight md:text-6xl">{section.title}</h1>

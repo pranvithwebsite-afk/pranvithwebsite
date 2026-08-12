@@ -105,7 +105,7 @@ export async function payWithRazorpay({ amountRupees, itemId, itemName, productS
       description: itemName || 'Purchase',
       order_id: order.orderId,
       prefill,
-      theme: { color: '#7c3aed' },
+      theme: { color: '#ff4d00' },
       modal: {
         ondismiss: async () => {
           await markCancelled();

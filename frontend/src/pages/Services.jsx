@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Film, RefreshCw } from 'lucide-react';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
+import HeroLightSticks from '../components/HeroLightSticks';
 import ServiceCard from '../components/ServiceCard';
 import { useServices } from '../hooks/useServices';
 
@@ -19,7 +20,10 @@ const Services = () => {
   return (
     <>
       <Header />
-      <main className="page min-h-screen bg-transparent text-white">
+      <main className="services-page page min-h-screen bg-transparent text-white">
+        <div className="services-page-bg" aria-hidden="true">
+          <HeroLightSticks />
+        </div>
         <section className="relative overflow-hidden px-6 pb-14 pt-32 md:pt-36">
           <div className="cinematic-card mx-auto max-w-6xl px-6 py-8 md:px-10">
             <div className="relative mx-auto max-w-7xl">

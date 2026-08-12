@@ -77,7 +77,7 @@ const ServiceDetail = () => {
                   <p className="mt-5 max-w-[560px] text-xl font-semibold leading-snug text-white/86 md:text-2xl">{service.subtitle}</p>
                   <p className="mt-5 max-w-[560px] text-base leading-8 text-white/66">{service.short_description}</p>
                 </div>
-                <div className="min-w-0 overflow-hidden rounded-[22px] border border-purple-300/20 bg-black shadow-[0_0_45px_rgba(124,58,237,0.14)]">
+                <div className="min-w-0 overflow-hidden rounded-[22px] border border-purple-300/20 bg-black shadow-[0_0_45px_rgba(8,119,255,0.16)]">
                   {videoMediaTypes.has(detectMediaType(service.banner_url)) ? (
                     <SafeVideoEmbed videoType={detectMediaType(service.banner_url)} videoUrl={service.banner_url} title={service.title} className="rounded-2xl" />
                   ) : (

@@ -1,23 +1,16 @@
-import React, { useEffect, useMemo } from 'react';
-import { ArrowRight, Sparkles } from 'lucide-react';
-import { handleImageError, safeImageSrc, safePublicHref } from '../lib/utils';
-import SafeVideoEmbed, { detectMediaType, getYouTubeThumbnail } from './SafeVideoEmbed';
-import OptimizedImage from './OptimizedImage';
+import React from 'react';
+import { ArrowRight } from 'lucide-react';
+import { safePublicHref } from '../lib/utils';
+import HeroLightSticks from './HeroLightSticks';
 
 const fallbackHero = {
-  badge_text: 'Learn premium editing, LUTs, transitions, and storytelling workflows that get results.',
-  hero_title: 'Video Editing Mastery for Creators',
-  hero_subtitle: 'Master the art of video editing with our comprehensive courses. From beginner basics to advanced techniques, learn professional editing skills that transform your creative vision into stunning reality.',
+  badge_text: "India's Premium Editing Assets",
+  hero_title: 'CREATE CINEMATIC STORIES',
+  hero_subtitle: 'Transform raw footage into Hollywood-grade visual art with our curated LUTs, SFX bundles, and motion presets.',
   primary_button_text: 'Explore Assets',
   primary_button_link: '/assets',
-  secondary_button_text: 'Join Community',
+  secondary_button_text: 'Watch Showreel',
   secondary_button_link: '/courses',
-  hero_media_type: 'auto',
-  hero_media_url: '',
-  hero_media_poster_url: '',
-  hero_media_autoplay: true,
-  hero_media_muted: true,
-  hero_media_loop: true,
 };
 
 const cleanText = (value) => (typeof value === 'string' && value.trim() ? value : undefined);
@@ -26,140 +19,88 @@ const compactObject = (value) =>
 
 const Hero = ({ pageData, loading = false, fallbackAllowed = false }) => {
   const hasCmsHero = !!pageData;
+  const cmsHero = pageData
+    ? compactObject({
+        badge_text: cleanText(pageData.badgeText),
+        hero_title: cleanText(pageData.headline),
+        hero_subtitle: cleanText(pageData.subheadline),
+        primary_button_text: cleanText(pageData.buttonText),
+        primary_button_link: cleanText(pageData.buttonUrl),
+        secondary_button_text: cleanText(pageData.secondaryButtonText),
+        secondary_button_link: cleanText(pageData.secondaryButtonUrl),
+      })
+    : {};
 
-  const cmsHero = pageData ? compactObject({
-    badge_text: cleanText(pageData.badgeText),
-    hero_title: cleanText(pageData.headline),
-    hero_subtitle: cleanText(pageData.subheadline),
-    primary_button_text: cleanText(pageData.buttonText),
-    primary_button_link: cleanText(pageData.buttonUrl),
-    secondary_button_text: cleanText(pageData.secondaryButtonText),
-    secondary_button_link: cleanText(pageData.secondaryButtonUrl),
-    hero_media_type: cleanText(pageData.mediaType),
-    hero_media_url: cleanText(pageData.videoUrl || pageData.image),
-    hero_media_poster_url: cleanText(pageData.posterUrl || pageData.thumbnailUrl || pageData.imageUrl),
-  }) : {};
-  // Do not merge defaults with CMS fields. A CMS hero is the source of truth
-  // and replacing an empty field with old marketing copy is misleading.
-  const hero = hasCmsHero ? cmsHero : (fallbackAllowed ? fallbackHero : {});
-  const isLoading = loading && !hasCmsHero;
-  const rawMediaUrl = hero.hero_media_url || '';
-  const explicitMediaType = hero.hero_media_type || 'auto';
-  const detectedMediaType = explicitMediaType === 'auto' ? detectMediaType(rawMediaUrl) : explicitMediaType;
-  const videoMediaTypes = new Set(['video_file', 'video_url', 'youtube', 'vimeo']);
-  const videoUrl = cleanText(pageData?.videoUrl) || (videoMediaTypes.has(detectedMediaType) ? rawMediaUrl : '');
-  const imageUrl = cleanText(pageData?.imageUrl) || (!videoUrl ? rawMediaUrl : '');
-  const posterUrl = hero.hero_media_poster_url || cleanText(pageData?.thumbnailUrl) || cleanText(pageData?.imageUrl) || getYouTubeThumbnail(videoUrl, 'maxresdefault');
-  const mediaType = videoUrl
-    ? (detectedMediaType === 'auto' || detectedMediaType === 'image' ? detectMediaType(videoUrl) : detectedMediaType)
-    : detectedMediaType;
-  const hasVideo = !!videoUrl;
-  const hasMedia = !!(videoUrl || imageUrl || posterUrl);
-
-  useEffect(() => {
-    if (hasVideo || !imageUrl || typeof document === 'undefined') return undefined;
-    const href = safeImageSrc(imageUrl, '');
-    if (!href) return undefined;
-
-    const existing = document.head.querySelector(`link[rel="preload"][as="image"][href="${href}"]`);
-    if (existing) return undefined;
-
-    const preload = document.createElement('link');
-    preload.rel = 'preload';
-    preload.as = 'image';
-    preload.href = href;
-    document.head.appendChild(preload);
-
-    return () => {
-      if (preload.parentNode) preload.parentNode.removeChild(preload);
-    };
-  }, [hasVideo, imageUrl]);
-
-  const media = useMemo(() => {
-    if (hasVideo) {
-      return (
-        <SafeVideoEmbed
-          videoType={mediaType}
-          videoUrl={videoUrl}
-          title={hero.hero_title || 'Home hero video'}
-          posterUrl={posterUrl}
-          className="h-full w-full rounded-none border-0"
-          aspectRatio="h-full"
-          autoPlay
-          muted
-          loop
-          showPlayOverlay={false}
-          loadWhenVisible={false}
-          thumbnailLoading="eager"
-          thumbnailFetchPriority="high"
-          thumbnailWidth={1280}
-          thumbnailHeight={640}
-        />
-      );
-    }
-    if (!hasMedia) {
-      return (
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_20%,rgba(15,164,175,0.35),transparent_42%),linear-gradient(135deg,#024950,#003135_48%,var(--bg-main))]" />
-      );
-    }
-    return (
-      <OptimizedImage
-        src={safeImageSrc(imageUrl, '')}
-        alt="video editor"
-        priority
-        width={1280}
-        height={640}
-        loading="eager"
-        className="absolute inset-0 w-full h-full object-cover opacity-30"
-        onError={handleImageError}
-      />
-    );
-  }, [hasMedia, hasVideo, imageUrl, mediaType, posterUrl, videoUrl, hero.hero_title]);
+  const hero = hasCmsHero ? cmsHero : fallbackAllowed ? fallbackHero : fallbackHero;
 
   return (
-    <section className={`home-hero hero-section relative ${isLoading ? 'hero-is-loading' : 'hero-is-ready'}`}>
-      <div className="absolute inset-0 radial-purple pointer-events-none" />
+    <section className="hero-spectrum relative min-h-screen pt-28 pb-16 px-4 sm:px-6 lg:px-8 bg-black flex items-center justify-center overflow-hidden">
+      <HeroLightSticks />
+      <div className="hero-spectrum__grid absolute inset-0 pointer-events-none" />
+      <div className="absolute -left-32 top-1/3 h-96 w-96 rounded-full bg-[#ff4d00]/20 blur-3xl pointer-events-none" />
+      <div className="absolute -right-32 top-1/4 h-[32rem] w-[32rem] rounded-full bg-[#0877ff]/18 blur-3xl pointer-events-none" />
 
-      <div className="relative mx-auto max-w-7xl text-center">
-        <div className="hero-badge inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-violet-500/10 border border-violet-500/30 text-violet-300 text-xs font-medium mb-7 backdrop-blur">
-          <Sparkles size={12} />
-          <span className={isLoading ? 'hero-skeleton hero-skeleton-badge' : 'hero-fade-in'}>{isLoading ? '' : hero.badge_text}</span>
-        </div>
+      {/* Main Responsive Grid Container */}
+      <div className="relative z-10 mx-auto max-w-[86rem] w-full grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-6 xl:gap-10 items-center">
+        {/* Left Column: Heading & CTAs */}
+        <div className="lg:col-span-7 space-y-5 sm:space-y-6 text-left max-w-2xl mx-auto lg:mx-0">
+          {/* Badge */}
+          <div className="inline-flex items-center gap-2.5 px-3.5 py-1.5 rounded-full bg-black/40 border border-[#ff5a1f]/45 text-[#ff8a5c] text-[10px] font-semibold uppercase tracking-[0.18em] backdrop-blur-md">
+            <span className="h-1.5 w-1.5 rounded-full bg-[#ff5a1f] animate-pulse" />
+            <span>{hero.badge_text || "India's Premium Editing Assets"}</span>
+          </div>
 
-        <h1 className="hero-title-slot mx-auto mb-8 w-full max-w-[1100px] break-words text-[clamp(48px,7vw,108px)] font-bold leading-[0.95] tracking-tight">
-          <span className={isLoading ? 'hero-skeleton hero-skeleton-title' : 'text-white hero-fade-in'}>{isLoading ? '' : hero.hero_title}</span>
-        </h1>
-
-        <p className="hero-description-slot max-w-2xl mx-auto text-white/70 text-base md:text-lg leading-relaxed mb-10">
-          <span className={isLoading ? 'hero-skeleton hero-skeleton-description' : 'hero-fade-in'}>{isLoading ? '' : hero.hero_subtitle}</span>
-        </p>
-
-        <div className="hero-actions flex items-center justify-center gap-4 flex-wrap">
-          <a
-            href={safePublicHref(hero.primary_button_link, '/')}
-            className="hero-primary-cta group inline-flex items-center gap-3 bg-violet-600 hover:bg-violet-500 transition-colors text-white px-7 py-3.5 rounded-full text-sm font-semibold shadow-[0_8px_30px_rgba(150,71,52,0.45)]"
-          >
-            <span className={isLoading ? 'hero-skeleton hero-skeleton-button' : 'hero-fade-in'}>{isLoading ? '' : hero.primary_button_text}</span>
-            <span className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center group-hover:translate-x-0.5 transition-transform">
-              <ArrowRight size={12} />
+          {/* Huge 3-Line Heading */}
+          <h1 className="text-4xl sm:text-6xl lg:text-7xl xl:text-8xl font-black text-white leading-[0.92] tracking-tight font-[Space_Grotesk] uppercase">
+            CREATE <br />
+            CINEMATIC <br />
+            <span className="spectrum-text">
+              STORIES
             </span>
-          </a>
-          <a
-            href={safePublicHref(hero.secondary_button_link, '/')}
-            className="hero-secondary-cta inline-flex items-center gap-3 bg-white/5 hover:bg-white/10 border border-white/15 text-white px-7 py-3.5 rounded-full text-sm font-semibold transition"
-          >
-            <span className={isLoading ? 'hero-skeleton hero-skeleton-button' : 'hero-fade-in'}>{isLoading ? '' : hero.secondary_button_text}</span>
-          </a>
-        </div>
+          </h1>
 
-        <div className="relative mx-auto mt-16 max-w-5xl">
-          <div className="absolute -inset-6 bg-violet-500/20 blur-3xl rounded-3xl" />
-          <div className="relative rounded-3xl border border-violet-500/30 bg-gradient-to-br from-[#024950] via-[#04383c] to-[#003135] p-1 overflow-hidden">
-            <div className="relative aspect-[16/8] rounded-[20px] overflow-hidden bg-gradient-to-br from-[#024950] to-[#003135]">
-              {media}
-              <div className="absolute inset-0 bg-gradient-to-r from-[#003135]/90 via-transparent to-[#003135]/90 pointer-events-none" />
+          {/* Paragraph */}
+          <p className="text-white/70 text-sm sm:text-base lg:text-lg max-w-xl leading-relaxed">
+            {hero.hero_subtitle || 'Transform raw footage into Hollywood-grade visual art with our curated LUTs, SFX bundles, and motion presets.'}
+          </p>
+
+          {/* Dual Action Buttons */}
+          <div className="flex items-center gap-3.5 sm:gap-4 flex-wrap pt-2 sm:pt-4">
+            <a
+              href={safePublicHref(hero.primary_button_link, '/assets')}
+              className="group inline-flex items-center gap-3 border border-[#ff5a1f]/60 bg-[#ff5a1f] hover:bg-[#ff6a2f] text-white px-6 sm:px-8 py-3.5 sm:py-4 rounded-lg text-xs sm:text-sm font-bold tracking-wider uppercase shadow-[0_10px_35px_rgba(255,77,0,0.28)] transition duration-300 hover:-translate-y-0.5"
+            >
+              <span>Explore Assets</span>
+              <span className="w-5 h-5 sm:w-6 sm:h-6 rounded-full bg-white/20 flex items-center justify-center group-hover:translate-x-0.5 transition-transform">
+                <ArrowRight size={12} />
+              </span>
+            </a>
+            <a
+              href={safePublicHref(hero.secondary_button_link, '/courses')}
+              className="inline-flex items-center gap-2 bg-black/50 hover:bg-white/5 border border-white/15 hover:border-[#1683ff] text-white px-6 sm:px-8 py-3.5 sm:py-4 rounded-lg text-xs sm:text-sm font-bold tracking-wider uppercase transition duration-200"
+            >
+              <span>Watch Showreel</span>
+            </a>
+          </div>
+
+          {/* Software Bar */}
+          <div className="pt-6 sm:pt-8 border-t border-white/10">
+            <p className="text-[10px] sm:text-xs uppercase tracking-widest text-white/40 font-semibold mb-3">
+              Compatible With All Major NLEs
+            </p>
+            <div className="flex items-center gap-4 sm:gap-6 text-xs font-semibold text-white/60 flex-wrap">
+              <span className="hover:text-[#60a5fa] transition">Premiere Pro</span>
+              <span>•</span>
+              <span className="hover:text-[#60a5fa] transition">After Effects</span>
+              <span>•</span>
+              <span className="hover:text-[#60a5fa] transition">DaVinci Resolve</span>
+              <span>•</span>
+              <span className="hover:text-[#60a5fa] transition">Final Cut</span>
             </div>
           </div>
+        </div>
+
+        <div className="hidden lg:block lg:col-span-5 min-h-[520px] xl:min-h-[640px]" aria-hidden="true">
         </div>
       </div>
     </section>

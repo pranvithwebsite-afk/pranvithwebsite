@@ -3,10 +3,11 @@ import { ArrowRight } from 'lucide-react';
 import Header from '../components/Header';
 import Hero from '../components/Hero';
 import Footer from '../components/Footer';
-import ViewportGate from '../components/ViewportGate';
 import { usePublicPageLoading } from '../components/PublicPageLoader';
 import { useCmsPage } from '../hooks/useCmsPage';
 import { safePublicHref } from '../lib/utils';
+import CmsSectionRenderer from '../components/cms/CmsSectionRenderer';
+import SafeVideoEmbed, { detectMediaType } from '../components/SafeVideoEmbed';
 
 const ServicesSection = lazy(() => import('../components/ServicesSection'));
 const ShowreelSection = lazy(() => import('../components/ShowreelSection'));
@@ -41,7 +42,9 @@ const videoMediaTypes = new Set(['video_file', 'video_url', 'youtube', 'vimeo'])
 
 const homeOrderFromCms = (sections = [], allowFallback = false) => {
   const order = sections
-    .map((section) => sectionToHomeKey[section.section_id] || sectionToHomeKey[section.type])
+    .map((section) => sectionToHomeKey[section.section_id]
+      || sectionToHomeKey[section.type]
+      || `cms:${section.id || section.section_id}`)
     .filter(Boolean);
   return order.length || !allowFallback ? order : ['hero', 'featuredAssets', 'instagramProfile', 'services', 'showreel', 'cta', 'footerCta'];
 };
@@ -59,7 +62,6 @@ const Home = () => {
   const showreelSection = findSection('showreel');
   const faqSection = findSection('faq');
   const order = homeOrderFromCms(cmsSections, !loading && (!!error || !page));
-  const deferredKeys = new Set(['featuredAssets', 'instagramProfile', 'services', 'showreel', 'footerCta']);
 
   const heroData = heroSection ? {
     badgeText: firstText(heroSection.subtitle, heroSection.data?.badge_text),
@@ -79,10 +81,20 @@ const Home = () => {
   return (
     <>
       <Header />
-      <main className="home-page public-page page relative bg-transparent text-white">
+      <main className="home-page public-page page relative bg-black text-white">
         {order.map((sectionKey) => {
+          if (sectionKey.startsWith('cms:')) {
+            const sectionId = sectionKey.slice(4);
+            const cmsSection = cmsSections.find((section) => String(section.id || section.section_id) === sectionId);
+            return cmsSection ? <CmsSectionRenderer key={sectionKey} section={cmsSection} /> : null;
+          }
           const sections = {
-            hero: <Hero key="hero" pageData={heroData} loading={loading} fallbackAllowed={!loading && (!!error || !heroSection)} />,
+            hero: (
+              <React.Fragment key="hero">
+                <Hero pageData={heroData} loading={loading} fallbackAllowed={!loading && (!!error || !heroSection)} />
+                <HomeHeroVideo hero={heroData} />
+              </React.Fragment>
+            ),
             featuredAssets: (
               <Suspense key="featuredAssets" fallback={<SectionSkeleton />}>
                 <OurWorks section={worksSection} />
@@ -93,7 +105,11 @@ const Home = () => {
                 <TransformVision section={instagramSection} />
               </Suspense>
             ) : null,
-            services: servicesSection ? <ServicesSection key="services" section={servicesSection} /> : null,
+            services: servicesSection ? (
+              <Suspense key="services" fallback={<SectionSkeleton />}>
+                <ServicesSection section={servicesSection} />
+              </Suspense>
+            ) : null,
             showreel: showreelSection ? (
               <Suspense key="showreel" fallback={<SectionSkeleton />}>
                 <ShowreelSection section={showreelSection} />
@@ -108,20 +124,45 @@ const Home = () => {
           };
           const content = sections[sectionKey] || null;
           if (!content) return null;
-          if (!deferredKeys.has(sectionKey)) return content;
-          return (
-            <ViewportGate
-              key={`gate-${sectionKey}`}
-              rootMargin="320px 0px"
-              fallback={<SectionSkeleton compact={sectionKey !== 'footerCta'} />}
-            >
-              {content}
-            </ViewportGate>
-          );
+          return content;
         })}
       </main>
       <Footer />
     </>
+  );
+};
+
+const HomeHeroVideo = ({ hero }) => {
+  const videoUrl = hero?.videoUrl;
+  if (!videoUrl) return null;
+
+  const videoType = firstText(hero?.mediaType, detectMediaType(videoUrl), 'video_file');
+  const posterUrl = firstText(hero?.posterUrl, hero?.thumbnailUrl, hero?.image);
+
+  return (
+    <section className="home-hero-video-section section-block relative z-10 px-6 pt-0">
+      <div className="page-shell">
+        <div className="video-glow-card mx-auto max-w-6xl">
+          <div className="video-glow-card__inner rounded-[30px] border border-[var(--border-blue)] bg-black p-2 shadow-2xl shadow-blue-950/40">
+            <SafeVideoEmbed
+              videoType={videoType}
+              videoUrl={videoUrl}
+              title={hero?.headline || 'PranvithDOP hero video'}
+              posterUrl={posterUrl}
+              className="rounded-[24px]"
+              aspectRatio="aspect-video"
+              fit="cover"
+              autoPlay
+              muted
+              loop
+              showPlayOverlay={false}
+              loadWhenVisible={false}
+              thumbnailFetchPriority="high"
+            />
+          </div>
+        </div>
+      </div>
+    </section>
   );
 };
 

@@ -259,9 +259,9 @@ const SafeVideoEmbed = ({
             }}
           />
         ) : (
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_35%,rgba(124,58,237,0.35),transparent_38%),linear-gradient(135deg,#1a0a3a,#0f0625_52%,var(--bg-main))]" />
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_35%,rgba(255,77,0,0.26),transparent_38%),linear-gradient(135deg,#1a0a3a,#0f0625_52%,var(--bg-main))]" />
         )}
-        <span className="absolute left-1/2 top-1/2 flex h-11 w-11 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-white/20 bg-violet-600/95 text-white shadow-[0_0_18px_rgba(139,92,246,0.55)] transition group-hover:scale-105 group-hover:bg-violet-500 sm:h-[52px] sm:w-[52px]">
+        <span className="absolute left-1/2 top-1/2 flex h-11 w-11 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-white/20 bg-violet-600/95 text-white shadow-[0_0_18px_rgba(255,77,0,0.45)] transition group-hover:scale-105 group-hover:bg-violet-500 sm:h-[52px] sm:w-[52px]">
           <Play size={20} fill="currentColor" className="ml-0.5 sm:h-[22px] sm:w-[22px]" />
         </span>
         <span className="absolute bottom-4 left-4 right-4 line-clamp-2 text-sm font-semibold text-white drop-shadow md:text-base">

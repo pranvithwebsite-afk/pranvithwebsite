@@ -4,6 +4,16 @@ import { Menu, X } from 'lucide-react';
 import { navLinks } from '../data/mock';
 import { FALLBACK_IMAGE, handleImageError } from '../lib/utils';
 
+const customNavLinks = [
+  { name: 'Home', path: '/' },
+  { name: 'Courses', path: '/courses' },
+  { name: 'About', path: '/about' },
+  { name: 'Services', path: '/services' },
+  { name: 'Assets', path: '/assets' },
+  { name: 'Our Works', path: '/works' },
+  { name: 'Hire From Us', path: '/hire' },
+];
+
 const Header = () => {
   const location = useLocation();
   const [open, setOpen] = useState(false);
@@ -21,39 +31,31 @@ const Header = () => {
   };
 
   return (
-    <header className="site-header fixed left-0 right-0 top-0 z-[80] bg-transparent pt-4 md:pt-5">
+    <header className="site-header fixed left-0 right-0 top-0 z-[80] bg-transparent pt-4 md:pt-5 px-4">
       <nav
-        className="site-container flex items-center justify-between gap-3 rounded-full border border-[var(--border-soft)] bg-[rgba(0,49,53,0.78)] px-3 py-2 backdrop-blur-[18px] transition-all duration-300 md:gap-8 md:px-5"
+        className="foureditors-nav mx-auto max-w-7xl flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-black/75 px-3.5 py-2 backdrop-blur-2xl shadow-[0_14px_50px_rgba(0,0,0,0.72)]"
       >
-        <Link to="/" onClick={refreshHomeIfActive} className="flex items-center gap-2 shrink-0" data-testid="header-brand">
-          <div className="h-9 w-9 overflow-hidden rounded-full bg-gradient-to-br from-[#964734] to-[#0FA4AF] ring-2 ring-[#0FA4AF]/45 shadow-[0_0_26px_rgba(15,164,175,0.35)]">
-            <img
-              src={FALLBACK_IMAGE}
-              alt="PranvithDOP"
-              width="36"
-              height="36"
-              loading="eager"
-              decoding="async"
-              className="w-full h-full object-cover"
-              onError={handleImageError}
-            />
+        <Link to="/" onClick={refreshHomeIfActive} className="flex items-center gap-2.5 shrink-0" data-testid="header-brand">
+          <div className="brand-orbit h-9 w-9 rounded-full flex items-center justify-center text-white font-extrabold text-[10px]">
+            PD
           </div>
-          <span className="text-lg font-bold tracking-tight text-white drop-shadow-[0_0_18px_rgba(255,255,255,0.16)]">PranvithDOP</span>
+          <span className="text-xl font-bold tracking-tight text-white font-[Space_Grotesk]">
+            PRANVITH <span className="text-[#ff5a1f]">DOP</span>
+          </span>
         </Link>
 
-        <ul className="hidden md:flex items-center gap-1">
-          {navLinks.map((l) => {
+        <ul className="hidden lg:flex items-center gap-1">
+          {customNavLinks.map((l) => {
             const active = isActive(l.path);
             return (
               <li key={l.name}>
                 <Link
                   to={l.path}
                   onClick={l.path === '/' ? refreshHomeIfActive : undefined}
-                  data-testid={`nav-${l.name.toLowerCase().replace(/\s+/g, '-')}`}
-                  className={`rounded-full px-4 py-2 text-sm font-medium transition-all duration-200 ${
+                  className={`rounded-full px-2.5 py-2 text-[10px] font-semibold uppercase tracking-wider transition-all duration-200 xl:px-3.5 xl:text-xs ${
                     active
-                      ? 'bg-[rgba(15,164,175,0.22)] text-accent-purple-strong font-semibold'
-                      : 'text-white/78 hover:bg-white/5 hover:text-white'
+                      ? 'text-white border border-[#ff5a1f]/50 bg-[#ff5a1f]/10'
+                      : 'text-white/55 hover:bg-white/5 hover:text-white'
                   }`}
                 >
                   {l.name}
@@ -63,19 +65,28 @@ const Header = () => {
           })}
         </ul>
 
-        <button
-          className="rounded-full border border-white/10 bg-white/5 p-2 text-white shadow-[0_0_20px_rgba(15,164,175,0.15)] transition hover:bg-white/10 md:hidden"
-          onClick={() => setOpen(!open)}
-          aria-label="menu"
-        >
-          {open ? <X size={22} /> : <Menu size={22} />}
-        </button>
+        <div className="flex items-center gap-3">
+          <Link
+            to="/assets"
+            className="inline-flex items-center justify-center rounded-lg border border-[#ff5a1f]/55 bg-[#ff5a1f]/10 text-white px-4 py-2 text-[11px] font-semibold uppercase tracking-wider shadow-[0_0_24px_rgba(255,90,31,0.14)] transition hover:bg-[#ff5a1f]"
+          >
+            Buy Bundle
+          </Link>
+
+          <button
+            className="rounded-full border border-white/10 bg-white/5 p-2 text-white transition hover:bg-white/10 lg:hidden"
+            onClick={() => setOpen(!open)}
+            aria-label="menu"
+          >
+            {open ? <X size={20} /> : <Menu size={20} />}
+          </button>
+        </div>
       </nav>
 
       {open && (
-        <div className="absolute left-4 right-4 top-[4.75rem] rounded-3xl border border-[var(--border-soft)] bg-[var(--bg-elevated)] p-3 shadow-[0_22px_70px_rgba(0,49,53,0.85)] backdrop-blur-xl md:hidden">
+        <div className="absolute left-4 right-4 top-[4.75rem] rounded-3xl border border-white/15 bg-[#0b0f14]/95 p-4 shadow-2xl backdrop-blur-2xl lg:hidden">
           <ul className="flex flex-col gap-1">
-            {navLinks.map((l) => {
+            {customNavLinks.map((l) => {
               const active = isActive(l.path);
               return (
                 <li key={l.name}>
@@ -85,11 +96,10 @@ const Header = () => {
                       setOpen(false);
                       if (l.path === '/') refreshHomeIfActive(event);
                     }}
-                    data-testid={`mobile-nav-${l.name.toLowerCase().replace(/\s+/g, '-')}`}
                     className={`block rounded-2xl px-4 py-3 text-sm font-medium transition-all ${
                       active
-                        ? 'bg-[rgba(15,164,175,0.22)] text-accent-purple-strong font-semibold'
-                        : 'text-white/86 hover:bg-white/6 hover:text-white'
+                        ? 'bg-[#ff5a1f]/15 text-[#ff8a5c] font-semibold'
+                        : 'text-white/80 hover:bg-white/6 hover:text-white'
                     }`}
                   >
                     {l.name}

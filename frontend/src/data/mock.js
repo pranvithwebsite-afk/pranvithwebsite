@@ -39,7 +39,7 @@ export const assetProducts = [
     isFree: true,
     isPaid: false,
     createdAt: '2025-06-15',
-    bg: 'linear-gradient(135deg, #6d28d9 0%, #ec4899 60%, #1e1b4b 100%)',
+    bg: 'linear-gradient(135deg, #ff4d00 0%, #ec4899 60%, #1e1b4b 100%)',
     headline: 'SMOOTH',
     subhead: 'TRANSITIONS PACK',
   },

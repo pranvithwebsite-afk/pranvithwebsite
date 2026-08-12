@@ -8160,7 +8160,7 @@ app.add_middleware(
         origin.strip()
         for origin in os.environ.get(
             "CORS_ORIGINS",
-            "https://pranvithdop.com,http://localhost:3000",
+            "https://pranvithdop.com,https://www.pranvithdop.com,http://localhost:3000",
         ).split(",")
         if origin.strip()
     ],

@@ -8,7 +8,7 @@ const NotFound = () => (
     <Header />
     <main className="page bg-transparent text-white">
       <section className="relative overflow-hidden px-6 pb-24 pt-32 text-center md:pt-36">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(124,58,237,0.24),transparent_48%)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(255,77,0,0.18),transparent_48%)]" />
         <div className="relative mx-auto max-w-3xl">
           <p className="section-eyebrow text-xs">404</p>
           <h1 className="mt-5 text-5xl font-bold tracking-tight md:text-7xl">Page not found</h1>

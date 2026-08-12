@@ -40,8 +40,8 @@ const OurWorks = ({ section }) => {
                 type="button"
                 onClick={() => setActiveCategory(category)}
                 className={`shrink-0 whitespace-nowrap rounded-full border px-4 py-2 text-sm font-semibold backdrop-blur transition ${activeCategory === category
-                  ? 'border-violet-400/60 bg-violet-600 text-white shadow-[0_8px_24px_rgba(124,58,237,0.28)]'
-                  : 'border-white/10 bg-black/30 text-white/70 hover:border-violet-400/40 hover:bg-violet-500/10 hover:text-white'}`}
+                  ? 'border-[#3b82f6]/60 bg-gradient-to-r from-[#3b82f6] to-[#2563eb] text-white shadow-[0_8px_24px_rgba(59,130,246,0.35)]'
+                  : 'border-white/10 bg-black/30 text-white/70 hover:border-[#3b82f6]/40 hover:bg-[#3b82f6]/10 hover:text-white'}`}
               >
                 {category}
               </button>
@@ -57,7 +57,7 @@ const OurWorks = ({ section }) => {
 
         {(section.button_text || section.button_link) && (
           <div className="mt-12 text-center">
-            <a href={safePublicHref(section.button_link, '/works')} className="inline-flex rounded-full bg-violet-600 px-7 py-3 text-sm font-semibold tracking-wider text-white transition-colors hover:bg-violet-500">
+            <a href={safePublicHref(section.button_link, '/works')} className="inline-flex rounded-full bg-gradient-to-r from-[#3b82f6] to-[#2563eb] hover:from-[#2563eb] hover:to-[#1d4ed8] px-7 py-3 text-sm font-semibold tracking-wider text-white transition-all duration-300">
               {section.button_text || 'VIEW ALL WORKS'}
             </a>
           </div>
@@ -101,6 +101,5 @@ const WorkCard = ({ project, onPlay }) => {
     </article>
   );
 }
-
 
 export default OurWorks;

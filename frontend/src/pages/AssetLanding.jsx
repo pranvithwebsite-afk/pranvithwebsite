@@ -60,6 +60,46 @@ const toMarketTable = (value) => (
     : []
 );
 
+const SFX_PACK_DETAILS = {
+  description: 'A focused sound-effects library for editors who want faster timelines and stronger cinematic impact. Browse, preview, and drag professionally organized sounds into commercials, wedding films, reels, trailers, YouTube videos, and client projects.',
+  features: [
+    'Drag-and-drop workflow with clearly named files for fast searching and previewing.',
+    'Organized folders for transitions, impacts, whooshes, risers, ambience, and cinematic accents.',
+    'High-quality audio files prepared for modern editing and post-production workflows.',
+    'Works offline after download, so the complete library stays available wherever you edit.',
+  ],
+  benefits: [
+    'Creator-ready files checked and organized before delivery.',
+    'Fast digital delivery immediately after successful access confirmation.',
+    'Lifetime access to the downloaded pack—no recurring subscription required.',
+    'Suitable for personal and commercial edits under the included product license.',
+  ],
+  compatibility: ['Premiere Pro', 'After Effects', 'DaVinci Resolve', 'Final Cut Pro', 'Windows', 'macOS'],
+  installationSteps: [
+    { title: 'Download the SFX Pack', description: 'Complete checkout and use the secure download link to save the latest pack to your device.' },
+    { title: 'Extract the Files', description: 'Open the downloaded ZIP file and extract it to a permanent folder on your internal or external drive.' },
+    { title: 'Import Into Your Editor', description: 'Open your editing application and import the required category folder or individual sound files into the project.' },
+    { title: 'Preview, Place, and Mix', description: 'Preview sounds, drag the best option onto the timeline, then adjust timing, volume, fades, and effects for your edit.' },
+  ],
+  faqs: [
+    { q: 'Which editing applications support this SFX pack?', a: 'The audio files work with major editors that can import standard audio formats, including Premiere Pro, After Effects, DaVinci Resolve, and Final Cut Pro.' },
+    { q: 'Does the pack work on Windows and macOS?', a: 'Yes. The delivered audio files are platform-independent and can be used on both Windows and macOS.' },
+    { q: 'Is this a one-time purchase?', a: 'Yes. This product uses a one-time checkout and does not require a recurring subscription.' },
+    { q: 'Can I use the sounds for commercial projects?', a: 'Yes. You may use the sounds in completed personal and commercial creative projects under the included license.' },
+    { q: 'Can I resell or redistribute the original files?', a: 'No. You may include the sounds in completed edits, but you may not resell, share, upload, or redistribute the source library.' },
+    { q: 'How do I install the pack?', a: 'No plugin installation is required. Download and extract the ZIP, then import the audio files directly into your editing software.' },
+    { q: 'Does the pack require an internet connection?', a: 'Internet access is required for checkout and download. After the files are saved locally, they can be used offline.' },
+    { q: 'How will I receive the files?', a: 'The files are delivered digitally through the secure access flow after checkout or free-access confirmation.' },
+    { q: 'Can I preview sounds before using them?', a: 'Yes. Use your operating system, media browser, or editor to preview individual files before placing them on the timeline.' },
+    { q: 'Are the files ready for drag and drop?', a: 'Yes. Import the files or folders into your project, then drag the selected sound directly onto an audio track.' },
+    { q: 'Can I use the pack for YouTube and social media?', a: 'Yes. The library is suitable for completed videos published on YouTube, Instagram, and other social platforms.' },
+    { q: 'Can I use the pack for wedding and commercial films?', a: 'Yes. It is designed for wedding films, advertisements, reels, trailers, branded content, and other edited productions.' },
+    { q: 'Do I need additional software?', a: 'No dedicated extension is required. You only need software capable of importing and editing standard audio files.' },
+    { q: 'Where should I store the pack?', a: 'Keep the extracted library in a permanent, backed-up folder so your editing projects can continue locating the source files.' },
+    { q: 'What if I have trouble downloading the pack?', a: 'Use the contact or support option on the website and include your order details so the delivery can be checked.' },
+  ],
+};
+
 const normalizeProduct = (value) => {
   const product = value && typeof value === 'object' ? value : {};
   const landing = product.landing_content && typeof product.landing_content === 'object'
@@ -101,10 +141,12 @@ const normalizeProduct = (value) => {
     || '',
     ''
   );
+  const isSfxPack = String(product.slug || '').trim() === 'sfx-pack-for-editors';
   const faqs = dedupeFaqs([
     ...toFaqList(landing.faqs),
     ...toFaqList(product.faqs),
-  ]).slice(0, 10);
+    ...(isSfxPack ? SFX_PACK_DETAILS.faqs : []),
+  ]).slice(0, 24);
 
   return {
     raw: product,
@@ -112,16 +154,19 @@ const normalizeProduct = (value) => {
     name: String(product.name || product.title || 'Asset').trim() || 'Asset',
     title: String(product.title || product.name || 'Asset').trim() || 'Asset',
     slug: String(product.slug || '').trim(),
-    description: String(product.description || '').trim(),
+    description: String(product.description || (isSfxPack ? SFX_PACK_DETAILS.description : '')).trim(),
     category: String(product.category || '').trim() || 'Asset',
     price: resolvedPrice,
     isFree: product.is_free === true || resolvedPrice === 0,
     heroImage,
     galleryImages,
     galleryLayout: product.gallery_layout === 'full' ? 'full' : 'grid',
-    features: toStringList(product.features),
-    benefits: toStringList(product.benefits),
-    compatibility: toStringList(landing.compatibility),
+    features: toStringList(product.features).length ? toStringList(product.features) : (isSfxPack ? SFX_PACK_DETAILS.features : []),
+    benefits: toStringList(product.benefits).length ? toStringList(product.benefits) : (isSfxPack ? SFX_PACK_DETAILS.benefits : []),
+    compatibility: toStringList(landing.compatibility).length ? toStringList(landing.compatibility) : (isSfxPack ? SFX_PACK_DETAILS.compatibility : []),
+    installationSteps: Array.isArray(landing.installation_steps) && landing.installation_steps.length
+      ? landing.installation_steps
+      : (isSfxPack ? SFX_PACK_DETAILS.installationSteps : []),
     marketTable: toMarketTable(landing.market_table),
     faqs,
     beforeImageUrl: safeImageSrc(product.before_image_url || '', ''),
@@ -195,6 +240,7 @@ const AssetLanding = () => {
     features,
     benefits,
     compatibility,
+    installationSteps,
     marketTable,
     faqs,
     beforeImageUrl,
@@ -210,7 +256,23 @@ const AssetLanding = () => {
 
   const heroHeadline = String(landing.hero?.headline || landing.headline || name || 'Asset').trim() || 'Asset';
   const heroSubhead = String(landing.hero?.subhead || landing.subhead || description || 'Product details will be available soon.').trim();
+  const fullProductDescription = String(
+    product?.description
+    || landing.description
+    || (asset.slug === 'sfx-pack-for-editors' ? SFX_PACK_DETAILS.description : heroSubhead)
+  ).trim();
   const beforeAfterDescription = String(landing.before_after || '').trim();
+  const fileInformation = asset.slug === 'sfx-pack-for-editors' ? [
+    { label: 'Compatibility', value: 'Windows & macOS' },
+    { label: 'Software', value: 'All video editing software' },
+    { label: 'Format', value: 'WAV audio files' },
+    { label: 'License', value: 'Free for personal & commercial use' },
+  ] : [
+    { label: 'Category', value: category },
+    { label: 'Compatibility', value: compatibility.length ? compatibility.join(', ') : 'Universal digital asset' },
+    { label: 'Delivery', value: isFree ? 'Instant free access' : 'Instant digital delivery' },
+    { label: 'License', value: 'Personal & commercial projects' },
+  ];
 
   const onShare = async () => {
     await shareProduct(product || { slug, name, description });
@@ -261,9 +323,9 @@ const AssetLanding = () => {
           />
         ) : (
           <>
-            <section className="section-block pt-32 md:pt-36">
+            <section className="section-block pb-12 pt-28 md:pt-32">
               <div className="page-shell">
-                <nav className="mb-8 flex flex-wrap items-center gap-2 text-sm text-white/55" data-testid="asset-breadcrumb">
+                <nav className="mb-7 flex flex-wrap items-center gap-2 text-xs text-white/45" data-testid="asset-breadcrumb">
                   <Link to="/" className="hover:text-white">Home</Link>
                   <ChevronRight size={14} />
                   <Link to="/assets" className="hover:text-white">Assets</Link>
@@ -271,60 +333,59 @@ const AssetLanding = () => {
                   <span className="text-white/85">{name}</span>
                 </nav>
 
-                <div className="cinematic-card overflow-hidden p-5 sm:p-7 lg:p-9">
-                  <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_22rem] xl:items-start">
-                    <div className="order-1 xl:hidden">
-                      <ProductHeroImage heroImage={heroImage} name={name} />
-                    </div>
+                <div className="mb-7">
+                  <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-[#ff5a1f]/35 bg-[#ff5a1f]/10 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.24em] text-[#ff8a5c]">
+                    <Sparkles size={13} /> {category}
+                  </div>
+                  <h1 className="max-w-4xl text-3xl font-black tracking-[-0.035em] text-white sm:text-4xl lg:text-5xl" data-testid="asset-title">
+                    {heroHeadline}
+                  </h1>
+                </div>
 
-                    <div className="order-2 xl:order-1 xl:col-start-1 xl:row-start-1">
-                      <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-purple-300/20 bg-purple-500/15 px-4 py-2 text-[11px] uppercase tracking-[0.28em] text-purple-200 sm:text-xs">
-                        <Sparkles size={16} /> {category}
-                      </div>
-                      <h1 className="max-w-3xl text-3xl font-black tracking-tight text-white sm:text-4xl lg:text-5xl" data-testid="asset-title">
-                        {heroHeadline}
-                      </h1>
-                      <ProductDescription
-                        value={heroSubhead}
-                        className="mt-4 max-w-2xl space-y-4"
-                      />
-                    </div>
+                <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem] xl:grid-cols-[minmax(0,1fr)_22rem] lg:items-start">
+                  <div className="min-w-0 space-y-6">
+                    <ProductHeroImage heroImage={heroImage} name={name} />
+                    <ProductDescription value={heroSubhead} className="space-y-4 text-sm leading-7 text-white/60 sm:text-base" />
+                    <FileInformation rows={fileInformation} />
+                  </div>
 
-                    <div className="order-4 hidden space-y-5 xl:order-2 xl:col-start-2 xl:row-span-2 xl:block xl:sticky xl:top-[7.5rem]">
-                      <ProductHeroImage heroImage={heroImage} name={name} />
-                      <PriceCard
-                        price={price}
-                        isFree={isFree}
-                        busy={busy}
-                        product={product}
-                        onPrimaryCta={onPrimaryCta}
-                        onShare={onShare}
-                      />
-                    </div>
-
-                    <div className="order-3 xl:order-3 xl:col-start-1 xl:row-start-2">
-                      <PriceCard
-                        price={price}
-                        isFree={isFree}
-                        busy={busy}
-                        product={product}
-                        onPrimaryCta={onPrimaryCta}
-                        onShare={onShare}
-                        className="xl:hidden"
-                      />
-                    </div>
-
-                    <div className="order-4 xl:order-4 xl:col-start-1 xl:row-start-3">
-                      <div className="grid gap-3 sm:grid-cols-3">
-                        <ValuePill label="Format" value={category} />
-                        <ValuePill label="Access" value={isFree ? 'Instant free access' : 'Instant delivery'} />
-                        <ValuePill label="Support" value="Creator-ready files" />
-                      </div>
-                    </div>
+                  <div className="lg:sticky lg:top-[7rem]">
+                    <PriceCard
+                      price={price}
+                      isFree={isFree}
+                      busy={busy}
+                      product={product}
+                      onPrimaryCta={onPrimaryCta}
+                      onShare={onShare}
+                    />
                   </div>
                 </div>
               </div>
             </section>
+
+            {fullProductDescription && (
+              <section className="pb-14">
+                <div className="page-shell">
+                  <div className="rounded-2xl border border-white/10 bg-[#090a0c] p-6 sm:p-8">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.28em] text-[#ff8a5c]">About this asset</p>
+                    <h2 className="mt-3 text-2xl font-bold tracking-tight text-white sm:text-3xl">Description</h2>
+                    <ProductDescription
+                      value={fullProductDescription}
+                      className="mt-5 max-w-5xl space-y-4 text-sm leading-7 text-white/62 sm:text-base sm:leading-8"
+                    />
+                    {asset.slug === 'sfx-pack-for-editors' && (
+                      <div className="mt-6 flex flex-wrap gap-2">
+                        {['Video Editing', 'Wedding Films', 'Commercials', 'Reels', 'YouTube', 'Gaming'].map((useCase) => (
+                          <span key={useCase} className="rounded-full border border-white/10 bg-black/35 px-3 py-1.5 text-xs text-white/55">
+                            {useCase}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </section>
+            )}
 
             <ViewportGate
               rootMargin="360px 0px"
@@ -336,16 +397,42 @@ const AssetLanding = () => {
             {features.length > 0 && (
               <section className="section-block pt-0">
                 <div className="page-shell">
-                  <h2 className="mb-8 text-3xl font-bold tracking-tight">What you get</h2>
-                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  <p className="mb-3 text-[10px] font-semibold uppercase tracking-[0.28em] text-[#ff8a5c]">Included with your asset</p>
+                  <h2 className="mb-8 text-3xl font-bold tracking-tight">Engineered for a faster workflow</h2>
+                  <div className="grid gap-4 sm:grid-cols-2">
                     {features.map((item) => (
-                      <div key={item} className="cinematic-card p-6 text-sm text-white/75">
-                        <div className="cinematic-icon mb-4 inline-flex h-10 w-10 items-center justify-center rounded-2xl">
+                      <div key={item} className="rounded-2xl border border-white/10 bg-[#090a0c] p-6 text-sm text-white/65 transition hover:border-[#1683ff]/35">
+                        <div className="mb-4 inline-flex h-10 w-10 items-center justify-center rounded-xl border border-[#ff5a1f]/25 bg-[#ff5a1f]/10 text-[#ff8a5c]">
                           <CheckCircle size={18} />
                         </div>
                         <p className="font-semibold text-white">{item}</p>
                       </div>
                     ))}
+                  </div>
+                </div>
+              </section>
+            )}
+
+            {installationSteps.length > 0 && (
+              <section className="section-block pt-0">
+                <div className="page-shell">
+                  <p className="mb-3 text-[10px] font-semibold uppercase tracking-[0.28em] text-[#69adff]">Simple setup</p>
+                  <h2 className="mb-8 text-3xl font-bold tracking-tight">Installation and usage guide</h2>
+                  <div className="relative space-y-4 before:absolute before:bottom-7 before:left-[1.15rem] before:top-7 before:w-px before:bg-gradient-to-b before:from-[#ff5a1f] before:via-[#ff5a1f]/35 before:to-transparent">
+                    {installationSteps.map((step, index) => {
+                      const normalizedStep = typeof step === 'string' ? { title: step, description: '' } : step;
+                      return (
+                        <div key={`${normalizedStep.title || 'step'}-${index}`} className="relative grid grid-cols-[2.4rem_minmax(0,1fr)] gap-4">
+                          <span className="relative z-10 flex h-9 w-9 items-center justify-center rounded-full border border-[#ff5a1f]/50 bg-black text-xs font-bold text-[#ff8a5c]">
+                            {index + 1}
+                          </span>
+                          <div className="rounded-2xl border border-white/10 bg-[#090a0c] p-5 sm:p-6">
+                            <h3 className="font-semibold text-white">{normalizedStep.title || `Step ${index + 1}`}</h3>
+                            {normalizedStep.description && <p className="mt-2 text-sm leading-6 text-white/55">{normalizedStep.description}</p>}
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               </section>
@@ -375,7 +462,7 @@ const AssetLanding = () => {
                 <div className="page-shell">
                   <div className="cinematic-card p-8">
                     <div className="section-eyebrow mb-6 inline-flex items-center gap-3 text-sm">
-                      <ShieldCheck size={16} /> Why creators love it
+                      <ShieldCheck size={16} /> Why download from PranvithDOP
                     </div>
                     <div className="grid gap-4 md:grid-cols-3">
                       {benefits.map((item) => (
@@ -443,12 +530,15 @@ const AssetLanding = () => {
               <section className="section-block pt-0">
                 <div className="page-shell max-w-4xl">
                   <h2 className="mb-8 text-3xl font-bold tracking-tight">Frequently Asked Questions</h2>
-                  <div className="grid gap-4">
+                  <div className="grid gap-2">
                     {faqs.map((item, index) => (
-                      <div key={item.q || `${item.a}-${index}`} className="cinematic-card p-6">
-                        <p className="font-semibold text-white">{item.q || 'Question'}</p>
-                        <p className="mt-3 text-sm leading-relaxed text-white/70">{item.a || 'Answer coming soon.'}</p>
-                      </div>
+                      <details key={item.q || `${item.a}-${index}`} className="group rounded-xl border border-white/10 bg-[#090a0c] px-5 py-4 open:border-[#ff5a1f]/30">
+                        <summary className="flex cursor-pointer list-none items-center justify-between gap-4 text-sm font-semibold text-white">
+                          {item.q || 'Question'}
+                          <span className="text-lg text-[#ff8a5c] transition-transform group-open:rotate-45">+</span>
+                        </summary>
+                        <p className="mt-4 border-t border-white/8 pt-4 text-sm leading-relaxed text-white/60">{item.a || 'Answer coming soon.'}</p>
+                      </details>
                     ))}
                   </div>
                 </div>
@@ -457,7 +547,7 @@ const AssetLanding = () => {
 
             <section className="section-block pt-0">
               <div className="page-shell max-w-5xl">
-                <div className="cinematic-card p-7 text-center sm:p-10">
+                <div className="rounded-2xl border border-white/15 bg-[linear-gradient(110deg,rgba(255,77,0,.16),rgba(12,14,19,.5)_48%,rgba(8,119,255,.18))] p-7 text-center shadow-[0_22px_70px_rgba(0,0,0,.18)] backdrop-blur-xl sm:p-10">
                   <span className="mb-6 inline-flex items-center justify-center rounded-full border border-purple-300/20 bg-purple-500/15 px-4 py-2 text-xs uppercase tracking-[0.35em] text-purple-200">
                     Get Instant Access
                   </span>
@@ -524,28 +614,36 @@ const StatusState = ({ title, description }) => (
   </section>
 );
 
-const ValuePill = ({ label, value }) => (
-  <div className="rounded-2xl border border-purple-300/15 bg-white/[0.03] px-4 py-4">
-    <p className="text-[11px] uppercase tracking-[0.24em] text-white/40">{label}</p>
-    <p className="mt-2 text-sm font-semibold text-white/88">{value}</p>
-  </div>
+const FileInformation = ({ rows }) => (
+  <section className="rounded-2xl border border-white/10 bg-[#090a0c] p-5 shadow-[0_18px_55px_rgba(0,0,0,.24)] sm:p-7">
+    <p className="text-[10px] font-semibold uppercase tracking-[0.28em] text-[#69adff]">Product specifications</p>
+    <h2 className="mt-3 text-2xl font-bold tracking-tight text-white">File Information</h2>
+    <dl className="mt-6 grid gap-3">
+      {rows.map((row) => (
+        <div key={row.label} className="grid gap-2 rounded-xl border border-white/10 bg-black/30 px-4 py-4 sm:grid-cols-[11rem_minmax(0,1fr)] sm:items-center sm:px-5">
+          <dt className="text-xs font-semibold uppercase tracking-[0.18em] text-white/42">{row.label}</dt>
+          <dd className="text-sm font-semibold leading-6 text-white sm:text-right sm:text-base">{row.value}</dd>
+        </div>
+      ))}
+    </dl>
+  </section>
 );
 
 const ProductHeroImage = ({ heroImage, name }) => (
-  <div className="product-hero-image-wrap shadow-[0_0_45px_rgba(124,58,237,0.14)]">
+  <div className="product-hero-image-wrap overflow-hidden rounded-2xl border border-white/10 bg-[#090a0c] shadow-[0_22px_70px_rgba(0,0,0,0.35)]">
     {heroImage ? (
       <OptimizedImage
         src={heroImage}
         alt={name}
         priority
-        width={440}
-        height={550}
-        className="product-hero-image"
+        width={1080}
+        height={720}
+        className="product-hero-image aspect-[16/10] w-full object-cover"
         data-testid="asset-hero-image"
         onError={handleImageError}
       />
     ) : (
-      <div className="flex min-h-[16rem] w-full items-center justify-center rounded-[inherit] bg-gradient-to-br from-violet-700 to-fuchsia-900 px-6 py-10 text-center text-2xl font-black text-white sm:min-h-[22rem]">
+      <div className="flex min-h-[18rem] w-full items-center justify-center rounded-[inherit] bg-[radial-gradient(circle_at_20%_80%,rgba(255,77,0,.35),transparent_40%),radial-gradient(circle_at_80%_20%,rgba(8,119,255,.42),transparent_42%),#08090b] px-6 py-10 text-center text-3xl font-black text-white sm:min-h-[28rem]">
         {name}
       </div>
     )}
@@ -553,11 +651,11 @@ const ProductHeroImage = ({ heroImage, name }) => (
 );
 
 const PriceCard = ({ price, isFree, busy, product, onPrimaryCta, onShare, className = '' }) => (
-  <div className={`rounded-[22px] border border-purple-300/20 bg-[var(--bg-elevated)] p-4 sm:p-5 ${className}`.trim()}>
+  <aside className={`overflow-hidden rounded-2xl border border-white/12 bg-[#090a0c] p-5 shadow-[0_24px_70px_rgba(0,0,0,.38)] ${className}`.trim()}>
     <p className="text-[11px] uppercase tracking-[0.3em] text-white/45">
       {price == null ? 'Price status' : isFree ? 'Price' : 'One-time price'}
     </p>
-    <p className="mt-3 text-3xl font-extrabold text-violet-300 sm:text-4xl" data-testid="asset-price">
+    <p className="mt-3 text-3xl font-extrabold text-white sm:text-4xl" data-testid="asset-price">
       {price == null ? 'Price unavailable' : isFree ? 'Free' : `Rs ${price.toLocaleString('en-IN')}`}
     </p>
     <div className="mt-4 grid gap-3">
@@ -565,7 +663,7 @@ const PriceCard = ({ price, isFree, busy, product, onPrimaryCta, onShare, classN
         onClick={onPrimaryCta}
         disabled={busy || !product}
         data-testid="asset-buy-now"
-        className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-violet-600 px-6 py-3.5 text-sm font-semibold uppercase tracking-[0.12em] text-white transition hover:bg-violet-500 disabled:opacity-60"
+        className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-[#ff6a2f] bg-[#ff4d00] px-6 py-3.5 text-sm font-semibold uppercase tracking-[0.12em] text-white shadow-[0_10px_28px_rgba(255,77,0,.22)] transition hover:bg-[#ff6a2f] disabled:opacity-60"
       >
         {busy ? (
           <><Loader2 size={16} className="animate-spin" /> Please wait...</>
@@ -576,16 +674,17 @@ const PriceCard = ({ price, isFree, busy, product, onPrimaryCta, onShare, classN
       <button
         type="button"
         onClick={onShare}
-        className="inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-purple-300/20 bg-purple-500/10 px-6 py-3.5 text-sm font-semibold uppercase tracking-[0.12em] text-white transition hover:border-purple-300/35 hover:bg-purple-500/15"
+        className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-white/12 bg-white/[0.03] px-6 py-3.5 text-sm font-semibold uppercase tracking-[0.12em] text-white transition hover:border-[#1683ff]/45 hover:bg-[#1683ff]/10"
       >
         <Share2 size={17} /> Share
       </button>
     </div>
-    <div className="mt-4 space-y-2 text-sm text-white/62">
-      <p>Clean mobile-first checkout flow.</p>
-      <p>Files delivered immediately after access confirmation.</p>
+    <div className="mt-5 space-y-3 border-t border-white/10 pt-5 text-xs text-white/55">
+      <p className="flex items-center gap-2"><ShieldCheck size={14} className="text-[#ff8a5c]" /> Secure one-time checkout</p>
+      <p className="flex items-center gap-2"><Download size={14} className="text-[#69adff]" /> Instant digital delivery</p>
+      <p className="flex items-center gap-2"><CheckCircle size={14} className="text-[#69adff]" /> Personal and commercial projects</p>
     </div>
-  </div>
+  </aside>
 );
 
 const ProductMediaSection = ({ product, galleryImages }) => {
@@ -700,7 +799,7 @@ const ProductMediaSection = ({ product, galleryImages }) => {
         {hasVideo && (
           <div>
             <h2 className="mb-8 text-3xl font-bold tracking-tight">Product Video</h2>
-            <div className="overflow-hidden rounded-[22px] border border-purple-300/20 bg-black shadow-[0_0_45px_rgba(124,58,237,0.14)]">
+            <div className="overflow-hidden rounded-[22px] border border-purple-300/20 bg-black shadow-[0_0_45px_rgba(8,119,255,0.16)]">
               <SafeVideoEmbed
                 videoType={product?.videoType === 'direct' ? 'video_file' : product?.videoType}
                 videoUrl={productVideoUrl}
@@ -800,7 +899,7 @@ const BeforeAfterSlider = ({ beforeImage, afterImage }) => {
   return (
     <div
       ref={frameRef}
-      className="relative mx-auto aspect-video max-w-5xl overflow-hidden rounded-[22px] border border-purple-300/20 bg-black shadow-[0_0_45px_rgba(124,58,237,0.14)]"
+      className="relative mx-auto aspect-video max-w-5xl overflow-hidden rounded-[22px] border border-purple-300/20 bg-black shadow-[0_0_45px_rgba(8,119,255,0.16)]"
       onMouseDown={startDrag}
       onTouchStart={startDrag}
     >

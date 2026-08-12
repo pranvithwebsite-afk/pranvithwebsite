@@ -187,7 +187,7 @@ const CheckoutModal = ({ product, open, onClose, onSuccess, onFailure }) => {
             <input
               value={form.name}
               onChange={(e) => update('name', e.target.value)}
-              className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-white/35 focus:border-violet-500/60 focus:outline-none"
+              className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-white/35 focus:border-[#3b82f6]/60 focus:outline-none"
               placeholder="Your name"
               autoComplete="name"
               required
@@ -197,7 +197,7 @@ const CheckoutModal = ({ product, open, onClose, onSuccess, onFailure }) => {
             <input
               value={form.email}
               onChange={(e) => update('email', e.target.value)}
-              className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-white/35 focus:border-violet-500/60 focus:outline-none"
+              className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-white/35 focus:border-[#3b82f6]/60 focus:outline-none"
               placeholder="you@example.com"
               autoComplete="email"
               type="email"
@@ -208,7 +208,7 @@ const CheckoutModal = ({ product, open, onClose, onSuccess, onFailure }) => {
             <input
               value={form.phone}
               onChange={(e) => update('phone', e.target.value)}
-              className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-white/35 focus:border-violet-500/60 focus:outline-none"
+              className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-white/35 focus:border-[#3b82f6]/60 focus:outline-none"
               placeholder="+91 98765 43210"
               autoComplete="tel"
               type="tel"
@@ -218,7 +218,7 @@ const CheckoutModal = ({ product, open, onClose, onSuccess, onFailure }) => {
 
           <div>
             <label className="mb-2 block text-sm font-medium text-white/80">Coupon Code</label>
-            {coupon ? <div className="flex items-center justify-between rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100"><span>{coupon.couponCode} applied — save ₹{(coupon.discountAmount / 100).toLocaleString('en-IN')}</span><button type="button" onClick={() => setCoupon(null)} className="font-semibold text-emerald-300">Remove</button></div> : <div className="flex gap-2"><input value={couponCode} onChange={(e) => setCouponCode(e.target.value.toUpperCase().replace(/\s/g, ''))} placeholder="ENTER CODE" className="min-w-0 flex-1 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-white/35 focus:border-violet-500/60 focus:outline-none" /><button type="button" onClick={applyCoupon} disabled={couponBusy} className="rounded-xl bg-violet-700 px-4 text-sm font-semibold text-white disabled:opacity-60">{couponBusy ? 'Applying…' : 'Apply'}</button></div>}
+            {coupon ? <div className="flex items-center justify-between rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100"><span>{coupon.couponCode} applied — save ₹{(coupon.discountAmount / 100).toLocaleString('en-IN')}</span><button type="button" onClick={() => setCoupon(null)} className="font-semibold text-emerald-300">Remove</button></div> : <div className="flex gap-2"><input value={couponCode} onChange={(e) => setCouponCode(e.target.value.toUpperCase().replace(/\s/g, ''))} placeholder="ENTER CODE" className="min-w-0 flex-1 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-white/35 focus:border-[#3b82f6]/60 focus:outline-none" /><button type="button" onClick={applyCoupon} disabled={couponBusy} className="rounded-xl bg-gradient-to-r from-[#3b82f6] to-[#2563eb] px-4 text-sm font-semibold text-white disabled:opacity-60">{couponBusy ? 'Applying…' : 'Apply'}</button></div>}
           </div>
 
           <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4 text-sm"><div className="flex justify-between text-white/70"><span>Product price</span><span>₹{Number(price).toLocaleString('en-IN')}</span></div>{coupon && <div className="mt-2 flex justify-between text-emerald-300"><span>Coupon discount</span><span>-₹{(coupon.discountAmount / 100).toLocaleString('en-IN')}</span></div>}<div className="mt-3 flex justify-between border-t border-white/10 pt-3 font-semibold text-white"><span>Total payable</span><span>₹{((coupon ? coupon.finalAmount : price * 100) / 100).toLocaleString('en-IN')}</span></div></div>
@@ -232,7 +232,7 @@ const CheckoutModal = ({ product, open, onClose, onSuccess, onFailure }) => {
           <button
             type="submit"
             disabled={busy}
-            className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-violet-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-violet-500 disabled:opacity-60"
+            className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#3b82f6] to-[#2563eb] hover:from-[#2563eb] hover:to-[#1d4ed8] px-5 py-3 text-sm font-semibold text-white transition disabled:opacity-60 shadow-[0_8px_24px_rgba(59,130,246,0.35)]"
           >
             {busy ? (
               <><Loader2 size={16} className="animate-spin" /> Opening payment…</>

@@ -9,6 +9,7 @@ import ClientTestimonialsSection from '../components/ClientTestimonialsSection';
 import { usePublicPageLoading } from '../components/PublicPageLoader';
 import OptimizedImage from '../components/OptimizedImage';
 import VideoModal from '../components/VideoModal';
+import HeroLightSticks from '../components/HeroLightSticks';
 
 const EMPTY_SECTIONS = [];
 
@@ -66,10 +67,11 @@ const Works = () => {
   return (
     <>
       <Header />
-      <main className="page bg-transparent text-white">
+      <main className="page works-page bg-transparent text-white">
         {showHero && (
-          <section className="section-block px-6 pb-12 pt-32 text-center md:pt-36">
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(124,58,237,0.22),transparent_45%)]" />
+          <section className="section-block works-hero hero-spectrum relative overflow-hidden px-6 pb-12 pt-32 text-center md:pt-36">
+            <HeroLightSticks />
+            <div className="hero-spectrum__grid absolute inset-0 pointer-events-none" />
             <div className="relative mx-auto max-w-5xl">
               <p className="section-eyebrow text-xs">{hero.subtitle || 'PORTFOLIO'}</p>
               <h1 className="mt-5 text-5xl font-bold tracking-tight md:text-7xl">{hero.title || page?.title || 'Films, commercials, aerials, and edits crafted for impact.'}</h1>
@@ -128,7 +130,7 @@ const Works = () => {
                   onClick={() => setActive(filter)}
                   className={`shrink-0 whitespace-nowrap rounded-full border px-4 py-2 text-sm font-semibold backdrop-blur transition ${
                     active === filter
-                      ? 'border-violet-400/60 bg-violet-600 text-white shadow-[0_8px_24px_rgba(124,58,237,0.28)]'
+                      ? 'border-violet-400/60 bg-violet-600 text-white shadow-[0_8px_24px_rgba(255,77,0,0.28)]'
                       : 'border-white/10 bg-black/30 text-white/70 hover:border-violet-400/40 hover:bg-violet-500/10 hover:text-white'
                   }`}
                 >

@@ -39,7 +39,7 @@ const Courses = ({ section }) => {
       <div className="relative mx-auto max-w-7xl">
         <div className="text-center mb-4">
           <h2 className="text-4xl md:text-6xl font-bold tracking-tight">{section?.title || 'MASTER VIDEO EDITING'}</h2>
-          <p className="mt-4 text-[#c4b5fd] text-base md:text-lg font-medium">{section?.subtitle || 'Expand Your Career Opportunity'}</p>
+          <p className="mt-4 text-[#69adff] text-base md:text-lg font-medium">{section?.subtitle || 'Expand Your Career Opportunity'}</p>
           <p className="mt-3 text-white/65 max-w-2xl mx-auto">
             {section?.description || 'Learn professional video editing techniques from industry experts. From beginner to advanced level courses.'}
           </p>

@@ -39,6 +39,7 @@ const PublicApp = () => (
       <Route path="/payment-success" element={<PaymentSuccess />} />
       <Route path="/payment-failed" element={<PaymentFailed />} />
       <Route path="/works" element={<Works />} />
+      <Route path="/portfolio" element={<Works />} />
       <Route path="/hire" element={<Hire />} />
       <Route path="/contact" element={<Hire />} />
       <Route path="/privacy" element={<Privacy />} />

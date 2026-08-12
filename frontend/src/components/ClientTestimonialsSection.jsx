@@ -20,6 +20,8 @@ const normalizeTestimonial = (item = {}, index) => ({
   sort_order: item.sort_order ?? index,
 });
 
+const cardGlows = ['card-glow-blue', 'card-glow-amber', 'card-glow-teal'];
+
 const ClientTestimonialsSection = ({ section = null }) => {
   const cmsItems = enabledSorted(section?.data?.items || []);
   const items = section ? cmsItems.map(normalizeTestimonial) : clientTestimonials;
@@ -27,39 +29,62 @@ const ClientTestimonialsSection = ({ section = null }) => {
   if (!items.length) return null;
 
   return (
-    <section className="relative px-6 py-20">
+    <section className="relative px-6 py-24">
       <div className="mx-auto max-w-6xl">
-        <div className="mb-10 max-w-2xl">
-          <p className="section-eyebrow text-sm">{section?.subtitle || 'Client words'}</p>
-          <h2 className="mt-3 text-4xl font-bold tracking-tight text-white md:text-5xl">
-            {section?.title || 'Trusted for films, brands, weddings, and launch visuals.'}
+        <div className="text-center mb-14">
+          <span className="inline-block px-4 py-1.5 rounded-full bg-[#ea580c]/15 border border-[#ea580c]/35 text-xs font-semibold uppercase tracking-wider text-[#f97316]">
+            SUCCESS STORIES
+          </span>
+          <h2 className="mt-5 text-4xl font-bold tracking-tight text-white md:text-5xl">
+            {section?.title || 'Hear from our customers & their success stories'}
           </h2>
-          {section?.description && <p className="mt-4 text-sm leading-7 text-white/65">{section.description}</p>}
+          {section?.description && <p className="mt-4 text-sm leading-relaxed text-white/65 max-w-xl mx-auto">{section.description}</p>}
         </div>
 
-        <div className="grid gap-5 md:grid-cols-3">
-          {items.map((item) => (
+        <div className="grid gap-6 md:grid-cols-3 mb-20">
+          {items.map((item, idx) => (
             <article
-              key={`${item.name}-${item.projectType}-${item.sort_order ?? ''}`}
-              className="cinematic-card p-6 backdrop-blur transition hover:-translate-y-1"
+              key={`${item.name}-${item.projectType}-${item.sort_order ?? idx}`}
+              className={`cinematic-card ${cardGlows[idx % cardGlows.length]} p-7 backdrop-blur-2xl border border-white/10 bg-[#0e1322] rounded-3xl transition duration-300 hover:-translate-y-1.5 shadow-[0_20px_60px_rgba(0,0,0,0.6)] flex flex-col justify-between`}
             >
-              <div className="flex gap-1 text-amber-300">
-                {Array.from({ length: item.rating || 5 }).map((_, index) => (
-                  <Star key={index} size={15} fill="currentColor" />
-                ))}
+              <div>
+                <div className="flex gap-1 text-amber-400 mb-4">
+                  {Array.from({ length: item.rating || 5 }).map((_, index) => (
+                    <Star key={index} size={15} fill="currentColor" />
+                  ))}
+                </div>
+                <p className="text-sm leading-relaxed text-white/80 font-normal">"{item.text}"</p>
               </div>
-              <p className="mt-5 text-sm leading-7 text-white/75">"{item.text}"</p>
-              <div className="mt-6 flex items-center gap-3 border-t border-purple-300/15 pt-5">
-                {item.image_url && (
-                  <img src={safeImageSrc(item.image_url)} alt={item.name} className="h-10 w-10 rounded-full object-cover" onError={handleImageError} />
+
+              <div className="mt-8 flex items-center gap-3.5 border-t border-white/10 pt-5">
+                {item.image_url ? (
+                  <img src={safeImageSrc(item.image_url)} alt={item.name} className="h-11 w-11 rounded-full object-cover border border-white/15" onError={handleImageError} />
+                ) : (
+                  <div className="h-11 w-11 rounded-full bg-gradient-to-tr from-[#3b82f6] to-[#ea580c] flex items-center justify-center text-white font-bold text-sm">
+                    {item.name.charAt(0)}
+                  </div>
                 )}
                 <div>
-                  <p className="font-semibold text-white">{item.name}</p>
-                  <p className="mt-1 text-xs uppercase tracking-[0.2em] text-violet-200/70">{item.projectType}</p>
+                  <p className="font-semibold text-sm text-white">{item.name}</p>
+                  <p className="text-xs text-[#93c5fd] mt-0.5">{item.projectType || 'Verified Creator'}</p>
                 </div>
               </div>
             </article>
           ))}
+        </div>
+
+        {/* Brand Logo Cloud Section */}
+        <div className="pt-12 border-t border-white/10 text-center">
+          <p className="text-xl md:text-2xl font-bold tracking-tight text-white mb-8">
+            Used by the world's best
+          </p>
+          <div className="flex items-center justify-center gap-8 md:gap-14 flex-wrap opacity-70 grayscale hover:grayscale-0 transition-all duration-500 text-lg font-extrabold text-white/70">
+            <span className="tracking-widest hover:text-[#ea580c] transition">UEFA</span>
+            <span className="tracking-wider italic hover:text-[#3b82f6] transition">LACOSTE</span>
+            <span className="tracking-widest font-serif hover:text-white transition">LEVI'S</span>
+            <span className="tracking-wider uppercase hover:text-[#ea580c] transition">LAMBORGHINI</span>
+            <span className="tracking-widest font-sans hover:text-[#3b82f6] transition">RED BULL</span>
+          </div>
         </div>
       </div>
     </section>

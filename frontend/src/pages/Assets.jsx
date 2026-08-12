@@ -10,6 +10,7 @@ import { useCmsPage } from '../hooks/useCmsPage';
 import { useProducts } from '../hooks/useProducts';
 import OptimizedImage from '../components/OptimizedImage';
 import AssetCategoryFilter from '../components/AssetCategoryFilter';
+import HeroLightSticks from '../components/HeroLightSticks';
 
 const assetCategories = [
   'All Assets',
@@ -23,14 +24,14 @@ const assetCategories = [
 ];
 
 const defaultBackgrounds = [
-  'linear-gradient(135deg, #2e1065 0%, #1a102d 60%, #05000d 100%)',
-  'linear-gradient(135deg, #171025 0%, #0b0318 100%)',
-  'linear-gradient(135deg, #6d28d9 0%, #a78bfa 60%, #1a102d 100%)',
-  'linear-gradient(135deg, #120d1d 0%, #2e1065 60%, #05000d 100%)',
-  'linear-gradient(135deg, #4c1d95 0%, #2e1065 60%, #0a0418 100%)',
-  'linear-gradient(135deg, #7c3aed 0%, #1a102d 60%, #05000d 100%)',
-  'linear-gradient(135deg, #581c87 0%, #4c1d95 100%)',
-  'linear-gradient(135deg, #a78bfa 0%, #4c1d95 100%)',
+  'linear-gradient(135deg, #024950 0%, #04383c 60%, #003135 100%)',
+  'linear-gradient(135deg, #04383c 0%, #003135 100%)',
+  'linear-gradient(135deg, #964734 0%, #0FA4AF 60%, #024950 100%)',
+  'linear-gradient(135deg, #003135 0%, #024950 60%, #003135 100%)',
+  'linear-gradient(135deg, #024950 0%, #04383c 60%, #003135 100%)',
+  'linear-gradient(135deg, #964734 0%, #024950 60%, #003135 100%)',
+  'linear-gradient(135deg, #04383c 0%, #024950 100%)',
+  'linear-gradient(135deg, #0FA4AF 0%, #024950 100%)',
 ];
 
 const findSection = (sections = [], idOrType) =>
@@ -113,7 +114,7 @@ const Assets = () => {
   usePublicPageLoading(cmsLoading || loading);
 
   const products = useMemo(() => {
-    if (!rawProducts) return [];
+    if (!Array.isArray(rawProducts)) return [];
     return dedupeCatalogItems(rawProducts.filter(Boolean)).map((p, idx) => normalize(p, idx));
   }, [rawProducts]);
 
@@ -178,6 +179,10 @@ const Assets = () => {
     <>
       <Header />
       <main className="assets-page page min-h-screen bg-transparent text-white">
+        <div className="assets-page-bg hero-spectrum" aria-hidden="true">
+          <HeroLightSticks />
+          <div className="hero-spectrum__grid absolute inset-0 pointer-events-none" />
+        </div>
         {!pageHidden && heroSection?.section_id && (
           <section className="pb-8 pt-28 md:pt-32">
             <div className="site-container">
@@ -207,15 +212,15 @@ const Assets = () => {
                   aria-expanded={isMobileFilterOpen}
                   aria-controls={mobileFilterPanelId}
                   onClick={() => setIsMobileFilterOpen((open) => !open)}
-                  className="flex w-full items-center justify-between rounded-[18px] border border-purple-300/20 bg-[linear-gradient(145deg,rgba(23,16,37,0.96),rgba(13,8,24,0.98))] px-4 py-3 text-left shadow-[0_0_45px_rgba(124,58,237,0.12)] transition hover:border-purple-300/35"
+                  className="flex w-full items-center justify-between rounded-[18px] border border-purple-300/20 bg-[linear-gradient(145deg,rgba(23,16,37,0.96),rgba(13,8,24,0.98))] px-4 py-3 text-left shadow-[0_0_45px_rgba(8,119,255,0.14)] transition hover:border-purple-300/35"
                 >
                   <span className="inline-flex items-center gap-3 text-sm font-semibold text-white">
-                    <span className="flex h-9 w-9 items-center justify-center rounded-2xl border border-purple-300/20 bg-purple-500/15 text-[#c4b5fd]">
+                    <span className="flex h-9 w-9 items-center justify-center rounded-2xl border border-purple-300/20 bg-purple-500/15 text-[#69adff]">
                       <Filter size={17} />
                     </span>
                     Filters{activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}
                   </span>
-                  <ChevronDown size={18} className={`text-[#c4b5fd] transition-transform duration-300 ${isMobileFilterOpen ? 'rotate-180' : ''}`} />
+                  <ChevronDown size={18} className={`text-[#69adff] transition-transform duration-300 ${isMobileFilterOpen ? 'rotate-180' : ''}`} />
                 </button>
                 <div
                   id={mobileFilterPanelId}
@@ -427,7 +432,7 @@ const ProductCard = ({ p, onView, onBuy }) => (
         </div>
       )}
       <span className={`absolute left-2.5 top-2.5 inline-flex h-7 items-center rounded-full px-2.5 text-[10px] font-bold tracking-wider sm:text-[11px] ${
-        p.isFree ? 'bg-violet-500 text-white' : 'bg-rose-500 text-white'
+        p.isFree ? 'bg-[#3b82f6] text-white' : 'bg-gradient-to-r from-[#3b82f6] to-[#2563eb] text-white'
       }`}>
         {p.badge}
       </span>
@@ -438,13 +443,13 @@ const ProductCard = ({ p, onView, onBuy }) => (
           e.stopPropagation();
           shareProduct(p);
         }}
-        className="absolute right-2.5 top-2.5 inline-flex h-9 w-9 items-center justify-center rounded-full border border-purple-300/20 bg-black/55 text-white/90 backdrop-blur transition hover:border-purple-300/35 hover:bg-purple-500/30"
+        className="absolute right-2.5 top-2.5 inline-flex h-9 w-9 items-center justify-center rounded-full border border-[#3b82f6]/20 bg-black/55 text-white/90 backdrop-blur transition hover:border-[#3b82f6]/35 hover:bg-[#3b82f6]/30"
       >
         <Share2 size={15} />
       </button>
     </div>
     <div className="flex flex-1 flex-col p-3 sm:p-4">
-      <div className="mb-2 inline-flex w-fit rounded-full border border-purple-300/15 bg-purple-500/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#c4b5fd] sm:text-[11px]">
+      <div className="mb-2 inline-flex w-fit rounded-full border border-[#3b82f6]/20 bg-[#3b82f6]/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#93c5fd] sm:text-[11px]">
         {p.category}
       </div>
       <h3 className="line-clamp-2 text-[13px] font-semibold leading-[1.35] text-white sm:text-[17px]">{p.title}</h3>
@@ -464,7 +469,7 @@ const ProductCard = ({ p, onView, onBuy }) => (
       <button
         onClick={(e) => { e.stopPropagation(); p.isFree ? onView() : onBuy(); }}
         data-testid={`view-asset-btn-${p.slug}`}
-        className="mt-auto inline-flex w-full items-center justify-center gap-2 rounded-lg bg-violet-600 py-2 text-xs font-semibold text-white transition-colors hover:bg-violet-500 sm:text-[13px]"
+        className="mt-auto inline-flex w-full items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-[#3b82f6] to-[#2563eb] hover:from-[#2563eb] hover:to-[#1d4ed8] py-2 text-xs font-semibold text-white transition-all duration-300 shadow-[0_4px_16px_rgba(59,130,246,0.3)] sm:text-[13px]"
       >
         {p.isFree ? 'Get Free' : 'Buy Now'}
       </button>
