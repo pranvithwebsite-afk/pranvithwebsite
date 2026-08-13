@@ -56,7 +56,7 @@ const OurWorks = ({ section }) => {
         </div>
 
         {(section.button_text || section.button_link) && (
-          <div className="mt-12 text-center">
+          <div className="mt-10 mb-2 text-center">
             <a href={safePublicHref(section.button_link, '/works')} className="inline-flex rounded-full bg-gradient-to-r from-[#3b82f6] to-[#2563eb] hover:from-[#2563eb] hover:to-[#1d4ed8] px-7 py-3 text-sm font-semibold tracking-wider text-white transition-all duration-300">
               {section.button_text || 'VIEW ALL WORKS'}
             </a>

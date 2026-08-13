@@ -132,12 +132,12 @@ const TransformVision = ({ section }) => {
       const centered = (progress - 0.5) * 2;
       const zoomWave = Math.sin(progress * Math.PI);
 
-      phoneEl.style.setProperty('--phone-y', `${-28 + progress * 56}px`);
-      phoneEl.style.setProperty('--phone-rotate-x', `${7 - progress * 12}deg`);
-      phoneEl.style.setProperty('--phone-rotate-y', `${-20 + progress * 34}deg`);
-      phoneEl.style.setProperty('--phone-rotate-z', `${-3 + progress * 5}deg`);
-      phoneEl.style.setProperty('--phone-scale', String(0.88 + zoomWave * 0.24));
-      phoneEl.style.setProperty('--phone-z', `${zoomWave * 140}px`);
+      phoneEl.style.setProperty('--phone-y', `${-12 + progress * 24}px`);
+      phoneEl.style.setProperty('--phone-rotate-x', `${5 - progress * 10}deg`);
+      phoneEl.style.setProperty('--phone-rotate-y', `${-16 + progress * 28}deg`);
+      phoneEl.style.setProperty('--phone-rotate-z', `${-2 + progress * 4}deg`);
+      phoneEl.style.setProperty('--phone-scale', String(0.92 + zoomWave * 0.10));
+      phoneEl.style.setProperty('--phone-z', `${zoomWave * 80}px`);
       phoneEl.style.setProperty('--phone-glow', String(0.55 + Math.abs(centered) * 0.2));
       rafId = 0;
     };
@@ -202,7 +202,7 @@ const TransformVision = ({ section }) => {
   ].filter(Boolean);
 
   return (
-    <section ref={sectionRef} className="transform-vision-section section-block relative overflow-hidden px-6">
+    <section ref={sectionRef} className="transform-vision-section relative overflow-hidden px-4 sm:px-6 py-16 md:py-20 lg:py-24">
       <div className="max-w-7xl mx-auto">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
           <div>
@@ -240,7 +240,7 @@ const TransformVision = ({ section }) => {
           </div>
 
           {/* Mobile mockup */}
-          <div className="transform-phone-stage flex justify-center md:justify-end">
+          <div className="transform-phone-stage flex justify-center md:justify-end py-4">
             <div ref={phoneRef} className="transform-phone-3d relative">
               <div className="transform-phone-orbit absolute -inset-10 rounded-full" />
               <div className="transform-phone-shadow" />
@@ -252,7 +252,7 @@ const TransformVision = ({ section }) => {
                 <span className="phone-chip-spark">✦</span>
                 New reel live
               </div>
-              <div className="phone-mockup relative h-[540px] w-[260px] overflow-hidden rounded-[42px] border-[10px] border-[#0a0518] bg-gradient-to-b from-[#1a0c4f] to-[#0a0518] md:h-[620px] md:w-[300px]">
+              <div className="phone-mockup relative h-[520px] w-[255px] overflow-hidden rounded-[40px] border-[9px] border-[#0a0518] bg-gradient-to-b from-[#1a0c4f] to-[#0a0518] md:h-[570px] md:w-[285px]">
                 <div className="phone-screen-shine" />
                 <div className="absolute top-0 left-1/2 -translate-x-1/2 w-28 h-6 bg-black rounded-b-2xl z-20" />
                 <div className="phone-camera-lens" />
