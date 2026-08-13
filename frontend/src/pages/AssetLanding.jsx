@@ -630,7 +630,7 @@ const FileInformation = ({ rows }) => (
 );
 
 const ProductHeroImage = ({ heroImage, name }) => (
-  <div className="product-hero-image-wrap overflow-hidden rounded-2xl border border-white/10 bg-[#090a0c] shadow-[0_22px_70px_rgba(0,0,0,0.35)]">
+  <div className="product-hero-image-wrap flex items-center justify-center overflow-hidden rounded-2xl border border-white/10 bg-[#090a0c] shadow-[0_22px_70px_rgba(0,0,0,0.35)]">
     {heroImage ? (
       <OptimizedImage
         src={heroImage}
@@ -638,7 +638,8 @@ const ProductHeroImage = ({ heroImage, name }) => (
         priority
         width={1080}
         height={720}
-        className="product-hero-image aspect-[16/10] w-full object-cover"
+        fit="contain"
+        className="product-hero-image block h-auto w-full max-h-[80vh] object-contain"
         data-testid="asset-hero-image"
         onError={handleImageError}
       />
@@ -782,11 +783,12 @@ const ProductMediaSection = ({ product, galleryImages }) => {
                     alt={`${titleForAlt} gallery image`}
                     width={galleryLayout === 'full' ? 1440 : 420}
                     height={galleryLayout === 'full' ? 1080 : 236}
-                  className={`block w-full overflow-hidden ${
-                    galleryLayout === 'full'
-                      ? 'cursor-pointer rounded-3xl object-cover transition duration-300 group-hover:scale-[1.01]'
-                      : 'product-gallery-image cursor-pointer transition duration-300 group-hover:scale-[1.02]'
-                  }`}
+                    fit="contain"
+                    className={`block w-full overflow-hidden ${
+                      galleryLayout === 'full'
+                        ? 'cursor-pointer rounded-3xl object-contain transition duration-300 group-hover:scale-[1.01]'
+                        : 'product-gallery-image cursor-pointer transition duration-300 group-hover:scale-[1.02]'
+                    }`}
                     fallback=""
                     onError={() => handleGalleryImageError(image)}
                   />

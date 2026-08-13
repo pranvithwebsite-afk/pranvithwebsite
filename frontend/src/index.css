@@ -306,7 +306,7 @@ h1, h2, h3, h4, h5, h6 {
     height: auto;
     min-height: 14rem;
     max-height: 26rem;
-    object-fit: cover;
+    object-fit: contain;
     background: rgba(255, 255, 255, 0.03);
   }
 
