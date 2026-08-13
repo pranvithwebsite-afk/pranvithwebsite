@@ -87,10 +87,11 @@ const adminRequestFailureMessage = (error, fallbackMessage) => {
     : '';
   const data = error?.response?.data || {};
   const code = data?.code || (typeof data?.detail === 'object' ? data.detail?.code : '') || '';
-  const backendMessage = data?.message || (typeof data?.detail === 'object' ? data.detail?.message : '') || fallbackMessage;
+  const detailStr = typeof data?.detail === 'string' ? data.detail : (typeof data?.detail?.message === 'string' ? data.detail.message : '');
+  const backendMessage = data?.message || detailStr || fallbackMessage;
   const detail = typeof data?.detail === 'object' && data.detail?.detail != null
     ? formatApiErrorDetail(data.detail.detail)
-    : formatApiErrorDetail(data?.detail);
+    : (typeof data?.detail === 'string' ? '' : formatApiErrorDetail(data?.detail));
   const parts = [`${status}${code ? ` [${code}]` : ''}: ${backendMessage}`];
   if (detail && detail !== backendMessage && detail !== 'Something went wrong. Please try again.') parts.push(detail);
   if (Array.isArray(data?.errors)) {
@@ -439,6 +440,8 @@ const Products = () => {
     return (
       <ProductForm
         formData={formData}
+        products={products}
+        editingId={editingId}
         onInputChange={handleInputChange}
         onFieldChange={handleFieldChange}
         onArrayAdd={handleArrayAdd}
@@ -495,6 +498,8 @@ const Products = () => {
 
 const ProductForm = ({
   formData,
+  products = [],
+  editingId = null,
   onInputChange,
   onFieldChange,
   onArrayAdd,
@@ -523,6 +528,13 @@ const ProductForm = ({
   const [mediaLibraryTarget, setMediaLibraryTarget] = useState(null);
 
   const currentSlug = normalizeSlug(formData.slug || formData.name);
+  const conflictingProduct = useMemo(() => {
+    if (!currentSlug) return null;
+    return (Array.isArray(products) ? products : []).find(
+      (p) => p.id !== editingId && normalizeSlug(p.slug || p.name) === currentSlug
+    );
+  }, [currentSlug, products, editingId]);
+
   const hasExistingPaymentLink = !!(formData.razorpay_payment_link_id || formData.razorpay_payment_link_url);
   const imageMediaItems = useMemo(() => (
     (Array.isArray(mediaLibraryItems) ? mediaLibraryItems : []).filter((item) => {
@@ -665,7 +677,8 @@ const ProductForm = ({
         status: error?.response?.status || error?.originalError?.response?.status || null,
         detail: error?.response?.data?.detail || error?.originalError?.response?.data?.detail || error?.message || error,
       });
-      toast.error(errorMessage || formatUploadError(error));
+      const detailError = error?.response?.data?.detail || error?.message || formatUploadError(error);
+      toast.error(detailError || errorMessage || 'Upload failed. Please try again.');
     } finally {
       setUploading((prev) => ({ ...prev, [uploadKey]: false }));
     }
@@ -683,8 +696,8 @@ const ProductForm = ({
       setUploadProgress((prev) => ({ ...prev, [uploadKey]: 0 }));
       const result = await uploadAdminPrivateDownload({
         file,
-        productSlug: currentSlug,
         purpose: 'paid-download',
+        productSlug: currentSlug,
         onUploadProgress: (event) => {
           if (!event.total) return;
           setUploadProgress((prev) => ({
@@ -693,12 +706,22 @@ const ProductForm = ({
           }));
         },
       });
-      onFieldChange('download_file_key', result.key);
-      onFieldChange('download_file_name', result.filename);
-      onFieldChange('download_file_bucket', result.bucket);
-      toast.success('Private download uploaded');
+      const fileUrl = result?.media?.public_url || result?.media?.url || result?.url;
+      onFieldChange('download_file_url', fileUrl);
+      onFieldChange('download_file', fileUrl);
+      if (result?.media?.r2_key) {
+        onFieldChange('download_file_key', result.media.r2_key);
+      }
+      if (result?.media?.r2_bucket) {
+        onFieldChange('download_file_bucket', result.media.r2_bucket);
+      }
+      if (result?.media?.filename || result?.media?.title) {
+        onFieldChange('download_file_name', result.media.filename || result.media.title);
+      }
+      toast.success(result?.message || 'Download file uploaded');
     } catch (error) {
-      toast.error(error?.response?.data?.detail || 'Private upload failed');
+      console.warn('[admin/products] private download upload failed', error);
+      toast.error(adminRequestFailureMessage(error, 'Failed to upload download file'));
     } finally {
       setUploading((prev) => ({ ...prev, [uploadKey]: false }));
     }
@@ -771,16 +794,50 @@ const ProductForm = ({
             />
           </div>
           <div>
-            <label className="block text-sm font-semibold text-white mb-2">Slug *</label>
+            <div className="mb-2 flex items-center justify-between">
+              <label className="block text-sm font-semibold text-white">Slug *</label>
+              {conflictingProduct && (
+                <span className="text-xs font-semibold text-amber-400">Slug in use</span>
+              )}
+            </div>
             <input
               type="text"
               name="slug"
               value={formData.slug}
               onChange={onInputChange}
-              className="w-full px-4 py-2 rounded-lg bg-slate-900 border border-slate-700 text-white focus:outline-none focus:border-violet-500"
+              className={`w-full px-4 py-2 rounded-lg bg-slate-900 border text-white focus:outline-none ${
+                conflictingProduct
+                  ? 'border-amber-500/80 focus:border-amber-400'
+                  : 'border-slate-700 focus:border-violet-500'
+              }`}
             />
           </div>
         </div>
+
+        {conflictingProduct && (
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-500/40 bg-amber-500/10 p-3.5 text-xs text-amber-200">
+            <p>
+              ⚠️ Slug <strong className="font-mono text-white">"{currentSlug}"</strong> is already in use by product: <strong>"{conflictingProduct.name || conflictingProduct.title || 'Existing product'}"</strong>.
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                const baseSlug = normalizeSlug(formData.slug || formData.name) || 'product';
+                const existingSlugs = new Set((products || []).filter(p => p.id !== editingId).map(p => normalizeSlug(p.slug || p.name)));
+                let count = 2;
+                let candidate = `${baseSlug}-${count}`;
+                while (existingSlugs.has(candidate)) {
+                  count += 1;
+                  candidate = `${baseSlug}-${count}`;
+                }
+                onFieldChange('slug', candidate);
+              }}
+              className="rounded-lg bg-amber-500 px-3 py-1.5 font-bold text-slate-950 transition hover:bg-amber-400"
+            >
+              Make Slug Unique
+            </button>
+          </div>
+        )}
 
         <div>
           <label className="block text-sm font-semibold text-white mb-2">Category</label>
@@ -849,7 +906,6 @@ const ProductForm = ({
             type: 'image',
             purpose: 'product-thumbnail',
             targetField: 'thumbnail_url',
-            errorMessage: 'Thumbnail Image upload failed. Please try again.',
           })}
         />
 
@@ -865,7 +921,6 @@ const ProductForm = ({
             type: 'image',
             purpose: 'product-image',
             targetField: 'image_url',
-            errorMessage: 'Main Product Image upload failed. Please try again.',
           })}
         />
 

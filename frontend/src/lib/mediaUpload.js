@@ -56,7 +56,9 @@ export const validateImageUploadFile = (file) => {
   }
   const extension = getExtension(file.name);
   const mimeType = String(file.type || '').toLowerCase();
-  if (!IMAGE_EXTENSIONS.has(extension) || !IMAGE_MIME_TYPES.has(mimeType)) {
+  const validExtension = IMAGE_EXTENSIONS.has(extension);
+  const validMime = IMAGE_MIME_TYPES.has(mimeType) || !mimeType || mimeType.startsWith('image/');
+  if (!validExtension && !validMime) {
     return 'Unsupported image type. Allowed: JPG, JPEG, PNG, WEBP.';
   }
   if (file.size > ADMIN_IMAGE_UPLOAD_MAX_BYTES) {

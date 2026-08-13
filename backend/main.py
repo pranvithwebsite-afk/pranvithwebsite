@@ -4494,7 +4494,7 @@ async def admin_create_product(payload: ProductIn, current_admin: AdminBase = De
         logger.exception("Product create lookup failed slug=%s detail=%s", doc["slug"], detail)
         return _json_error_response(503, "Product could not be saved", code="PRODUCT_DATABASE_ERROR", detail=detail)
     if existing:
-        raise HTTPException(status_code=409, detail="Product slug already exists")
+        raise HTTPException(status_code=409, detail=f"Product slug '{doc['slug']}' already exists. Please choose a different slug.")
     logger.info(
         "Product create requested database=%s collection=products id=%s slug=%s",
         db_name,
@@ -4731,6 +4731,7 @@ R2_MAX_PRIVATE_BYTES = 500 * 1024 * 1024
 
 R2_PUBLIC_PURPOSES = {
     "product-image",
+    "product-thumbnail",
     "product-video",
     "before-image",
     "after-image",
@@ -4738,6 +4739,7 @@ R2_PUBLIC_PURPOSES = {
     "thumbnail",
     "media-library-image",
     "media-library-file",
+    "media-library-video",
 }
 
 
@@ -4802,7 +4804,9 @@ def _r2_public_object_key(product_slug: str, purpose: str, file_ext: str) -> str
         return f"media-library/file/{today}/{file_id}{file_ext}"
     if purpose == "product-image":
         return f"products/{slug}/images/{file_id}{file_ext}"
-    if purpose == "product-video":
+    if purpose in {"thumbnail", "product-thumbnail"}:
+        return f"products/{slug}/thumbnails/{file_id}{file_ext}"
+    if purpose in {"product-video", "media-library-video"}:
         return f"products/{slug}/videos/{file_id}{file_ext}"
     if purpose == "before-image":
         return f"products/{slug}/before-after/before-{file_id}{file_ext}"
@@ -4823,19 +4827,21 @@ def _r2_private_object_key(product_slug: str, purpose: str, safe_filename: str) 
 def _validate_r2_public_upload(file: UploadFile, purpose: str) -> tuple[str, int]:
     original_name = Path(file.filename or "").name
     file_ext = Path(original_name).suffix.lower()
-    if purpose in {"product-image", "before-image", "after-image", "banner", "thumbnail", "media-library-image"}:
+    if purpose in {"product-image", "product-thumbnail", "before-image", "after-image", "banner", "thumbnail", "media-library-image"}:
         allowed_types = R2_IMAGE_TYPES.get(file_ext)
         max_bytes = R2_MAX_IMAGE_BYTES
     elif purpose == "media-library-file":
         allowed_types = ALLOWED_UPLOAD_TYPES.get(file_ext)
         max_bytes = MAX_UPLOAD_BYTES
-    elif purpose == "product-video":
+    elif purpose in {"product-video", "media-library-video"}:
         allowed_types = R2_VIDEO_TYPES.get(file_ext)
         max_bytes = R2_MAX_VIDEO_BYTES
     else:
         raise HTTPException(status_code=422, detail="Unsupported upload purpose")
-    if not allowed_types or file.content_type not in allowed_types:
+    if not allowed_types:
         raise HTTPException(status_code=415, detail="Unsupported file type")
+    if not file.content_type or file.content_type == "application/octet-stream" or file.content_type not in allowed_types:
+        file.content_type = next(iter(allowed_types))
     return file_ext, max_bytes
 
 
