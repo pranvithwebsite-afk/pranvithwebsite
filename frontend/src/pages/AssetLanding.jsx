@@ -100,6 +100,41 @@ const SFX_PACK_DETAILS = {
   ],
 };
 
+const DEFAULT_PRODUCT_DETAILS = {
+  description: 'Unlock a collection of premium creative assets designed to make your content stand out. Get access to professionally crafted styles, high-quality effects, and ready-to-use digital assets for social media, posters, banners, promotions, and video edits.',
+  features: [
+    'Drag-and-drop workflow with organized files for fast timeline integration.',
+    'High-resolution digital assets prepared for modern editing and post-production workflows.',
+    'Universal compatibility across major editing applications on Mac & Windows.',
+    'Works 100% offline after download—your pack stays ready whenever you create.',
+  ],
+  benefits: [
+    'Creator-ready files checked and organized before delivery.',
+    'Instant digital delivery immediately after successful checkout.',
+    'Lifetime access to the downloaded pack—no recurring subscription required.',
+    'Suitable for personal and commercial projects under the included product license.',
+  ],
+  compatibility: ['Premiere Pro', 'After Effects', 'DaVinci Resolve', 'Final Cut Pro', 'Photoshop', 'Windows', 'macOS'],
+  installationSteps: [
+    { title: 'Download the Pack', description: 'Complete checkout and use the secure download link to save the asset pack to your device.' },
+    { title: 'Extract the Files', description: 'Open the downloaded ZIP archive and extract it to a permanent folder on your drive.' },
+    { title: 'Import Into Your Editor', description: 'Open your editing application and import the asset files, styles, or presets into your project.' },
+    { title: 'Apply, Preview, and Customize', description: 'Drag and drop assets onto your timeline or canvas, then adjust timing, colors, and settings for your edit.' },
+  ],
+  faqs: [
+    { q: 'Which editing applications support this asset pack?', a: 'The files work with major creative applications that support standard digital assets, including Premiere Pro, After Effects, DaVinci Resolve, Final Cut Pro, and Photoshop.' },
+    { q: 'Does the pack work on Windows and macOS?', a: 'Yes. The delivered files are cross-platform and can be used on both Windows and macOS.' },
+    { q: 'Is this a one-time purchase?', a: 'Yes. This product uses a one-time checkout and does not require a recurring subscription.' },
+    { q: 'Can I use these assets for commercial projects?', a: 'Yes. You may use the assets in completed personal and commercial creative projects under the included license.' },
+    { q: 'Can I resell or redistribute the original files?', a: 'No. You may include the assets in completed edits, but you may not resell, share, upload, or redistribute the source files.' },
+    { q: 'How do I install the pack?', a: 'No complex plugin installation is required. Download and extract the ZIP, then import the files directly into your software.' },
+    { q: 'Does the pack require an internet connection?', a: 'Internet access is required for checkout and download. After the files are saved locally, they can be used offline.' },
+    { q: 'How will I receive the files?', a: 'The files are delivered digitally through the secure access flow immediately after checkout or free-access confirmation.' },
+    { q: 'Can I use the pack for YouTube and social media?', a: 'Yes. The pack is designed for YouTube videos, Instagram Reels, TikTok, advertisements, and social media content.' },
+    { q: 'What if I have trouble downloading the pack?', a: 'Use the contact or support option on the website and include your order details so your access can be verified.' },
+  ],
+};
+
 const normalizeProduct = (value) => {
   const product = value && typeof value === 'object' ? value : {};
   const landing = product.landing_content && typeof product.landing_content === 'object'
@@ -141,11 +176,15 @@ const normalizeProduct = (value) => {
     || '',
     ''
   );
-  const isSfxPack = String(product.slug || '').trim() === 'sfx-pack-for-editors';
+  const slugLower = String(product.slug || '').trim().toLowerCase();
+  const categoryLower = String(product.category || '').trim().toLowerCase();
+  const isSfxPack = slugLower === 'sfx-pack-for-editors' || categoryLower.includes('sound') || categoryLower.includes('sfx');
+  const defaultDetails = isSfxPack ? SFX_PACK_DETAILS : DEFAULT_PRODUCT_DETAILS;
+
   const faqs = dedupeFaqs([
     ...toFaqList(landing.faqs),
     ...toFaqList(product.faqs),
-    ...(isSfxPack ? SFX_PACK_DETAILS.faqs : []),
+    ...defaultDetails.faqs,
   ]).slice(0, 24);
 
   return {
@@ -154,19 +193,19 @@ const normalizeProduct = (value) => {
     name: String(product.name || product.title || 'Asset').trim() || 'Asset',
     title: String(product.title || product.name || 'Asset').trim() || 'Asset',
     slug: String(product.slug || '').trim(),
-    description: String(product.description || (isSfxPack ? SFX_PACK_DETAILS.description : '')).trim(),
+    description: String(product.description || defaultDetails.description).trim(),
     category: String(product.category || '').trim() || 'Asset',
     price: resolvedPrice,
     isFree: product.is_free === true || resolvedPrice === 0,
     heroImage,
     galleryImages,
     galleryLayout: product.gallery_layout === 'full' ? 'full' : 'grid',
-    features: toStringList(product.features).length ? toStringList(product.features) : (isSfxPack ? SFX_PACK_DETAILS.features : []),
-    benefits: toStringList(product.benefits).length ? toStringList(product.benefits) : (isSfxPack ? SFX_PACK_DETAILS.benefits : []),
-    compatibility: toStringList(landing.compatibility).length ? toStringList(landing.compatibility) : (isSfxPack ? SFX_PACK_DETAILS.compatibility : []),
+    features: toStringList(product.features).length ? toStringList(product.features) : defaultDetails.features,
+    benefits: toStringList(product.benefits).length ? toStringList(product.benefits) : defaultDetails.benefits,
+    compatibility: toStringList(landing.compatibility).length ? toStringList(landing.compatibility) : defaultDetails.compatibility,
     installationSteps: Array.isArray(landing.installation_steps) && landing.installation_steps.length
       ? landing.installation_steps
-      : (isSfxPack ? SFX_PACK_DETAILS.installationSteps : []),
+      : defaultDetails.installationSteps,
     marketTable: toMarketTable(landing.market_table),
     faqs,
     beforeImageUrl: safeImageSrc(product.before_image_url || '', ''),
@@ -373,15 +412,13 @@ const AssetLanding = () => {
                       value={fullProductDescription}
                       className="mt-5 max-w-5xl space-y-4 text-sm leading-7 text-white/62 sm:text-base sm:leading-8"
                     />
-                    {asset.slug === 'sfx-pack-for-editors' && (
-                      <div className="mt-6 flex flex-wrap gap-2">
-                        {['Video Editing', 'Wedding Films', 'Commercials', 'Reels', 'YouTube', 'Gaming'].map((useCase) => (
-                          <span key={useCase} className="rounded-full border border-white/10 bg-black/35 px-3 py-1.5 text-xs text-white/55">
-                            {useCase}
-                          </span>
-                        ))}
-                      </div>
-                    )}
+                    <div className="mt-6 flex flex-wrap gap-2">
+                      {['Video Editing', 'Wedding Films', 'Commercials', 'Reels', 'YouTube', 'Gaming', 'Promotions'].map((useCase) => (
+                        <span key={useCase} className="rounded-full border border-white/10 bg-black/35 px-3 py-1.5 text-xs text-white/55">
+                          {useCase}
+                        </span>
+                      ))}
+                    </div>
                   </div>
                 </div>
               </section>
