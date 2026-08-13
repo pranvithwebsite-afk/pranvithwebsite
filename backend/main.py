@@ -2373,7 +2373,8 @@ async def _cms_page_response(page_key: str, public: bool = False) -> dict:
     sections = await db.cms_sections.find(section_query).sort("sort_order", 1).to_list(length=None)
     for section in sections:
         if section.get("_id") is not None:
-            section["id"] = str(section["_id"])
+            if not section.get("id"):
+                section["id"] = str(section["_id"])
             section.pop("_id", None)
 
     safe_page = _decode_html_entities({k: v for k, v in page.items() if k not in {"_id"}})
@@ -3323,68 +3324,121 @@ async def admin_create_cms_section(page_key: str, payload: CmsSectionIn, current
     return {"success": True, "section": doc}
 
 
+def _cms_section_query(section_id: str) -> dict:
+    cleaned = str(section_id or "").strip()
+    clauses = [{"id": cleaned}, {"section_id": cleaned}]
+    if ObjectId.is_valid(cleaned):
+        clauses.append({"_id": ObjectId(cleaned)})
+    return {"$or": clauses}
+
+
 @admin_router.put("/cms/sections/{section_id}")
 async def admin_update_cms_section(section_id: str, payload: CmsSectionIn, current_admin: AdminBase = Depends(get_current_active_admin)):
-    existing = await db.cms_sections.find_one({"id": section_id}, {"_id": 0})
+    query = _cms_section_query(section_id)
+    existing = await db.cms_sections.find_one(query)
     if not existing:
         raise HTTPException(status_code=404, detail="CMS section not found")
     doc = _cms_section_doc(existing["page_key"], payload, existing)
-    await db.cms_sections.update_one({"id": section_id}, {"$set": doc})
-    return {"success": True, "section": doc}
+    filter_q = {"_id": existing["_id"]} if existing.get("_id") else query
+    await db.cms_sections.update_one(filter_q, {"$set": doc})
+    doc_id = str(existing.get("_id") or existing.get("id") or doc.get("id"))
+    doc["id"] = doc.get("id") or doc_id
+    return {"success": True, "section": _decode_html_entities(doc)}
 
 
 @admin_router.delete("/cms/sections/{section_id}")
 async def admin_delete_cms_section(section_id: str, current_admin: AdminBase = Depends(get_current_active_admin)):
-    section = await db.cms_sections.find_one({"id": section_id}, {"_id": 0})
+    query = _cms_section_query(section_id)
+    section = await db.cms_sections.find_one(query)
     if not section:
         raise HTTPException(status_code=404, detail="CMS section not found")
-    result = await db.cms_sections.delete_one({"id": section_id})
+    filter_q = {"_id": section["_id"]} if section.get("_id") else query
+    result = await db.cms_sections.delete_one(filter_q)
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="CMS section not found")
-    remaining = await db.cms_sections.find({"page_key": section["page_key"]}, {"_id": 0}).sort("sort_order", 1).to_list(200)
+    remaining = await db.cms_sections.find({"page_key": section["page_key"]}).sort("sort_order", 1).to_list(200)
     for index, row in enumerate(remaining):
-        await db.cms_sections.update_one({"id": row["id"]}, {"$set": {"sort_order": index + 1, "updated_at": datetime.now(timezone.utc).isoformat()}})
+        row_filter = {"_id": row["_id"]} if row.get("_id") else {"id": row["id"]}
+        await db.cms_sections.update_one(row_filter, {"$set": {"sort_order": index + 1, "updated_at": datetime.now(timezone.utc).isoformat()}})
     return {"success": True}
 
 
 @admin_router.patch("/cms/sections/{section_id}/visibility")
 async def admin_cms_section_visibility(section_id: str, payload: CmsVisibilityIn, current_admin: AdminBase = Depends(get_current_active_admin)):
+    query = _cms_section_query(section_id)
+    section = await db.cms_sections.find_one(query)
+    if not section:
+        raise HTTPException(status_code=404, detail="CMS section not found")
+    filter_q = {"_id": section["_id"]} if section.get("_id") else query
+    now = datetime.now(timezone.utc).isoformat()
     result = await db.cms_sections.update_one(
-        {"id": section_id},
-        {"$set": {"enabled": payload.enabled, "updated_at": datetime.now(timezone.utc).isoformat()}},
+        filter_q,
+        {"$set": {"enabled": payload.enabled, "updated_at": now}},
     )
     if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="CMS section not found")
-    section = await db.cms_sections.find_one({"id": section_id}, {"_id": 0})
-    return {"success": True, "section": section}
+    updated = await db.cms_sections.find_one(filter_q)
+    if updated and updated.get("_id"):
+        updated["id"] = updated.get("id") or str(updated["_id"])
+        updated.pop("_id", None)
+    return {"success": True, "section": _decode_html_entities(updated)}
 
 
 @admin_router.patch("/cms/pages/{page_key}/sections/reorder")
 async def admin_reorder_cms_sections(page_key: str, payload: CmsReorderIn, current_admin: AdminBase = Depends(get_current_active_admin)):
     page_key = _normalize_cms_page_key(page_key)
-    existing = await db.cms_sections.find({"page_key": page_key}, {"_id": 0}).sort("sort_order", 1).to_list(300)
-    existing_ids = {row["id"] for row in existing}
-    ordered_ids = []
+    existing = await db.cms_sections.find({"page_key": page_key}).sort("sort_order", 1).to_list(300)
+
+    id_map = {}
+    for row in existing:
+        if row.get("id"):
+            id_map[str(row["id"])] = row
+        if row.get("section_id"):
+            id_map[str(row["section_id"])] = row
+        if row.get("_id"):
+            id_map[str(row["_id"])] = row
+
+    ordered_docs = []
+    seen_db_ids = set()
+
     if payload.section_orders:
-        ordered_rows = []
+        ordered_inputs = []
         for item in payload.section_orders:
             item_id = str(item.get("id") or "").strip()
-            if item_id in existing_ids:
+            if item_id in id_map:
                 try:
                     sort_order = int(item.get("sort_order"))
                 except (TypeError, ValueError):
-                    sort_order = len(ordered_rows) + 1
-                ordered_rows.append({"id": item_id, "sort_order": sort_order})
-        ordered_rows.sort(key=lambda row: row["sort_order"])
-        ordered_ids = [row["id"] for row in ordered_rows]
-    if not ordered_ids:
-        ordered_ids = [section_id for section_id in payload.section_ids if section_id in existing_ids]
+                    sort_order = len(ordered_inputs) + 1
+                ordered_inputs.append((sort_order, id_map[item_id]))
+        ordered_inputs.sort(key=lambda pair: pair[0])
+        for _, doc in ordered_inputs:
+            doc_key = str(doc.get("_id") or doc.get("id"))
+            if doc_key not in seen_db_ids:
+                seen_db_ids.add(doc_key)
+                ordered_docs.append(doc)
+
+    if not ordered_docs and payload.section_ids:
+        for sec_id in payload.section_ids:
+            item_id = str(sec_id or "").strip()
+            if item_id in id_map:
+                doc = id_map[item_id]
+                doc_key = str(doc.get("_id") or doc.get("id"))
+                if doc_key not in seen_db_ids:
+                    seen_db_ids.add(doc_key)
+                    ordered_docs.append(doc)
+
     for row in existing:
-        if row["id"] not in ordered_ids:
-            ordered_ids.append(row["id"])
+        doc_key = str(row.get("_id") or row.get("id"))
+        if doc_key not in seen_db_ids:
+            seen_db_ids.add(doc_key)
+            ordered_docs.append(row)
+
     now = datetime.now(timezone.utc).isoformat()
-    for index, item_id in enumerate(ordered_ids):
-        await db.cms_sections.update_one({"id": item_id, "page_key": page_key}, {"$set": {"sort_order": index + 1, "updated_at": now}})
+    for index, doc in enumerate(ordered_docs):
+        filter_q = {"_id": doc["_id"]} if doc.get("_id") else {"id": doc.get("id")}
+        await db.cms_sections.update_one(filter_q, {"$set": {"sort_order": index + 1, "updated_at": now}})
+
     return await _cms_page_response(page_key, public=False)
 
 

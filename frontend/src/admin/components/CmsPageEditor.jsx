@@ -144,7 +144,8 @@ const CmsPageEditor = ({ pageKey, title, path, mediaItems, onBack }) => {
     if (saving) return;
     try {
       setSaving(true);
-      if (payload.id) await updateAdminCmsSection(payload.id, payload);
+      const sectionIdentifier = payload.id || payload.section_id;
+      if (sectionIdentifier) await updateAdminCmsSection(sectionIdentifier, payload);
       else await createAdminCmsSection(pageKey, payload);
       toast.success('Section saved');
       setSectionDirty(false);
