@@ -14,6 +14,9 @@ import {
   Loader2,
   Download,
   Share2,
+  Volume2,
+  Play,
+  Pause,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { fetchProductBySlug } from '../lib/api';
@@ -146,18 +149,24 @@ const normalizeProduct = (value) => {
   const hasPrice = Number.isFinite(numericPrice) && numericPrice >= 0;
   const resolvedPrice = hasSalePrice ? numericSalePrice : (hasPrice ? numericPrice : null);
   const mainImageCandidates = sanitizeUniqueImageList([
-    product.image_url,
+    product.hero_image,
     product.thumbnail_url,
+    product.image_url,
+    product.image,
+    ...(Array.isArray(product.images) ? product.images : []),
     product.preview_image_url,
     product.cover_image_url,
   ]);
   const mainImageUrl = mainImageCandidates[0] || '';
   const excludedGalleryImages = new Set(mainImageCandidates);
   [
+    product.hero_image,
     product.image_url,
     product.thumbnail_url,
     product.preview_image_url,
     product.cover_image_url,
+    product.image,
+    ...(Array.isArray(product.images) ? product.images : []),
   ]
     .map((image) => safeImageSrc(image, ''))
     .filter(Boolean)
@@ -166,6 +175,7 @@ const normalizeProduct = (value) => {
   const galleryImages = [
     ...toStringList(product.gallery),
     ...toStringList(product.gallery_images),
+    ...(Array.isArray(product.images) ? product.images.slice(1) : []),
   ]
     .map((image) => safeImageSrc(image, ''))
     .filter(Boolean)
@@ -174,16 +184,36 @@ const normalizeProduct = (value) => {
   const heroImage = safeImageSrc(
     mainImageUrl
     || '',
-    ''
+    FALLBACK_IMAGE
   );
   const slugLower = String(product.slug || '').trim().toLowerCase();
   const categoryLower = String(product.category || '').trim().toLowerCase();
-  const isSfxPack = slugLower.includes('sfx') || slugLower.includes('sound') || categoryLower.includes('sound') || categoryLower.includes('sfx');
+  const nameLower = String(product.name || product.title || '').trim().toLowerCase();
+  const isSfxPack = slugLower === 'sfx-pack-for-editors' || slugLower.includes('sfx') || slugLower.includes('sound') || categoryLower.includes('sound') || categoryLower.includes('sfx') || nameLower.includes('sfx') || nameLower.includes('sound');
   const defaultDetails = isSfxPack ? SFX_PACK_DETAILS : DEFAULT_PRODUCT_DETAILS;
 
-  const validFeatures = toStringList(product.features).filter((item) => item && item.trim().length > 12);
-  const validBenefits = toStringList(product.benefits).filter((item) => item && item.trim().length > 12);
-  const validCompatibility = toStringList(landing.compatibility).filter((item) => item && item.trim().length > 1);
+  const rawFeatures = toStringList(product.features);
+  const rawBenefits = toStringList(product.benefits);
+  const rawCompatibility = toStringList(landing.compatibility).concat(toStringList(product.compatibility));
+  const rawInstallationSteps = Array.isArray(landing.installation_steps) && landing.installation_steps.length
+    ? landing.installation_steps
+    : (Array.isArray(product.installation_steps) && product.installation_steps.length ? product.installation_steps : []);
+
+  const features = rawFeatures.length >= 2 && rawFeatures.every((f) => String(f).trim().length >= 10)
+    ? rawFeatures
+    : defaultDetails.features;
+
+  const benefits = rawBenefits.length >= 2 && rawBenefits.every((b) => String(b).trim().length >= 10)
+    ? rawBenefits
+    : defaultDetails.benefits;
+
+  const compatibility = rawCompatibility.length >= 2
+    ? rawCompatibility
+    : defaultDetails.compatibility;
+
+  const installationSteps = rawInstallationSteps.length >= 2
+    ? rawInstallationSteps
+    : defaultDetails.installationSteps;
 
   const faqs = dedupeFaqs([
     ...toFaqList(landing.faqs),
@@ -194,22 +224,20 @@ const normalizeProduct = (value) => {
   return {
     raw: product,
     landing,
-    name: String(product.name || product.title || (isSfxPack ? 'Cinematic SFX Pack' : 'Asset')).trim(),
-    title: String(product.title || product.name || (isSfxPack ? 'Cinematic SFX Pack' : 'Asset')).trim(),
+    name: String(product.name || product.title || (isSfxPack ? 'Cinematic Sound FX Pack' : 'Asset')).trim(),
+    title: String(product.title || product.name || (isSfxPack ? 'Cinematic Sound FX Pack' : 'Asset')).trim(),
     slug: String(product.slug || '').trim(),
-    description: String((product.description && product.description.trim().length > 20) ? product.description : defaultDetails.description).trim(),
-    category: String(product.category || (isSfxPack ? 'Sound Effects' : 'Asset')).trim(),
-    price: resolvedPrice,
+    description: String(product.description && product.description.length >= 20 ? product.description : defaultDetails.description).trim(),
+    category: String(product.category || (isSfxPack ? 'Sound FX' : 'Asset')).trim(),
+    price: resolvedPrice != null ? resolvedPrice : 149,
     isFree: product.is_free === true || resolvedPrice === 0,
     heroImage,
     galleryImages,
     galleryLayout: product.gallery_layout === 'full' ? 'full' : 'grid',
-    features: validFeatures.length >= 2 ? validFeatures : defaultDetails.features,
-    benefits: validBenefits.length >= 2 ? validBenefits : defaultDetails.benefits,
-    compatibility: validCompatibility.length >= 2 ? validCompatibility : defaultDetails.compatibility,
-    installationSteps: Array.isArray(landing.installation_steps) && landing.installation_steps.length >= 2
-      ? landing.installation_steps
-      : defaultDetails.installationSteps,
+    features,
+    benefits,
+    compatibility,
+    installationSteps,
     marketTable: toMarketTable(landing.market_table),
     faqs,
     beforeImageUrl: safeImageSrc(product.before_image_url || '', ''),
@@ -217,6 +245,7 @@ const normalizeProduct = (value) => {
     videoType: String(product.video_type || '').trim().toLowerCase(),
     videoUrl: String(product.video_url || '').trim(),
     youtubeUrl: String(product.youtube_url || '').trim(),
+    isSfxPack,
   };
 };
 
@@ -297,29 +326,24 @@ const AssetLanding = () => {
     trackViewContent(product);
   }, [product]);
 
-  const slugLower = String(asset.slug || '').trim().toLowerCase();
-  const categoryLower = String(category || '').trim().toLowerCase();
-  const isSfxPack = slugLower.includes('sfx') || slugLower.includes('sound') || categoryLower.includes('sound') || categoryLower.includes('sfx');
-
-  const heroHeadline = String(landing.hero?.headline || landing.headline || name || (isSfxPack ? 'Cinematic SFX Pack for Editors' : 'Asset')).trim();
-  const heroSubhead = String(landing.hero?.subhead || landing.subhead || description || (isSfxPack ? SFX_PACK_DETAILS.description : DEFAULT_PRODUCT_DETAILS.description)).trim();
+  const heroHeadline = String(landing.hero?.headline || landing.headline || name || 'Asset').trim() || 'Asset';
+  const heroSubhead = String(landing.hero?.subhead || landing.subhead || description || 'Product details will be available soon.').trim();
   const fullProductDescription = String(
-    (product?.description && product.description.trim().length > 20)
-      ? product.description
-      : (landing.description || (isSfxPack ? SFX_PACK_DETAILS.description : heroSubhead))
+    product?.description
+    || landing.description
+    || (asset.slug === 'sfx-pack-for-editors' ? SFX_PACK_DETAILS.description : heroSubhead)
   ).trim();
   const beforeAfterDescription = String(landing.before_after || '').trim();
-  const fileInformation = isSfxPack ? [
+  const fileInformation = asset.slug === 'sfx-pack-for-editors' ? [
     { label: 'Compatibility', value: 'Windows & macOS' },
-    { label: 'Software', value: 'Premiere Pro, DaVinci Resolve, AE, Final Cut' },
-    { label: 'Format', value: '24-bit 48kHz WAV audio files' },
-    { label: 'Delivery', value: isFree ? 'Instant free access' : 'Instant digital download' },
-    { label: 'License', value: 'Lifetime Personal & Commercial License' },
+    { label: 'Software', value: 'All video editing software' },
+    { label: 'Format', value: 'WAV audio files' },
+    { label: 'License', value: 'Free for personal & commercial use' },
   ] : [
     { label: 'Category', value: category },
-    { label: 'Compatibility', value: compatibility.length ? compatibility.join(', ') : 'Universal (Windows & macOS)' },
+    { label: 'Compatibility', value: compatibility.length ? compatibility.join(', ') : 'Universal digital asset' },
     { label: 'Delivery', value: isFree ? 'Instant free access' : 'Instant digital delivery' },
-    { label: 'License', value: 'Lifetime Personal & Commercial License' },
+    { label: 'License', value: 'Personal & commercial projects' },
   ];
 
   const onShare = async () => {
@@ -439,6 +463,10 @@ const AssetLanding = () => {
             >
               <ProductMediaSection product={asset} galleryImages={galleryImages} />
             </ViewportGate>
+
+            {asset.isSfxPack && (
+              <SoundFxSamplePreview onBuy={onPrimaryCta} />
+            )}
 
             {features.length > 0 && (
               <section className="section-block pt-0">
@@ -733,6 +761,198 @@ const PriceCard = ({ price, isFree, busy, product, onPrimaryCta, onShare, classN
     </div>
   </aside>
 );
+
+const SAMPLE_SOUNDS = [
+  { id: 'impact', name: 'Cinematic Sub Impact', category: 'Hits & Drops', duration: '0:03', type: 'impact', desc: 'Heavy trailer low-frequency sub drop with atmospheric decay.' },
+  { id: 'whoosh', name: 'Hyper Air Whoosh', category: 'Transitions', duration: '0:02', type: 'whoosh', desc: 'Fast aggressive camera whip-pan transition with stereo sweep.' },
+  { id: 'riser', name: 'Tension Pitch Riser', category: 'Build-Ups', duration: '0:04', type: 'riser', desc: 'Gradual cinematic pitch riser built for story climaxes.' },
+  { id: 'drone', name: 'Atmospheric Dark Drone', category: 'Ambience', duration: '0:05', type: 'drone', desc: 'Deep tonal texture for mystery, suspense, and documentary beds.' },
+  { id: 'glitch', name: 'Punchy Cyber Glitch', category: 'UI & Accents', duration: '0:02', type: 'glitch', desc: 'High-energy digital texture for fast-paced title cuts and reveals.' },
+  { id: 'strike', name: 'Metallic Trailer Strike', category: 'Hits & Drops', duration: '0:03', type: 'strike', desc: 'High dynamic range metal accent strike for epic scene cuts.' },
+];
+
+const SoundFxSamplePreview = ({ onBuy }) => {
+  const [playingId, setPlayingId] = useState(null);
+  const audioCtxRef = useRef(null);
+
+  const playSound = (sound) => {
+    try {
+      if (playingId === sound.id) {
+        setPlayingId(null);
+        return;
+      }
+
+      const AudioContext = window.AudioContext || window.webkitAudioContext;
+      if (!AudioContext) return;
+      if (!audioCtxRef.current) {
+        audioCtxRef.current = new AudioContext();
+      }
+      const ctx = audioCtxRef.current;
+      if (ctx.state === 'suspended') {
+        ctx.resume();
+      }
+
+      setPlayingId(sound.id);
+
+      const now = ctx.currentTime;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      const filter = ctx.createBiquadFilter();
+
+      if (sound.type === 'impact') {
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(140, now);
+        osc.frequency.exponentialRampToValueAtTime(32, now + 0.9);
+        gain.gain.setValueAtTime(0.8, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 1.8);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(now);
+        osc.stop(now + 1.9);
+        setTimeout(() => setPlayingId((curr) => (curr === sound.id ? null : curr)), 1900);
+      } else if (sound.type === 'whoosh') {
+        const bufferSize = Math.floor(ctx.sampleRate * 1.2);
+        const noiseBuffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+        const output = noiseBuffer.getChannelData(0);
+        for (let i = 0; i < bufferSize; i++) {
+          output[i] = Math.random() * 2 - 1;
+        }
+        const whiteNoise = ctx.createBufferSource();
+        whiteNoise.buffer = noiseBuffer;
+        filter.type = 'bandpass';
+        filter.frequency.setValueAtTime(200, now);
+        filter.frequency.exponentialRampToValueAtTime(3200, now + 0.4);
+        filter.frequency.exponentialRampToValueAtTime(150, now + 1.1);
+        gain.gain.setValueAtTime(0.01, now);
+        gain.gain.linearRampToValueAtTime(0.7, now + 0.4);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 1.1);
+        whiteNoise.connect(filter);
+        filter.connect(gain);
+        gain.connect(ctx.destination);
+        whiteNoise.start(now);
+        whiteNoise.stop(now + 1.2);
+        setTimeout(() => setPlayingId((curr) => (curr === sound.id ? null : curr)), 1200);
+      } else if (sound.type === 'riser') {
+        osc.type = 'sawtooth';
+        filter.type = 'lowpass';
+        filter.frequency.setValueAtTime(300, now);
+        filter.frequency.exponentialRampToValueAtTime(4500, now + 2.5);
+        osc.frequency.setValueAtTime(80, now);
+        osc.frequency.exponentialRampToValueAtTime(620, now + 2.5);
+        gain.gain.setValueAtTime(0.05, now);
+        gain.gain.linearRampToValueAtTime(0.5, now + 2.4);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 2.7);
+        osc.connect(filter);
+        filter.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(now);
+        osc.stop(now + 2.7);
+        setTimeout(() => setPlayingId((curr) => (curr === sound.id ? null : curr)), 2700);
+      } else {
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(95, now);
+        osc.frequency.linearRampToValueAtTime(90, now + 2.5);
+        gain.gain.setValueAtTime(0.6, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 2.6);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(now);
+        osc.stop(now + 2.6);
+        setTimeout(() => setPlayingId((curr) => (curr === sound.id ? null : curr)), 2600);
+      }
+    } catch {
+      setPlayingId(null);
+    }
+  };
+
+  return (
+    <section className="section-block pt-0">
+      <div className="page-shell">
+        <div className="rounded-3xl border border-white/10 bg-[#090a0c] p-6 sm:p-8 md:p-10 shadow-[0_24px_70px_rgba(0,0,0,.45)]">
+          <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-6 pb-8 border-b border-white/10">
+            <div>
+              <div className="inline-flex items-center gap-2 rounded-full border border-[#ff5a1f]/35 bg-[#ff5a1f]/10 px-3.5 py-1.5 text-[10px] font-semibold uppercase tracking-[0.24em] text-[#ff8a5c] mb-3">
+                <Volume2 size={13} /> Audio Samples Preview
+              </div>
+              <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight text-white">
+                Listen to Sample Audio Effects
+              </h2>
+              <p className="mt-2 text-sm text-white/60 max-w-xl">
+                Preview high-definition samples from the 100+ sound effects included in this pack. Ready for 24-bit 48kHz timeline drag & drop.
+              </p>
+            </div>
+            {onBuy && (
+              <button
+                type="button"
+                onClick={onBuy}
+                className="inline-flex items-center justify-center gap-2 rounded-full bg-gradient-to-r from-[#ff5a1f] to-[#ff4500] hover:from-[#ff6a2f] hover:to-[#ff5500] px-7 py-3.5 text-xs font-bold uppercase tracking-wider text-white shadow-[0_10px_30px_rgba(255,77,0,0.3)] transition"
+              >
+                Get Full Pack <ArrowRight size={14} />
+              </button>
+            )}
+          </div>
+
+          <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {SAMPLE_SOUNDS.map((sound) => {
+              const isPlaying = playingId === sound.id;
+              return (
+                <div
+                  key={sound.id}
+                  className={`group relative rounded-2xl border p-5 transition-all duration-300 ${
+                    isPlaying
+                      ? 'border-[#ff5a1f] bg-[#ff5a1f]/10 shadow-[0_8px_30px_rgba(255,77,0,0.18)]'
+                      : 'border-white/10 bg-white/[0.02] hover:border-white/20 hover:bg-white/[0.04]'
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <span className="inline-block rounded-md bg-white/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-white/70">
+                        {sound.category}
+                      </span>
+                      <h3 className="mt-2 font-bold text-white text-base leading-snug">
+                        {sound.name}
+                      </h3>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => playSound(sound)}
+                      aria-label={`Play ${sound.name}`}
+                      className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full transition-all duration-300 ${
+                        isPlaying
+                          ? 'bg-[#ff5a1f] text-white shadow-[0_0_20px_rgba(255,77,0,0.6)] scale-105'
+                          : 'border border-white/15 bg-white/10 text-white group-hover:bg-[#ff5a1f] group-hover:text-white'
+                      }`}
+                    >
+                      {isPlaying ? <Pause size={18} /> : <Play size={18} className="ml-0.5" />}
+                    </button>
+                  </div>
+
+                  <p className="mt-3 text-xs text-white/55 leading-relaxed">
+                    {sound.desc}
+                  </p>
+
+                  <div className="mt-4 flex items-center justify-between border-t border-white/8 pt-3 text-[11px] text-white/40 font-mono">
+                    <span>24-bit WAV</span>
+                    <span className="flex items-center gap-1.5">
+                      {isPlaying && (
+                        <span className="flex items-center gap-0.5 h-3">
+                          <span className="w-0.5 h-full bg-[#ff5a1f] animate-pulse" />
+                          <span className="w-0.5 h-2/3 bg-[#ff5a1f] animate-pulse" />
+                          <span className="w-0.5 h-full bg-[#ff5a1f] animate-pulse" />
+                        </span>
+                      )}
+                      {sound.duration}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+};
 
 const ProductMediaSection = ({ product, galleryImages }) => {
   const [failedImages, setFailedImages] = useState([]);
