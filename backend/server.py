@@ -1555,6 +1555,10 @@ def _safe_footer(footer: Optional[dict]) -> dict:
         "newsletter_heading": str(source.get("newsletter_heading") or "").strip()[:120],
         "newsletter_description": str(source.get("newsletter_description") or "").strip()[:500],
         "subscribe_button_text": str(source.get("subscribe_button_text") or "").strip()[:80],
+        "logo_url": _reject_unsafe_url(source.get("logo_url") or "") or "",
+        "logo_badge_text": str(source.get("logo_badge_text") or "").strip()[:20],
+        "brand_title_primary": str(source.get("brand_title_primary") or "").strip()[:80],
+        "brand_title_accent": str(source.get("brand_title_accent") or "").strip()[:80],
     }
 
 

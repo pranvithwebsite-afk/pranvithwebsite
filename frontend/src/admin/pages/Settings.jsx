@@ -246,14 +246,65 @@ const Settings = () => {
             <textarea value={settings.site_description} onChange={(event) => update('site_description', event.target.value)} rows={4} className={`${fieldClass} min-h-[140px] resize-none`} placeholder="Premium video editing training, assets and tutorials." />
           </Field>
 
+          {/* Website Logo & Brand Identity */}
+          <div className="rounded-3xl border border-violet-500/30 bg-slate-900/80 p-6 shadow-xl shadow-violet-950/20">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <h2 className="text-xl font-semibold text-white">Brand Logo & Identity</h2>
+                <p className="mt-1 text-sm text-slate-400">
+                  Upload your brand logo image to display across the site header, navigation, and footer.
+                </p>
+              </div>
+            </div>
+            <div className="mt-6 grid gap-6 lg:grid-cols-2">
+              <MediaUrlInput
+                label="Site Logo Image"
+                value={settings.logo_url || settings.header?.logo_url || ''}
+                onChange={(value) => {
+                  update('logo_url', value);
+                  updateHeader('logo_url', value);
+                  updateFooter('logo_url', value);
+                }}
+                accept="image/*"
+                placeholder="Upload logo PNG/JPG/SVG or paste URL"
+              />
+              <Field label="Logo Badge Text (Fallback if no logo image)">
+                <input
+                  value={settings.header?.logo_badge_text || 'PD'}
+                  onChange={(event) => {
+                    updateHeader('logo_badge_text', event.target.value);
+                    updateFooter('logo_badge_text', event.target.value);
+                  }}
+                  className={fieldClass}
+                  placeholder="PD"
+                />
+              </Field>
+              <Field label="Brand Name Primary">
+                <input
+                  value={settings.header?.brand_title_primary || 'PRANVITH'}
+                  onChange={(event) => {
+                    updateHeader('brand_title_primary', event.target.value);
+                    updateFooter('brand_title_primary', event.target.value);
+                  }}
+                  className={fieldClass}
+                  placeholder="PRANVITH"
+                />
+              </Field>
+              <Field label="Brand Name Accent (Highlighted in orange)">
+                <input
+                  value={settings.header?.brand_title_accent || 'DOP'}
+                  onChange={(event) => {
+                    updateHeader('brand_title_accent', event.target.value);
+                    updateFooter('brand_title_accent', event.target.value);
+                  }}
+                  className={fieldClass}
+                  placeholder="DOP"
+                />
+              </Field>
+            </div>
+          </div>
+
           <div className="grid gap-6 lg:grid-cols-2">
-            <MediaUrlInput
-              label="Logo URL"
-              value={settings.logo_url}
-              onChange={(value) => update('logo_url', value)}
-              accept="image/*"
-              placeholder="/assets/brand-profile.png"
-            />
             <Field label="Contact email">
               <input type="email" value={settings.contact_email} onChange={(event) => update('contact_email', event.target.value)} className={fieldClass} placeholder="info@pranvithdop.com" />
             </Field>
@@ -278,40 +329,9 @@ const Settings = () => {
           </div>
 
           <div className="rounded-3xl border border-slate-800 bg-slate-900/60 p-5">
-            <h2 className="text-xl font-semibold text-white">Header & Branding</h2>
-            <p className="mt-2 text-sm text-slate-500">Customize the site header logo, brand name, and top-right CTA button dynamically.</p>
+            <h2 className="text-xl font-semibold text-white">Header Navigation & Action</h2>
+            <p className="mt-2 text-sm text-slate-500">Configure the top-right action button in the site header.</p>
             <div className="mt-5 grid gap-6 lg:grid-cols-2">
-              <MediaUrlInput
-                label="Header Logo Image"
-                value={settings.header?.logo_url || ''}
-                onChange={(value) => updateHeader('logo_url', value)}
-                accept="image/*"
-                placeholder="Upload logo image or paste image URL"
-              />
-              <Field label="Logo Badge Text (fallback if no image)">
-                <input
-                  value={settings.header?.logo_badge_text || ''}
-                  onChange={(event) => updateHeader('logo_badge_text', event.target.value)}
-                  className={fieldClass}
-                  placeholder="PD"
-                />
-              </Field>
-              <Field label="Brand Name Primary">
-                <input
-                  value={settings.header?.brand_title_primary || ''}
-                  onChange={(event) => updateHeader('brand_title_primary', event.target.value)}
-                  className={fieldClass}
-                  placeholder="PRANVITH"
-                />
-              </Field>
-              <Field label="Brand Name Accent (Highlighted)">
-                <input
-                  value={settings.header?.brand_title_accent || ''}
-                  onChange={(event) => updateHeader('brand_title_accent', event.target.value)}
-                  className={fieldClass}
-                  placeholder="DOP"
-                />
-              </Field>
               <Field label="Header Button Text">
                 <input
                   value={settings.header?.cta_text || ''}
@@ -335,6 +355,13 @@ const Settings = () => {
             <h2 className="text-xl font-semibold text-white">Footer / Global Content</h2>
             <p className="mt-2 text-sm text-slate-500">These fields control the public footer across the website.</p>
             <div className="mt-5 grid gap-6 lg:grid-cols-2">
+              <MediaUrlInput
+                label="Footer Logo Image (leave empty to use main brand logo)"
+                value={settings.footer?.logo_url || ''}
+                onChange={(value) => updateFooter('logo_url', value)}
+                accept="image/*"
+                placeholder="Upload footer logo image or paste URL"
+              />
               <Field label="Brand title">
                 <input value={settings.footer?.brand_title || ''} onChange={(event) => updateFooter('brand_title', event.target.value)} className={fieldClass} />
               </Field>

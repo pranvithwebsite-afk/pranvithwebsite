@@ -4,10 +4,11 @@ import { Instagram, Mail, MapPin, Phone, Youtube } from 'lucide-react';
 import { footerLinks } from '../data/mock';
 import { toast } from 'sonner';
 import { fetchPublicSettings, subscribeNewsletter } from '../lib/api';
+import { handleImageError, safeImageSrc } from '../lib/utils';
 
 const footerDefaults = {
   brand_title: 'PranvithDOP',
-  description: 'Empowering creators with AI-driven tools and professional video editing resources.\nJoin the future of content creation.',
+  description: 'Cinematic Assets • LUTs • Wedding Films • Editing Tools. Empowering editors and cinematographers around the world.',
   youtube_link: '#',
   instagram_link: '#',
   explore_links: footerLinks.explore,
@@ -22,23 +23,29 @@ const footerDefaults = {
 const Footer = () => {
   const [email, setEmail] = useState('');
   const [busy, setBusy] = useState(false);
-  const [settingsFooter, setSettingsFooter] = useState(null);
+  const [siteSettings, setSiteSettings] = useState(null);
 
   useEffect(() => {
     let mounted = true;
     fetchPublicSettings()
       .then((settings) => {
-        if (mounted) setSettingsFooter(settings?.footer || null);
+        if (mounted) setSiteSettings(settings || null);
       })
       .catch(() => {
-        if (mounted) setSettingsFooter(null);
+        if (mounted) setSiteSettings(null);
       });
     return () => {
       mounted = false;
     };
   }, []);
 
-  const footer = useMemo(() => ({ ...footerDefaults, ...(settingsFooter || {}) }), [settingsFooter]);
+  const footer = useMemo(() => ({ ...footerDefaults, ...(siteSettings?.footer || {}) }), [siteSettings]);
+  const logoUrl = footer.logo_url || siteSettings?.header?.logo_url || siteSettings?.logo_url || '';
+  const logoBadgeText = footer.logo_badge_text || siteSettings?.header?.logo_badge_text || 'PD';
+  const brandPrimary = footer.brand_title_primary || siteSettings?.header?.brand_title_primary || 'PRANVITH';
+  const brandAccent = footer.brand_title_accent || siteSettings?.header?.brand_title_accent || 'DOP';
+  const footerDescription = footer.description || footerDefaults.description;
+
   const exploreLinks = Array.isArray(footer.explore_links) && footer.explore_links.length
     ? footer.explore_links.filter((link) => link.enabled !== false)
     : footerDefaults.explore_links;
@@ -70,21 +77,30 @@ const Footer = () => {
             {/* Brand Info */}
             <div className="lg:col-span-2 space-y-4">
               <div className="flex items-center gap-2.5">
-                <div className="brand-orbit h-9 w-9 rounded-full flex items-center justify-center text-white font-extrabold text-[10px]">
-                  PD
-                </div>
+                {logoUrl ? (
+                  <img
+                    src={safeImageSrc(logoUrl)}
+                    alt="Brand logo"
+                    className="h-9 w-9 rounded-full object-cover border border-white/15"
+                    onError={handleImageError}
+                  />
+                ) : (
+                  <div className="brand-orbit h-9 w-9 rounded-full flex items-center justify-center text-white font-extrabold text-[10px]">
+                    {logoBadgeText}
+                  </div>
+                )}
                 <span className="text-2xl font-bold tracking-tight text-white font-[Space_Grotesk]">
-                  PRANVITH <span className="text-[#ff5a1f]">DOP</span>
+                  {brandPrimary} {brandAccent && <span className="text-[#ff5a1f]">{brandAccent}</span>}
                 </span>
               </div>
               <p className="text-sm text-white/60 leading-relaxed max-w-sm">
-                Cinematic Assets • LUTs • Wedding Films • Editing Tools. Empowering editors and cinematographers around the world.
+                {footerDescription}
               </p>
               <div className="flex items-center gap-3 pt-2">
-                <a href="#" aria-label="YouTube" className="flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/5 text-[#60a5fa] transition hover:bg-[#3b82f6] hover:text-white">
+                <a href={footer.youtube_link || '#'} target="_blank" rel="noopener noreferrer" aria-label="YouTube" className="flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/5 text-[#60a5fa] transition hover:bg-[#3b82f6] hover:text-white">
                   <Youtube size={16} />
                 </a>
-                <a href="#" aria-label="Instagram" className="flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/5 text-[#60a5fa] transition hover:bg-[#3b82f6] hover:text-white">
+                <a href={footer.instagram_link || '#'} target="_blank" rel="noopener noreferrer" aria-label="Instagram" className="flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/5 text-[#60a5fa] transition hover:bg-[#3b82f6] hover:text-white">
                   <Instagram size={16} />
                 </a>
               </div>
