@@ -178,8 +178,12 @@ const normalizeProduct = (value) => {
   );
   const slugLower = String(product.slug || '').trim().toLowerCase();
   const categoryLower = String(product.category || '').trim().toLowerCase();
-  const isSfxPack = slugLower === 'sfx-pack-for-editors' || categoryLower.includes('sound') || categoryLower.includes('sfx');
+  const isSfxPack = slugLower.includes('sfx') || slugLower.includes('sound') || categoryLower.includes('sound') || categoryLower.includes('sfx');
   const defaultDetails = isSfxPack ? SFX_PACK_DETAILS : DEFAULT_PRODUCT_DETAILS;
+
+  const validFeatures = toStringList(product.features).filter((item) => item && item.trim().length > 12);
+  const validBenefits = toStringList(product.benefits).filter((item) => item && item.trim().length > 12);
+  const validCompatibility = toStringList(landing.compatibility).filter((item) => item && item.trim().length > 1);
 
   const faqs = dedupeFaqs([
     ...toFaqList(landing.faqs),
@@ -190,20 +194,20 @@ const normalizeProduct = (value) => {
   return {
     raw: product,
     landing,
-    name: String(product.name || product.title || 'Asset').trim() || 'Asset',
-    title: String(product.title || product.name || 'Asset').trim() || 'Asset',
+    name: String(product.name || product.title || (isSfxPack ? 'Cinematic SFX Pack' : 'Asset')).trim(),
+    title: String(product.title || product.name || (isSfxPack ? 'Cinematic SFX Pack' : 'Asset')).trim(),
     slug: String(product.slug || '').trim(),
-    description: String(product.description || defaultDetails.description).trim(),
-    category: String(product.category || '').trim() || 'Asset',
+    description: String((product.description && product.description.trim().length > 20) ? product.description : defaultDetails.description).trim(),
+    category: String(product.category || (isSfxPack ? 'Sound Effects' : 'Asset')).trim(),
     price: resolvedPrice,
     isFree: product.is_free === true || resolvedPrice === 0,
     heroImage,
     galleryImages,
     galleryLayout: product.gallery_layout === 'full' ? 'full' : 'grid',
-    features: toStringList(product.features).length ? toStringList(product.features) : defaultDetails.features,
-    benefits: toStringList(product.benefits).length ? toStringList(product.benefits) : defaultDetails.benefits,
-    compatibility: toStringList(landing.compatibility).length ? toStringList(landing.compatibility) : defaultDetails.compatibility,
-    installationSteps: Array.isArray(landing.installation_steps) && landing.installation_steps.length
+    features: validFeatures.length >= 2 ? validFeatures : defaultDetails.features,
+    benefits: validBenefits.length >= 2 ? validBenefits : defaultDetails.benefits,
+    compatibility: validCompatibility.length >= 2 ? validCompatibility : defaultDetails.compatibility,
+    installationSteps: Array.isArray(landing.installation_steps) && landing.installation_steps.length >= 2
       ? landing.installation_steps
       : defaultDetails.installationSteps,
     marketTable: toMarketTable(landing.market_table),
@@ -293,24 +297,29 @@ const AssetLanding = () => {
     trackViewContent(product);
   }, [product]);
 
-  const heroHeadline = String(landing.hero?.headline || landing.headline || name || 'Asset').trim() || 'Asset';
-  const heroSubhead = String(landing.hero?.subhead || landing.subhead || description || 'Product details will be available soon.').trim();
+  const slugLower = String(asset.slug || '').trim().toLowerCase();
+  const categoryLower = String(category || '').trim().toLowerCase();
+  const isSfxPack = slugLower.includes('sfx') || slugLower.includes('sound') || categoryLower.includes('sound') || categoryLower.includes('sfx');
+
+  const heroHeadline = String(landing.hero?.headline || landing.headline || name || (isSfxPack ? 'Cinematic SFX Pack for Editors' : 'Asset')).trim();
+  const heroSubhead = String(landing.hero?.subhead || landing.subhead || description || (isSfxPack ? SFX_PACK_DETAILS.description : DEFAULT_PRODUCT_DETAILS.description)).trim();
   const fullProductDescription = String(
-    product?.description
-    || landing.description
-    || (asset.slug === 'sfx-pack-for-editors' ? SFX_PACK_DETAILS.description : heroSubhead)
+    (product?.description && product.description.trim().length > 20)
+      ? product.description
+      : (landing.description || (isSfxPack ? SFX_PACK_DETAILS.description : heroSubhead))
   ).trim();
   const beforeAfterDescription = String(landing.before_after || '').trim();
-  const fileInformation = asset.slug === 'sfx-pack-for-editors' ? [
+  const fileInformation = isSfxPack ? [
     { label: 'Compatibility', value: 'Windows & macOS' },
-    { label: 'Software', value: 'All video editing software' },
-    { label: 'Format', value: 'WAV audio files' },
-    { label: 'License', value: 'Free for personal & commercial use' },
+    { label: 'Software', value: 'Premiere Pro, DaVinci Resolve, AE, Final Cut' },
+    { label: 'Format', value: '24-bit 48kHz WAV audio files' },
+    { label: 'Delivery', value: isFree ? 'Instant free access' : 'Instant digital download' },
+    { label: 'License', value: 'Lifetime Personal & Commercial License' },
   ] : [
     { label: 'Category', value: category },
-    { label: 'Compatibility', value: compatibility.length ? compatibility.join(', ') : 'Universal digital asset' },
+    { label: 'Compatibility', value: compatibility.length ? compatibility.join(', ') : 'Universal (Windows & macOS)' },
     { label: 'Delivery', value: isFree ? 'Instant free access' : 'Instant digital delivery' },
-    { label: 'License', value: 'Personal & commercial projects' },
+    { label: 'License', value: 'Lifetime Personal & Commercial License' },
   ];
 
   const onShare = async () => {

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Edit3, KeyRound, Plus, RefreshCw, ShieldCheck, Trash2, UserX } from 'lucide-react';
 import { toast } from 'sonner';
-import { createAdminUser, deleteAdminUser, fetchAdminUsers, resetAdminUserPassword, updateAdminUser } from '../../lib/api';
+import { createAdminUser, deleteAdminUser, fetchAdminUsers, formatApiErrorDetail, resetAdminUserPassword, updateAdminUser } from '../../lib/api';
 import { useAdminAuth } from '../AdminAuthContext';
 
 const fieldClass = 'w-full rounded-2xl border border-slate-800 bg-slate-900 px-4 py-3 text-white outline-none focus:border-violet-500';
@@ -37,7 +37,7 @@ const AdminUsers = () => {
     } catch (err) {
       const message = err?.response?.status === 403
         ? 'Only super admins can manage admin users.'
-        : (err?.response?.data?.detail || 'Unable to load admin users');
+        : (formatApiErrorDetail(err?.response?.data?.detail) || err?.message || 'Unable to load admin users');
       setError(message);
       toast.error(message);
     } finally {
@@ -110,7 +110,7 @@ const AdminUsers = () => {
       closeForm();
       loadUsers();
     } catch (err) {
-      toast.error(err?.response?.data?.detail || 'Unable to save admin');
+      toast.error(formatApiErrorDetail(err?.response?.data?.detail) || err?.message || 'Unable to save admin');
     } finally {
       setSaving(false);
     }
@@ -127,7 +127,7 @@ const AdminUsers = () => {
       toast.success(user.is_active === false ? 'Admin activated' : 'Admin disabled');
       loadUsers();
     } catch (err) {
-      toast.error(err?.response?.data?.detail || 'Unable to update status');
+      toast.error(formatApiErrorDetail(err?.response?.data?.detail) || err?.message || 'Unable to update status');
     }
   };
 
@@ -140,7 +140,7 @@ const AdminUsers = () => {
       toast.success('Admin user deleted');
       loadUsers();
     } catch (err) {
-      toast.error(err?.response?.data?.detail || 'Unable to delete admin user');
+      toast.error(formatApiErrorDetail(err?.response?.data?.detail) || err?.message || 'Unable to delete admin user');
     }
   };
 

@@ -3020,6 +3020,8 @@ async def get_current_admin(token: str = Depends(oauth2_scheme)) -> AdminBase:
 
 
 async def get_current_active_admin(current_admin: AdminBase = Depends(get_current_admin)) -> AdminBase:
+    if not current_admin.is_active:
+        raise HTTPException(status_code=403, detail="Admin account is disabled")
     return current_admin
 
 
@@ -3030,18 +3032,29 @@ async def get_current_super_admin(current_admin: AdminBase = Depends(get_current
 
 
 async def assert_not_last_super_admin(admin_id: str, next_role: Optional[str] = None, next_active: Optional[bool] = None):
-    target = await db.admins.find_one({"id": admin_id})
+    target = await db.admins.find_one(_admin_query(admin_id))
     if not target:
         raise HTTPException(status_code=404, detail="Admin user not found")
-    is_super = target.get("role") == "super_admin"
-    will_be_super = (next_role or target.get("role")) == "super_admin"
-    will_be_active = (target.get("is_active", True) is not False) if next_active is None else bool(next_active)
-    if not is_super:
+    is_currently_active_super = (
+        target.get("role") == "super_admin"
+        and target.get("is_active", True) is not False
+    )
+    will_be_active_super = (
+        (next_role or target.get("role")) == "super_admin"
+        and (target.get("is_active", True) is not False if next_active is None else bool(next_active))
+    )
+    if not is_currently_active_super or will_be_active_super:
         return target
-    if will_be_super and will_be_active:
-        return target
-    active_super_count = await db.admins.count_documents({"role": "super_admin", "is_active": {"$ne": False}})
-    if active_super_count <= 1:
+    other_active_filter = {
+        "role": "super_admin",
+        "is_active": {"$ne": False},
+    }
+    if target.get("_id"):
+        other_active_filter["_id"] = {"$ne": target["_id"]}
+    elif target.get("id"):
+        other_active_filter["id"] = {"$ne": target.get("id")}
+    other_active_super = await db.admins.count_documents(other_active_filter)
+    if other_active_super < 1:
         raise HTTPException(status_code=409, detail="Cannot remove or disable the last active super admin")
     return target
 
@@ -3103,8 +3116,9 @@ async def admin_change_password(payload: AdminChangePasswordIn, current_admin: A
     if not verify_password(payload.current_password, admin.get("hashed_password", "")):
         raise HTTPException(status_code=400, detail="Current password is incorrect")
     now = datetime.now(timezone.utc).isoformat()
+    filter_q = {"_id": admin["_id"]} if admin.get("_id") else {"id": current_admin.id}
     await db.admins.update_one(
-        {"id": current_admin.id},
+        filter_q,
         {"$set": {"hashed_password": get_password_hash(payload.new_password), "updated_at": now}},
     )
     return {"success": True, "message": "Password changed successfully"}
@@ -3112,7 +3126,7 @@ async def admin_change_password(payload: AdminChangePasswordIn, current_admin: A
 
 @admin_router.get("/users")
 async def admin_list_users(current_admin: AdminBase = Depends(get_current_super_admin)):
-    rows = await db.admins.find({}, {"_id": 0, "hashed_password": 0}).sort("created_at", 1).to_list(200)
+    rows = await db.admins.find({}, {"hashed_password": 0}).sort("created_at", 1).to_list(200)
     return [admin_doc_to_public(row).model_dump() for row in rows]
 
 
@@ -3148,16 +3162,26 @@ async def admin_create_user(payload: AdminUserCreateIn, current_admin: AdminBase
 async def admin_update_user(admin_id: str, payload: AdminUserUpdateIn, current_admin: AdminBase = Depends(get_current_super_admin)):
     role = validate_admin_role(payload.role)
     is_active = bool(payload.is_active)
-    if admin_id == current_admin.id and not is_active:
+    target = await db.admins.find_one(_admin_query(admin_id))
+    if not target:
+        raise HTTPException(status_code=404, detail="Admin user not found")
+    target_id = str(target.get("id") or target.get("_id") or "")
+    if (target_id == current_admin.id or str(target.get("_id", "")) == current_admin.id) and not is_active:
         raise HTTPException(status_code=409, detail="You cannot disable your own admin account")
     await assert_not_last_super_admin(admin_id, next_role=role, next_active=is_active)
     email = str(payload.email).lower().strip()
-    duplicate = await db.admins.find_one({"email": email, "id": {"$ne": admin_id}})
+    dup_filter = {"email": email}
+    if target.get("_id"):
+        dup_filter["_id"] = {"$ne": target["_id"]}
+    else:
+        dup_filter["id"] = {"$ne": target.get("id")}
+    duplicate = await db.admins.find_one(dup_filter)
     if duplicate:
         raise HTTPException(status_code=409, detail="An admin with this email already exists")
     now = datetime.now(timezone.utc).isoformat()
+    filter_q = {"_id": target["_id"]} if target.get("_id") else {"id": target.get("id")}
     result = await db.admins.update_one(
-        {"id": admin_id},
+        filter_q,
         {
             "$set": {
                 "name": payload.name.strip(),
@@ -3171,19 +3195,20 @@ async def admin_update_user(admin_id: str, payload: AdminUserUpdateIn, current_a
     )
     if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="Admin user not found")
-    updated = await get_admin_by_id(admin_id)
+    updated = await db.admins.find_one(filter_q)
     return admin_doc_to_public(updated).model_dump()
 
 
 @admin_router.post("/users/{admin_id}/reset-password")
 async def admin_reset_user_password(admin_id: str, payload: AdminResetPasswordIn, current_admin: AdminBase = Depends(get_current_super_admin)):
     validate_password_confirmation(payload.password, payload.confirm_password)
-    admin = await get_admin_by_id(admin_id)
+    admin = await db.admins.find_one(_admin_query(admin_id))
     if not admin:
         raise HTTPException(status_code=404, detail="Admin user not found")
     now = datetime.now(timezone.utc).isoformat()
+    filter_q = {"_id": admin["_id"]} if admin.get("_id") else {"id": admin.get("id")}
     await db.admins.update_one(
-        {"id": admin_id},
+        filter_q,
         {"$set": {"hashed_password": get_password_hash(payload.password), "updated_at": now}},
     )
     return {"success": True, "message": "Password reset successfully"}
@@ -3191,10 +3216,15 @@ async def admin_reset_user_password(admin_id: str, payload: AdminResetPasswordIn
 
 @admin_router.delete("/users/{admin_id}")
 async def admin_delete_user(admin_id: str, current_admin: AdminBase = Depends(get_current_super_admin)):
-    if admin_id == current_admin.id:
+    target = await db.admins.find_one(_admin_query(admin_id))
+    if not target:
+        raise HTTPException(status_code=404, detail="Admin user not found")
+    target_id = str(target.get("id") or target.get("_id") or "")
+    if target_id == current_admin.id or (target.get("_id") and str(target["_id"]) == str(getattr(current_admin, "id", ""))):
         raise HTTPException(status_code=409, detail="You cannot delete your own admin account")
     await assert_not_last_super_admin(admin_id, next_active=False)
-    result = await db.admins.delete_one({"id": admin_id})
+    filter_q = {"_id": target["_id"]} if target.get("_id") else {"id": target.get("id")}
+    result = await db.admins.delete_one(filter_q)
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Admin user not found")
     return {"success": True, "message": "Admin user deleted successfully"}
