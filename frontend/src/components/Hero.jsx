@@ -34,7 +34,7 @@ const Hero = ({ pageData, loading = false, fallbackAllowed = false }) => {
   const hero = hasCmsHero ? cmsHero : fallbackAllowed ? fallbackHero : fallbackHero;
 
   return (
-    <section className="hero-spectrum relative min-h-screen pt-28 pb-16 px-4 sm:px-6 lg:px-8 bg-black flex items-center justify-center overflow-hidden">
+    <section className="hero-spectrum home-hero relative min-h-0 lg:min-h-screen pt-20 lg:pt-28 pb-6 lg:pb-16 px-4 sm:px-6 lg:px-8 bg-black flex items-start lg:items-center justify-center overflow-hidden">
       <HeroLightSticks />
       <div className="hero-spectrum__grid absolute inset-0 pointer-events-none" />
       <div className="absolute -left-32 top-1/3 h-96 w-96 rounded-full bg-[#ff4d00]/20 blur-3xl pointer-events-none" />

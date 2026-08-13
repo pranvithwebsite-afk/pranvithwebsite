@@ -1318,6 +1318,7 @@ async def public_settings():
             "page_settings": DEFAULT_PAGE_SETTINGS,
             "works_page": DEFAULT_WORKS_PAGE,
             "footer": DEFAULT_FOOTER,
+            "header": DEFAULT_HEADER,
         }
     return _safe_settings(settings_doc)
 
@@ -1342,6 +1343,7 @@ PUBLIC_SETTINGS_FIELDS = {
     "page_settings",
     "works_page",
     "footer",
+    "header",
 }
 
 
@@ -1349,6 +1351,8 @@ def _safe_settings(settings: Optional[dict]) -> dict:
     source = dict(settings or {})
     if "footer" not in source:
         source["footer"] = DEFAULT_FOOTER
+    if "header" not in source:
+        source["header"] = DEFAULT_HEADER
     safe = {
         key: value
         for key, value in source.items()
@@ -1370,7 +1374,31 @@ def _safe_settings(settings: Optional[dict]) -> dict:
         safe["works_page"] = _safe_works_page(safe.get("works_page"))
     if "footer" in safe:
         safe["footer"] = _safe_footer(safe.get("footer"))
+    if "header" in safe:
+        safe["header"] = _safe_header(safe.get("header"))
     return safe
+
+
+DEFAULT_HEADER = {
+    "logo_url": "",
+    "logo_badge_text": "PD",
+    "brand_title_primary": "PRANVITH",
+    "brand_title_accent": "DOP",
+    "cta_text": "Buy Bundle",
+    "cta_link": "/assets",
+}
+
+
+def _safe_header(header: Optional[dict]) -> dict:
+    source = {**DEFAULT_HEADER, **(header or {})}
+    return {
+        "logo_url": _reject_unsafe_url(source.get("logo_url") or "") or "",
+        "logo_badge_text": str(source.get("logo_badge_text") or "").strip()[:20],
+        "brand_title_primary": str(source.get("brand_title_primary") or "").strip()[:80],
+        "brand_title_accent": str(source.get("brand_title_accent") or "").strip()[:80],
+        "cta_text": str(source.get("cta_text") or "").strip()[:80],
+        "cta_link": _reject_unsafe_url(source.get("cta_link") or "") or "/assets",
+    }
 
 
 DEFAULT_FOOTER = {

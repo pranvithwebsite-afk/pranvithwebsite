@@ -577,19 +577,19 @@ footer,
 
 @media (max-width: 767px) {
   .home-hero {
-    min-height: 760px !important;
-    padding-top: 72px;
-    padding-bottom: 48px;
+    min-height: 0 !important;
+    padding-top: 76px !important;
+    padding-bottom: 20px !important;
   }
 
   .home-page .section-block {
-    padding-top: 56px;
-    padding-bottom: 56px;
+    padding-top: 32px;
+    padding-bottom: 32px;
   }
 
   .home-page #faq {
-    padding-top: 56px;
-    padding-bottom: 56px;
+    padding-top: 32px;
+    padding-bottom: 32px;
   }
 
   .site-footer__inner {

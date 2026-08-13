@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Menu, X } from 'lucide-react';
 import { navLinks } from '../data/mock';
-import { FALLBACK_IMAGE, handleImageError } from '../lib/utils';
+import { fetchPublicSettings } from '../lib/api';
+import { FALLBACK_IMAGE, handleImageError, safeImageSrc, safePublicHref } from '../lib/utils';
 
 const customNavLinks = [
   { name: 'Home', path: '/' },
@@ -17,7 +18,51 @@ const customNavLinks = [
 const Header = () => {
   const location = useLocation();
   const [open, setOpen] = useState(false);
+  const [siteSettings, setSiteSettings] = useState(null);
+
   useEffect(() => setOpen(false), [location.pathname]);
+
+  useEffect(() => {
+    let mounted = true;
+    fetchPublicSettings()
+      .then((data) => {
+        if (mounted && data) setSiteSettings(data);
+      })
+      .catch((error) => console.warn('[header] Failed to fetch settings', error));
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const headerData = useMemo(() => {
+    const header = siteSettings?.header || {};
+    const siteName = siteSettings?.site_name || 'PRANVITH DOP';
+    const logoUrl = header.logo_url || siteSettings?.logo_url || '';
+    const logoText = header.logo_badge_text || 'PD';
+    
+    let primary = header.brand_title_primary || '';
+    let accent = header.brand_title_accent || '';
+
+    if (!primary && siteName) {
+      const parts = siteName.trim().split(' ');
+      if (parts.length > 1) {
+        accent = parts.pop();
+        primary = parts.join(' ');
+      } else {
+        primary = siteName;
+        accent = '';
+      }
+    }
+
+    return {
+      logoUrl,
+      logoText: logoText || 'PD',
+      brandPrimary: primary || 'PRANVITH',
+      brandAccent: accent || 'DOP',
+      ctaText: header.cta_text || 'Buy Bundle',
+      ctaLink: header.cta_link || '/assets',
+    };
+  }, [siteSettings]);
 
   const isActive = (path) => (
     path === '/' ? location.pathname === '/' : location.pathname === path || location.pathname.startsWith(`${path}/`)
@@ -36,11 +81,20 @@ const Header = () => {
         className="foureditors-nav mx-auto max-w-7xl flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-black/75 px-3.5 py-2 backdrop-blur-2xl shadow-[0_14px_50px_rgba(0,0,0,0.72)]"
       >
         <Link to="/" onClick={refreshHomeIfActive} className="flex items-center gap-2.5 shrink-0" data-testid="header-brand">
-          <div className="brand-orbit h-9 w-9 rounded-full flex items-center justify-center text-white font-extrabold text-[10px]">
-            PD
-          </div>
+          {headerData.logoUrl ? (
+            <img
+              src={safeImageSrc(headerData.logoUrl)}
+              alt="Brand logo"
+              className="h-9 w-9 rounded-full object-cover border border-white/15"
+              onError={handleImageError}
+            />
+          ) : (
+            <div className="brand-orbit h-9 w-9 rounded-full flex items-center justify-center text-white font-extrabold text-[10px]">
+              {headerData.logoText}
+            </div>
+          )}
           <span className="text-xl font-bold tracking-tight text-white font-[Space_Grotesk]">
-            PRANVITH <span className="text-[#ff5a1f]">DOP</span>
+            {headerData.brandPrimary} {headerData.brandAccent && <span className="text-[#ff5a1f]">{headerData.brandAccent}</span>}
           </span>
         </Link>
 
@@ -67,10 +121,10 @@ const Header = () => {
 
         <div className="flex items-center gap-3">
           <Link
-            to="/assets"
-            className="inline-flex items-center justify-center rounded-lg border border-[#ff5a1f]/55 bg-[#ff5a1f]/10 text-white px-4 py-2 text-[11px] font-semibold uppercase tracking-wider shadow-[0_0_24px_rgba(255,90,31,0.14)] transition hover:bg-[#ff5a1f]"
+            to={safePublicHref(headerData.ctaLink, '/assets')}
+            className="inline-flex items-center justify-center rounded-lg border border-[#ff5a1f]/55 bg-[#ff5a1f]/10 text-[#ff8a5c] hover:text-white px-4 py-2 text-[11px] font-semibold uppercase tracking-wider shadow-[0_0_24px_rgba(255,90,31,0.14)] transition hover:bg-[#ff5a1f]"
           >
-            Buy Bundle
+            {headerData.ctaText}
           </Link>
 
           <button

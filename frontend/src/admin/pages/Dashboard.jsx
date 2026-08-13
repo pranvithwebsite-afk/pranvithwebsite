@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { RefreshCw } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { RefreshCw, Settings as SettingsIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import { fetchAdminDashboardStats, formatApiErrorDetail, recheckRazorpayPayments } from '../../lib/api';
 
@@ -66,15 +67,24 @@ const Dashboard = () => {
             <p className="mt-2 text-lg font-medium text-white">{stats?.role || 'Admin'}</p>
           </div>
         </div>
-        <button
-          type="button"
-          onClick={handleRecheckRazorpay}
-          disabled={rechecking}
-          className="mt-5 inline-flex h-11 items-center gap-2 rounded-2xl border border-violet-500/30 bg-violet-500/10 px-4 text-sm font-semibold text-violet-100 transition hover:bg-violet-500/20 disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          <RefreshCw size={15} className={rechecking ? 'animate-spin' : ''} />
-          {rechecking ? 'Rechecking...' : 'Recheck Razorpay Payments'}
-        </button>
+        <div className="mt-5 flex flex-wrap items-center gap-3">
+          <Link
+            to="/admin/settings"
+            className="inline-flex h-11 items-center gap-2 rounded-2xl bg-violet-600 px-4 text-sm font-semibold text-white transition hover:bg-violet-500"
+          >
+            <SettingsIcon size={15} />
+            Change Logo & Brand Header Text
+          </Link>
+          <button
+            type="button"
+            onClick={handleRecheckRazorpay}
+            disabled={rechecking}
+            className="inline-flex h-11 items-center gap-2 rounded-2xl border border-violet-500/30 bg-violet-500/10 px-4 text-sm font-semibold text-violet-100 transition hover:bg-violet-500/20 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            <RefreshCw size={15} className={rechecking ? 'animate-spin' : ''} />
+            {rechecking ? 'Rechecking...' : 'Recheck Razorpay Payments'}
+          </button>
+        </div>
       </div>
 
       {error && <div className="rounded-3xl border border-rose-500/20 bg-rose-500/10 p-5 text-rose-100">{error}</div>}

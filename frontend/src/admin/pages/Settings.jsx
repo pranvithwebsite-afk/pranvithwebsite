@@ -16,6 +16,14 @@ const defaultSettings = {
   meta_pixel_id: '',
   ga4_id: '',
   gtm_id: '',
+  header: {
+    logo_url: '',
+    logo_badge_text: 'PD',
+    brand_title_primary: 'PRANVITH',
+    brand_title_accent: 'DOP',
+    cta_text: 'Buy Bundle',
+    cta_link: '/assets',
+  },
   footer: {
     brand_title: 'PranvithDOP',
     description: 'Empowering creators with AI-driven tools and professional video editing resources.\nJoin the future of content creation.',
@@ -88,7 +96,12 @@ const Settings = () => {
       .then((data) => {
         const loaded = data || {};
         setRawSettings(loaded);
-        setSettings({ ...defaultSettings, ...loaded, footer: { ...defaultSettings.footer, ...(loaded.footer || {}) } });
+        setSettings({
+          ...defaultSettings,
+          ...loaded,
+          header: { ...defaultSettings.header, ...(loaded.header || {}) },
+          footer: { ...defaultSettings.footer, ...(loaded.footer || {}) },
+        });
         setLoadError('');
       })
       .catch((error) => {
@@ -102,6 +115,16 @@ const Settings = () => {
   const update = (field, value) => {
     setSettings((current) => ({ ...current, [field]: value }));
     setErrors((current) => ({ ...current, [field]: '' }));
+  };
+
+  const updateHeader = (field, value) => {
+    setSettings((current) => ({
+      ...current,
+      header: {
+        ...(current.header || defaultSettings.header),
+        [field]: value,
+      },
+    }));
   };
 
   const updateFooter = (field, value) => {
@@ -136,18 +159,29 @@ const Settings = () => {
         meta_pixel_id: settings.meta_pixel_id,
         ga4_id: settings.ga4_id,
         gtm_id: settings.gtm_id,
+        header: settings.header,
         footer: settings.footer,
       };
       const result = await saveAdminSettings(payload);
       const saved = result.settings || payload;
       setRawSettings(saved);
-      setSettings({ ...defaultSettings, ...saved, footer: { ...defaultSettings.footer, ...(saved.footer || {}) } });
+      setSettings({
+        ...defaultSettings,
+        ...saved,
+        header: { ...defaultSettings.header, ...(saved.header || {}) },
+        footer: { ...defaultSettings.footer, ...(saved.footer || {}) },
+      });
       toast.success('Settings saved successfully');
       try {
         const refreshed = await fetchAdminSettings();
         const nextSettings = refreshed || saved;
         setRawSettings(nextSettings);
-        setSettings({ ...defaultSettings, ...nextSettings, footer: { ...defaultSettings.footer, ...(nextSettings.footer || {}) } });
+        setSettings({
+          ...defaultSettings,
+          ...nextSettings,
+          header: { ...defaultSettings.header, ...(nextSettings.header || {}) },
+          footer: { ...defaultSettings.footer, ...(nextSettings.footer || {}) },
+        });
       } catch (refreshError) {
         console.warn('[admin/settings] Settings saved but refresh failed', refreshError?.response?.data?.detail || refreshError?.message || refreshError);
       }
@@ -242,10 +276,59 @@ const Settings = () => {
             </Field>
           </div>
 
-          <label className="flex items-center gap-3 text-sm text-slate-200">
-            <input type="checkbox" checked={settings.notifications_enabled} onChange={(event) => update('notifications_enabled', event.target.checked)} className="h-5 w-5 rounded border-slate-700 bg-slate-900 text-violet-500" />
-            Enable site notifications for global events
-          </label>
+          <div className="rounded-3xl border border-slate-800 bg-slate-900/60 p-5">
+            <h2 className="text-xl font-semibold text-white">Header & Branding</h2>
+            <p className="mt-2 text-sm text-slate-500">Customize the site header logo, brand name, and top-right CTA button dynamically.</p>
+            <div className="mt-5 grid gap-6 lg:grid-cols-2">
+              <MediaUrlInput
+                label="Header Logo Image"
+                value={settings.header?.logo_url || ''}
+                onChange={(value) => updateHeader('logo_url', value)}
+                accept="image/*"
+                placeholder="Upload logo image or paste image URL"
+              />
+              <Field label="Logo Badge Text (fallback if no image)">
+                <input
+                  value={settings.header?.logo_badge_text || ''}
+                  onChange={(event) => updateHeader('logo_badge_text', event.target.value)}
+                  className={fieldClass}
+                  placeholder="PD"
+                />
+              </Field>
+              <Field label="Brand Name Primary">
+                <input
+                  value={settings.header?.brand_title_primary || ''}
+                  onChange={(event) => updateHeader('brand_title_primary', event.target.value)}
+                  className={fieldClass}
+                  placeholder="PRANVITH"
+                />
+              </Field>
+              <Field label="Brand Name Accent (Highlighted)">
+                <input
+                  value={settings.header?.brand_title_accent || ''}
+                  onChange={(event) => updateHeader('brand_title_accent', event.target.value)}
+                  className={fieldClass}
+                  placeholder="DOP"
+                />
+              </Field>
+              <Field label="Header Button Text">
+                <input
+                  value={settings.header?.cta_text || ''}
+                  onChange={(event) => updateHeader('cta_text', event.target.value)}
+                  className={fieldClass}
+                  placeholder="Buy Bundle"
+                />
+              </Field>
+              <Field label="Header Button Link">
+                <input
+                  value={settings.header?.cta_link || ''}
+                  onChange={(event) => updateHeader('cta_link', event.target.value)}
+                  className={fieldClass}
+                  placeholder="/assets"
+                />
+              </Field>
+            </div>
+          </div>
 
           <div className="rounded-3xl border border-slate-800 bg-slate-900/60 p-5">
             <h2 className="text-xl font-semibold text-white">Footer / Global Content</h2>
