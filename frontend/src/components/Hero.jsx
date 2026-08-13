@@ -34,16 +34,18 @@ const Hero = ({ pageData, loading = false, fallbackAllowed = false }) => {
   const hero = hasCmsHero ? cmsHero : fallbackAllowed ? fallbackHero : fallbackHero;
 
   return (
-    <section className="hero-spectrum home-hero relative min-h-0 lg:min-h-screen pt-20 lg:pt-28 pb-6 lg:pb-16 px-4 sm:px-6 lg:px-8 bg-black flex items-start lg:items-center justify-center overflow-hidden">
+    <section className="hero-spectrum home-hero relative min-h-0 lg:min-h-screen pt-20 lg:pt-28 pb-6 lg:pb-16 px-4 sm:px-6 lg:px-8 bg-black flex items-start lg:items-center justify-center overflow-hidden w-full max-w-full">
       <HeroLightSticks />
-      <div className="hero-spectrum__grid absolute inset-0 pointer-events-none" />
-      <div className="absolute -left-32 top-1/3 h-96 w-96 rounded-full bg-[#ff4d00]/20 blur-3xl pointer-events-none" />
-      <div className="absolute -right-32 top-1/4 h-[32rem] w-[32rem] rounded-full bg-[#0877ff]/18 blur-3xl pointer-events-none" />
+      <div className="absolute inset-0 overflow-hidden pointer-events-none" aria-hidden="true">
+        <div className="hero-spectrum__grid absolute inset-0 pointer-events-none" />
+        <div className="absolute -left-32 top-1/3 h-96 w-96 rounded-full bg-[#ff4d00]/20 blur-3xl pointer-events-none" />
+        <div className="absolute -right-32 top-1/4 h-[32rem] w-[32rem] rounded-full bg-[#0877ff]/18 blur-3xl pointer-events-none" />
+      </div>
 
       {/* Main Responsive Grid Container */}
       <div className="relative z-10 mx-auto max-w-[86rem] w-full grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-6 xl:gap-10 items-center">
         {/* Left Column: Heading & CTAs */}
-        <div className="lg:col-span-7 space-y-5 sm:space-y-6 text-left max-w-2xl mx-auto lg:mx-0">
+        <div className="lg:col-span-7 space-y-5 sm:space-y-6 text-left w-full max-w-full lg:max-w-2xl mx-auto lg:mx-0">
           {/* Badge */}
           <div className="inline-flex items-center gap-2.5 px-3.5 py-1.5 rounded-full bg-black/40 border border-[#ff5a1f]/45 text-[#ff8a5c] text-[10px] font-semibold uppercase tracking-[0.18em] backdrop-blur-md">
             <span className="h-1.5 w-1.5 rounded-full bg-[#ff5a1f] animate-pulse" />

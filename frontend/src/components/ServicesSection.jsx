@@ -17,10 +17,10 @@ const ServicesSection = ({ section }) => {
   const visibleServices = cmsItems.length > 0 ? cmsItems : fallbackServices;
 
   return (
-    <section className="section-block site-section--base px-6">
+    <section className="section-block site-section--base px-4 sm:px-6 overflow-hidden w-full max-w-full">
       {/* Subtle background glow */}
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_10%,rgba(8,119,255,0.1),transparent_40%)]" />
-      <div className="relative mx-auto max-w-7xl">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_10%,rgba(8,119,255,0.1),transparent_40%)] pointer-events-none" />
+      <div className="relative mx-auto max-w-7xl w-full">
         <div className="mb-12 max-w-3xl">
           <p className="section-eyebrow text-xs">{section?.data?.eyebrow || 'Services'}</p>
           <h2 className="mt-4 text-4xl font-bold tracking-tight text-white md:text-6xl">

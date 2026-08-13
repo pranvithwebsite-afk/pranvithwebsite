@@ -624,6 +624,18 @@
 }
 
 @media (max-width: 1023px) {
+  .hero-light-sticks {
+    overflow: hidden !important;
+    width: 100% !important;
+    max-width: 100vw !important;
+  }
+
+  .hero-light-sticks__blue-wash,
+  .hero-light-sticks__orange-wash {
+    min-width: 0 !important;
+    min-height: 0 !important;
+  }
+
   .hero-light-sticks::before {
     background:
       linear-gradient(180deg, rgba(0, 0, 0, 0.9) 0%, rgba(0, 0, 0, 0.62) 52%, rgba(3, 28, 75, 0.44) 100%),
@@ -631,10 +643,10 @@
   }
 
   .hero-light-stick {
-    right: -16vw;
+    right: -5vw;
     top: 16vh;
     height: 86vh;
-    opacity: 0.62;
+    opacity: 0.45;
   }
 
   .hero-light-stick--one {

@@ -140,10 +140,10 @@ const HomeHeroVideo = ({ hero }) => {
   const posterUrl = firstText(hero?.posterUrl, hero?.thumbnailUrl, hero?.image);
 
   return (
-    <section className="home-hero-video-section section-block relative z-10 px-6 pt-0">
-      <div className="page-shell">
-        <div className="video-glow-card mx-auto max-w-6xl">
-          <div className="video-glow-card__inner rounded-[30px] border border-[var(--border-blue)] bg-black p-2 shadow-2xl shadow-blue-950/40">
+    <section className="home-hero-video-section section-block relative z-10 px-4 sm:px-6 pt-0 overflow-hidden w-full max-w-full">
+      <div className="page-shell w-full max-w-6xl mx-auto px-0">
+        <div className="video-glow-card mx-auto max-w-6xl w-full">
+          <div className="video-glow-card__inner rounded-[20px] sm:rounded-[30px] border border-[var(--border-blue)] bg-black p-1.5 sm:p-2 shadow-2xl shadow-blue-950/40 w-full overflow-hidden">
             <SafeVideoEmbed
               videoType={videoType}
               videoUrl={videoUrl}

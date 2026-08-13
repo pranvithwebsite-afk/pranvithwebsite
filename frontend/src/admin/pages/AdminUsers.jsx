@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { Edit3, KeyRound, Plus, RefreshCw, ShieldCheck, UserX } from 'lucide-react';
+import { Edit3, KeyRound, Plus, RefreshCw, ShieldCheck, Trash2, UserX } from 'lucide-react';
 import { toast } from 'sonner';
-import { createAdminUser, fetchAdminUsers, resetAdminUserPassword, updateAdminUser } from '../../lib/api';
+import { createAdminUser, deleteAdminUser, fetchAdminUsers, resetAdminUserPassword, updateAdminUser } from '../../lib/api';
 import { useAdminAuth } from '../AdminAuthContext';
 
 const fieldClass = 'w-full rounded-2xl border border-slate-800 bg-slate-900 px-4 py-3 text-white outline-none focus:border-violet-500';
@@ -131,6 +131,19 @@ const AdminUsers = () => {
     }
   };
 
+  const handleDeleteUser = async (user) => {
+    if (!window.confirm(`Are you sure you want to permanently delete admin account "${user.name || user.email}"?`)) {
+      return;
+    }
+    try {
+      await deleteAdminUser(user.id);
+      toast.success('Admin user deleted');
+      loadUsers();
+    } catch (err) {
+      toast.error(err?.response?.data?.detail || 'Unable to delete admin user');
+    }
+  };
+
   const submitReset = async (event) => {
     event.preventDefault();
     if (!resetUser) return;
@@ -220,9 +233,18 @@ const AdminUsers = () => {
                           type="button"
                           onClick={() => toggleActive(user)}
                           disabled={user.id === admin?.id}
-                          className="rounded-xl border border-rose-500/30 px-3 py-2 text-xs font-semibold text-rose-100 hover:border-rose-400 disabled:opacity-40"
+                          className="rounded-xl border border-amber-500/30 px-3 py-2 text-xs font-semibold text-amber-100 hover:border-amber-400 disabled:opacity-40"
                         >
                           <UserX size={14} className="inline" /> {user.is_active === false ? 'Activate' : 'Disable'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteUser(user)}
+                          disabled={user.id === admin?.id}
+                          className="rounded-xl border border-rose-500/40 bg-rose-500/10 px-3 py-2 text-xs font-semibold text-rose-300 hover:bg-rose-500/20 hover:text-rose-100 disabled:opacity-40"
+                          title="Delete admin user permanently"
+                        >
+                          <Trash2 size={14} className="inline" /> Delete
                         </button>
                       </div>
                     </td>

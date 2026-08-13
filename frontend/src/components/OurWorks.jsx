@@ -22,8 +22,8 @@ const OurWorks = ({ section }) => {
   if (!section || projects.length === 0) return null;
 
   return (
-    <section className="section-block site-section--base px-6">
-      <div className="relative mx-auto max-w-7xl">
+    <section className="section-block site-section--base px-4 sm:px-6 overflow-hidden w-full max-w-full">
+      <div className="relative mx-auto max-w-7xl w-full">
         <div className="mb-12 text-center">
           <p className="section-eyebrow text-xs">{section.data?.eyebrow || 'Our Works'}</p>
           <h2 className="mt-4 text-4xl font-bold tracking-tight md:text-6xl">{section.title || 'Cinematic work, cleanly presented.'}</h2>

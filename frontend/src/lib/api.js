@@ -269,6 +269,11 @@ export const resetAdminUserPassword = async (adminId, payload) => {
   return data;
 };
 
+export const deleteAdminUser = async (adminId) => {
+  const { data } = await adminApi.delete(`/admin/users/${encodeURIComponent(adminId)}`);
+  return data;
+};
+
 export const fetchAdminDashboardStats = async () => {
   const { data } = await adminApi.get('/admin/dashboard');
   return data;

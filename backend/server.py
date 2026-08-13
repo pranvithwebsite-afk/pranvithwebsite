@@ -3294,6 +3294,17 @@ async def admin_reset_user_password(admin_id: str, payload: AdminResetPasswordIn
     return {"success": True, "message": "Password reset successfully"}
 
 
+@admin_router.delete("/users/{admin_id}")
+async def admin_delete_user(admin_id: str, current_admin: AdminBase = Depends(get_current_super_admin)):
+    if admin_id == current_admin.id:
+        raise HTTPException(status_code=409, detail="You cannot delete your own admin account")
+    await assert_not_last_super_admin(admin_id, next_active=False)
+    result = await db.admins.delete_one({"id": admin_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Admin user not found")
+    return {"success": True, "message": "Admin user deleted successfully"}
+
+
 @admin_router.get("/dashboard")
 async def admin_dashboard(current_admin: AdminBase = Depends(get_current_active_admin)):
     pages_count = await db.pages.count_documents({})
