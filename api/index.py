@@ -32,6 +32,10 @@ def _startup_env_report() -> None:
         "RAZORPAY_KEY_ID": _env_state("RAZORPAY_KEY_ID"),
         "RAZORPAY_KEY_SECRET_OR_RAZORPAY_SECRET": _env_state("RAZORPAY_KEY_SECRET", "RAZORPAY_SECRET"),
         "PUBLIC_SITE_URL_OR_FRONTEND_URL": _env_state("PUBLIC_SITE_URL", "FRONTEND_URL", "PUBLIC_BASE_URL"),
+        "CLOUDFLARE_R2_ACCESS_KEY_ID": _env_state("CLOUDFLARE_R2_ACCESS_KEY_ID"),
+        "CLOUDFLARE_R2_SECRET_ACCESS_KEY": _env_state("CLOUDFLARE_R2_SECRET_ACCESS_KEY"),
+        "CLOUDFLARE_R2_BUCKET": _env_state("CLOUDFLARE_R2_BUCKET"),
+        "CLOUDFLARE_R2_PUBLIC_BASE_URL": _env_state("CLOUDFLARE_R2_PUBLIC_BASE_URL"),
     }
     missing = [name for name, configured in states.items() if not configured]
     logger.info("Vercel backend environment configured=%s missing=%s", states, missing)
@@ -44,6 +48,7 @@ async def health():
         "mongo_configured": _env_state("MONGO_URL", "DATABASE_URL"),
         "db_name_configured": _env_state("DB_NAME"),
         "jwt_secret_configured": _env_state("JWT_SECRET"),
+        "r2_configured": _env_state("CLOUDFLARE_R2_ACCESS_KEY_ID") and _env_state("CLOUDFLARE_R2_SECRET_ACCESS_KEY") and _env_state("CLOUDFLARE_R2_BUCKET") and _env_state("CLOUDFLARE_R2_PUBLIC_BASE_URL"),
     }
 
 
