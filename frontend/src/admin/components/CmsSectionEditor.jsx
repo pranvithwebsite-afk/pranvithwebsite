@@ -76,9 +76,19 @@ const worksPortfolioProjectsSchema = createSchema({
 const SECTION_EDITOR_SCHEMAS = {
   'home:hero': createSchema({
     sectionFields: ['section_id', 'type', 'title', 'subtitle', 'description', 'button_text', 'button_link', ...mixedMediaFields, 'enabled'],
+    dataFields: ['secondary_button_text', 'secondary_button_link'],
     sectionLabels: {
-      media_url: 'Media URL',
-      poster_url: 'Poster / Thumbnail URL (optional)',
+      title: 'Main Heading (e.g. CREATE CINEMATIC STORIES)',
+      subtitle: 'Top Pill Badge Text',
+      description: 'Hero Subtitle Paragraph',
+      button_text: 'Primary Button Text (e.g. Explore Assets)',
+      button_link: 'Primary Button Link (e.g. /assets)',
+      media_url: 'Hero Video URL (optional)',
+      poster_url: 'Hero Video Poster / Thumbnail URL (optional)',
+    },
+    dataLabels: {
+      secondary_button_text: 'Secondary Button Text (e.g. Watch Showreel)',
+      secondary_button_link: 'Secondary Button Link (e.g. /courses)',
     },
   }),
   'home:featured-assets': createSchema({

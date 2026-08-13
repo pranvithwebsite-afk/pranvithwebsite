@@ -31,7 +31,46 @@ const Hero = ({ pageData, loading = false, fallbackAllowed = false }) => {
       })
     : {};
 
-  const hero = hasCmsHero ? cmsHero : fallbackAllowed ? fallbackHero : fallbackHero;
+  const hero = hasCmsHero ? { ...fallbackHero, ...cmsHero } : (fallbackAllowed ? fallbackHero : fallbackHero);
+
+  const titleText = String(hero.hero_title || 'CREATE CINEMATIC STORIES').trim();
+
+  const renderHeading = () => {
+    if (titleText.includes('\n')) {
+      const lines = titleText.split('\n').map((l) => l.trim()).filter(Boolean);
+      return lines.map((line, idx) => (
+        <React.Fragment key={idx}>
+          {idx === lines.length - 1 ? (
+            <span className="spectrum-text">{line}</span>
+          ) : (
+            line
+          )}
+          {idx < lines.length - 1 && <br />}
+        </React.Fragment>
+      ));
+    }
+
+    const words = titleText.split(' ').filter(Boolean);
+    if (words.length <= 1) {
+      return <span className="spectrum-text">{titleText}</span>;
+    }
+    if (words.length === 3) {
+      return (
+        <>
+          {words[0]} <br />
+          {words[1]} <br />
+          <span className="spectrum-text">{words[2]}</span>
+        </>
+      );
+    }
+    const lastWord = words[words.length - 1];
+    const prefix = words.slice(0, -1).join(' ');
+    return (
+      <>
+        {prefix} <span className="spectrum-text">{lastWord}</span>
+      </>
+    );
+  };
 
   return (
     <section className="hero-spectrum home-hero relative min-h-0 lg:min-h-screen pt-20 lg:pt-28 pb-6 lg:pb-16 px-4 sm:px-6 lg:px-8 bg-black flex items-start lg:items-center justify-center overflow-hidden w-full max-w-full">
@@ -52,13 +91,9 @@ const Hero = ({ pageData, loading = false, fallbackAllowed = false }) => {
             <span>{hero.badge_text || "India's Premium Editing Assets"}</span>
           </div>
 
-          {/* Huge 3-Line Heading */}
+          {/* Dynamic 3-Line Heading */}
           <h1 className="text-4xl sm:text-6xl lg:text-7xl xl:text-8xl font-black text-white leading-[0.92] tracking-tight font-[Space_Grotesk] uppercase">
-            CREATE <br />
-            CINEMATIC <br />
-            <span className="spectrum-text">
-              STORIES
-            </span>
+            {renderHeading()}
           </h1>
 
           {/* Paragraph */}
@@ -72,7 +107,7 @@ const Hero = ({ pageData, loading = false, fallbackAllowed = false }) => {
               href={safePublicHref(hero.primary_button_link, '/assets')}
               className="group inline-flex items-center gap-3 border border-[#ff5a1f]/60 bg-[#ff5a1f] hover:bg-[#ff6a2f] text-white px-6 sm:px-8 py-3.5 sm:py-4 rounded-lg text-xs sm:text-sm font-bold tracking-wider uppercase shadow-[0_10px_35px_rgba(255,77,0,0.28)] transition duration-300 hover:-translate-y-0.5"
             >
-              <span>Explore Assets</span>
+              <span>{hero.primary_button_text || 'Explore Assets'}</span>
               <span className="w-5 h-5 sm:w-6 sm:h-6 rounded-full bg-white/20 flex items-center justify-center group-hover:translate-x-0.5 transition-transform">
                 <ArrowRight size={12} />
               </span>
@@ -81,7 +116,7 @@ const Hero = ({ pageData, loading = false, fallbackAllowed = false }) => {
               href={safePublicHref(hero.secondary_button_link, '/courses')}
               className="inline-flex items-center gap-2 bg-black/50 hover:bg-white/5 border border-white/15 hover:border-[#1683ff] text-white px-6 sm:px-8 py-3.5 sm:py-4 rounded-lg text-xs sm:text-sm font-bold tracking-wider uppercase transition duration-200"
             >
-              <span>Watch Showreel</span>
+              <span>{hero.secondary_button_text || 'Watch Showreel'}</span>
             </a>
           </div>
 
