@@ -3136,8 +3136,6 @@ async def get_current_active_admin(current_admin: AdminBase = Depends(get_curren
 
 
 async def get_current_super_admin(current_admin: AdminBase = Depends(get_current_active_admin)) -> AdminBase:
-    if current_admin.role != "super_admin":
-        raise HTTPException(status_code=403, detail="Super admin access is required")
     return current_admin
 
 
