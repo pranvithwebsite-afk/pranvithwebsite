@@ -155,12 +155,19 @@ const SafeVideoEmbed = ({
   thumbnailHeight,
   onPlay,
 }) => {
+  const [videoFailed, setVideoFailed] = useState(false);
   const [activated, setActivated] = useState(false);
   const [nearViewport, setNearViewport] = useState(false);
   const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.matchMedia?.('(max-width: 767px)').matches);
   const [posterFailed, setPosterFailed] = useState(false);
   const [youtubeMaxFailed, setYoutubeMaxFailed] = useState(false);
   const [thumbnailUnavailable, setThumbnailUnavailable] = useState(false);
+
+  useEffect(() => {
+    setVideoFailed(false);
+    setPosterFailed(false);
+  }, [videoUrl, posterUrl, poster]);
+
   const type = String(videoType || '').trim().toLowerCase();
   const embedUrl = getSafeVideoEmbedUrl(type, videoUrl);
   const directVideo = type === 'direct' || type === 'video_file' || isDirectVideoUrl(videoUrl);
@@ -194,7 +201,7 @@ const SafeVideoEmbed = ({
     return () => observer.disconnect();
   }, [loadWhenVisible, nearViewport]);
 
-  if (shouldLoadPlayer && directVideo && externalUrl) {
+  if (shouldLoadPlayer && directVideo && externalUrl && !videoFailed) {
     return (
       <div ref={frameRef} className={wrapperClass}>
         <video
@@ -207,6 +214,7 @@ const SafeVideoEmbed = ({
           playsInline
           preload={autoPlay ? 'auto' : (activated ? 'metadata' : 'none')}
           className={`absolute inset-0 z-[3] h-full w-full bg-transparent ${mediaFitClass}`}
+          onError={() => setVideoFailed(true)}
         />
       </div>
     );

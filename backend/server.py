@@ -3,7 +3,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.security import OAuth2PasswordBearer
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
-from starlette.responses import JSONResponse, RedirectResponse, PlainTextResponse, StreamingResponse
+from starlette.responses import JSONResponse, RedirectResponse, PlainTextResponse, StreamingResponse, FileResponse
 from motor.motor_asyncio import AsyncIOMotorClient
 from bson import ObjectId
 from pymongo.errors import DuplicateKeyError, OperationFailure, ServerSelectionTimeoutError
@@ -8253,7 +8253,23 @@ async def get_status_checks():
 
 app.include_router(api_router)
 
-# Serve uploaded files statically
+# Serve uploaded files statically with fallback to Cloudflare R2
+@app.get("/api/uploads/{file_path:path}")
+async def serve_uploaded_file(file_path: str):
+    clean_path = str(file_path or "").strip().lstrip("/")
+    if ".." in Path(clean_path).parts:
+        raise HTTPException(status_code=400, detail="Invalid path")
+
+    local_file = (UPLOAD_DIR / clean_path).resolve()
+    if local_file.exists() and local_file.is_file():
+        return FileResponse(str(local_file))
+
+    public_base = os.environ.get("CLOUDFLARE_R2_PUBLIC_BASE_URL", "").strip().rstrip("/")
+    if public_base:
+        return RedirectResponse(url=f"{public_base}/{clean_path}", status_code=307)
+
+    raise HTTPException(status_code=404, detail="File not found")
+
 from fastapi.staticfiles import StaticFiles
 if UPLOAD_DIR.exists():
     app.mount("/api/uploads", StaticFiles(directory=str(UPLOAD_DIR)), name="uploads")
