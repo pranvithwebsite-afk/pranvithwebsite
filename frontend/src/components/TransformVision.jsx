@@ -244,14 +244,6 @@ const TransformVision = ({ section }) => {
             <div ref={phoneRef} className="transform-phone-3d relative">
               <div className="transform-phone-orbit absolute -inset-10 rounded-full" />
               <div className="transform-phone-shadow" />
-              <div className="phone-floating-chip phone-floating-chip--top">
-                <span className="phone-chip-dot" />
-                5.3K audience
-              </div>
-              <div className="phone-floating-chip phone-floating-chip--bottom">
-                <span className="phone-chip-spark">✦</span>
-                New reel live
-              </div>
               <div className="phone-mockup relative h-[520px] w-[255px] overflow-hidden rounded-[40px] border-[9px] border-[#0a0518] bg-gradient-to-b from-[#1a0c4f] to-[#0a0518] md:h-[570px] md:w-[285px]">
                 <div className="phone-screen-shine" />
                 <div className="absolute top-0 left-1/2 -translate-x-1/2 w-28 h-6 bg-black rounded-b-2xl z-20" />
