@@ -1066,13 +1066,13 @@ class DownloadLinkIn(BaseModel):
 
 
 class SettingsPayload(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="ignore")
     site_name: Optional[str] = None
     theme: Optional[str] = None
     notifications_enabled: Optional[bool] = None
     site_description: Optional[str] = None
     logo_url: Optional[str] = None
-    contact_email: Optional[EmailStr] = None
+    contact_email: Optional[str] = None
     contact_phone: Optional[str] = None
     contact_address: Optional[str] = None
     meta_pixel_id: Optional[str] = None
@@ -1086,6 +1086,7 @@ class SettingsPayload(BaseModel):
     page_settings: Optional[Dict[str, Any]] = None
     works_page: Optional[Dict[str, Any]] = None
     footer: Optional[Dict[str, Any]] = None
+    header: Optional[Dict[str, Any]] = None
 
     @field_validator("logo_url")
     @classmethod
@@ -1131,6 +1132,11 @@ class SettingsPayload(BaseModel):
     @classmethod
     def validate_footer(cls, value):
         return _safe_footer(value)
+
+    @field_validator("header")
+    @classmethod
+    def validate_header(cls, value):
+        return _safe_header(value)
 
 
 class HireRequestIn(BaseModel):

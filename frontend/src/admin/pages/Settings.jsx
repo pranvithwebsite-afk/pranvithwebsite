@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Activity, Save } from 'lucide-react';
 import { toast } from 'sonner';
-import { fetchAdminRazorpayHealth, fetchAdminSettings, saveAdminSettings } from '../../lib/api';
+import { fetchAdminRazorpayHealth, fetchAdminSettings, formatApiErrorDetail, saveAdminSettings } from '../../lib/api';
 import MediaUrlInput from '../components/MediaUrlInput';
 
 const defaultSettings = {
@@ -187,7 +187,8 @@ const Settings = () => {
       }
     } catch (error) {
       console.error('[admin/settings] Failed to save settings', error?.response?.data?.detail || error?.message || error);
-      toast.error(error?.response?.data?.detail || 'Unable to save settings');
+      const detail = formatApiErrorDetail(error?.response?.data?.detail);
+      toast.error(detail || error?.message || 'Unable to save settings');
     } finally {
       setSaving(false);
     }
