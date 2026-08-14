@@ -16,6 +16,8 @@ import {
 } from 'lucide-react';
 import { askCameraAi } from '../lib/api';
 
+import { Link } from 'react-router-dom';
+
 const SHORTCUTS = [
   { id: 'find_product', label: 'Find a Product', icon: ShoppingBag, prompt: 'What editing packs, LUTs, and presets are available?' },
   { id: 'product_rec', label: 'Product Recommendation', icon: Star, prompt: 'Which LUT pack or preset is best for Sony and Canon wedding videos?' },
@@ -32,18 +34,35 @@ const FormattedAiMessage = ({ text }) => {
     <div className="space-y-1.5 text-xs md:text-sm leading-relaxed">
       {lines.map((line, idx) => {
         if (!line.trim()) return <div key={idx} className="h-1.5" />;
-        const parts = line.split(/(\*\*.*?\*\*)/g);
+        // Split by markdown links [label](url)
+        const linkParts = line.split(/(\[.*?\]\(.*?\))/g);
         return (
           <div key={idx} className={line.startsWith('•') ? 'pl-2 text-white/95' : 'text-white/90'}>
-            {parts.map((part, pIdx) => {
-              if (part.startsWith('**') && part.endsWith('**')) {
+            {linkParts.map((lPart, lIdx) => {
+              const linkMatch = lPart.match(/^\[(.*?)\]\((.*?)\)$/);
+              if (linkMatch) {
+                const [, label, url] = linkMatch;
                 return (
-                  <strong key={pIdx} className="text-[#ff8a5c] font-semibold">
-                    {part.slice(2, -2)}
-                  </strong>
+                  <Link
+                    key={lIdx}
+                    to={url}
+                    className="inline-flex items-center text-[#ff8a5c] underline font-semibold hover:text-white transition"
+                  >
+                    {label}
+                  </Link>
                 );
               }
-              return part;
+              const boldParts = lPart.split(/(\*\*.*?\*\*)/g);
+              return boldParts.map((part, pIdx) => {
+                if (part.startsWith('**') && part.endsWith('**')) {
+                  return (
+                    <strong key={`${lIdx}-${pIdx}`} className="text-[#ff8a5c] font-semibold">
+                      {part.slice(2, -2)}
+                    </strong>
+                  );
+                }
+                return part;
+              });
             })}
           </div>
         );

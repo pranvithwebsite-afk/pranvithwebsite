@@ -1345,9 +1345,18 @@ async def camera_ai_assistant(payload: CameraAiRequest):
         try:
             import httpx
             system_prompt = (
-                "You are Pranvith Camera AI, a master cinematographer, photography director (DOP), "
-                "and color grading technician. Provide concise, highly actionable camera recipes with ISO, "
-                "Aperture, Shutter Speed/Angle, Picture Profile (S-Log3, C-Log3), White Balance, and lighting tips."
+                "You are Pranvith AI, the official intelligent assistant for PranvithDOP (https://pranvithdop.com), "
+                "a premier platform for professional video editing assets, master courses, and cinematography production.\n\n"
+                "OUR PRODUCTS & CATALOG:\n"
+                "1. Creative LUT Pack (₹49): 10+ 3D cinematic LUTs for Sony S-Log3, Canon C-Log3, V-Log & Rec.709. Drag-and-drop for Premiere Pro, Resolve, Final Cut, CapCut. Link: /assets/creative-lut-pack\n"
+                "2. Cinematic Sound FX Pack (₹149): 100+ 24-bit WAV impacts, risers, whooshes, atmospheres. Link: /assets/cinematic-sound-fx-pack\n"
+                "3. Premiere Pro Wedding Templates (₹299): 10+ 4K editable wedding titles, invitations, lower thirds. Link: /assets/premiere-pro-wedding-templates\n"
+                "4. Wedding Album PSD Pack (₹199): 100+ professional PSD photo grids. Link: /assets/wedding-album-psd-pack\n"
+                "5. Master Cinematography Course: Practical camera and color grading training. Link: /courses\n\n"
+                "RULES:\n"
+                "- If the user asks for LUTs, editing packs, presets, prices, or downloads, direct them to our products with exact prices and links.\n"
+                "- If the user asks for camera settings (Sony, Canon, FX3, A7IV, etc.), provide precise technical recipes (Dual Base ISOs, 180° shutter, ETTR +1.7 EV, S-Log3/C-Log3).\n"
+                "- Keep answers structured, friendly, concise, and beautifully formatted with bullet points."
             )
             async with httpx.AsyncClient(timeout=15.0) as client:
                 res = await client.post(
@@ -1366,78 +1375,193 @@ async def camera_ai_assistant(payload: CameraAiRequest):
                         if content:
                             return {"response": content, "source": "gemini"}
         except Exception as e:
-            logger.warning("Gemini API call failed, falling back to built-in camera engine: %s", e)
+            logger.warning("Gemini API call failed, falling back to built-in intelligence engine: %s", e)
 
-    q = query.lower()
-    if any(k in q for k in ["s-log", "slog", "sony", "fx3", "a7s", "a7iv", "a7m4", "a74"]):
+    q = query.lower().strip()
+
+    # 1. LUTs & Color Grading Packs
+    if any(k in q for k in ["lut", "luts", "color grade", "color grading pack", "grading pack", "preset", "presets"]):
+        resp = (
+            "🎨 **Pranvith Creative LUT Pack (₹49):**\n\n"
+            "• **Contents:** 10+ Cinematic 3D LUTs calibrated for Sony S-Log3, Canon C-Log3, Panasonic V-Log, and standard Rec.709 footage.\n"
+            "• **Price:** **₹49** (One-time purchase, lifetime access & free updates).\n"
+            "• **Software Compatibility:** Adobe Premiere Pro, DaVinci Resolve, Final Cut Pro, CapCut, and After Effects.\n"
+            "• **Delivery:** Instant download link after payment + token sent to your email.\n\n"
+            "👉 [View Creative LUT Pack (₹49)](/assets/creative-lut-pack)\n"
+            "👉 [Browse All Assets](/assets)"
+        )
+        return {"response": resp, "source": "pranvith_ai"}
+
+    # 2. Sound FX / SFX Packs
+    if any(k in q for k in ["sound", "sfx", "sound fx", "audio pack", "whoosh", "riser", "impact"]):
+        resp = (
+            "🔊 **Cinematic Sound FX Pack (₹149):**\n\n"
+            "• **Contents:** 100+ High-impact cinematic sound effects (whooshes, risers, deep hits, sub-booms, and atmospheric drones).\n"
+            "• **Quality:** Studio-grade 24-bit 48kHz WAV files.\n"
+            "• **License:** 100% Royalty-Free for commercial client videos, YouTube, and reels.\n"
+            "• **Price:** **₹149** (One-time lifetime access).\n\n"
+            "👉 [Get Sound FX Pack (₹149)](/assets/cinematic-sound-fx-pack)"
+        )
+        return {"response": resp, "source": "pranvith_ai"}
+
+    # 3. Wedding Templates / Premiere Pro
+    if any(k in q for k in ["template", "templates", "wedding template", "lower third", "invitation", "prproj"]):
+        resp = (
+            "💍 **Premiere Pro Wedding Templates (₹299):**\n\n"
+            "• **Contents:** 10+ Ready-to-use 4K cinematic wedding templates (animated invitations, title sequences, lower thirds, and save-the-date openers).\n"
+            "• **Compatibility:** Adobe Premiere Pro CC 2020 and newer (No third-party plugins required).\n"
+            "• **Price:** **₹299** (Instant digital download).\n\n"
+            "👉 [Get Wedding Templates (₹299)](/assets/premiere-pro-wedding-templates)"
+        )
+        return {"response": resp, "source": "pranvith_ai"}
+
+    # 4. Album PSD Pack
+    if any(k in q for k in ["album", "psd", "photoshop", "photo grid", "album pack"]):
+        resp = (
+            "📖 **Wedding Album PSD Pack (₹199):**\n\n"
+            "• **Contents:** 100+ High-resolution PSD wedding photo album design grids & layouts.\n"
+            "• **Format:** Fully layered, editable Photoshop (.PSD) files with smart objects.\n"
+            "• **Price:** **₹199**.\n\n"
+            "👉 [Get Wedding Album PSD Pack (₹199)](/assets/wedding-album-psd-pack)"
+        )
+        return {"response": resp, "source": "pranvith_ai"}
+
+    # 5. General Products / Catalog / Pricing / Buying / Shop
+    if any(k in q for k in ["product", "products", "pack", "packs", "asset", "assets", "buy", "price", "cost", "shop", "catalog", "store"]):
+        resp = (
+            "🛍️ **PranvithDOP Digital Assets & Pricing:**\n\n"
+            "1. **Creative LUT Pack:** ₹49 ➔ [View LUTs](/assets/creative-lut-pack)\n"
+            "2. **Cinematic Sound FX Pack:** ₹149 ➔ [View Sound FX](/assets/cinematic-sound-fx-pack)\n"
+            "3. **Premiere Pro Wedding Templates:** ₹299 ➔ [View Templates](/assets/premiere-pro-wedding-templates)\n"
+            "4. **Wedding Album PSD Pack:** ₹199 ➔ [View PSD Pack](/assets/wedding-album-psd-pack)\n\n"
+            "• **Instant Delivery:** Automatic download link upon checkout.\n"
+            "• **Payment:** UPI (GPay/PhonePe), Cards, Net Banking via Razorpay.\n\n"
+            "👉 [Browse All Creative Assets](/assets)"
+        )
+        return {"response": resp, "source": "pranvith_ai"}
+
+    # 6. Download & Order Help
+    if any(k in q for k in ["download", "token", "expired", "lost email", "where is my file", "order status", "not received"]):
+        resp = (
+            "📥 **Download & Order Recovery:**\n\n"
+            "1. **Instant Download:** A download link is shown immediately on the order confirmation screen.\n"
+            "2. **Email Receipt:** An automated email containing your secure download token is sent to your billing address.\n"
+            "3. **Expired or Lost Link?** Send your Order ID / Payment screenshot to **info@pranvithdop.com** or WhatsApp **+91 9059867883** for instant link renewal!"
+        )
+        return {"response": resp, "source": "pranvith_ai"}
+
+    # 7. Payments & Checkout
+    if any(k in q for k in ["payment", "pay", "upi", "gpay", "phonepe", "razorpay", "card", "failed"]):
+        resp = (
+            "💳 **Payment Methods & Security:**\n\n"
+            "• We accept **UPI (Google Pay, PhonePe, Paytm, BHIM)**, **Credit/Debit Cards (Visa, Mastercard, RuPay)**, and **Net Banking**.\n"
+            "• Processed via 100% secure Razorpay encrypted checkout.\n"
+            "• Digital files are unlocked and downloadable instantly upon successful payment."
+        )
+        return {"response": resp, "source": "pranvith_ai"}
+
+    # 8. Courses & Cinematography Training
+    if any(k in q for k in ["course", "courses", "learn", "class", "training", "roadmap", "masterclass"]):
+        resp = (
+            "🎓 **PranvithDOP Master Cinematography Course:**\n\n"
+            "• **Curriculum:** Camera operation, S-Log3/C-Log3 exposure mastery, on-set lighting, gimbal movements, color grading in DaVinci Resolve & Premiere Pro.\n"
+            "• **Format:** Self-paced step-by-step video modules with real-world practice footage and community support.\n\n"
+            "👉 [Explore Courses & Roadmap](/courses)"
+        )
+        return {"response": resp, "source": "pranvith_ai"}
+
+    # 9. Services & Hiring
+    if any(k in q for k in ["hire", "service", "services", "quote", "booking", "brand film", "drone shoot"]):
+        resp = (
+            "🎬 **Hire PranvithDOP Production Services:**\n\n"
+            "• **Commercial Video Production:** Brand films, ad films, and promotional reels.\n"
+            "• **Cinematic Wedding Films:** High-end multi-cam wedding coverage with 4K color-graded films.\n"
+            "• **Aerial Drone Cinematography:** Licensed high-resolution aerial visuals.\n\n"
+            "👉 [Send Project Enquiry](/hire)"
+        )
+        return {"response": resp, "source": "pranvith_ai"}
+
+    # 10. Sony A7 IV / A7M4 / A74
+    if any(k in q for k in ["a7iv", "a7m4", "a74", "a7 iv", "a7 4", "m4", "sony iv"]):
+        resp = (
+            "🎥 **Sony A7 IV (A7M4) Cinematic Video Setup:**\n\n"
+            "• **Picture Profile:** PP8 / PP11 (S-Log3 / S-Gamut3.Cine).\n"
+            "• **Dual Native Base ISO:** **ISO 800 (Base 1)** & **ISO 3,200 (Base 2)**.\n"
+            "• **Exposure Strategy:** Expose to the right (**+1.7 to +2.0 EV** MM) for zero shadow noise.\n"
+            "• **Shutter Speed:** 1/50s for 24/25fps | 1/100s for 50fps (180° Rule).\n"
+            "• **Codec:** XAVC S-I 4K (All-Intra) 10-Bit 4:2:2 for maximum color grading flexibility.\n"
+            "• **Zebras:** Set lower limit at 52-55% for skin tones, 94%+ for highlight clipping.\n"
+            "• **Note on 60fps:** A7 IV applies a 1.5x Super35 crop at 4K 60p."
+        )
+        return {"response": resp, "source": "pranvith_camera_ai"}
+
+    # 11. Sony FX3 / A7S III / FX6
+    if any(k in q for k in ["fx3", "a7s", "a7siii", "a7s3", "fx6", "zve1", "a6700", "sony"]):
         if any(k in q for k in ["low light", "night", "dark"]):
             resp = (
-                "🎥 **Sony S-Log3 Low-Light Recipe (FX3 / A7S III / A7 IV):**\n\n"
-                "• **Base ISO:** Jump to the 2nd Base ISO (**ISO 12,800** on FX3/A7S III or **ISO 3,200** on A7 IV) for zero shadow noise.\n"
-                "• **Exposure Metering:** Expose at **+1.7 to +2.0 EV** MM (Metered Manual) to push shadow detail above the noise floor.\n"
-                "• **Shutter Speed:** 1/50s (for 24/25fps) or 180° Shutter Angle.\n"
-                "• **Color Gamut:** S-Gamut3.Cine / S-Log3 for accurate skin tones.\n"
-                "• **Zebra Settings:** Skin tones at 52-55% Zebra, 94%+ for highlight clipping.\n"
-                "• **Pro Tip:** Never shoot between ISO 1,000 and 10,000 in low light—jump directly to Base ISO 2 for cleaner dynamic range!"
-            )
-        elif any(k in q for k in ["golden hour", "sunset", "outdoor", "sun"]):
-            resp = (
-                "🌅 **Sony S-Log3 Golden-Hour / Outdoor Cinematography:**\n\n"
-                "• **Base ISO:** Base 1 (**ISO 800** on FX3/A7S III/A7 IV).\n"
-                "• **ND Filter:** Variable ND (2-5 Stops / ND4-ND32) to maintain wide aperture (f/1.4 - f/2.0).\n"
-                "• **Shutter Speed:** 1/50s (24fps) or 1/100s (50/60fps slow motion).\n"
-                "• **White Balance:** Manual Kelvin at **5600K - 6000K** for warm golden sunset glow.\n"
-                "• **Exposure:** Expose highlights carefully; retain sun flare roll-off by exposing skin around +1.3 to +1.7 EV."
+                "🎥 **Sony S-Log3 Low-Light Recipe (FX3 / A7S III):**\n\n"
+                "• **Base ISO:** Jump directly to **ISO 12,800 (Base 2)** for clean, grain-free shadows.\n"
+                "• **Exposure:** Expose at **+1.7 to +2.0 EV** on Metered Manual (ETTR).\n"
+                "• **Shutter Speed:** 1/50s (24/25fps) or 180° Shutter Angle.\n"
+                "• **Gamut:** S-Gamut3.Cine.\n"
+                "• **Pro Tip:** Never shoot between ISO 1,250 and 10,000 in low light—jump directly to ISO 12,800!"
             )
         else:
             resp = (
-                "🎬 **Sony S-Log3 General Mastering Guide:**\n\n"
-                "• **Picture Profile:** PP8 / PP11 (S-Log3 / S-Gamut3.Cine).\n"
-                "• **Base ISOs:** FX3/A7S III: **ISO 800 & 12,800** | A7 IV: **ISO 800 & 3,200**.\n"
-                "• **Exposure Strategy:** Expose to the right (ETTR) by **+1.5 to +1.7 EV**.\n"
-                "• **Zebra Target:** 52-55% for Caucasian/Asian skin, 45-50% for darker skin tones.\n"
-                "• **Color Grading:** Convert with PranvithDOP S-Log3 Master Rec.709 LUT before secondary grading."
+                "🎬 **Sony S-Log3 General Mastering Guide (FX3 / FX6 / A7S III):**\n\n"
+                "• **Picture Profile:** S-Log3 / S-Gamut3.Cine (10-Bit 4:2:2).\n"
+                "• **Dual Native Base ISOs:** **ISO 800 & ISO 12,800**.\n"
+                "• **Exposure Strategy:** Expose to the right (ETTR) by **+1.7 EV**.\n"
+                "• **Skin Tone Zebras:** 52-55%.\n"
+                "• **LUT Workflow:** Convert with Pranvith Creative LUT Pack before secondary grading."
             )
         return {"response": resp, "source": "pranvith_camera_ai"}
 
-    elif any(k in q for k in ["canon", "c-log", "clog", "r6", "r5", "c70"]):
+    # 12. Canon C-Log3 / R5 / R6
+    if any(k in q for k in ["canon", "c-log", "clog", "r6", "r5", "c70", "r8"]):
         resp = (
             "🎥 **Canon C-Log3 Cinematography Recipe (R5 / R6 II / C70):**\n\n"
             "• **Picture Profile:** C-Log3 / Cinema Gamut.\n"
-            "• **Base ISO:** **ISO 800** (Native) | Low noise floor.\n"
-            "• **Exposure Strategy:** Expose **+1.0 to +1.3 EV** over standard meter reading.\n"
-            "• **Waveform Target:** Middle grey at **35%**, Caucasian skin tones at **50-55%**, white clipping at **85%**.\n"
-            "• **Noise Reduction:** Set in-camera NR to Low or Off; denoise in DaVinci Resolve Studio / Neat Video.\n"
-            "• **Color Transform:** Canon Cinema Gamut to Rec.709 via CST (Color Space Transform) in DaVinci Resolve."
+            "• **Base ISO:** **ISO 800** (Native).\n"
+            "• **Exposure Strategy:** Expose **+1.0 to +1.3 EV** over standard meter.\n"
+            "• **Waveform Target:** Middle grey at 35%, skin tones at 50-55%.\n"
+            "• **Color Transform:** Canon Cinema Gamut to Rec.709 via CST node in DaVinci Resolve."
         )
         return {"response": resp, "source": "pranvith_camera_ai"}
 
-    elif any(k in q for k in ["slow motion", "slowmo", "60fps", "120fps", "50fps", "100fps"]):
+    # 13. Slow Motion & Frame Rates
+    if any(k in q for k in ["slow motion", "slowmo", "60fps", "120fps", "50fps", "100fps", "240fps", "fps"]):
         resp = (
             "⚡ **Cinematic Slow-Motion Recipe:**\n\n"
-            "• **Frame Rate:** 60fps (2.5x slow down in 24p) or 120fps (5x slow down).\n"
             "• **180° Shutter Rule:**\n"
-            "  - 60fps ➔ **1/120s** (or 1/125s)\n"
-            "  - 120fps ➔ **1/240s** (or 1/250s)\n"
-            "• **Lighting Compensation:** Because shutter speed is faster, you lose ~1.5 to 2 stops of light. Open aperture (f/1.4 - f/2.0) or increase Base ISO.\n"
-            "• **Gimbal / Handheld:** Enable Active IBIS + optical lens stabilization.\n"
-            "• **Audio Note:** In-camera audio is often muted at 120fps S&Q mode—record ambient sound on a separate track!"
+            "  - 60fps ➔ **1/120s**\n"
+            "  - 120fps ➔ **1/240s**\n"
+            "• **Light Compensation:** Higher frame rates lose ~1.5 to 2 stops of light. Open your aperture (f/1.4-f/2.0) or switch to your camera's second Base ISO.\n"
+            "• **Playback:** Conform 60fps/120fps to a 24fps timeline for smooth 2.5x to 5x slow motion."
         )
         return {"response": resp, "source": "pranvith_camera_ai"}
 
-    elif any(k in q for k in ["flicker", "flickering", "hz", "banding", "lines", "led"]):
+    # 14. Light Flicker & LED Banding
+    if any(k in q for k in ["flicker", "flickering", "hz", "banding", "lines", "led"]):
         resp = (
-            "💡 **Light Flicker & LED Banding Fix Guide:**\n\n"
+            "💡 **Light Flicker & LED Banding Fix:**\n\n"
             "• **50Hz Regions (India, UK, Europe, Australia):**\n"
-            "  - Set PAL standard: **25fps @ 1/50s** or **50fps @ 1/100s**.\n"
-            "  - For 60fps in 50Hz countries, switch shutter to **1/100s** (not 1/120s).\n"
+            "  - Use **25fps @ 1/50s** or **50fps @ 1/100s**.\n"
+            "  - For 60fps in 50Hz countries, dial shutter to **1/100s**.\n"
             "• **60Hz Regions (USA, Canada, Japan):**\n"
-            "  - Set NTSC standard: **24fps @ 1/48s (or 1/50s)** | **30fps @ 1/60s** | **60fps @ 1/120s**.\n"
-            "• **Variable Shutter / Anti-Flicker Scan:**\n"
-            "  - Sony: Turn on *ECS / Variable Shutter* and dial fractions (e.g. 1/50.2s) until banding disappears.\n"
-            "  - Canon / Panasonic: Enable *Synchro Scan*."
+            "  - Use **24fps @ 1/48s (or 1/50s)** | **60fps @ 1/120s**.\n"
+            "• **Anti-Flicker Mode:** Turn on *ECS / Variable Shutter* (Sony) or *Synchro Scan* (Canon/Panasonic)."
         )
         return {"response": resp, "source": "pranvith_camera_ai"}
+
+    # 15. Default Friendly Fallback
+    resp = (
+        f"🎬 **Pranvith AI Assistant for: \"{query}\"**\n\n"
+        "• **Looking for Editing Packs?** Check out our [Creative LUT Pack (₹49)](/assets/creative-lut-pack) and [Cinematic Sound FX Pack (₹149)](/assets/cinematic-sound-fx-pack).\n"
+        "• **Camera Settings?** Ask for exact settings on Sony (A7 IV, FX3, A7S III), Canon (R5, R6), slow-motion 60fps/120fps, or low-light wedding workflows.\n"
+        "• **Support / Orders:** Instant download access after checkout; support via **info@pranvithdop.com**."
+    )
+    return {"response": resp, "source": "pranvith_ai"}
 
     elif any(k in q for k in ["wedding", "bride", "groom", "reception", "ceremony", "couple"]):
         resp = (

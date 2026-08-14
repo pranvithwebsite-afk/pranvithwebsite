@@ -149,8 +149,23 @@ export const askCameraAi = async (message, history = []) => {
   } catch (error) {
     console.warn('[ai] Backend AI call failed, generating locally', error);
     const q = (message || '').toLowerCase();
+    if (q.includes('lut') || q.includes('preset') || q.includes('color grade')) {
+      return "🎨 **Pranvith Creative LUT Pack (₹49):**\n\n• **Contents:** 10+ Cinematic 3D LUTs calibrated for Sony S-Log3, Canon C-Log3, V-Log, and Rec.709 footage.\n• **Price:** **₹49** (Lifetime access & instant delivery).\n• **Compatibility:** Premiere Pro, DaVinci Resolve, Final Cut, CapCut.\n\n👉 [Get Creative LUT Pack (₹49)](/assets/creative-lut-pack)";
+    }
+    if (q.includes('sound') || q.includes('sfx') || q.includes('audio')) {
+      return "🔊 **Cinematic Sound FX Pack (₹149):**\n\n• **Contents:** 100+ 24-bit WAV impacts, risers, whooshes, and atmospheres.\n• **License:** 100% Royalty-Free.\n\n👉 [Get Sound FX Pack (₹149)](/assets/cinematic-sound-fx-pack)";
+    }
+    if (q.includes('template') || q.includes('invitation')) {
+      return "💍 **Premiere Pro Wedding Templates (₹299):**\n\n• **Contents:** 10+ 4K wedding openers, invitations, and lower thirds.\n\n👉 [Get Wedding Templates (₹299)](/assets/premiere-pro-wedding-templates)";
+    }
+    if (q.includes('product') || q.includes('pack') || q.includes('price') || q.includes('buy')) {
+      return "🛍️ **PranvithDOP Digital Assets & Pricing:**\n\n1. **Creative LUT Pack:** ₹49 ➔ [View LUTs](/assets/creative-lut-pack)\n2. **Cinematic Sound FX Pack:** ₹149 ➔ [View Sound FX](/assets/cinematic-sound-fx-pack)\n3. **Premiere Pro Wedding Templates:** ₹299 ➔ [View Templates](/assets/premiere-pro-wedding-templates)\n4. **Wedding Album PSD Pack:** ₹199 ➔ [View PSD Pack](/assets/wedding-album-psd-pack)\n\n👉 [Browse All Creative Assets](/assets)";
+    }
+    if (q.includes('a7iv') || q.includes('a7m4') || q.includes('m4') || q.includes('a7 4')) {
+      return "🎥 **Sony A7 IV (A7M4) Cinematic Video Setup:**\n\n• **Picture Profile:** PP8 / PP11 (S-Log3 / S-Gamut3.Cine).\n• **Dual Native Base ISO:** **ISO 800 (Base 1)** & **ISO 3,200 (Base 2)**.\n• **Exposure:** Expose to the right (**+1.7 to +2.0 EV** MM) for zero shadow noise.\n• **Shutter:** 1/50s for 24/25fps | 1/100s for 50fps.\n• **Codec:** XAVC S-I 4K 10-Bit 4:2:2.";
+    }
     if (q.includes('sony') || q.includes('slog') || q.includes('s-log') || q.includes('fx3')) {
-      return "🎥 **Sony S-Log3 Cinematography Recipe:**\n\n• **Base ISO:** ISO 800 (Base 1) or ISO 12,800 (Base 2 on FX3/A7S III).\n• **Exposure:** Expose to the right (+1.7 EV) for noise-free shadow detail.\n• **Gamut:** S-Gamut3.Cine for cinematic colors.\n• **Shutter:** 1/50s at 24fps or 1/100s at 50/60fps.";
+      return "🎥 **Sony S-Log3 Cinematography Recipe:**\n\n• **Base ISOs:** ISO 800 (Base 1) & ISO 12,800 (Base 2 on FX3/A7S III).\n• **Exposure:** Expose to the right (+1.7 to +2.0 EV) for clean shadow detail.\n• **Gamut:** S-Gamut3.Cine for cinematic colors.\n• **Shutter:** 1/50s at 24/25fps or 1/100s at 50/60fps.";
     }
     if (q.includes('canon') || q.includes('clog') || q.includes('c-log') || q.includes('r6')) {
       return "🎥 **Canon C-Log3 Recipe (R5/R6):**\n\n• **Base ISO:** ISO 800 Native.\n• **Exposure:** +1.0 to +1.3 EV.\n• **Gamut:** Cinema Gamut.\n• **Color Transform:** CST node in DaVinci Resolve to Rec.709.";
@@ -158,7 +173,7 @@ export const askCameraAi = async (message, history = []) => {
     if (q.includes('slow') || q.includes('60fps') || q.includes('120fps')) {
       return "⚡ **Cinematic Slow Motion (60fps/120fps):**\n\n• **60fps:** Shutter 1/120s (180° rule).\n• **120fps:** Shutter 1/240s.\n• **Aperture:** Open by 1.5 stops or increase Base ISO to compensate for faster shutter speed.";
     }
-    return `🎬 **Pranvith Camera AI:**\n\n• **Recommended Settings:** 10-Bit 4:2:2 Log, 180° Shutter Angle, Manual Kelvin White Balance.\n• **Exposure Tip:** Always expose Log curves above middle grey (+1.5 EV) for maximum dynamic range and cleaner color grading!`;
+    return `🎬 **Pranvith AI Assistant:**\n\n• **Looking for Assets?** Check our [Creative LUT Pack (₹49)](/assets/creative-lut-pack) and [Sound FX Pack (₹149)](/assets/cinematic-sound-fx-pack).\n• **Camera Settings?** Ask for exact Dual Native ISOs, Log exposure, slow-motion, or light flicker fixes!`;
   }
 };
 
