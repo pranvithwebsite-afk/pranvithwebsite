@@ -1,0 +1,332 @@
+import React, { useState, useRef, useEffect } from 'react';
+import {
+  MessageSquare,
+  Sparkles,
+  Star,
+  X,
+  Trash2,
+  Send,
+  ShoppingBag,
+  Download,
+  CreditCard,
+  Package,
+  HelpCircle,
+  Headphones,
+  Loader2,
+  ChevronRight,
+  Bot,
+} from 'lucide-react';
+import { askCameraAi } from '../lib/api';
+import { Link } from 'react-router-dom';
+
+const SHORTCUTS = [
+  { id: 'find_product', label: 'Find a Product', icon: ShoppingBag, prompt: 'What editing packs, LUTs, and presets are available?' },
+  { id: 'product_rec', label: 'Product Recommendation', icon: Star, prompt: 'Which LUT pack or preset is best for Sony and Canon wedding videos?' },
+  { id: 'download_help', label: 'Download Help', icon: Download, prompt: 'How do I download my purchased assets and what if my link expired?' },
+  { id: 'payment_help', label: 'Payment Help', icon: CreditCard, prompt: 'What payment methods do you support and how does Razorpay checkout work?' },
+  { id: 'order_help', label: 'Order Help', icon: Package, prompt: 'How do I check my order status or re-access my download token?' },
+  { id: 'faq', label: 'FAQ', icon: HelpCircle, prompt: 'What is your commercial license policy and software compatibility?' },
+  { id: 'support', label: 'Talk to Support', icon: Headphones, prompt: 'How can I contact PranvithDOP support directly?' },
+];
+
+const FormattedAiMessage = ({ text }) => {
+  const lines = String(text || '').split('\n');
+  return (
+    <div className="space-y-1.5 text-xs md:text-sm leading-relaxed">
+      {lines.map((line, idx) => {
+        if (!line.trim()) return <div key={idx} className="h-1.5" />;
+        const parts = line.split(/(\*\*.*?\*\*)/g);
+        return (
+          <div key={idx} className={line.startsWith('•') ? 'pl-2 text-white/95' : 'text-white/90'}>
+            {parts.map((part, pIdx) => {
+              if (part.startsWith('**') && part.endsWith('**')) {
+                return (
+                  <strong key={pIdx} className="text-violet-300 font-semibold">
+                    {part.slice(2, -2)}
+                  </strong>
+                );
+              }
+              return part;
+            })}
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
+const FloatingAiAssistant = () => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [input, setInput] = useState('');
+  const [isTyping, setIsTyping] = useState(false);
+  const [hasUnread, setHasUnread] = useState(true);
+  const [messages, setMessages] = useState(() => {
+    try {
+      const saved = sessionStorage.getItem('pranvith_ai_chat');
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) {
+      return [];
+    }
+  });
+
+  const chatEndRef = useRef(null);
+
+  const scrollToBottom = () => {
+    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  useEffect(() => {
+    if (isOpen) {
+      scrollToBottom();
+      setHasUnread(false);
+    }
+  }, [isOpen, messages, isTyping]);
+
+  useEffect(() => {
+    try {
+      sessionStorage.setItem('pranvith_ai_chat', JSON.stringify(messages));
+    } catch (e) {}
+  }, [messages]);
+
+  const handleSend = async (customPrompt) => {
+    const textToSend = typeof customPrompt === 'string' ? customPrompt : input;
+    if (!textToSend.trim() || isTyping) return;
+
+    const userMsg = textToSend.trim();
+    if (typeof customPrompt !== 'string') setInput('');
+
+    const newHistory = [...messages, { sender: 'user', text: userMsg }];
+    setMessages(newHistory);
+    setIsTyping(true);
+
+    try {
+      const history = newHistory.slice(-6).map((m) => ({
+        role: m.sender === 'user' ? 'user' : 'model',
+        text: m.text,
+      }));
+
+      // Pre-baked instant smart answers for common customer support shortcuts
+      let response = '';
+      const q = userMsg.toLowerCase();
+
+      if (q.includes('find a product') || q.includes('available') || q.includes('packs')) {
+        response = `🛍️ **PranvithDOP Editing Packs & Assets:**\n\n• **Wedding LUTs Master Pack:** 15+ high-grade cinematic LUTs calibrated for Sony S-Log3, Canon C-Log3, and Rec.709.\n• **Cinematic Sound FX Bundle:** 200+ whooshes, risers, impacts, and ambient soundscapes.\n• **Motion Transitions & Overlay Presets:** Seamless zooms, light leaks, and glitch transitions.\n• **Album PSD Templates:** Professional photo editing grids.\n\n👉 [Explore All Assets](/assets)`;
+      } else if (q.includes('download help') || q.includes('download') || q.includes('expired')) {
+        response = `📥 **Download Instructions:**\n\n1. Instant access is provided immediately after payment on the confirmation page.\n2. A download token link is also automatically sent to your billing email.\n3. If your token expired or you lost the email, send your Order ID to **info@pranvithdop.com** for instant renewal!`;
+      } else if (q.includes('payment') || q.includes('methods') || q.includes('razorpay')) {
+        response = `💳 **Payment & Checkout:**\n\n• We accept **UPI (GPay, PhonePe, Paytm)**, **Credit/Debit Cards**, **Net Banking**, and **International Cards** via Razorpay.\n• 100% encrypted and instant automatic delivery!`;
+      } else if (q.includes('order help') || q.includes('status')) {
+        response = `📦 **Order Status & Downloads:**\n\n• All digital assets are delivered instantly upon successful payment.\n• Please check your email inbox and spam folder for the download receipt.\n• Need instant re-send? Contact our support team below!`;
+      } else if (q.includes('support') || q.includes('contact') || q.includes('talk to support')) {
+        response = `💬 **Contact PranvithDOP Support:**\n\n• **Email:** info@pranvithdop.com\n• **WhatsApp / Phone:** +91 9059867883\n• **Location:** Hyderabad, India\n• **Hours:** 24/7 Response time for digital downloads & enquiries.`;
+      } else {
+        response = await askCameraAi(userMsg, history);
+      }
+
+      setMessages((prev) => [...prev, { sender: 'ai', text: response }]);
+    } catch (err) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          sender: 'ai',
+          text: '⚡ **Pranvith AI Assistant:** How can I help you today? Ask about presets, downloads, camera profiles, or support!',
+        },
+      ]);
+    } finally {
+      setIsTyping(false);
+    }
+  };
+
+  const handleClear = () => {
+    setMessages([]);
+    try {
+      sessionStorage.removeItem('pranvith_ai_chat');
+    } catch (e) {}
+  };
+
+  return (
+    <>
+      {/* Floating Chat Modal Popup */}
+      {isOpen && (
+        <div
+          className="fixed bottom-24 right-4 sm:right-6 z-[999] w-[calc(100vw-2rem)] sm:w-[410px] max-h-[640px] h-[84vh] rounded-3xl border border-violet-500/30 bg-[#0d0d16]/95 backdrop-blur-2xl shadow-[0_25px_80px_rgba(0,0,0,0.85)] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200"
+          role="dialog"
+          aria-label="Pranvith AI Assistant Chat"
+        >
+          {/* Header */}
+          <div className="flex items-center justify-between px-5 py-4 border-b border-white/10 bg-slate-900/60 backdrop-blur-md shrink-0">
+            <div className="flex items-center gap-3">
+              <div className="relative flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-tr from-violet-600 to-indigo-500 text-white shadow-[0_0_20px_rgba(139,92,246,0.5)]">
+                <Star size={20} className="fill-white/20 text-white" />
+                <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-[#0d0d16] bg-emerald-400" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-sm font-bold text-white tracking-wide">Pranvith AI</h3>
+                  <span className="rounded-md bg-violet-600/30 border border-violet-500/40 px-1.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wider text-violet-300">
+                    PRO
+                  </span>
+                </div>
+                <p className="flex items-center gap-1.5 text-[11px] text-white/60 font-medium">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  Online • Instant Assistant
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={handleClear}
+                title="Clear Chat"
+                className="h-8 w-8 rounded-xl flex items-center justify-center text-white/50 hover:bg-white/10 hover:text-white transition"
+              >
+                <Trash2 size={16} />
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsOpen(false)}
+                title="Close"
+                className="h-8 w-8 rounded-xl flex items-center justify-center text-white/50 hover:bg-white/10 hover:text-white transition"
+              >
+                <X size={18} />
+              </button>
+            </div>
+          </div>
+
+          {/* Chat Body & Conversation */}
+          <div className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin">
+            {/* Welcome Card & Shortcuts (shown when empty or at top) */}
+            <div className="rounded-2xl border border-violet-500/20 bg-gradient-to-b from-violet-950/25 to-slate-900/40 p-5 text-center shadow-lg">
+              <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-violet-600/20 border border-violet-500/30 text-violet-400 shadow-[0_0_20px_rgba(139,92,246,0.3)]">
+                <MessageSquare size={22} />
+              </div>
+              <h4 className="text-base font-bold text-white">
+                Hi 👋 Welcome to <span className="text-violet-400">PranvithDOP!</span>
+              </h4>
+              <p className="mt-1.5 text-xs text-white/65 leading-relaxed max-w-xs mx-auto">
+                I can help you explore editing packs, find presets, verify order downloads, and answer camera & technical questions.
+              </p>
+
+              {/* Quick Shortcuts Grid */}
+              <div className="mt-4 pt-3 border-t border-white/10 text-left">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-violet-300/80 mb-2.5">
+                  QUICK SHORTCUTS:
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {SHORTCUTS.map((item) => {
+                    const Icon = item.icon;
+                    return (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => handleSend(item.prompt)}
+                        className="inline-flex items-center gap-1.5 rounded-full border border-violet-500/30 bg-violet-950/40 hover:bg-violet-600/30 hover:border-violet-400 px-3 py-1.5 text-[11px] font-medium text-white/90 hover:text-white transition duration-200"
+                      >
+                        <Icon size={12} className="text-violet-400" />
+                        <span>{item.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
+            {/* Chat Message Bubbles */}
+            {messages.map((msg, i) => (
+              <div
+                key={i}
+                className={`flex gap-2.5 text-sm ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}
+              >
+                {msg.sender === 'ai' && (
+                  <div className="h-7 w-7 rounded-xl bg-violet-600/20 border border-violet-500/40 flex items-center justify-center shrink-0 text-violet-400 mt-0.5">
+                    <Sparkles size={13} />
+                  </div>
+                )}
+                <div
+                  className={`max-w-[85%] rounded-2xl px-4 py-3 leading-relaxed ${
+                    msg.sender === 'user'
+                      ? 'bg-gradient-to-r from-violet-600 to-indigo-600 text-white rounded-br-none font-medium shadow-md shadow-violet-950/40 text-xs md:text-sm'
+                      : 'bg-slate-900/90 border border-white/10 rounded-bl-none text-white shadow-md'
+                  }`}
+                >
+                  {msg.sender === 'ai' ? <FormattedAiMessage text={msg.text} /> : msg.text}
+                </div>
+              </div>
+            ))}
+
+            {isTyping && (
+              <div className="flex gap-2.5 text-sm justify-start">
+                <div className="h-7 w-7 rounded-xl bg-violet-600/20 border border-violet-500/40 flex items-center justify-center shrink-0 text-violet-400">
+                  <Sparkles size={13} className="animate-spin" />
+                </div>
+                <div className="bg-slate-900/90 border border-white/10 rounded-2xl rounded-bl-none px-4 py-2.5 text-xs text-white/70 flex items-center gap-2">
+                  <Loader2 size={12} className="animate-spin text-violet-400" />
+                  <span>Thinking...</span>
+                </div>
+              </div>
+            )}
+
+            <div ref={chatEndRef} />
+          </div>
+
+          {/* Input Bar */}
+          <div className="p-3.5 border-t border-white/10 bg-slate-950/80 shrink-0">
+            <form onSubmit={(e) => { e.preventDefault(); handleSend(); }} className="relative flex items-center">
+              <input
+                type="text"
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                placeholder="Ask about presets, order downloads, pricing..."
+                className="w-full rounded-2xl border border-violet-500/40 bg-slate-900/90 py-3 pl-4 pr-12 text-xs md:text-sm text-white placeholder:text-white/40 focus:border-violet-400 focus:ring-1 focus:ring-violet-400 focus:outline-none shadow-inner"
+              />
+              <button
+                type="submit"
+                disabled={!input.trim() || isTyping}
+                className="absolute right-1.5 flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-r from-violet-600 to-indigo-500 text-white shadow-md shadow-violet-950/50 hover:brightness-110 disabled:opacity-40 transition"
+                aria-label="Send message"
+              >
+                {isTyping ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />}
+              </button>
+            </form>
+            <div className="mt-2 flex items-center justify-between px-1 text-[10px] text-white/40">
+              <span>Pranvith AI Assistant</span>
+              <span className="flex items-center gap-1 text-emerald-400/80">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                Support Verified
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Minimized Floating Trigger Button (Bottom Right) */}
+      <button
+        type="button"
+        onClick={() => setIsOpen((prev) => !prev)}
+        className="fixed bottom-6 right-6 z-[998] flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-tr from-violet-600 via-indigo-600 to-purple-500 text-white shadow-[0_8px_30px_rgba(139,92,246,0.55)] hover:scale-105 active:scale-95 transition-all duration-300 group border border-white/20"
+        aria-label="Open AI Assistant Chat"
+      >
+        {isOpen ? (
+          <X size={26} className="transition-transform duration-200 group-hover:rotate-90" />
+        ) : (
+          <div className="relative flex items-center justify-center">
+            <MessageSquare size={26} className="transition-transform duration-300 group-hover:scale-110" />
+            <Star
+              size={12}
+              className="absolute -top-1.5 -right-2 text-yellow-300 fill-yellow-400 animate-pulse"
+            />
+            {hasUnread && (
+              <span className="absolute -top-3 -right-3 flex h-4 w-4">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-violet-400 opacity-75" />
+                <span className="relative inline-flex rounded-full h-4 w-4 bg-violet-500 border-2 border-black" />
+              </span>
+            )}
+          </div>
+        )}
+      </button>
+    </>
+  );
+};
+
+export default FloatingAiAssistant;

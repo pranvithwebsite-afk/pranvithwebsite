@@ -1,5 +1,6 @@
 import React, { Suspense, lazy } from 'react';
 import { Routes, Route } from 'react-router-dom';
+import FloatingAiAssistant from './components/FloatingAiAssistant';
 
 const Home = lazy(() => import('./pages/Home'));
 const Courses = lazy(() => import('./pages/Courses'));
@@ -29,28 +30,29 @@ const PublicApp = () => (
   <div className="public-site min-h-screen">
     <Suspense fallback={<RouteFallback />}>
       <Routes>
-      <Route path="/" element={<Home />} />
-      <Route path="/courses" element={<Courses />} />
-      <Route path="/about" element={<About />} />
-      <Route path="/assets" element={<Assets />} />
-      <Route path="/assets/:slug" element={<AssetLanding />} />
-      <Route path="/services" element={<Services />} />
-      <Route path="/services/:slug" element={<ServiceDetail />} />
-      <Route path="/payment-success" element={<PaymentSuccess />} />
-      <Route path="/payment-failed" element={<PaymentFailed />} />
-      <Route path="/works" element={<Works />} />
-      <Route path="/portfolio" element={<Works />} />
-      <Route path="/hire" element={<Hire />} />
-      <Route path="/contact" element={<Hire />} />
-      <Route path="/privacy" element={<Privacy />} />
-      <Route path="/privacy-policy" element={<Privacy />} />
-      <Route path="/terms" element={<Privacy />} />
-      <Route path="/commercial-video-production" element={<ServicePage type="commercial" />} />
-      <Route path="/wedding-cinematography" element={<ServicePage type="wedding" />} />
-      <Route path="/drone-cinematography" element={<ServicePage type="drone" />} />
-      <Route path="*" element={<NotFound />} />
+        <Route path="/" element={<Home />} />
+        <Route path="/courses" element={<Courses />} />
+        <Route path="/about" element={<About />} />
+        <Route path="/assets" element={<Assets />} />
+        <Route path="/assets/:slug" element={<AssetLanding />} />
+        <Route path="/services" element={<Services />} />
+        <Route path="/services/:slug" element={<ServiceDetail />} />
+        <Route path="/payment-success" element={<PaymentSuccess />} />
+        <Route path="/payment-failed" element={<PaymentFailed />} />
+        <Route path="/works" element={<Works />} />
+        <Route path="/portfolio" element={<Works />} />
+        <Route path="/hire" element={<Hire />} />
+        <Route path="/contact" element={<Hire />} />
+        <Route path="/privacy" element={<Privacy />} />
+        <Route path="/privacy-policy" element={<Privacy />} />
+        <Route path="/terms" element={<Privacy />} />
+        <Route path="/commercial-video-production" element={<ServicePage type="commercial" />} />
+        <Route path="/wedding-cinematography" element={<ServicePage type="wedding" />} />
+        <Route path="/drone-cinematography" element={<ServicePage type="drone" />} />
+        <Route path="*" element={<NotFound />} />
       </Routes>
     </Suspense>
+    <FloatingAiAssistant />
   </div>
 );
 
