@@ -1329,6 +1329,138 @@ async def public_settings():
     return _safe_settings(settings_doc)
 
 
+class CameraAiRequest(BaseModel):
+    message: str
+    history: Optional[List[Dict[str, str]]] = None
+
+
+@api_router.post("/ai/camera-assistant")
+async def camera_ai_assistant(payload: CameraAiRequest):
+    query = (payload.message or "").strip()
+    if not query:
+        raise HTTPException(status_code=400, detail="Message cannot be empty")
+
+    gemini_key = os.environ.get("GEMINI_API_KEY", "").strip()
+    if gemini_key:
+        try:
+            import httpx
+            system_prompt = (
+                "You are Pranvith Camera AI, a master cinematographer, photography director (DOP), "
+                "and color grading technician. Provide concise, highly actionable camera recipes with ISO, "
+                "Aperture, Shutter Speed/Angle, Picture Profile (S-Log3, C-Log3), White Balance, and lighting tips."
+            )
+            async with httpx.AsyncClient(timeout=15.0) as client:
+                res = await client.post(
+                    f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={gemini_key}",
+                    json={
+                        "contents": [
+                            {"role": "user", "parts": [{"text": f"{system_prompt}\n\nQuestion: {query}"}]}
+                        ]
+                    }
+                )
+                if res.status_code == 200:
+                    data = res.json()
+                    candidates = data.get("candidates", [])
+                    if candidates:
+                        content = candidates[0].get("content", {}).get("parts", [{}])[0].get("text", "")
+                        if content:
+                            return {"response": content, "source": "gemini"}
+        except Exception as e:
+            logger.warning("Gemini API call failed, falling back to built-in camera engine: %s", e)
+
+    q = query.lower()
+    if any(k in q for k in ["s-log", "slog", "sony", "fx3", "a7s", "a7iv", "a7m4", "a74"]):
+        if any(k in q for k in ["low light", "night", "dark"]):
+            resp = (
+                "🎥 **Sony S-Log3 Low-Light Recipe (FX3 / A7S III / A7 IV):**\n\n"
+                "• **Base ISO:** Jump to the 2nd Base ISO (**ISO 12,800** on FX3/A7S III or **ISO 3,200** on A7 IV) for zero shadow noise.\n"
+                "• **Exposure Metering:** Expose at **+1.7 to +2.0 EV** MM (Metered Manual) to push shadow detail above the noise floor.\n"
+                "• **Shutter Speed:** 1/50s (for 24/25fps) or 180° Shutter Angle.\n"
+                "• **Color Gamut:** S-Gamut3.Cine / S-Log3 for accurate skin tones.\n"
+                "• **Zebra Settings:** Skin tones at 52-55% Zebra, 94%+ for highlight clipping.\n"
+                "• **Pro Tip:** Never shoot between ISO 1,000 and 10,000 in low light—jump directly to Base ISO 2 for cleaner dynamic range!"
+            )
+        elif any(k in q for k in ["golden hour", "sunset", "outdoor", "sun"]):
+            resp = (
+                "🌅 **Sony S-Log3 Golden-Hour / Outdoor Cinematography:**\n\n"
+                "• **Base ISO:** Base 1 (**ISO 800** on FX3/A7S III/A7 IV).\n"
+                "• **ND Filter:** Variable ND (2-5 Stops / ND4-ND32) to maintain wide aperture (f/1.4 - f/2.0).\n"
+                "• **Shutter Speed:** 1/50s (24fps) or 1/100s (50/60fps slow motion).\n"
+                "• **White Balance:** Manual Kelvin at **5600K - 6000K** for warm golden sunset glow.\n"
+                "• **Exposure:** Expose highlights carefully; retain sun flare roll-off by exposing skin around +1.3 to +1.7 EV."
+            )
+        else:
+            resp = (
+                "🎬 **Sony S-Log3 General Mastering Guide:**\n\n"
+                "• **Picture Profile:** PP8 / PP11 (S-Log3 / S-Gamut3.Cine).\n"
+                "• **Base ISOs:** FX3/A7S III: **ISO 800 & 12,800** | A7 IV: **ISO 800 & 3,200**.\n"
+                "• **Exposure Strategy:** Expose to the right (ETTR) by **+1.5 to +1.7 EV**.\n"
+                "• **Zebra Target:** 52-55% for Caucasian/Asian skin, 45-50% for darker skin tones.\n"
+                "• **Color Grading:** Convert with PranvithDOP S-Log3 Master Rec.709 LUT before secondary grading."
+            )
+        return {"response": resp, "source": "pranvith_camera_ai"}
+
+    elif any(k in q for k in ["canon", "c-log", "clog", "r6", "r5", "c70"]):
+        resp = (
+            "🎥 **Canon C-Log3 Cinematography Recipe (R5 / R6 II / C70):**\n\n"
+            "• **Picture Profile:** C-Log3 / Cinema Gamut.\n"
+            "• **Base ISO:** **ISO 800** (Native) | Low noise floor.\n"
+            "• **Exposure Strategy:** Expose **+1.0 to +1.3 EV** over standard meter reading.\n"
+            "• **Waveform Target:** Middle grey at **35%**, Caucasian skin tones at **50-55%**, white clipping at **85%**.\n"
+            "• **Noise Reduction:** Set in-camera NR to Low or Off; denoise in DaVinci Resolve Studio / Neat Video.\n"
+            "• **Color Transform:** Canon Cinema Gamut to Rec.709 via CST (Color Space Transform) in DaVinci Resolve."
+        )
+        return {"response": resp, "source": "pranvith_camera_ai"}
+
+    elif any(k in q for k in ["slow motion", "slowmo", "60fps", "120fps", "50fps", "100fps"]):
+        resp = (
+            "⚡ **Cinematic Slow-Motion Recipe:**\n\n"
+            "• **Frame Rate:** 60fps (2.5x slow down in 24p) or 120fps (5x slow down).\n"
+            "• **180° Shutter Rule:**\n"
+            "  - 60fps ➔ **1/120s** (or 1/125s)\n"
+            "  - 120fps ➔ **1/240s** (or 1/250s)\n"
+            "• **Lighting Compensation:** Because shutter speed is faster, you lose ~1.5 to 2 stops of light. Open aperture (f/1.4 - f/2.0) or increase Base ISO.\n"
+            "• **Gimbal / Handheld:** Enable Active IBIS + optical lens stabilization.\n"
+            "• **Audio Note:** In-camera audio is often muted at 120fps S&Q mode—record ambient sound on a separate track!"
+        )
+        return {"response": resp, "source": "pranvith_camera_ai"}
+
+    elif any(k in q for k in ["flicker", "flickering", "hz", "banding", "lines", "led"]):
+        resp = (
+            "💡 **Light Flicker & LED Banding Fix Guide:**\n\n"
+            "• **50Hz Regions (India, UK, Europe, Australia):**\n"
+            "  - Set PAL standard: **25fps @ 1/50s** or **50fps @ 1/100s**.\n"
+            "  - For 60fps in 50Hz countries, switch shutter to **1/100s** (not 1/120s).\n"
+            "• **60Hz Regions (USA, Canada, Japan):**\n"
+            "  - Set NTSC standard: **24fps @ 1/48s (or 1/50s)** | **30fps @ 1/60s** | **60fps @ 1/120s**.\n"
+            "• **Variable Shutter / Anti-Flicker Scan:**\n"
+            "  - Sony: Turn on *ECS / Variable Shutter* and dial fractions (e.g. 1/50.2s) until banding disappears.\n"
+            "  - Canon / Panasonic: Enable *Synchro Scan*."
+        )
+        return {"response": resp, "source": "pranvith_camera_ai"}
+
+    elif any(k in q for k in ["wedding", "bride", "groom", "reception", "ceremony", "couple"]):
+        resp = (
+            "💍 **Wedding Cinematography On-Set Workflow:**\n\n"
+            "• **Pre-Wedding / Couple Shoot:** 85mm f/1.4 or 50mm f/1.2 at Golden Hour (5600K WB, 60fps slow-motion b-roll).\n"
+            "• **Ceremony (Mandap / Altar):** Dual camera setup:\n"
+            "  - Cam A (Wide Master): 24-70mm f/2.8 on tripod (24fps 4K 10-bit).\n"
+            "  - Cam B (Closeups/Emotions): 70-200mm f/2.8 or 85mm f/1.4 handheld/monopod.\n"
+            "• **Low-Light Sangeet / Reception:** Dual Base ISO (e.g. ISO 12,800), on-camera tube light (Nanlite/Aputure) dimmed to 10% warm fill.\n"
+            "• **Audio:** Wireless lavalier (DJI Mic 2 / Rode Wireless PRO) with 32-bit float backup."
+        )
+        return {"response": resp, "source": "pranvith_camera_ai"}
+
+    resp = (
+        f"🎬 **Pranvith Camera AI Recommendation for: \"{query}\"**\n\n"
+        "• **Recommended Profile:** 10-Bit 4:2:2 Log (S-Log3 / C-Log3 / V-Log) for 14+ stops dynamic range.\n"
+        "• **Exposure Priority:** 180° Shutter Angle (1/50s for 24fps) with circular variable ND filter.\n"
+        "• **Color Pipeline:** Expose to the right (ETTR +1.7 EV) and convert with custom PranvithDOP Rec.709 conversion LUTs.\n"
+        "• **Workflow Tip:** Always lock Manual White Balance (Kelvin) before shooting so color matching across cuts is seamless!"
+    )
+    return {"response": resp, "source": "pranvith_camera_ai"}
+
+
 PUBLIC_SETTINGS_FIELDS = {
     "site_name",
     "theme",

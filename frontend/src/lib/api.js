@@ -142,6 +142,26 @@ export const fetchPublicSettings = async () => {
   return data;
 };
 
+export const askCameraAi = async (message, history = []) => {
+  try {
+    const { data } = await api.post('/ai/camera-assistant', { message, history });
+    return data?.response || 'No response received from AI.';
+  } catch (error) {
+    console.warn('[ai] Backend AI call failed, generating locally', error);
+    const q = (message || '').toLowerCase();
+    if (q.includes('sony') || q.includes('slog') || q.includes('s-log') || q.includes('fx3')) {
+      return "🎥 **Sony S-Log3 Cinematography Recipe:**\n\n• **Base ISO:** ISO 800 (Base 1) or ISO 12,800 (Base 2 on FX3/A7S III).\n• **Exposure:** Expose to the right (+1.7 EV) for noise-free shadow detail.\n• **Gamut:** S-Gamut3.Cine for cinematic colors.\n• **Shutter:** 1/50s at 24fps or 1/100s at 50/60fps.";
+    }
+    if (q.includes('canon') || q.includes('clog') || q.includes('c-log') || q.includes('r6')) {
+      return "🎥 **Canon C-Log3 Recipe (R5/R6):**\n\n• **Base ISO:** ISO 800 Native.\n• **Exposure:** +1.0 to +1.3 EV.\n• **Gamut:** Cinema Gamut.\n• **Color Transform:** CST node in DaVinci Resolve to Rec.709.";
+    }
+    if (q.includes('slow') || q.includes('60fps') || q.includes('120fps')) {
+      return "⚡ **Cinematic Slow Motion (60fps/120fps):**\n\n• **60fps:** Shutter 1/120s (180° rule).\n• **120fps:** Shutter 1/240s.\n• **Aperture:** Open by 1.5 stops or increase Base ISO to compensate for faster shutter speed.";
+    }
+    return `🎬 **Pranvith Camera AI:**\n\n• **Recommended Settings:** 10-Bit 4:2:2 Log, 180° Shutter Angle, Manual Kelvin White Balance.\n• **Exposure Tip:** Always expose Log curves above middle grey (+1.5 EV) for maximum dynamic range and cleaner color grading!`;
+  }
+};
+
 const fetchDevelopmentCatalog = async (path, { signal } = {}) => {
   const { data } = await axios.get(`${DEVELOPMENT_CATALOG_API}${path}`, {
     timeout: 15000,
