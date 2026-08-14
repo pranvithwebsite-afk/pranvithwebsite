@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import {
+  Camera,
   MessageSquare,
   Sparkles,
   Star,
@@ -213,13 +214,13 @@ const FloatingAiAssistant = () => {
           <div className="flex items-center justify-between px-5 py-4 border-b border-white/10 bg-black/60 backdrop-blur-md shrink-0">
             <div className="flex items-center gap-3">
               <div className="relative flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-tr from-[#ff5a1f] to-[#0877ff] text-white shadow-[0_0_20px_rgba(255,90,31,0.4)]">
-                <Star size={20} className="fill-white/20 text-white" />
+                <Camera size={20} className="text-white" />
                 <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-[#07090e] bg-emerald-400" />
               </div>
               <div>
                 <div className="flex items-center gap-2">
                   <h3 className="text-sm font-bold text-white tracking-wide font-[Space_Grotesk]">
-                    Pranvith <span className="text-[#ff5a1f]">AI</span>
+                    Camera <span className="text-[#ff5a1f]">AI</span>
                   </h3>
                   <span className="rounded-md bg-[#ff5a1f]/20 border border-[#ff5a1f]/40 px-1.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wider text-[#ff8a5c]">
                     PRO
@@ -348,7 +349,7 @@ const FloatingAiAssistant = () => {
               </button>
             </form>
             <div className="mt-2 flex items-center justify-between px-1 text-[10px] text-white/40">
-              <span>Pranvith AI Assistant</span>
+              <span>Camera AI Assistant</span>
               <span className="flex items-center gap-1 text-emerald-400/80">
                 <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
                 Support Verified
@@ -363,14 +364,14 @@ const FloatingAiAssistant = () => {
         type="button"
         onClick={() => setIsOpen((prev) => !prev)}
         className="fixed bottom-6 right-6 z-[998] flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-tr from-[#ff5a1f] via-[#ea580c] to-[#0877ff] text-white shadow-[0_8px_30px_rgba(255,90,31,0.55)] hover:scale-105 active:scale-95 transition-all duration-300 group border border-white/20"
-        aria-label="Open AI Assistant Chat"
+        aria-label="Open Camera AI Chat"
       >
         {isOpen ? (
           <X size={26} className="transition-transform duration-200 group-hover:rotate-90" />
         ) : (
           <div className="relative flex items-center justify-center">
-            <MessageSquare size={26} className="transition-transform duration-300 group-hover:scale-110" />
-            <Star
+            <Camera size={24} className="transition-transform duration-300 group-hover:scale-110" />
+            <Sparkles
               size={12}
               className="absolute -top-1.5 -right-2 text-yellow-300 fill-yellow-400 animate-pulse"
             />
