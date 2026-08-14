@@ -13,11 +13,8 @@ import {
   HelpCircle,
   Headphones,
   Loader2,
-  ChevronRight,
-  Bot,
 } from 'lucide-react';
 import { askCameraAi } from '../lib/api';
-import { Link } from 'react-router-dom';
 
 const SHORTCUTS = [
   { id: 'find_product', label: 'Find a Product', icon: ShoppingBag, prompt: 'What editing packs, LUTs, and presets are available?' },
@@ -41,7 +38,7 @@ const FormattedAiMessage = ({ text }) => {
             {parts.map((part, pIdx) => {
               if (part.startsWith('**') && part.endsWith('**')) {
                 return (
-                  <strong key={pIdx} className="text-violet-300 font-semibold">
+                  <strong key={pIdx} className="text-[#ff8a5c] font-semibold">
                     {part.slice(2, -2)}
                   </strong>
                 );
@@ -105,7 +102,6 @@ const FloatingAiAssistant = () => {
         text: m.text,
       }));
 
-      // Pre-baked instant smart answers for common customer support shortcuts
       let response = '';
       const q = userMsg.toLowerCase();
 
@@ -149,21 +145,23 @@ const FloatingAiAssistant = () => {
       {/* Floating Chat Modal Popup */}
       {isOpen && (
         <div
-          className="fixed bottom-24 right-4 sm:right-6 z-[999] w-[calc(100vw-2rem)] sm:w-[410px] max-h-[640px] h-[84vh] rounded-3xl border border-violet-500/30 bg-[#0d0d16]/95 backdrop-blur-2xl shadow-[0_25px_80px_rgba(0,0,0,0.85)] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200"
+          className="fixed bottom-24 right-4 sm:right-6 z-[999] w-[calc(100vw-2rem)] sm:w-[410px] max-h-[640px] h-[84vh] rounded-3xl border border-[#ff5a1f]/35 bg-[#07090e]/95 backdrop-blur-2xl shadow-[0_25px_80px_rgba(0,0,0,0.9),0_0_35px_rgba(255,90,31,0.15)] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200"
           role="dialog"
           aria-label="Pranvith AI Assistant Chat"
         >
           {/* Header */}
-          <div className="flex items-center justify-between px-5 py-4 border-b border-white/10 bg-slate-900/60 backdrop-blur-md shrink-0">
+          <div className="flex items-center justify-between px-5 py-4 border-b border-white/10 bg-black/60 backdrop-blur-md shrink-0">
             <div className="flex items-center gap-3">
-              <div className="relative flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-tr from-violet-600 to-indigo-500 text-white shadow-[0_0_20px_rgba(139,92,246,0.5)]">
+              <div className="relative flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-tr from-[#ff5a1f] to-[#0877ff] text-white shadow-[0_0_20px_rgba(255,90,31,0.4)]">
                 <Star size={20} className="fill-white/20 text-white" />
-                <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-[#0d0d16] bg-emerald-400" />
+                <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-[#07090e] bg-emerald-400" />
               </div>
               <div>
                 <div className="flex items-center gap-2">
-                  <h3 className="text-sm font-bold text-white tracking-wide">Pranvith AI</h3>
-                  <span className="rounded-md bg-violet-600/30 border border-violet-500/40 px-1.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wider text-violet-300">
+                  <h3 className="text-sm font-bold text-white tracking-wide font-[Space_Grotesk]">
+                    Pranvith <span className="text-[#ff5a1f]">AI</span>
+                  </h3>
+                  <span className="rounded-md bg-[#ff5a1f]/20 border border-[#ff5a1f]/40 px-1.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wider text-[#ff8a5c]">
                     PRO
                   </span>
                 </div>
@@ -197,12 +195,12 @@ const FloatingAiAssistant = () => {
           {/* Chat Body & Conversation */}
           <div className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin">
             {/* Welcome Card & Shortcuts (shown when empty or at top) */}
-            <div className="rounded-2xl border border-violet-500/20 bg-gradient-to-b from-violet-950/25 to-slate-900/40 p-5 text-center shadow-lg">
-              <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-violet-600/20 border border-violet-500/30 text-violet-400 shadow-[0_0_20px_rgba(139,92,246,0.3)]">
+            <div className="rounded-2xl border border-white/10 bg-[linear-gradient(145deg,rgba(255,90,31,0.08),rgba(7,9,14,0.6)_50%,rgba(8,119,255,0.08))] p-5 text-center shadow-lg">
+              <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-[#ff5a1f]/15 border border-[#ff5a1f]/30 text-[#ff8a5c] shadow-[0_0_20px_rgba(255,90,31,0.25)]">
                 <MessageSquare size={22} />
               </div>
-              <h4 className="text-base font-bold text-white">
-                Hi 👋 Welcome to <span className="text-violet-400">PranvithDOP!</span>
+              <h4 className="text-base font-bold text-white font-[Space_Grotesk]">
+                Hi 👋 Welcome to <span className="text-[#ff5a1f]">PranvithDOP!</span>
               </h4>
               <p className="mt-1.5 text-xs text-white/65 leading-relaxed max-w-xs mx-auto">
                 I can help you explore editing packs, find presets, verify order downloads, and answer camera & technical questions.
@@ -210,7 +208,7 @@ const FloatingAiAssistant = () => {
 
               {/* Quick Shortcuts Grid */}
               <div className="mt-4 pt-3 border-t border-white/10 text-left">
-                <p className="text-[10px] font-bold uppercase tracking-wider text-violet-300/80 mb-2.5">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-[#ff8a5c] mb-2.5">
                   QUICK SHORTCUTS:
                 </p>
                 <div className="flex flex-wrap gap-1.5">
@@ -221,9 +219,9 @@ const FloatingAiAssistant = () => {
                         key={item.id}
                         type="button"
                         onClick={() => handleSend(item.prompt)}
-                        className="inline-flex items-center gap-1.5 rounded-full border border-violet-500/30 bg-violet-950/40 hover:bg-violet-600/30 hover:border-violet-400 px-3 py-1.5 text-[11px] font-medium text-white/90 hover:text-white transition duration-200"
+                        className="inline-flex items-center gap-1.5 rounded-full border border-white/12 bg-white/[0.04] hover:bg-[#ff5a1f]/20 hover:border-[#ff5a1f]/50 px-3 py-1.5 text-[11px] font-medium text-white/90 hover:text-white transition duration-200"
                       >
-                        <Icon size={12} className="text-violet-400" />
+                        <Icon size={12} className="text-[#ff8a5c]" />
                         <span>{item.label}</span>
                       </button>
                     );
@@ -239,15 +237,15 @@ const FloatingAiAssistant = () => {
                 className={`flex gap-2.5 text-sm ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}
               >
                 {msg.sender === 'ai' && (
-                  <div className="h-7 w-7 rounded-xl bg-violet-600/20 border border-violet-500/40 flex items-center justify-center shrink-0 text-violet-400 mt-0.5">
+                  <div className="h-7 w-7 rounded-xl bg-[#ff5a1f]/15 border border-[#ff5a1f]/35 flex items-center justify-center shrink-0 text-[#ff8a5c] mt-0.5">
                     <Sparkles size={13} />
                   </div>
                 )}
                 <div
                   className={`max-w-[85%] rounded-2xl px-4 py-3 leading-relaxed ${
                     msg.sender === 'user'
-                      ? 'bg-gradient-to-r from-violet-600 to-indigo-600 text-white rounded-br-none font-medium shadow-md shadow-violet-950/40 text-xs md:text-sm'
-                      : 'bg-slate-900/90 border border-white/10 rounded-bl-none text-white shadow-md'
+                      ? 'bg-gradient-to-r from-[#ff5a1f] to-[#ea580c] text-white rounded-br-none font-medium shadow-md shadow-[#ea580c]/30 text-xs md:text-sm'
+                      : 'bg-white/[0.06] border border-white/10 rounded-bl-none text-white shadow-md'
                   }`}
                 >
                   {msg.sender === 'ai' ? <FormattedAiMessage text={msg.text} /> : msg.text}
@@ -257,11 +255,11 @@ const FloatingAiAssistant = () => {
 
             {isTyping && (
               <div className="flex gap-2.5 text-sm justify-start">
-                <div className="h-7 w-7 rounded-xl bg-violet-600/20 border border-violet-500/40 flex items-center justify-center shrink-0 text-violet-400">
+                <div className="h-7 w-7 rounded-xl bg-[#ff5a1f]/15 border border-[#ff5a1f]/35 flex items-center justify-center shrink-0 text-[#ff8a5c]">
                   <Sparkles size={13} className="animate-spin" />
                 </div>
-                <div className="bg-slate-900/90 border border-white/10 rounded-2xl rounded-bl-none px-4 py-2.5 text-xs text-white/70 flex items-center gap-2">
-                  <Loader2 size={12} className="animate-spin text-violet-400" />
+                <div className="bg-white/[0.06] border border-white/10 rounded-2xl rounded-bl-none px-4 py-2.5 text-xs text-white/70 flex items-center gap-2">
+                  <Loader2 size={12} className="animate-spin text-[#ff5a1f]" />
                   <span>Thinking...</span>
                 </div>
               </div>
@@ -271,19 +269,19 @@ const FloatingAiAssistant = () => {
           </div>
 
           {/* Input Bar */}
-          <div className="p-3.5 border-t border-white/10 bg-slate-950/80 shrink-0">
+          <div className="p-3.5 border-t border-white/10 bg-black/80 shrink-0">
             <form onSubmit={(e) => { e.preventDefault(); handleSend(); }} className="relative flex items-center">
               <input
                 type="text"
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                placeholder="Ask about presets, order downloads, pricing..."
-                className="w-full rounded-2xl border border-violet-500/40 bg-slate-900/90 py-3 pl-4 pr-12 text-xs md:text-sm text-white placeholder:text-white/40 focus:border-violet-400 focus:ring-1 focus:ring-violet-400 focus:outline-none shadow-inner"
+                placeholder="Ask about presets, order downloads, camera settings..."
+                className="w-full rounded-2xl border border-[#ff5a1f]/35 bg-white/[0.05] py-3 pl-4 pr-12 text-xs md:text-sm text-white placeholder:text-white/40 focus:border-[#ff5a1f] focus:ring-1 focus:ring-[#ff5a1f] focus:outline-none shadow-inner"
               />
               <button
                 type="submit"
                 disabled={!input.trim() || isTyping}
-                className="absolute right-1.5 flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-r from-violet-600 to-indigo-500 text-white shadow-md shadow-violet-950/50 hover:brightness-110 disabled:opacity-40 transition"
+                className="absolute right-1.5 flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-r from-[#ff5a1f] to-[#ea580c] text-white shadow-md shadow-[#ea580c]/40 hover:brightness-110 disabled:opacity-40 transition"
                 aria-label="Send message"
               >
                 {isTyping ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />}
@@ -304,7 +302,7 @@ const FloatingAiAssistant = () => {
       <button
         type="button"
         onClick={() => setIsOpen((prev) => !prev)}
-        className="fixed bottom-6 right-6 z-[998] flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-tr from-violet-600 via-indigo-600 to-purple-500 text-white shadow-[0_8px_30px_rgba(139,92,246,0.55)] hover:scale-105 active:scale-95 transition-all duration-300 group border border-white/20"
+        className="fixed bottom-6 right-6 z-[998] flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-tr from-[#ff5a1f] via-[#ea580c] to-[#0877ff] text-white shadow-[0_8px_30px_rgba(255,90,31,0.55)] hover:scale-105 active:scale-95 transition-all duration-300 group border border-white/20"
         aria-label="Open AI Assistant Chat"
       >
         {isOpen ? (
@@ -318,8 +316,8 @@ const FloatingAiAssistant = () => {
             />
             {hasUnread && (
               <span className="absolute -top-3 -right-3 flex h-4 w-4">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-violet-400 opacity-75" />
-                <span className="relative inline-flex rounded-full h-4 w-4 bg-violet-500 border-2 border-black" />
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#ff5a1f] opacity-75" />
+                <span className="relative inline-flex rounded-full h-4 w-4 bg-[#ff5a1f] border-2 border-black" />
               </span>
             )}
           </div>
@@ -330,3 +328,4 @@ const FloatingAiAssistant = () => {
 };
 
 export default FloatingAiAssistant;
+
