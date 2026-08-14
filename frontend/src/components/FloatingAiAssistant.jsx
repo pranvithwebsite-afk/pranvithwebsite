@@ -13,9 +13,9 @@ import {
   HelpCircle,
   Headphones,
   Loader2,
+  ExternalLink,
 } from 'lucide-react';
 import { askCameraAi } from '../lib/api';
-
 import { Link } from 'react-router-dom';
 
 const SHORTCUTS = [
@@ -28,42 +28,83 @@ const SHORTCUTS = [
   { id: 'support', label: 'Talk to Support', icon: Headphones, prompt: 'How can I contact PranvithDOP support directly?' },
 ];
 
-const FormattedAiMessage = ({ text }) => {
+const parseBoldText = (str, keyPrefix = '') => {
+  const parts = str.split(/(\*\*.*?\*\*)/g);
+  return parts.map((part, pIdx) => {
+    if (part.startsWith('**') && part.endsWith('**')) {
+      return (
+        <strong key={`${keyPrefix}-b-${pIdx}`} className="text-[#ff8a5c] font-semibold">
+          {part.slice(2, -2)}
+        </strong>
+      );
+    }
+    return part;
+  });
+};
+
+const parseInlineContent = (str, keyPrefix = '', onLinkClick) => {
+  if (!str) return null;
+  // Match [label](url) even when label contains parentheses like (₹149)
+  const regex = /\[([^\]]+)\]\s*\(([^)]+)\)/g;
+  const elements = [];
+  let lastIndex = 0;
+  let match;
+
+  while ((match = regex.exec(str)) !== null) {
+    const textBefore = str.substring(lastIndex, match.index);
+    if (textBefore) {
+      elements.push(...parseBoldText(textBefore, `${keyPrefix}-pre-${lastIndex}`));
+    }
+    const label = match[1].trim();
+    const url = match[2].trim();
+    const isInternal = url.startsWith('/');
+
+    if (isInternal) {
+      elements.push(
+        <Link
+          key={`${keyPrefix}-link-${match.index}`}
+          to={url}
+          onClick={onLinkClick}
+          className="inline-flex items-center gap-1.5 px-3.5 py-1.5 my-1 mr-1.5 rounded-xl bg-gradient-to-r from-[#ff5a1f] to-[#ea580c] hover:from-[#e04e17] hover:to-[#ff5a1f] text-white font-bold text-xs shadow-md shadow-[#ea580c]/30 hover:scale-[1.02] active:scale-95 transition-all duration-200 cursor-pointer no-underline"
+        >
+          <span>{label}</span>
+          <ExternalLink size={12} className="shrink-0 text-white/90" />
+        </Link>
+      );
+    } else {
+      elements.push(
+        <a
+          key={`${keyPrefix}-link-${match.index}`}
+          href={url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-1 text-[#ff8a5c] underline font-semibold hover:text-white transition cursor-pointer"
+        >
+          <span>{label}</span>
+          <ExternalLink size={11} className="shrink-0" />
+        </a>
+      );
+    }
+    lastIndex = regex.lastIndex;
+  }
+
+  const remainingText = str.substring(lastIndex);
+  if (remainingText) {
+    elements.push(...parseBoldText(remainingText, `${keyPrefix}-post-${lastIndex}`));
+  }
+  return elements;
+};
+
+const FormattedAiMessage = ({ text, onLinkClick }) => {
   const lines = String(text || '').split('\n');
   return (
     <div className="space-y-1.5 text-xs md:text-sm leading-relaxed">
       {lines.map((line, idx) => {
         if (!line.trim()) return <div key={idx} className="h-1.5" />;
-        // Split by markdown links [label](url)
-        const linkParts = line.split(/(\[.*?\]\(.*?\))/g);
+        const isBullet = line.startsWith('•');
         return (
-          <div key={idx} className={line.startsWith('•') ? 'pl-2 text-white/95' : 'text-white/90'}>
-            {linkParts.map((lPart, lIdx) => {
-              const linkMatch = lPart.match(/^\[(.*?)\]\((.*?)\)$/);
-              if (linkMatch) {
-                const [, label, url] = linkMatch;
-                return (
-                  <Link
-                    key={lIdx}
-                    to={url}
-                    className="inline-flex items-center text-[#ff8a5c] underline font-semibold hover:text-white transition"
-                  >
-                    {label}
-                  </Link>
-                );
-              }
-              const boldParts = lPart.split(/(\*\*.*?\*\*)/g);
-              return boldParts.map((part, pIdx) => {
-                if (part.startsWith('**') && part.endsWith('**')) {
-                  return (
-                    <strong key={`${lIdx}-${pIdx}`} className="text-[#ff8a5c] font-semibold">
-                      {part.slice(2, -2)}
-                    </strong>
-                  );
-                }
-                return part;
-              });
-            })}
+          <div key={idx} className={isBullet ? 'pl-2 text-white/95' : 'text-white/90'}>
+            {parseInlineContent(line, `l-${idx}`, onLinkClick)}
           </div>
         );
       })}

@@ -2,6 +2,9 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Sparkles, Bot, Send, Zap, Sliders, Film, Loader2 } from 'lucide-react';
 import { askCameraAi } from '../lib/api';
 
+import { ExternalLink } from 'lucide-react';
+import { Link } from 'react-router-dom';
+
 const QUICK_PROMPTS = [
   'Sony S-Log3 Exposure',
   'Low-Light Wedding Settings',
@@ -10,26 +13,81 @@ const QUICK_PROMPTS = [
   'Golden Hour Color Grade',
 ];
 
+const parseBoldText = (str, keyPrefix = '') => {
+  const parts = str.split(/(\*\*.*?\*\*)/g);
+  return parts.map((part, pIdx) => {
+    if (part.startsWith('**') && part.endsWith('**')) {
+      return (
+        <strong key={`${keyPrefix}-b-${pIdx}`} className="text-[#f97316] font-semibold">
+          {part.slice(2, -2)}
+        </strong>
+      );
+    }
+    return part;
+  });
+};
+
+const parseInlineContent = (str, keyPrefix = '') => {
+  if (!str) return null;
+  const regex = /\[([^\]]+)\]\s*\(([^)]+)\)/g;
+  const elements = [];
+  let lastIndex = 0;
+  let match;
+
+  while ((match = regex.exec(str)) !== null) {
+    const textBefore = str.substring(lastIndex, match.index);
+    if (textBefore) {
+      elements.push(...parseBoldText(textBefore, `${keyPrefix}-pre-${lastIndex}`));
+    }
+    const label = match[1].trim();
+    const url = match[2].trim();
+    const isInternal = url.startsWith('/');
+
+    if (isInternal) {
+      elements.push(
+        <Link
+          key={`${keyPrefix}-link-${match.index}`}
+          to={url}
+          className="inline-flex items-center gap-1.5 px-3 py-1 my-1 mr-1.5 rounded-xl bg-gradient-to-r from-[#ea580c] to-[#f97316] hover:from-[#c2410c] hover:to-[#ea580c] text-white font-bold text-xs shadow-md shadow-[#ea580c]/30 hover:scale-[1.02] active:scale-95 transition-all duration-200 cursor-pointer no-underline"
+        >
+          <span>{label}</span>
+          <ExternalLink size={12} className="shrink-0 text-white/90" />
+        </Link>
+      );
+    } else {
+      elements.push(
+        <a
+          key={`${keyPrefix}-link-${match.index}`}
+          href={url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-1 text-[#f97316] underline font-semibold hover:text-white transition cursor-pointer"
+        >
+          <span>{label}</span>
+          <ExternalLink size={11} className="shrink-0" />
+        </a>
+      );
+    }
+    lastIndex = regex.lastIndex;
+  }
+
+  const remainingText = str.substring(lastIndex);
+  if (remainingText) {
+    elements.push(...parseBoldText(remainingText, `${keyPrefix}-post-${lastIndex}`));
+  }
+  return elements;
+};
+
 const FormattedAiText = ({ text }) => {
   const lines = String(text || '').split('\n');
   return (
     <div className="space-y-1.5 text-xs md:text-sm leading-relaxed">
       {lines.map((line, idx) => {
         if (!line.trim()) return <div key={idx} className="h-1.5" />;
-        // Bold formatting
-        const parts = line.split(/(\*\*.*?\*\*)/g);
+        const isBullet = line.startsWith('•');
         return (
-          <div key={idx} className={line.startsWith('•') ? 'pl-2 text-white/95' : 'text-white/90'}>
-            {parts.map((part, pIdx) => {
-              if (part.startsWith('**') && part.endsWith('**')) {
-                return (
-                  <strong key={pIdx} className="text-[#f97316] font-semibold">
-                    {part.slice(2, -2)}
-                  </strong>
-                );
-              }
-              return part;
-            })}
+          <div key={idx} className={isBullet ? 'pl-2 text-white/95' : 'text-white/90'}>
+            {parseInlineContent(line, `ai-l-${idx}`)}
           </div>
         );
       })}
