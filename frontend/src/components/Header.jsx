@@ -15,10 +15,20 @@ const customNavLinks = [
   { name: 'Hire From Us', path: '/hire' },
 ];
 
+const getCachedSettings = () => {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = sessionStorage.getItem('pranvith_public_settings') || localStorage.getItem('pranvith_public_settings');
+    return raw ? JSON.parse(raw) : null;
+  } catch (e) {
+    return null;
+  }
+};
+
 const Header = () => {
   const location = useLocation();
   const [open, setOpen] = useState(false);
-  const [siteSettings, setSiteSettings] = useState(null);
+  const [siteSettings, setSiteSettings] = useState(() => getCachedSettings());
 
   useEffect(() => setOpen(false), [location.pathname]);
 
@@ -26,7 +36,13 @@ const Header = () => {
     let mounted = true;
     fetchPublicSettings()
       .then((data) => {
-        if (mounted && data) setSiteSettings(data);
+        if (mounted && data) {
+          setSiteSettings(data);
+          try {
+            sessionStorage.setItem('pranvith_public_settings', JSON.stringify(data));
+            localStorage.setItem('pranvith_public_settings', JSON.stringify(data));
+          } catch (e) {}
+        }
       })
       .catch((error) => console.warn('[header] Failed to fetch settings', error));
     return () => {

@@ -20,16 +20,32 @@ const footerDefaults = {
   subscribe_button_text: 'Subscribe',
 };
 
+const getCachedSettings = () => {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = sessionStorage.getItem('pranvith_public_settings') || localStorage.getItem('pranvith_public_settings');
+    return raw ? JSON.parse(raw) : null;
+  } catch (e) {
+    return null;
+  }
+};
+
 const Footer = () => {
   const [email, setEmail] = useState('');
   const [busy, setBusy] = useState(false);
-  const [siteSettings, setSiteSettings] = useState(null);
+  const [siteSettings, setSiteSettings] = useState(() => getCachedSettings());
 
   useEffect(() => {
     let mounted = true;
     fetchPublicSettings()
       .then((settings) => {
-        if (mounted) setSiteSettings(settings || null);
+        if (mounted && settings) {
+          setSiteSettings(settings);
+          try {
+            sessionStorage.setItem('pranvith_public_settings', JSON.stringify(settings));
+            localStorage.setItem('pranvith_public_settings', JSON.stringify(settings));
+          } catch (e) {}
+        }
       })
       .catch(() => {
         if (mounted) setSiteSettings(null);

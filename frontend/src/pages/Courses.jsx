@@ -62,6 +62,19 @@ const normalizeTextReview = (item = {}, index) => ({
   sort_order: item.sort_order ?? index,
 });
 
+const CourseSkeleton = () => (
+  <section className="courses-hero relative min-h-[680px] pt-32 pb-20 px-4 sm:px-6 lg:px-8 bg-black flex items-center justify-center overflow-hidden">
+    <div className="relative z-10 mx-auto max-w-4xl w-full text-center">
+      <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-8 sm:p-14 backdrop-blur-xl animate-pulse">
+        <div className="h-4 w-36 mx-auto rounded-full bg-white/10 mb-6" />
+        <div className="h-10 sm:h-14 w-3/4 mx-auto rounded-2xl bg-white/10 mb-6" />
+        <div className="h-5 w-2/3 mx-auto rounded-lg bg-white/5 mb-8" />
+        <div className="h-12 w-44 mx-auto rounded-xl bg-white/10" />
+      </div>
+    </div>
+  </section>
+);
+
 const Courses = () => {
   const { page, loading } = useCmsPage('courses');
   usePublicPageLoading(loading);
@@ -69,7 +82,7 @@ const Courses = () => {
   const sections = (page?.sections || []).filter((item) => item.enabled !== false);
   const settings = { ...defaultCourseVisibility, ...(page?.settings || {}) };
   const comingSoon = sections.find(isComingSoonSection) || null;
-  const showComingSoon = loading || !!comingSoon;
+  const showComingSoon = !loading && (pageHidden || !!comingSoon);
   const hero = section(sections, 'hero') || {};
   const rightForYou = section(sections, 'right-for-you') || {};
   const learn = section(sections, 'what-youll-learn') || section(sections, 'course_showcase') || {};
@@ -114,8 +127,8 @@ const Courses = () => {
     <>
       <Header />
       <main className="page bg-transparent text-white">
-        {!loading && pageHidden ? (
-          <CourseComingSoon visibility={settings} />
+        {loading && !page ? (
+          <CourseSkeleton />
         ) : showComingSoon ? (
           <CourseComingSoon
             visibility={{
