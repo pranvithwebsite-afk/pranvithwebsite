@@ -1469,6 +1469,7 @@ async def admin_create_product(payload: ProductIn, current_admin: AdminBase = De
         except Exception as exc:
             warning = _payment_link_warning_payload(exc)
             logger.warning("Product saved without Razorpay Payment Link id=%s slug=%s warning=%s", doc["id"], doc["slug"], warning)
+    doc.pop("_id", None)
     response = {"success": True, "product": doc}
     if warning:
         response["warning"] = warning
