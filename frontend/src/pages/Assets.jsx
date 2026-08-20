@@ -111,12 +111,13 @@ const Assets = () => {
   const [checkoutProduct, setCheckoutProduct] = useState(null);
   const [isMobileFilterOpen, setIsMobileFilterOpen] = useState(false);
   const mobileFilterRef = useRef(null);
-  usePublicPageLoading(loading && products.length === 0);
 
   const products = useMemo(() => {
     if (!Array.isArray(rawProducts)) return [];
     return dedupeCatalogItems(rawProducts.filter(Boolean)).map((p, idx) => normalize(p, idx));
   }, [rawProducts]);
+
+  usePublicPageLoading(loading && products.length === 0);
 
   const filteredAssets = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
