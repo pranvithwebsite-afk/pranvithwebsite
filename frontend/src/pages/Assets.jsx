@@ -111,7 +111,7 @@ const Assets = () => {
   const [checkoutProduct, setCheckoutProduct] = useState(null);
   const [isMobileFilterOpen, setIsMobileFilterOpen] = useState(false);
   const mobileFilterRef = useRef(null);
-  usePublicPageLoading(cmsLoading || loading);
+  usePublicPageLoading(loading && products.length === 0);
 
   const products = useMemo(() => {
     if (!Array.isArray(rawProducts)) return [];
@@ -263,13 +263,13 @@ const Assets = () => {
             )}
 
             <div className="min-w-0">
-              {loading || cmsLoading ? (
+              {loading && products.length === 0 ? (
                 <div className="grid grid-cols-2 gap-3 min-[768px]:gap-5 min-[1100px]:grid-cols-3 min-[1440px]:grid-cols-4 max-[374px]:grid-cols-1" aria-hidden="true">
                   {Array.from({ length: 8 }).map((_, index) => (
                     <div key={index} className="cinematic-card aspect-[3/4] animate-pulse rounded-[18px]" />
                   ))}
                 </div>
-              ) : loadError ? (
+              ) : loadError && products.length === 0 ? (
                 <div className="rounded-2xl border border-rose-500/20 bg-rose-500/5 p-12 text-center text-white/70" data-testid="assets-error">
                   <p>{navigator.onLine ? 'We could not reach the asset catalogue.' : 'You appear to be offline. Reconnect, then try again.'}</p>
                   {isDevelopment && (

@@ -7,12 +7,14 @@ import App from "@/App";
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      // Keep the last successful screen visible while a route remounts, but
-      // revalidate editor-managed content immediately.
-      staleTime: 0,
-      gcTime: 5 * 60_000,
-      retry: 2,
-      retryDelay: (attempt) => Math.min(1000 * (2 ** attempt), 4000),
+      // Keep successful data fresh for 2 minutes to prevent loading flicker
+      staleTime: 1000 * 60 * 2,
+      gcTime: 10 * 60_000,
+      retry: (failureCount, error) => {
+        if (error?.response?.status === 404) return false;
+        return failureCount < 1;
+      },
+      retryDelay: (attempt) => Math.min(1000 * (2 ** attempt), 3000),
       refetchOnWindowFocus: false,
       refetchOnReconnect: true,
     },

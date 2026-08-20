@@ -29,6 +29,10 @@ export const useCmsPage = (pageKey) => {
     initialData: () => getCachedPage(pageKey),
     placeholderData: (previous) => previous,
     staleTime: 1000 * 60 * 5,
+    retry: (failureCount, error) => {
+      if (error?.response?.status === 404) return false;
+      return failureCount < 1;
+    },
   });
   return {
     page: query.data || null,

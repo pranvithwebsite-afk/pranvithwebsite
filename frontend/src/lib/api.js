@@ -45,49 +45,137 @@ const cachedRequest = async (key, request, ttlMs = 5 * 60 * 1000) => {
 
 const FALLBACK_PRODUCTS = [
   {
-    id: 'fallback-vo',
-    slug: 'vo',
-    name: 'VO Asset',
-    title: 'VO Asset',
-    category: 'Asset',
-    price: 0,
-    sale_price: 0,
-    is_free: true,
-    description: 'A PranvithDOP asset. Live catalog details load from the backend when available.',
-    hero_image: '',
-    images: [],
-    published: true,
-    created_at: '2026-01-01T00:00:00+00:00',
-  },
-  {
     id: 'fallback-creative-lut-pack',
     slug: 'creative-lut-pack',
-    name: 'Creative LUT Pack',
-    title: 'Creative LUT Pack',
+    name: 'Pranvith Creative LUT Pack 5',
+    title: 'Pranvith Creative LUT Pack 5',
     category: 'LUTs',
-    price: 499,
-    sale_price: 499,
+    subcategory: 'LUTs',
+    price: 49,
+    sale_price: 49,
+    original_price: 1000,
     is_free: false,
-    description: 'Premium color looks for editors.',
+    description: '10+ Cinematic 3D LUTs calibrated for Sony S-Log3, Canon C-Log3, V-Log, and Rec.709 footage.',
     hero_image: '/assets/creative-luts.png',
     images: ['/assets/creative-luts.png'],
     published: true,
     created_at: '2026-01-01T00:00:00+00:00',
   },
   {
+    id: 'fallback-premiere-wedding-invitation',
+    slug: 'premiere-pro-wedding-templates',
+    name: 'Premiere Pro Wedding Invitation',
+    title: 'Premiere Pro Wedding Invitation',
+    category: 'Premiere Pro',
+    subcategory: 'Wedding Invitation',
+    price: 299,
+    sale_price: 299,
+    original_price: 1000,
+    is_free: false,
+    description: '10+ 4K wedding openers, invitations, and lower thirds for Premiere Pro.',
+    hero_image: '/assets/wedding-template.png',
+    images: ['/assets/wedding-template.png'],
+    published: true,
+    created_at: '2026-01-02T00:00:00+00:00',
+  },
+  {
+    id: 'fallback-wedding-album-psd',
+    slug: 'wedding-album-psd-pack',
+    name: 'Wedding Album PSD Pack',
+    title: 'Wedding Album PSD Pack',
+    category: 'PSD',
+    subcategory: 'Wedding Invitation',
+    price: 199,
+    sale_price: 199,
+    original_price: 1000,
+    is_free: false,
+    description: 'Complete high-resolution PSD album templates for wedding photographers and designers.',
+    hero_image: '/assets/wedding-album.png',
+    images: ['/assets/wedding-album.png'],
+    published: true,
+    created_at: '2026-01-03T00:00:00+00:00',
+  },
+  {
     id: 'fallback-cinematic-sound-fx-pack',
     slug: 'cinematic-sound-fx-pack',
     name: 'Cinematic Sound FX Pack',
     title: 'Cinematic Sound FX Pack',
-    category: 'Sound',
-    price: 299,
-    sale_price: 299,
+    category: 'Sound Packs',
+    subcategory: 'Sound Packs',
+    price: 149,
+    sale_price: 149,
+    original_price: 999,
     is_free: false,
-    description: 'Cinematic sound effects for video edits.',
+    description: '100+ 24-bit WAV impacts, risers, whooshes, and atmospheres for video editors.',
     hero_image: '/assets/cinematic-sound-fx.png',
     images: ['/assets/cinematic-sound-fx.png'],
     published: true,
-    created_at: '2026-01-01T00:00:00+00:00',
+    created_at: '2026-01-04T00:00:00+00:00',
+  },
+  {
+    id: 'fallback-smooth-transitions',
+    slug: 'smooth-transitions-pack',
+    name: 'Smooth Transitions Pack',
+    title: 'Smooth Transitions Pack',
+    category: 'Premiere Pro',
+    subcategory: 'Premiere Pro',
+    price: 0,
+    sale_price: 0,
+    is_free: true,
+    description: 'Seamless drag-and-drop transitions for Premiere Pro.',
+    hero_image: '',
+    images: [],
+    published: true,
+    created_at: '2026-01-05T00:00:00+00:00',
+  },
+  {
+    id: 'fallback-after-effects-titles',
+    slug: 'after-effects-title-templates',
+    name: 'After Effects Title Templates',
+    title: 'After Effects Title Templates',
+    category: 'After Effects',
+    subcategory: 'After Effects',
+    price: 199,
+    sale_price: 199,
+    original_price: 1499,
+    is_free: false,
+    description: 'Dynamic kinetic typography and motion titles for After Effects.',
+    hero_image: '',
+    images: [],
+    published: true,
+    created_at: '2026-01-06T00:00:00+00:00',
+  },
+  {
+    id: 'fallback-color-grading-presets',
+    slug: 'color-grading-presets',
+    name: 'Color Grading Presets',
+    title: 'Color Grading Presets',
+    category: 'Photoshop',
+    subcategory: 'LUTs',
+    price: 0,
+    sale_price: 0,
+    is_free: true,
+    description: 'Free Photoshop & Lightroom color grading presets.',
+    hero_image: '',
+    images: [],
+    published: true,
+    created_at: '2026-01-07T00:00:00+00:00',
+  },
+  {
+    id: 'fallback-typography-pack',
+    slug: 'typography-font-pack',
+    name: 'Typography 80+ Font Pack',
+    title: 'Typography 80+ Font Pack',
+    category: 'Photoshop',
+    subcategory: 'PSD',
+    price: 0,
+    sale_price: 0,
+    is_free: true,
+    description: 'Curated 80+ typography and font assets for graphic designers.',
+    hero_image: '',
+    images: [],
+    published: true,
+    created_at: '2026-01-08T00:00:00+00:00',
   },
 ];
 
@@ -103,7 +191,7 @@ const logApiError = (label, error) => {
 
 export const api = axios.create({
   baseURL: API,
-  timeout: 15000,
+  timeout: 7000,
 });
 
 export const adminApi = axios.create({
@@ -179,7 +267,7 @@ export const askCameraAi = async (message, history = []) => {
 
 const fetchDevelopmentCatalog = async (path, { signal } = {}) => {
   const { data } = await axios.get(`${DEVELOPMENT_CATALOG_API}${path}`, {
-    timeout: 15000,
+    timeout: 5000,
     signal,
   });
   return data;
@@ -190,9 +278,14 @@ const getFallbackProductBySlug = (slug) =>
 
 export const fetchProducts = async ({ signal } = {}) => {
   try {
-    const { data } = await api.get('/products', { signal });
+    const { data } = await api.get('/products', { signal, timeout: 6000 });
     const decoded = decodeCmsText(data);
     if (Array.isArray(decoded) && decoded.length > 0) {
+      if (typeof window !== 'undefined') {
+        try {
+          sessionStorage.setItem('pranvith_products_cache', JSON.stringify(decoded));
+        } catch (_) {}
+      }
       return decoded;
     }
   } catch (error) {
@@ -201,9 +294,12 @@ export const fetchProducts = async ({ signal } = {}) => {
 
   if (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
     try {
-      const { data } = await axios.get('http://localhost:8000/api/products', { signal, timeout: 5000 });
+      const { data } = await axios.get('http://localhost:8000/api/products', { signal, timeout: 3000 });
       const decoded = decodeCmsText(data);
       if (Array.isArray(decoded) && decoded.length > 0) {
+        try {
+          sessionStorage.setItem('pranvith_products_cache', JSON.stringify(decoded));
+        } catch (_) {}
         return decoded;
       }
     } catch (err) {
@@ -213,7 +309,14 @@ export const fetchProducts = async ({ signal } = {}) => {
 
   try {
     const data = decodeCmsText(await fetchDevelopmentCatalog('/products', { signal }));
-    if (Array.isArray(data) && data.length > 0) return data;
+    if (Array.isArray(data) && data.length > 0) {
+      if (typeof window !== 'undefined') {
+        try {
+          sessionStorage.setItem('pranvith_products_cache', JSON.stringify(data));
+        } catch (_) {}
+      }
+      return data;
+    }
   } catch (err) {
     logApiError('development catalog products fallback', err);
   }
@@ -222,32 +325,48 @@ export const fetchProducts = async ({ signal } = {}) => {
 };
 
 export const fetchPageBySlug = async (slug) => {
-  const { data } = await api.get(`/pages/${slug}`);
+  const { data } = await api.get(`/pages/${slug}`, { timeout: 6000 });
   return data;
 };
 
 export const fetchServices = async ({ signal } = {}) => {
-  const { data } = await api.get('/services', { signal });
+  const { data } = await api.get('/services', { signal, timeout: 6000 });
   console.debug('[public-api] services response', { count: Array.isArray(data) ? data.length : 0 });
+  if (Array.isArray(data) && data.length > 0 && typeof window !== 'undefined') {
+    try {
+      sessionStorage.setItem('pranvith_services_cache', JSON.stringify(data));
+    } catch (_) {}
+  }
   return data;
 };
 
 export const fetchServiceBySlug = async (slug) => {
   return cachedRequest(`services:detail:${slug}`, async () => {
-    const { data } = await api.get(`/services/${encodeURIComponent(slug)}`);
+    const { data } = await api.get(`/services/${encodeURIComponent(slug)}`, { timeout: 6000 });
     return data;
   }, 5 * 60 * 1000);
 };
 
 export const fetchCmsPage = async (pageKey, { signal } = {}) => {
-  // CMS content is published data, not catalogue data. Never serve an older
-  // in-memory response after an editor publishes a page.
-  const { data } = await api.get(`/cms/pages/${encodeURIComponent(pageKey)}`, {
-    headers: { 'Cache-Control': 'no-cache' }, signal,
-  });
-  const decoded = decodeCmsText(data);
-  console.debug('[public-api] cms response', { pageKey, sections: Array.isArray(decoded?.sections) ? decoded.sections.length : 0 });
-  return decoded;
+  try {
+    const { data } = await api.get(`/cms/pages/${encodeURIComponent(pageKey)}`, {
+      headers: { 'Cache-Control': 'no-cache' },
+      signal,
+      timeout: 6000,
+    });
+    const decoded = decodeCmsText(data);
+    console.debug('[public-api] cms response', { pageKey, sections: Array.isArray(decoded?.sections) ? decoded.sections.length : 0 });
+    return decoded;
+  } catch (err) {
+    if (err?.response?.status === 404) {
+      return { page_key: pageKey, title: '', subtitle: '', sections: [], settings: {} };
+    }
+    const cached = typeof window !== 'undefined' ? sessionStorage.getItem(`cms_page_${pageKey}`) : null;
+    if (cached) {
+      try { return JSON.parse(cached); } catch (_) {}
+    }
+    return { page_key: pageKey, title: '', subtitle: '', sections: [], settings: {} };
+  }
 };
 
 export const invalidateCmsPageCache = (pageKey) => {
