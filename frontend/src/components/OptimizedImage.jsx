@@ -11,14 +11,14 @@ const OptimizedImage = ({
   decoding = 'async',
   width,
   height,
-  fit = 'cover',
+  fit,
   fetchPriority,
   onError,
   ...props
 }) => {
   const imageLoading = loading || (priority ? 'eager' : 'lazy');
   const style = {
-    objectFit: fit,
+    ...(fit ? { objectFit: fit } : {}),
     ...(props.style || {}),
   };
 

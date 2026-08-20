@@ -88,13 +88,13 @@ const FeaturedProducts = () => {
             >
               <div>
                 {/* Image Container */}
-                <div className="relative aspect-[4/3] rounded-2xl overflow-hidden mb-5 bg-[#0e1322]">
+                <div className="relative aspect-[4/3] rounded-2xl overflow-hidden mb-5 bg-[#0e1322] flex items-center justify-center p-2">
                   <img
                     src={item.image}
                     alt={item.title}
-                    className="w-full h-full object-cover transition duration-700 group-hover:scale-110"
+                    className="w-full h-full object-contain transition duration-700 group-hover:scale-105"
                   />
-                  <div className="absolute inset-0 bg-gradient-to-t from-[#0b0f14] via-transparent to-transparent opacity-80" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-[#0b0f14]/80 via-transparent to-transparent pointer-events-none" />
 
                   {/* Badge */}
                   <span className="absolute top-3 left-3 bg-[#3b82f6] text-white text-[11px] font-bold px-3 py-1 rounded-full shadow-lg">

@@ -410,14 +410,23 @@ const ProductCard = ({ p, onView, onBuy }) => (
     data-testid={`asset-card-${p.slug}`}
     className="cinematic-card group flex h-full min-w-0 cursor-pointer flex-col overflow-hidden rounded-[18px] transition-all duration-300 hover:-translate-y-1"
   >
-    <div className="relative aspect-square h-auto w-full shrink-0 overflow-hidden bg-[#f4f0ea]">
+    <div className="relative aspect-square h-auto w-full shrink-0 overflow-hidden bg-[#0a0e17] flex items-center justify-center p-2.5 sm:p-3">
       {p.image ? (
-        <OptimizedImage src={p.image} alt={p.title} width={640} height={640} className="absolute inset-0 h-full w-full object-contain object-center" fallback={FALLBACK_IMAGE} onError={handleImageError} />
+        <OptimizedImage
+          src={p.image}
+          alt={p.title}
+          width={640}
+          height={640}
+          fit="contain"
+          className="h-full w-full object-contain object-center rounded-xl transition duration-500 group-hover:scale-[1.02]"
+          fallback={FALLBACK_IMAGE}
+          onError={handleImageError}
+        />
       ) : (
         <div className="absolute inset-0" style={{ background: p.bg }} />
       )}
-      <div className="pointer-events-none absolute -inset-1 opacity-30" style={{
-        background: 'linear-gradient(115deg, transparent 40%, rgba(255,255,255,0.18) 50%, transparent 60%)'
+      <div className="pointer-events-none absolute -inset-1 opacity-20" style={{
+        background: 'linear-gradient(115deg, transparent 40%, rgba(255,255,255,0.12) 50%, transparent 60%)'
       }} />
       {!p.image && (
         <div className="absolute inset-0 flex items-center justify-center px-6">
