@@ -236,9 +236,10 @@ const Products = () => {
 
   const openEditForm = async (product) => {
     try {
-      const fullProduct = await fetchAdminProduct(product.id);
+      const productId = product.id || product._id;
+      const fullProduct = await fetchAdminProduct(productId);
       setFormData(normalizeProductForForm(fullProduct));
-      setEditingId(product.id);
+      setEditingId(productId);
       setShowForm(true);
     } catch (error) {
       toast.error('Failed to load product details');
@@ -253,9 +254,26 @@ const Products = () => {
 
   const handleSave = async () => {
     if (saveInFlight.current) return;
-    const slug = normalizeSlug(formData.slug || formData.name);
+    let slug = normalizeSlug(formData.slug || formData.name);
     const mainImageUrl = rejectUnsafeMediaUrl(formData.image_url);
     const thumbnailImageUrl = rejectUnsafeMediaUrl(formData.thumbnail_url);
+
+    // Auto-resolve duplicate slug in client state so product can always save cleanly
+    const existingSlugs = new Set(
+      (products || [])
+        .filter((p) => (editingId ? (p.id !== editingId && p._id !== editingId) : true))
+        .map((p) => normalizeSlug(p.slug || p.name))
+    );
+    if (existingSlugs.has(slug)) {
+      let count = 2;
+      let candidate = `${slug}-${count}`;
+      while (existingSlugs.has(candidate)) {
+        count += 1;
+        candidate = `${slug}-${count}`;
+      }
+      slug = candidate;
+    }
+
     const payload = {
       ...formData,
       slug,
@@ -306,7 +324,7 @@ const Products = () => {
   };
 
   const handleDelete = async (id) => {
-    const product = products.find((item) => item.id === id);
+    const product = products.find((item) => item.id === id || item._id === id);
     await confirm({
       title: 'Delete product?',
       itemName: product?.name || product?.title || 'Selected product',
@@ -363,7 +381,7 @@ const Products = () => {
         ...prev,
         [name]: name === 'slug' ? normalizeSlug(nextValue) : nextValue,
       };
-      if (name === 'name' && !prev.slug) {
+      if (name === 'name' && (!prev.slug || prev.slug === normalizeSlug(prev.name))) {
         next.slug = normalizeSlug(nextValue);
       }
       return next;
@@ -531,9 +549,26 @@ const ProductForm = ({
   const conflictingProduct = useMemo(() => {
     if (!currentSlug) return null;
     return (Array.isArray(products) ? products : []).find(
-      (p) => p.id !== editingId && normalizeSlug(p.slug || p.name) === currentSlug
+      (p) => (editingId ? (p.id !== editingId && p._id !== editingId) : true) && normalizeSlug(p.slug || p.name) === currentSlug
     );
   }, [currentSlug, products, editingId]);
+
+  const candidateSlug = useMemo(() => {
+    if (!conflictingProduct || !currentSlug) return '';
+    const baseSlug = currentSlug;
+    const existingSlugs = new Set(
+      (products || [])
+        .filter((p) => (editingId ? (p.id !== editingId && p._id !== editingId) : true))
+        .map((p) => normalizeSlug(p.slug || p.name))
+    );
+    let count = 2;
+    let candidate = `${baseSlug}-${count}`;
+    while (existingSlugs.has(candidate)) {
+      count += 1;
+      candidate = `${baseSlug}-${count}`;
+    }
+    return candidate;
+  }, [conflictingProduct, currentSlug, products, editingId]);
 
   const hasExistingPaymentLink = !!(formData.razorpay_payment_link_id || formData.razorpay_payment_link_url);
   const imageMediaItems = useMemo(() => (
@@ -818,24 +853,17 @@ const ProductForm = ({
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-500/40 bg-amber-500/10 p-3.5 text-xs text-amber-200">
             <p>
               ⚠️ Slug <strong className="font-mono text-white">"{currentSlug}"</strong> is already in use by product: <strong>"{conflictingProduct.name || conflictingProduct.title || 'Existing product'}"</strong>.
+              {candidateSlug ? <> (Available unique slug: <strong className="font-mono text-emerald-300">"{candidateSlug}"</strong>)</> : null}
             </p>
-            <button
-              type="button"
-              onClick={() => {
-                const baseSlug = normalizeSlug(formData.slug || formData.name) || 'product';
-                const existingSlugs = new Set((products || []).filter(p => p.id !== editingId).map(p => normalizeSlug(p.slug || p.name)));
-                let count = 2;
-                let candidate = `${baseSlug}-${count}`;
-                while (existingSlugs.has(candidate)) {
-                  count += 1;
-                  candidate = `${baseSlug}-${count}`;
-                }
-                onFieldChange('slug', candidate);
-              }}
-              className="rounded-lg bg-amber-500 px-3 py-1.5 font-bold text-slate-950 transition hover:bg-amber-400"
-            >
-              Make Slug Unique
-            </button>
+            {candidateSlug && (
+              <button
+                type="button"
+                onClick={() => onFieldChange('slug', candidateSlug)}
+                className="rounded-lg bg-amber-500 px-3 py-1.5 font-bold text-slate-950 transition hover:bg-amber-400"
+              >
+                Use "{candidateSlug}"
+              </button>
+            )}
           </div>
         )}
 
@@ -1101,6 +1129,24 @@ const ProductForm = ({
             Publish this product
           </label>
         </div>
+
+        {conflictingProduct && (
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-500/40 bg-amber-500/10 p-3.5 text-xs text-amber-200">
+            <p>
+              ⚠️ Slug <strong className="font-mono text-white">"{currentSlug}"</strong> is already in use by <strong>"{conflictingProduct.name || conflictingProduct.title || 'Existing product'}"</strong>.
+              {candidateSlug ? <> Saving will automatically use unique slug <strong className="font-mono text-emerald-300">"{candidateSlug}"</strong>.</> : null}
+            </p>
+            {candidateSlug && (
+              <button
+                type="button"
+                onClick={() => onFieldChange('slug', candidateSlug)}
+                className="rounded-lg bg-amber-500 px-3 py-1.5 font-bold text-slate-950 transition hover:bg-amber-400"
+              >
+                Use "{candidateSlug}"
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="flex flex-col gap-3 sm:flex-row">

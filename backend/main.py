@@ -4790,15 +4790,28 @@ async def admin_delete_page(page_id: str, current_admin: AdminBase = Depends(get
     return {"success": True}
 
 
+async def _get_unique_product_slug(base_slug: str, exclude_id: Optional[str] = None) -> str:
+    normalized_base = normalize_slug(base_slug) or "product"
+    slug = normalized_base
+    counter = 1
+    while True:
+        query = {"slug": slug}
+        if exclude_id:
+            query["id"] = {"$ne": exclude_id}
+        existing = await db.products.find_one(query)
+        if not existing:
+            return slug
+        counter += 1
+        slug = f"{normalized_base}-{counter}"
+
+
 @admin_router.post("/products")
 async def admin_create_product(payload: ProductIn, current_admin: AdminBase = Depends(get_current_active_admin)):
     doc = _normalize_product_media_fields(payload.model_dump())
     create_payment_link = bool(doc.pop("create_razorpay_payment_link", False))
-    doc["slug"] = normalize_slug(doc.get("slug") or doc.get("name"))
-    if not doc["slug"]:
+    raw_slug = normalize_slug(doc.get("slug") or doc.get("name"))
+    if not raw_slug:
         raise HTTPException(status_code=422, detail="Product slug is required")
-    if not doc.get("product_url"):
-        doc["product_url"] = product_url_for_slug(doc["slug"])
     doc.update({
         "id": str(uuid.uuid4()),
         "created_at": datetime.now(timezone.utc).isoformat(),
@@ -4806,32 +4819,34 @@ async def admin_create_product(payload: ProductIn, current_admin: AdminBase = De
         "sold_count": 0,
     })
     try:
-        existing = await db.products.find_one({"slug": doc["slug"]})
+        doc["slug"] = await _get_unique_product_slug(raw_slug)
     except Exception as exc:
         detail = mongodb_public_error(exc)
-        logger.exception("Product create lookup failed slug=%s detail=%s", doc["slug"], detail)
+        logger.exception("Product create lookup failed slug=%s detail=%s", raw_slug, detail)
         return _json_error_response(503, "Product could not be saved", code="PRODUCT_DATABASE_ERROR", detail=detail)
-    if existing:
-        raise HTTPException(status_code=409, detail=f"Product slug '{doc['slug']}' already exists. Please choose a different slug.")
+    doc["product_url"] = product_url_for_slug(doc["slug"])
     logger.info(
         "Product create requested database=%s collection=products id=%s slug=%s",
         db_name,
         doc["id"],
         doc["slug"],
     )
-    try:
-        await db.products.insert_one(doc)
-    except DuplicateKeyError:
-        logger.info(
-            "Product create conflict database=%s collection=products slug=%s",
-            db_name,
-            doc["slug"],
-        )
+    inserted = False
+    for attempt in range(5):
+        try:
+            await db.products.insert_one(doc)
+            inserted = True
+            break
+        except DuplicateKeyError:
+            logger.info("Product create conflict retry attempt=%d slug=%s", attempt, doc["slug"])
+            doc["slug"] = f"{raw_slug}-{attempt + 2}"
+            doc["product_url"] = product_url_for_slug(doc["slug"])
+        except Exception as exc:
+            detail = mongodb_public_error(exc)
+            logger.exception("Product create failed id=%s slug=%s detail=%s", doc["id"], doc["slug"], detail)
+            return _json_error_response(503, "Product could not be saved", code="PRODUCT_DATABASE_ERROR", detail=detail)
+    if not inserted:
         raise HTTPException(status_code=409, detail="Product slug already exists")
-    except Exception as exc:
-        detail = mongodb_public_error(exc)
-        logger.exception("Product create failed id=%s slug=%s detail=%s", doc["id"], doc["slug"], detail)
-        return _json_error_response(503, "Product could not be saved", code="PRODUCT_DATABASE_ERROR", detail=detail)
     logger.info(
         "Product created database=%s collection=products id=%s slug=%s",
         db_name,
@@ -4857,24 +4872,23 @@ async def admin_create_product(payload: ProductIn, current_admin: AdminBase = De
 async def admin_update_product(product_id: str, payload: ProductIn, current_admin: AdminBase = Depends(get_current_active_admin)):
     update_doc = _normalize_product_media_fields(payload.model_dump(exclude_none=True))
     create_payment_link = bool(update_doc.pop("create_razorpay_payment_link", False))
-    update_doc["slug"] = normalize_slug(update_doc.get("slug") or update_doc.get("name"))
-    if not update_doc["slug"]:
+    raw_slug = normalize_slug(update_doc.get("slug") or update_doc.get("name"))
+    if not raw_slug:
         raise HTTPException(status_code=422, detail="Product slug is required")
-    if not update_doc.get("product_url"):
-        update_doc["product_url"] = product_url_for_slug(update_doc["slug"])
     try:
-        existing = await db.products.find_one({"slug": update_doc["slug"], "id": {"$ne": product_id}})
+        update_doc["slug"] = await _get_unique_product_slug(raw_slug, exclude_id=product_id)
     except Exception as exc:
         detail = mongodb_public_error(exc)
-        logger.exception("Product update lookup failed id=%s slug=%s detail=%s", product_id, update_doc["slug"], detail)
+        logger.exception("Product update lookup failed id=%s slug=%s detail=%s", product_id, raw_slug, detail)
         return _json_error_response(503, "Product could not be saved", code="PRODUCT_DATABASE_ERROR", detail=detail)
-    if existing:
-        raise HTTPException(status_code=409, detail="Product slug already exists")
+    update_doc["product_url"] = product_url_for_slug(update_doc["slug"])
     update_doc["updated_at"] = datetime.now(timezone.utc).isoformat()
     try:
         result = await db.products.update_one({"id": product_id}, {"$set": update_doc})
     except DuplicateKeyError:
-        raise HTTPException(status_code=409, detail="Product slug already exists")
+        update_doc["slug"] = f"{raw_slug}-{uuid.uuid4().hex[:6]}"
+        update_doc["product_url"] = product_url_for_slug(update_doc["slug"])
+        result = await db.products.update_one({"id": product_id}, {"$set": update_doc})
     except Exception as exc:
         detail = mongodb_public_error(exc)
         logger.exception("Product update failed id=%s slug=%s detail=%s", product_id, update_doc["slug"], detail)

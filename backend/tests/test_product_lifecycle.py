@@ -17,14 +17,16 @@ class FakeProducts:
         self.duplicate_on_insert = duplicate_on_insert
 
     async def find_one(self, query, projection=None):
-        document = next(
-            (
-                item
-                for item in self.documents
-                if all(item.get(key) == value for key, value in query.items())
-            ),
-            None,
-        )
+        def _matches(item):
+            for key, value in query.items():
+                if isinstance(value, dict) and "$ne" in value:
+                    if item.get(key) == value["$ne"]:
+                        return False
+                elif item.get(key) != value:
+                    return False
+            return True
+
+        document = next((item for item in self.documents if _matches(item)), None)
         if document is None:
             return None
         if not projection:
@@ -136,7 +138,7 @@ def upload_file(name, content_type, content=b"test-bytes"):
     return UploadFile(filename=name, file=BytesIO(content), headers={"content-type": content_type})
 
 
-def test_product_create_rejects_existing_slug_before_insert(monkeypatch):
+def test_product_create_auto_resolves_existing_slug(monkeypatch):
     fake_db = FakeDatabase([
         {
             "id": "product-1",
@@ -146,12 +148,12 @@ def test_product_create_rejects_existing_slug_before_insert(monkeypatch):
     ])
     monkeypatch.setattr(server, "db", fake_db)
 
-    with pytest.raises(HTTPException) as raised:
-        asyncio.run(server.admin_create_product(product_payload(), None))
+    response = asyncio.run(server.admin_create_product(product_payload(), None))
 
-    assert raised.value.status_code == 409
-    assert raised.value.detail == "Product slug already exists"
-    assert len(fake_db.products.documents) == 1
+    assert response["success"] is True
+    assert response["product"]["slug"] == "transitions-2"
+    assert response["product"]["product_url"] == "/assets/transitions-2"
+    assert len(fake_db.products.documents) == 2
 
 
 def test_product_create_converts_duplicate_key_race_to_conflict(monkeypatch):
