@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { CircleCheckBig, Clock3, FileSpreadsheet, FileText, Mail, Phone, RefreshCw, Search, Trash2, User } from 'lucide-react';
+import { Archive, CircleCheckBig, Clock3, FileSpreadsheet, FileText, Mail, Phone, RotateCw, Search, Trash2, User } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   archiveInvalidPaymentAttempts,
@@ -50,25 +50,30 @@ const exportCsv = (rows, filename) => {
 const PaymentAttempts = () => {
   const [attempts, setAttempts] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
   const [query, setQuery] = useState('');
   const [status, setStatus] = useState('all');
   const [archiving, setArchiving] = useState(false);
-  const [exporting, setExporting] = useState(false);
 
-  const loadAttempts = useCallback(() => {
-    setLoading(true);
+  const loadAttempts = useCallback((isManual = false) => {
+    if (isManual) setRefreshing(true);
+    else setLoading(true);
     return fetchAdminPaymentAttempts(status, query)
       .then((data) => {
         setAttempts(Array.isArray(data) ? data : []);
         setError('');
+        if (isManual) toast.success('Payment attempts refreshed');
       })
       .catch((err) => {
         console.error('[admin/payment-attempts] Failed to load payment attempts', err?.response?.data?.detail || err?.message || err);
         setAttempts([]);
         setError('Payment attempts could not be loaded.');
       })
-      .finally(() => setLoading(false));
+      .finally(() => {
+        setLoading(false);
+        setRefreshing(false);
+      });
   }, [status, query]);
 
   useEffect(() => {
@@ -79,8 +84,8 @@ const PaymentAttempts = () => {
     const pending = attempts.filter((attempt) => normalizeStatus(attempt) === 'pending').length;
     const failed = attempts.filter((attempt) => normalizeStatus(attempt) === 'failed').length;
     const cancelled = attempts.filter((attempt) => normalizeStatus(attempt) === 'cancelled').length;
-    const recoveryRate = attempts.length ? Math.round(((attempts.filter((attempt) => normalizeStatus(attempt) === 'pending').length / attempts.length) * 100)) : 0;
-    return { pending, failed, cancelled, recoveryRate };
+    const total = attempts.length;
+    return { pending, failed, cancelled, total };
   }, [attempts]);
 
   const filteredAttempts = useMemo(() => {
@@ -108,11 +113,19 @@ const PaymentAttempts = () => {
   }, [attempts, query, status]);
 
   const handleArchive = async () => {
+    if (!attempts.length) {
+      toast.info('No incomplete payment attempts to archive.');
+      return;
+    }
     if (!window.confirm('Are you sure you want to archive and clear all incomplete/invalid payment attempts?')) return;
     setArchiving(true);
     try {
       const result = await archiveInvalidPaymentAttempts(0);
-      toast.success(`Archived ${result?.deleted ?? 0} invalid payment attempt${result?.deleted === 1 ? '' : 's'}.`);
+      if ((result?.deleted ?? 0) > 0) {
+        toast.success(`Archived ${result.deleted} invalid payment attempt${result.deleted === 1 ? '' : 's'}.`);
+      } else {
+        toast.info('No invalid payment attempts found to archive.');
+      }
       await loadAttempts();
     } catch (err) {
       const message = formatApiErrorDetail(err?.response?.data?.detail) || err?.message || 'Could not archive invalid attempts.';
@@ -144,15 +157,26 @@ const PaymentAttempts = () => {
             <h1 className="mt-2 text-3xl font-semibold text-white">Payment Attempts</h1>
             <p className="mt-2 text-slate-400">Unsuccessful and incomplete payment sessions</p>
           </div>
-          <button
-            type="button"
-            onClick={handleArchive}
-            disabled={archiving}
-            className="inline-flex h-11 items-center gap-2 rounded-2xl border border-rose-500/30 bg-rose-500/10 px-4 text-sm font-semibold text-rose-100 transition hover:bg-rose-500/20 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            <RefreshCw size={15} className={archiving ? 'animate-spin' : ''} />
-            {archiving ? 'Archiving...' : 'Archive Invalid Attempts'}
-          </button>
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              onClick={() => loadAttempts(true)}
+              disabled={loading || refreshing}
+              className="inline-flex h-11 items-center gap-2 rounded-2xl border border-slate-700 bg-slate-800 px-4 text-sm font-semibold text-slate-100 transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <RotateCw size={15} className={refreshing ? 'animate-spin' : ''} />
+              {refreshing ? 'Refreshing...' : 'Refresh'}
+            </button>
+            <button
+              type="button"
+              onClick={handleArchive}
+              disabled={archiving || attempts.length === 0}
+              className="inline-flex h-11 items-center gap-2 rounded-2xl border border-rose-500/30 bg-rose-500/10 px-4 text-sm font-semibold text-rose-100 transition hover:bg-rose-500/20 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              <Archive size={15} className={archiving ? 'animate-spin' : ''} />
+              {archiving ? 'Archiving...' : 'Archive Invalid Attempts'}
+            </button>
+          </div>
         </div>
       </div>
 
@@ -160,7 +184,7 @@ const PaymentAttempts = () => {
         <StatCard label="Pending Payments" value={stats.pending} />
         <StatCard label="Failed Payments" value={stats.failed} />
         <StatCard label="Cancelled Payments" value={stats.cancelled} />
-        <StatCard label="Recovery Rate" value={`${stats.recoveryRate}%`} />
+        <StatCard label="Total Incomplete" value={stats.total} />
       </div>
 
       <div className="grid gap-3 rounded-3xl border border-slate-800 bg-slate-950 p-4 lg:grid-cols-[1fr_180px]">
@@ -185,8 +209,22 @@ const PaymentAttempts = () => {
       </div>
 
       <div className="flex flex-wrap gap-2">
-        <button type="button" onClick={() => exportCsv(filteredAttempts, 'payment-attempts.csv')} className="inline-flex h-10 items-center gap-2 rounded-2xl border border-violet-500/30 bg-violet-500/10 px-4 text-sm font-semibold text-violet-100 transition hover:bg-violet-500/20"><FileSpreadsheet size={15} />Export Excel</button>
-        <button type="button" onClick={() => exportCsv(filteredAttempts, 'payment-attempts.csv')} className="inline-flex h-10 items-center gap-2 rounded-2xl border border-slate-700 bg-slate-800 px-4 text-sm font-semibold text-slate-100 transition hover:bg-slate-700"><FileText size={15} />Export CSV</button>
+        <button
+          type="button"
+          onClick={() => exportCsv(filteredAttempts, 'payment-attempts.csv')}
+          disabled={filteredAttempts.length === 0}
+          className="inline-flex h-10 items-center gap-2 rounded-2xl border border-violet-500/30 bg-violet-500/10 px-4 text-sm font-semibold text-violet-100 transition hover:bg-violet-500/20 disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          <FileSpreadsheet size={15} />Export Excel
+        </button>
+        <button
+          type="button"
+          onClick={() => exportCsv(filteredAttempts, 'payment-attempts.csv')}
+          disabled={filteredAttempts.length === 0}
+          className="inline-flex h-10 items-center gap-2 rounded-2xl border border-slate-700 bg-slate-800 px-4 text-sm font-semibold text-slate-100 transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          <FileText size={15} />Export CSV
+        </button>
       </div>
 
       {error && <div className="rounded-3xl border border-rose-500/20 bg-rose-500/10 p-5 text-rose-100">{error}</div>}
@@ -205,7 +243,13 @@ const PaymentAttempts = () => {
             />
           ))
         ) : (
-          <div className="rounded-3xl border border-slate-800 bg-slate-950 p-5 text-slate-400">No incomplete payment attempts.</div>
+          <div className="flex flex-col items-center justify-center rounded-3xl border border-slate-800 bg-slate-950/60 py-12 px-6 text-center">
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-slate-800 bg-slate-900 text-slate-500">
+              <CircleCheckBig size={24} className="text-emerald-400/80" />
+            </div>
+            <h3 className="mt-3 text-base font-medium text-slate-200">No Incomplete Payment Attempts</h3>
+            <p className="mt-1 text-sm text-slate-500">All checkout sessions are completed or have been cleared.</p>
+          </div>
         )}
       </div>
     </section>
