@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
 import { CalendarDays, CheckCircle2, MapPin, Send, Sparkles } from 'lucide-react';
@@ -171,11 +171,53 @@ const Hire = () => {
   );
 };
 
-const FormInput = ({ label, type = 'text', value, onChange, placeholder = '', className = '' }) => (
-  <label className={`block ${className}`}>
-    <span className="mb-1.5 block text-xs text-white/65">{label}</span>
-    <input type={type} value={value} onChange={(event) => onChange(event.target.value)} className="w-full rounded-xl border border-purple-300/20 bg-purple-500/10 px-4 py-3 text-sm text-white outline-none transition focus:border-purple-300/35" placeholder={placeholder} />
-  </label>
-);
+const FormInput = ({ label, type = 'text', value, onChange, placeholder = '', className = '' }) => {
+  const isDate = type === 'date';
+  const inputRef = useRef(null);
+
+  const handleOpenPicker = () => {
+    if (inputRef.current) {
+      if (typeof inputRef.current.showPicker === 'function') {
+        try {
+          inputRef.current.showPicker();
+        } catch (_) {
+          inputRef.current.focus();
+        }
+      } else {
+        inputRef.current.focus();
+      }
+    }
+  };
+
+  return (
+    <label className={`block ${className}`}>
+      <span className="mb-1.5 block text-xs text-white/65">{label}</span>
+      <div className="relative">
+        <input
+          ref={inputRef}
+          type={type}
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          style={isDate ? { colorScheme: 'dark' } : undefined}
+          className={`w-full rounded-xl border border-purple-300/20 bg-purple-500/10 px-4 py-3 text-sm text-white outline-none transition focus:border-purple-300/35 ${
+            isDate ? 'date-input-custom [color-scheme:dark] pr-11' : ''
+          }`}
+          placeholder={placeholder}
+        />
+        {isDate && (
+          <button
+            type="button"
+            tabIndex={-1}
+            onClick={handleOpenPicker}
+            aria-label="Open calendar"
+            className="absolute right-3.5 top-1/2 -translate-y-1/2 text-white hover:text-white transition cursor-pointer p-0.5 pointer-events-none"
+          >
+            <CalendarDays size={19} className="text-white drop-shadow-[0_0_8px_rgba(255,255,255,0.4)]" />
+          </button>
+        )}
+      </div>
+    </label>
+  );
+};
 
 export default Hire;

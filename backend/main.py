@@ -4227,19 +4227,71 @@ async def admin_report_payments_excel(
 
 
 
+class ArchivePaymentAttemptsIn(BaseModel):
+    days: Optional[int] = 0
+
 @admin_router.post("/payments/payment-attempts/archive-invalid")
-async def admin_archive_invalid_payment_attempts(days: int = 7, current_admin: AdminBase = Depends(get_current_active_admin)):
+async def admin_archive_invalid_payment_attempts(
+    payload: Optional[ArchivePaymentAttemptsIn] = None,
+    days: Optional[int] = None,
+    current_admin: AdminBase = Depends(get_current_active_admin)
+):
     if db is None:
         raise HTTPException(status_code=500, detail="Database not configured")
-    cutoff = datetime.now(timezone.utc) - timedelta(days=max(days, 1))
-    cutoff_iso = cutoff.isoformat()
-    result = await db.payment_attempts.delete_many(
-        {
-            "payment_status": {"$in": ["pending", "created", "failed", "cancelled", "expired", "abandoned"]},
-            "created_at": {"$lt": cutoff_iso},
-        }
-    )
-    return {"success": True, "deleted": result.deleted_count, "cutoff": cutoff_iso}
+    
+    target_days = 0
+    if payload is not None and payload.days is not None:
+        target_days = payload.days
+    elif days is not None:
+        target_days = days
+
+    match_filter: dict = {
+        "payment_status": {"$in": ["pending", "created", "failed", "cancelled", "expired", "abandoned"]}
+    }
+
+    if target_days > 0:
+        cutoff = datetime.now(timezone.utc) - timedelta(days=target_days)
+        cutoff_iso = cutoff.isoformat()
+        match_filter["created_at"] = {"$lt": cutoff_iso}
+
+    result = await db.payment_attempts.delete_many(match_filter)
+    try:
+        if hasattr(db, "orders"):
+            await db.orders.delete_many({
+                **match_filter,
+                "verified": {"$ne": True}
+            })
+    except Exception as exc:
+        logger.warning("Optional cleanup in orders failed: %s", exc)
+
+    return {"success": True, "deleted": result.deleted_count}
+
+
+@admin_router.delete("/payments/payment-attempts/{attempt_id}")
+async def admin_delete_payment_attempt(attempt_id: str, current_admin: AdminBase = Depends(get_current_active_admin)):
+    if db is None:
+        raise HTTPException(status_code=500, detail="Database not configured")
+    
+    filter_query = {
+        "$or": [
+            {"id": attempt_id},
+            {"razorpay_order_id": attempt_id},
+            {"razorpay_payment_id": attempt_id}
+        ]
+    }
+    
+    result = await db.payment_attempts.delete_many(filter_query)
+    try:
+        if hasattr(db, "orders"):
+            await db.orders.delete_many({
+                **filter_query,
+                "payment_status": {"$in": ["pending", "created", "failed", "cancelled", "expired", "abandoned"]},
+                "verified": {"$ne": True}
+            })
+    except Exception as exc:
+        logger.warning("Optional single attempt cleanup in orders failed: %s", exc)
+
+    return {"success": True, "deleted": result.deleted_count}
 
 
 @admin_router.post("/orders/{order_id}/resend-download-email")

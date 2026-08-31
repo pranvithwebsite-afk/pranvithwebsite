@@ -543,8 +543,13 @@ export const fetchAdminPaymentAttempts = async (status = 'all', search = '') => 
   return data;
 };
 
-export const archiveInvalidPaymentAttempts = async (days = 7) => {
-  const { data } = await adminApi.post('/admin/payments/payment-attempts/archive-invalid', { days });
+export const archiveInvalidPaymentAttempts = async (days = 0) => {
+  const { data } = await adminApi.post('/admin/payments/payment-attempts/archive-invalid', { days }, { params: { days } });
+  return data;
+};
+
+export const deleteAdminPaymentAttempt = async (attemptId) => {
+  const { data } = await adminApi.delete(`/admin/payments/payment-attempts/${encodeURIComponent(attemptId)}`);
   return data;
 };
 

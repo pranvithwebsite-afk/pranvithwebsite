@@ -1,8 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { CircleCheckBig, Clock3, FileSpreadsheet, FileText, Mail, Phone, RefreshCw, Search, User } from 'lucide-react';
+import { CircleCheckBig, Clock3, FileSpreadsheet, FileText, Mail, Phone, RefreshCw, Search, Trash2, User } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   archiveInvalidPaymentAttempts,
+  deleteAdminPaymentAttempt,
   fetchAdminPaymentAttempts,
   formatApiErrorDetail,
 } from '../../lib/api';
@@ -107,16 +108,30 @@ const PaymentAttempts = () => {
   }, [attempts, query, status]);
 
   const handleArchive = async () => {
+    if (!window.confirm('Are you sure you want to archive and clear all incomplete/invalid payment attempts?')) return;
     setArchiving(true);
     try {
-      const result = await archiveInvalidPaymentAttempts(7);
-      toast.success(`Archived ${result?.deleted ?? 0} invalid payment attempts.`);
+      const result = await archiveInvalidPaymentAttempts(0);
+      toast.success(`Archived ${result?.deleted ?? 0} invalid payment attempt${result?.deleted === 1 ? '' : 's'}.`);
       await loadAttempts();
     } catch (err) {
       const message = formatApiErrorDetail(err?.response?.data?.detail) || err?.message || 'Could not archive invalid attempts.';
       toast.error(message);
     } finally {
       setArchiving(false);
+    }
+  };
+
+  const handleDeleteAttempt = async (attemptId) => {
+    if (!attemptId) return;
+    if (!window.confirm('Are you sure you want to delete this payment attempt record?')) return;
+    try {
+      await deleteAdminPaymentAttempt(attemptId);
+      toast.success('Payment attempt deleted.');
+      await loadAttempts();
+    } catch (err) {
+      const message = formatApiErrorDetail(err?.response?.data?.detail) || err?.message || 'Could not delete payment attempt.';
+      toast.error(message);
     }
   };
 
@@ -183,7 +198,11 @@ const PaymentAttempts = () => {
           ))
         ) : filteredAttempts.length > 0 ? (
           filteredAttempts.map((attempt) => (
-            <AttemptCard key={attempt.id || attempt.razorpay_order_id || attempt.razorpay_payment_id} attempt={attempt} />
+            <AttemptCard
+              key={attempt.id || attempt.razorpay_order_id || attempt.razorpay_payment_id}
+              attempt={attempt}
+              onDelete={handleDeleteAttempt}
+            />
           ))
         ) : (
           <div className="rounded-3xl border border-slate-800 bg-slate-950 p-5 text-slate-400">No incomplete payment attempts.</div>
@@ -193,7 +212,7 @@ const PaymentAttempts = () => {
   );
 };
 
-const AttemptCard = ({ attempt }) => {
+const AttemptCard = ({ attempt, onDelete }) => {
   const status = normalizeStatus(attempt);
   const statusClass = status === 'pending'
     ? 'border-amber-500/20 bg-amber-500/10 text-amber-100'
@@ -220,7 +239,17 @@ const AttemptCard = ({ attempt }) => {
           <p className="text-xs uppercase tracking-[0.24em] text-slate-500">Attempt ID</p>
           <h2 className="mt-1 break-all text-lg font-semibold text-white">{attempt.id || 'N/A'}</h2>
         </div>
-        <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${statusClass}`}>{status === 'pending' ? 'Pending' : status === 'failed' ? 'Failed' : status === 'cancelled' ? 'Cancelled' : status === 'expired' ? 'Expired' : status === 'abandoned' ? 'Abandoned' : status}</span>
+        <div className="flex items-center gap-2">
+          <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${statusClass}`}>{status === 'pending' ? 'Pending' : status === 'failed' ? 'Failed' : status === 'cancelled' ? 'Cancelled' : status === 'expired' ? 'Expired' : status === 'abandoned' ? 'Abandoned' : status}</span>
+          <button
+            type="button"
+            onClick={() => onDelete?.(attempt.id || attempt.razorpay_order_id)}
+            title="Delete this payment attempt"
+            className="inline-flex h-8 w-8 items-center justify-center rounded-xl border border-slate-800 bg-slate-900 text-slate-400 transition hover:border-rose-500/40 hover:bg-rose-500/15 hover:text-rose-200"
+          >
+            <Trash2 size={14} />
+          </button>
+        </div>
       </div>
 
       <div className="mt-5 grid gap-4 xl:grid-cols-3">
