@@ -850,13 +850,24 @@ async def admin_payment_attempts(status: Optional[str] = None, search: Optional[
     if db is None:
         raise HTTPException(status_code=500, detail="Database not configured")
     try:
-        match: dict = {"payment_status": {"$in": list(PAYMENT_ATTEMPT_STATUSES)}}
+        collection = getattr(db, "payment_attempts", getattr(db, "orders", None))
+        if collection is None:
+            raise HTTPException(status_code=500, detail="Database collection not available")
+
+        status_list = list(PAYMENT_ATTEMPT_STATUSES)
+        conditions = []
         if status and status != "all":
-            match["payment_status"] = status
+            conditions.append({"$or": [{"payment_status": status}, {"status": status}]})
+        else:
+            conditions.append({"$or": [{"payment_status": {"$in": status_list}}, {"status": {"$in": status_list}}]})
+
         if search:
             escaped = re.escape(search.strip())
-            match["$or"] = [{field: {"$regex": escaped, "$options": "i"}} for field in ["id", "razorpay_order_id", "razorpay_payment_id", "customer_name", "customer_email", "product_name", "product_slug"]]
-        rows = await db.payment_attempts.find(match, {"_id": 0}).sort([("created_at", -1)]).to_list(500)
+            search_fields = ["id", "razorpay_order_id", "razorpay_payment_id", "customer_name", "customer_email", "customer_phone", "buyer_name", "buyer_email", "buyer_phone", "product_name", "product_slug", "product_title"]
+            conditions.append({"$or": [{field: {"$regex": escaped, "$options": "i"}} for field in search_fields]})
+
+        match = {"$and": conditions} if len(conditions) > 1 else conditions[0] if conditions else {}
+        rows = await collection.find(match, {"_id": 0}).sort([("created_at", -1)]).to_list(500)
         return [_public_payment_attempt_payload(row) for row in rows]
     except Exception:
         logger.exception("Admin payment attempts fetch failed")

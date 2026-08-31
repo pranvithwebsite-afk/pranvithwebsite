@@ -8,7 +8,14 @@ import {
   formatApiErrorDetail,
 } from '../../lib/api';
 
-const statusOptions = ['all', 'pending', 'failed', 'cancelled', 'expired', 'abandoned'];
+const statusOptions = [
+  { value: 'all', label: 'All Statuses' },
+  { value: 'pending', label: 'Pending' },
+  { value: 'failed', label: 'Failed' },
+  { value: 'cancelled', label: 'Cancelled' },
+  { value: 'expired', label: 'Expired' },
+  { value: 'abandoned', label: 'Abandoned' },
+];
 
 const formatAmount = (amount = 0, currency = 'INR') =>
   new Intl.NumberFormat('en-IN', {
@@ -59,7 +66,7 @@ const PaymentAttempts = () => {
   const loadAttempts = useCallback((isManual = false) => {
     if (isManual) setRefreshing(true);
     else setLoading(true);
-    return fetchAdminPaymentAttempts(status, query)
+    return fetchAdminPaymentAttempts('all')
       .then((data) => {
         setAttempts(Array.isArray(data) ? data : []);
         setError('');
@@ -74,7 +81,7 @@ const PaymentAttempts = () => {
         setLoading(false);
         setRefreshing(false);
       });
-  }, [status, query]);
+  }, []);
 
   useEffect(() => {
     loadAttempts();
@@ -200,10 +207,10 @@ const PaymentAttempts = () => {
         <select
           value={status}
           onChange={(event) => setStatus(event.target.value)}
-          className="h-11 rounded-2xl border border-slate-800 bg-slate-900 px-4 text-sm text-white outline-none focus:border-violet-500"
+          className="h-11 rounded-2xl border border-slate-800 bg-slate-900 px-4 text-sm text-white outline-none focus:border-violet-500 cursor-pointer"
         >
           {statusOptions.map((item) => (
-            <option key={item} value={item}>{item === 'all' ? 'All statuses' : item}</option>
+            <option key={item.value} value={item.value}>{item.label}</option>
           ))}
         </select>
       </div>
@@ -247,8 +254,23 @@ const PaymentAttempts = () => {
             <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-slate-800 bg-slate-900 text-slate-500">
               <CircleCheckBig size={24} className="text-emerald-400/80" />
             </div>
-            <h3 className="mt-3 text-base font-medium text-slate-200">No Incomplete Payment Attempts</h3>
-            <p className="mt-1 text-sm text-slate-500">All checkout sessions are completed or have been cleared.</p>
+            <h3 className="mt-3 text-base font-medium text-slate-200">
+              {status !== 'all' || query.trim() ? 'No Matching Payment Attempts' : 'No Incomplete Payment Attempts'}
+            </h3>
+            <p className="mt-1 text-sm text-slate-500 max-w-md">
+              {status !== 'all' || query.trim()
+                ? `No payment attempts match the active filter criteria.`
+                : 'All checkout sessions are completed or have been cleared.'}
+            </p>
+            {(status !== 'all' || query.trim()) && (
+              <button
+                type="button"
+                onClick={() => { setStatus('all'); setQuery(''); }}
+                className="mt-4 inline-flex items-center gap-2 rounded-xl border border-violet-500/40 bg-violet-500/20 px-4 py-2 text-xs font-semibold text-violet-200 hover:bg-violet-500/30 transition"
+              >
+                Reset Filters
+              </button>
+            )}
           </div>
         )}
       </div>
