@@ -8477,9 +8477,6 @@ async def payment_free_order(payload: PaymentFreeOrderIn):
         raise HTTPException(status_code=400, detail="This product is not free")
 
     download_fields = _product_download_fields(product)
-    if not download_fields.get("download_file_key") and not download_fields.get("download_file"):
-        raise HTTPException(status_code=404, detail="Download file not configured")
-
     download_token = secrets.token_urlsafe(32)
     download_url = _paid_download_url(order_id, download_token)
     order_doc = {

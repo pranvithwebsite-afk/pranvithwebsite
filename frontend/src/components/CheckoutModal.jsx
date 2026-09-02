@@ -123,7 +123,7 @@ const CheckoutModal = ({ product, open, onClose, onSuccess, onFailure }) => {
           downloadToken: data.download_token,
         };
       } catch (err) {
-        const msg = err?.response?.data?.detail || 'Could not create free order';
+        const msg = err?.response?.data?.detail || err?.response?.data?.message || err?.message || 'Could not create free order';
         result = { success: false, error: typeof msg === 'string' ? msg : 'Could not create free order' };
       }
     } else {
