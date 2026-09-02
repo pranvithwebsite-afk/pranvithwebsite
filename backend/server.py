@@ -8252,10 +8252,13 @@ def _validate_download_access(order: Optional[dict], token: str) -> dict:
 
 
 async def _ensure_verified_paid_download_order(order: dict) -> dict:
-    if not order.get("razorpay_order_id"):
+    if order.get("source") == "free_download" or order.get("amount") == 0:
+        return order
+    razorpay_order_id = str(order.get("razorpay_order_id") or "")
+    if not razorpay_order_id or razorpay_order_id.startswith("free_"):
         return order
     payment_id = order.get("razorpay_payment_id")
-    if not payment_id:
+    if not payment_id or str(payment_id).startswith("free_"):
         await _mark_order_not_paid(order, "failed", "No Razorpay payment ID found for paid order")
         raise HTTPException(status_code=403, detail="Download is available only after successful payment")
     verification = await _verify_razorpay_paid_order(order, payment_id)
@@ -8481,7 +8484,8 @@ async def payment_free_order(payload: PaymentFreeOrderIn):
     download_url = _paid_download_url(order_id, download_token)
     order_doc = {
         "id": order_id,
-        "razorpay_order_id": None,
+        "razorpay_order_id": f"free_{order_id}",
+        "razorpay_payment_id": f"free_pay_{uuid.uuid4().hex[:16]}",
         "amount": 0,
         "originalAmount": coupon_result["originalAmount"] if coupon_result else raw_amount,
         "couponCode": _coupon_code(payload.coupon_code) if payload.coupon_code else None,
