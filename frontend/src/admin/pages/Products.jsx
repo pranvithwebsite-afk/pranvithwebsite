@@ -1240,13 +1240,13 @@ const PrivateDownloadSection = ({
 }) => (
   <div className="space-y-4 rounded-2xl border border-slate-800 bg-slate-900/70 p-4">
     <div>
-      <h2 className="text-sm font-semibold text-white">Private Paid Download</h2>
-      <p className="mt-2 text-xs leading-relaxed text-slate-500">
-        Use this for ZIP files, project files, LUT packs, templates, and paid course materials. Customers can access this only after successful payment.
+      <h2 className="text-sm font-semibold text-white">Downloadable Asset / File</h2>
+      <p className="mt-2 text-xs leading-relaxed text-slate-400">
+        Attach the file or link that buyers receive after ordering this product (free or paid).
       </p>
     </div>
     <div>
-      <label className="mb-2 block text-sm font-semibold text-white">Legacy Download File URL</label>
+      <label className="mb-2 block text-sm font-semibold text-white">Download File URL (Google Drive / Direct Link)</label>
       <input
         type="url"
         name="download_file"
@@ -1255,10 +1255,10 @@ const PrivateDownloadSection = ({
           onInputChange(event);
           onFieldChange('download_file_url', event.target.value);
         }}
-        placeholder="https://example.com/file.zip"
+        placeholder="https://drive.google.com/... or https://example.com/file.zip"
         className="w-full rounded-lg border border-slate-700 bg-slate-950 px-4 py-2 text-white placeholder:text-slate-600 focus:border-violet-500 focus:outline-none"
       />
-      <p className="mt-2 text-xs text-slate-500">Manual URL is for old products only. New paid files should use the protected upload below.</p>
+      <p className="mt-2 text-xs text-slate-500">You can paste a Google Drive link, Dropbox link, or direct download URL above, or upload a file below.</p>
     </div>
     <UploadButton
       label="Upload Private File"
