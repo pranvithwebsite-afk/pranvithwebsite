@@ -259,35 +259,85 @@ export function toProductDescriptionPreview(value) {
     .join(' ');
 }
 
-export async function shareProduct(product, fallbackUrl) {
+export async function copyToClipboard(text) {
+  if (!text) return false;
+  try {
+    if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+  } catch (_) {
+    // Fall back to document.execCommand below
+  }
+  try {
+    if (typeof document !== 'undefined') {
+      const textarea = document.createElement('textarea');
+      textarea.value = text;
+      textarea.style.position = 'fixed';
+      textarea.style.left = '-9999px';
+      textarea.style.top = '-9999px';
+      textarea.style.opacity = '0';
+      document.body.appendChild(textarea);
+      textarea.focus();
+      textarea.select();
+      const successful = document.execCommand('copy');
+      document.body.removeChild(textarea);
+      return Boolean(successful);
+    }
+  } catch (_) {
+    // Both failed
+  }
+  return false;
+}
+
+export function getProductShareUrl(product, fallbackUrl) {
   const slug = product?.slug;
-  const productUrl = fallbackUrl || (slug && typeof window !== 'undefined'
-    ? `${window.location.origin}/assets/${slug}`
-    : '');
+  if (fallbackUrl) return fallbackUrl;
+  if (slug && typeof window !== 'undefined') {
+    return `${window.location.origin}/assets/${slug}`;
+  }
+  if (typeof window !== 'undefined') {
+    return window.location.href;
+  }
+  return '';
+}
+
+export async function shareProduct(product, fallbackUrl) {
+  const productUrl = getProductShareUrl(product, fallbackUrl);
+  const title = String(product?.title || product?.name || 'Asset').trim();
 
   if (!productUrl) {
     toast.error('Product link unavailable');
-    return;
+    return false;
   }
 
-  try {
-    if (typeof navigator !== 'undefined' && navigator.share) {
+  // Detect mobile device for native share sheet
+  const isMobile = typeof navigator !== 'undefined' && /Android|iPhone|iPad|iPod/i.test(navigator.userAgent || '');
+
+  if (isMobile && typeof navigator !== 'undefined' && navigator.share) {
+    try {
       await navigator.share({
-        title: product?.name || product?.title || 'Product',
-        text: product?.description || product?.name || product?.title || 'Product',
+        title: `${title} | Pranvith DOP`,
+        text: `Check out ${title} on Pranvith DOP:`,
         url: productUrl,
       });
-    } else if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
-      await navigator.clipboard.writeText(productUrl);
-    } else {
-      throw new Error('Clipboard is not available');
+      return true;
+    } catch (error) {
+      if (error?.name === 'AbortError') return false;
     }
-    toast.success('Product link copied');
-  } catch (error) {
-    if (error?.name === 'AbortError') return;
-    toast.error('Could not copy product link');
+  }
+
+  // Fallback to copying clean link to clipboard
+  const copied = await copyToClipboard(productUrl);
+  if (copied) {
+    toast.success('Link copied to clipboard!');
+    return true;
+  } else {
+    toast.error('Could not copy link');
+    return false;
   }
 }
+
 
 export const normalizeWorkItem = (project) => {
   if (!project) return null;

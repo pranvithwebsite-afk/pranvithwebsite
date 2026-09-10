@@ -22,6 +22,7 @@ import { toast } from 'sonner';
 import { fetchProductBySlug } from '../lib/api';
 import { FALLBACK_IMAGE, dedupeFaqs, handleImageError, safeImageSrc, shareProduct } from '../lib/utils';
 import CheckoutModal from '../components/CheckoutModal';
+import ShareModal from '../components/ShareModal';
 import { usePublicPageLoading } from '../components/PublicPageLoader';
 import SafeVideoEmbed, { getSafeVideoEmbedUrl, isDirectVideoUrl } from '../components/SafeVideoEmbed';
 import OptimizedImage from '../components/OptimizedImage';
@@ -258,6 +259,7 @@ const AssetLanding = () => {
   const [notFound, setNotFound] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [checkoutOpen, setCheckoutOpen] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
   const viewedProductIds = useRef(new Set());
   usePublicPageLoading(loading);
 
@@ -346,8 +348,8 @@ const AssetLanding = () => {
     { label: 'License', value: 'Personal & commercial projects' },
   ];
 
-  const onShare = async () => {
-    await shareProduct(product || { slug, name, description });
+  const onShare = () => {
+    setShareOpen(true);
   };
 
   const onPrimaryCta = () => {
@@ -666,6 +668,11 @@ const AssetLanding = () => {
           toast.error(message);
           if (result?.failed) goToPaymentFailed(message, result);
         }}
+      />
+      <ShareModal
+        product={product || asset}
+        open={shareOpen}
+        onClose={() => setShareOpen(false)}
       />
     </>
   );
