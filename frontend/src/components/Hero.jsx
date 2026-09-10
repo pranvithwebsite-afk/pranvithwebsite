@@ -13,6 +13,7 @@ const fallbackHero = {
   secondary_button_link: '/courses',
 };
 
+
 const cleanText = (value) => (typeof value === 'string' && value.trim() ? value : undefined);
 const compactObject = (value) =>
   Object.fromEntries(Object.entries(value).filter(([, item]) => item !== undefined));
@@ -21,14 +22,14 @@ const Hero = ({ pageData, loading = false, fallbackAllowed = false }) => {
   const hasCmsHero = !!pageData;
   const cmsHero = pageData
     ? compactObject({
-        badge_text: cleanText(pageData.badgeText),
-        hero_title: cleanText(pageData.headline),
-        hero_subtitle: cleanText(pageData.subheadline),
-        primary_button_text: cleanText(pageData.buttonText),
-        primary_button_link: cleanText(pageData.buttonUrl),
-        secondary_button_text: cleanText(pageData.secondaryButtonText),
-        secondary_button_link: cleanText(pageData.secondaryButtonUrl),
-      })
+      badge_text: cleanText(pageData.badgeText),
+      hero_title: cleanText(pageData.headline),
+      hero_subtitle: cleanText(pageData.subheadline),
+      primary_button_text: cleanText(pageData.buttonText),
+      primary_button_link: cleanText(pageData.buttonUrl),
+      secondary_button_text: cleanText(pageData.secondaryButtonText),
+      secondary_button_link: cleanText(pageData.secondaryButtonUrl),
+    })
     : {};
 
   const hero = hasCmsHero ? { ...fallbackHero, ...cmsHero } : (fallbackAllowed ? fallbackHero : fallbackHero);
