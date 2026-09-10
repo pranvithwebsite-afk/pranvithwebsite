@@ -83,6 +83,25 @@ from ..utils.razorpay import (_create_razorpay_payment_link_for_product, _refres
 
 logger = logging.getLogger(__name__)
 
+
+def _is_product_eligible_for_payment_link(product: dict) -> bool:
+    if not isinstance(product, dict) or product.get("is_free"):
+        return False
+    raw_price = product.get("sale_price")
+    if raw_price in (None, ""):
+        raw_price = product.get("price", 0)
+    if isinstance(raw_price, str):
+        cleaned = raw_price.strip().replace(",", "")
+        cleaned = re.sub(r"^[^\d\-+.]+", "", cleaned)
+    else:
+        cleaned = raw_price
+    try:
+        amount = int(round(float(cleaned or 0) * 100))
+        return amount >= 100
+    except (TypeError, ValueError):
+        return False
+
+
 admin_router = APIRouter(prefix="/admin", tags=["admin"])
 
 @admin_router.post("/login", response_model=AdminLoginResponse)
@@ -1525,13 +1544,14 @@ async def admin_create_product(payload: ProductIn, current_admin: AdminBase = De
     )
     warning = None
     if create_payment_link and not (doc.get("razorpay_payment_link_id") or doc.get("razorpay_payment_link_url")):
-        try:
-            link_result = await _create_razorpay_payment_link_for_product(doc)
-            doc.update(link_result["fields"])
-            await db.products.update_one({"id": doc["id"]}, {"$set": link_result["fields"]})
-        except Exception as exc:
-            warning = _payment_link_warning_payload(exc)
-            logger.warning("Product saved without Razorpay Payment Link id=%s slug=%s warning=%s", doc["id"], doc["slug"], warning)
+        if _is_product_eligible_for_payment_link(doc):
+            try:
+                link_result = await _create_razorpay_payment_link_for_product(doc)
+                doc.update(link_result["fields"])
+                await db.products.update_one({"id": doc["id"]}, {"$set": link_result["fields"]})
+            except Exception as exc:
+                warning = _payment_link_warning_payload(exc)
+                logger.warning("Product saved without Razorpay Payment Link id=%s slug=%s warning=%s", doc["id"], doc["slug"], warning)
     doc.pop("_id", None)
     response = {"success": True, "product": doc}
     if warning:
@@ -1570,13 +1590,14 @@ async def admin_update_product(product_id: str, payload: ProductIn, current_admi
     if create_payment_link:
         product = await db.products.find_one({"id": product_id}, {"_id": 0})
         if not (product.get("razorpay_payment_link_id") or product.get("razorpay_payment_link_url")):
-            try:
-                link_result = await _create_razorpay_payment_link_for_product(product)
-                await db.products.update_one({"id": product_id}, {"$set": link_result["fields"]})
-                product.update(link_result["fields"])
-            except Exception as exc:
-                warning = _payment_link_warning_payload(exc)
-                logger.warning("Product updated without Razorpay Payment Link id=%s slug=%s warning=%s", product_id, update_doc["slug"], warning)
+            if _is_product_eligible_for_payment_link(product):
+                try:
+                    link_result = await _create_razorpay_payment_link_for_product(product)
+                    await db.products.update_one({"id": product_id}, {"$set": link_result["fields"]})
+                    product.update(link_result["fields"])
+                except Exception as exc:
+                    warning = _payment_link_warning_payload(exc)
+                    logger.warning("Product updated without Razorpay Payment Link id=%s slug=%s warning=%s", product_id, update_doc["slug"], warning)
     response = {"success": True}
     if warning:
         response["warning"] = warning

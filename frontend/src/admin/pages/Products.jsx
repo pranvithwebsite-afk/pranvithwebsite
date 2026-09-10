@@ -58,7 +58,7 @@ const defaultProductForm = {
   download_file_key: '',
   download_file_name: '',
   download_file_bucket: '',
-  create_razorpay_payment_link: true,
+  create_razorpay_payment_link: false,
   razorpay_payment_link_id: '',
   razorpay_payment_link_url: '',
   razorpay_payment_link_status: '',
@@ -166,10 +166,12 @@ const normalizeProductForForm = (product = {}) => {
   const galleryImages = getGalleryImageCandidates(product);
   const mainImageUrl = getMainProductImageUrl(product);
   const thumbnailImageUrl = getThumbnailProductImageUrl(product);
+  const isFreeProduct = product.is_free === true || !product.price || Number(product.price) <= 0;
   const hasExistingPaymentLink = !!(product.razorpay_payment_link_id || product.razorpay_payment_link_url);
   return {
     ...defaultProductForm,
     ...product,
+    is_free: isFreeProduct,
     image_url: mainImageUrl,
     thumbnail_url: thumbnailImageUrl,
     preview_image_url: String(product.preview_image_url || '').trim(),
@@ -188,7 +190,7 @@ const normalizeProductForForm = (product = {}) => {
     download_file_key: product.download_file_key || '',
     download_file_name: product.download_file_name || '',
     download_file_bucket: product.download_file_bucket || '',
-    create_razorpay_payment_link: !hasExistingPaymentLink,
+    create_razorpay_payment_link: !hasExistingPaymentLink && !isFreeProduct,
   };
 };
 
@@ -274,8 +276,11 @@ const Products = () => {
       slug = candidate;
     }
 
+    const isFree = formData.is_free === true || Number(formData.price || 0) <= 0;
     const payload = {
       ...formData,
+      is_free: isFree,
+      create_razorpay_payment_link: !isFree && Boolean(formData.create_razorpay_payment_link),
       slug,
       product_url: productUrlForSlug(slug),
       gallery_images: formData.gallery_images || [],
@@ -952,23 +957,33 @@ const ProductForm = ({
           })}
         />
 
-        <label className="flex items-start gap-3 rounded-lg border border-slate-800 bg-slate-900 p-4 text-sm text-slate-200">
+        <label className={`flex items-start gap-3 rounded-lg border p-4 text-sm ${
+          formData.is_free || Number(formData.price || 0) <= 0
+            ? 'border-slate-800/50 bg-slate-900/40 text-slate-500'
+            : 'border-slate-800 bg-slate-900 text-slate-200'
+        }`}>
           <input
             type="checkbox"
             name="create_razorpay_payment_link"
-            checked={!!formData.create_razorpay_payment_link}
-            disabled={hasExistingPaymentLink}
+            checked={!formData.is_free && Number(formData.price || 0) > 0 && !!formData.create_razorpay_payment_link}
+            disabled={hasExistingPaymentLink || formData.is_free || Number(formData.price || 0) <= 0}
             onChange={onInputChange}
             className="mt-1 h-4 w-4 rounded"
           />
           <span>
             <span className="block font-semibold text-white">
-              {hasExistingPaymentLink ? 'Payment Link already exists' : 'Also create Razorpay Payment Link after save'}
+              {formData.is_free || Number(formData.price || 0) <= 0
+                ? 'Payment Links are disabled for Free assets'
+                : hasExistingPaymentLink
+                  ? 'Payment Link already exists'
+                  : 'Also create Razorpay Payment Link after save'}
             </span>
             <span className="mt-1 block text-slate-500">
-              Enabled: creates a Razorpay Payment Link after saving this product. Website checkout still uses Razorpay Orders.
+              {formData.is_free || Number(formData.price || 0) <= 0
+                ? 'Free products do not require payment or payment links.'
+                : 'Enabled: creates a Razorpay Payment Link after saving this product. Website checkout still uses Razorpay Orders.'}
             </span>
-            {hasExistingPaymentLink && (
+            {hasExistingPaymentLink && !formData.is_free && Number(formData.price || 0) > 0 && (
               <span className="mt-1 block text-xs text-emerald-300/80">
                 Existing links are reused and will not be recreated automatically.
               </span>
