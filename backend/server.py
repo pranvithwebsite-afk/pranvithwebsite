@@ -702,6 +702,8 @@ class Product(BaseModel):
     description: Optional[str] = None
     features: List[str] = []
     benefits: List[str] = []
+    compatibility: List[str] = []
+    installation_steps: List[Dict[str, Any]] = []
     faqs: List[Dict[str, str]] = []
     before_images: List[str] = []
     after_images: List[str] = []
@@ -750,6 +752,8 @@ class ProductIn(BaseModel):
     description: Optional[str] = None
     features: List[str] = []
     benefits: List[str] = []
+    compatibility: List[str] = []
+    installation_steps: List[Dict[str, Any]] = []
     faqs: List[Dict[str, str]] = []
     before_images: List[str] = []
     after_images: List[str] = []
@@ -2770,13 +2774,24 @@ def _normalize_product_media_fields(doc: dict) -> dict:
     ):
         if field_name in doc and doc.get(field_name) is not None:
             doc[field_name] = _normalize_text_value(doc.get(field_name), 5000 if field_name == "description" else 220)
-    for list_field in ("features", "benefits"):
+    for list_field in ("features", "benefits", "compatibility"):
         if list_field in doc:
             doc[list_field] = [
                 _normalize_text_value(item, 1000)
                 for item in (doc.get(list_field) or [])[:200]
                 if str(_decode_html_entities(item or "")).strip()
             ]
+    if "installation_steps" in doc:
+        safe_steps = []
+        for item in (doc.get("installation_steps") or [])[:50]:
+            if isinstance(item, dict):
+                title = _normalize_text_value(item.get("title") or "", 300)
+                desc = _normalize_text_value(item.get("description") or item.get("desc") or "", 2000)
+                if title or desc:
+                    safe_steps.append({"title": title, "description": desc})
+            elif isinstance(item, str) and item.strip():
+                safe_steps.append({"title": _normalize_text_value(item, 300), "description": ""})
+        doc["installation_steps"] = safe_steps
     if "faqs" in doc:
         safe_faqs = []
         for item in (doc.get("faqs") or [])[:100]:

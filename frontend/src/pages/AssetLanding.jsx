@@ -200,27 +200,29 @@ const normalizeProduct = (value) => {
     ? landing.installation_steps
     : (Array.isArray(product.installation_steps) && product.installation_steps.length ? product.installation_steps : []);
 
-  const features = rawFeatures.length >= 2 && rawFeatures.every((f) => String(f).trim().length >= 10)
+  const features = rawFeatures.length > 0
     ? rawFeatures
     : defaultDetails.features;
 
-  const benefits = rawBenefits.length >= 2 && rawBenefits.every((b) => String(b).trim().length >= 10)
+  const benefits = rawBenefits.length > 0
     ? rawBenefits
     : defaultDetails.benefits;
 
-  const compatibility = rawCompatibility.length >= 2
+  const compatibility = rawCompatibility.length > 0
     ? rawCompatibility
     : defaultDetails.compatibility;
 
-  const installationSteps = rawInstallationSteps.length >= 2
+  const installationSteps = rawInstallationSteps.length > 0
     ? rawInstallationSteps
     : defaultDetails.installationSteps;
 
-  const faqs = dedupeFaqs([
+  const customFaqs = [
     ...toFaqList(landing.faqs),
     ...toFaqList(product.faqs),
-    ...defaultDetails.faqs,
-  ]).slice(0, 24);
+  ];
+  const faqs = dedupeFaqs(
+    customFaqs.length > 0 ? customFaqs : defaultDetails.faqs
+  ).slice(0, 24);
 
   return {
     raw: product,

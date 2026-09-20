@@ -27,6 +27,50 @@ import {
   validateVideoUploadFile,
 } from '../../lib/mediaUpload';
 
+export const DEFAULT_PRODUCT_FEATURES = [
+  'Drag-and-drop workflow with organized files for fast timeline integration.',
+  'High-resolution digital assets prepared for modern editing and post-production workflows.',
+  'Universal compatibility across major editing applications on Mac & Windows.',
+  'Works 100% offline after download—your pack stays ready whenever you create.',
+];
+
+export const DEFAULT_PRODUCT_BENEFITS = [
+  'Creator-ready files checked and organized before delivery.',
+  'Instant digital delivery immediately after successful checkout.',
+  'Lifetime access to the downloaded pack—no recurring subscription required.',
+  'Suitable for personal and commercial projects under the included product license.',
+];
+
+export const DEFAULT_PRODUCT_COMPATIBILITY = [
+  'Premiere Pro',
+  'After Effects',
+  'DaVinci Resolve',
+  'Final Cut Pro',
+  'Photoshop',
+  'Windows',
+  'macOS',
+];
+
+export const DEFAULT_INSTALLATION_STEPS = [
+  { title: 'Download the Pack', description: 'Complete checkout and use the secure download link to save the asset pack to your device.' },
+  { title: 'Extract the Files', description: 'Open the downloaded ZIP archive and extract it to a permanent folder on your drive.' },
+  { title: 'Import Into Your Editor', description: 'Open your editing application and import the asset files, styles, or presets into your project.' },
+  { title: 'Apply, Preview, and Customize', description: 'Drag and drop assets onto your timeline or canvas, then adjust timing, colors, and settings for your edit.' },
+];
+
+export const DEFAULT_FAQS = [
+  { q: 'Which editing applications support this asset pack?', a: 'The files work with major creative applications that support standard digital assets, including Premiere Pro, After Effects, DaVinci Resolve, Final Cut Pro, and Photoshop.' },
+  { q: 'Does the pack work on Windows and macOS?', a: 'Yes. The delivered files are cross-platform and can be used on both Windows and macOS.' },
+  { q: 'Is this a one-time purchase?', a: 'Yes. This product uses a one-time checkout and does not require a recurring subscription.' },
+  { q: 'Can I use these assets for commercial projects?', a: 'Yes. You may use the assets in completed personal and commercial creative projects under the included license.' },
+  { q: 'Can I resell or redistribute the original files?', a: 'No. You may include the assets in completed edits, but you may not resell, share, upload, or redistribute the source files.' },
+  { q: 'How do I install the pack?', a: 'No complex plugin installation is required. Download and extract the ZIP, then import the files directly into your software.' },
+  { q: 'Does the pack require an internet connection?', a: 'Internet access is required for checkout and download. After the files are saved locally, they can be used offline.' },
+  { q: 'How will I receive the files?', a: 'The files are delivered digitally through the secure access flow immediately after checkout or free-access confirmation.' },
+  { q: 'Can I use the pack for YouTube and social media?', a: 'Yes. The pack is designed for YouTube videos, Instagram Reels, TikTok, advertisements, and social media content.' },
+  { q: 'What if I have trouble downloading the pack?', a: 'Use the contact or support option on the website and include your order details so your access can be verified.' },
+];
+
 const defaultProductForm = {
   slug: '',
   name: '',
@@ -36,6 +80,8 @@ const defaultProductForm = {
   description: '',
   features: [],
   benefits: [],
+  compatibility: [],
+  installation_steps: [],
   faqs: [],
   before_images: [],
   after_images: [],
@@ -168,9 +214,28 @@ const normalizeProductForForm = (product = {}) => {
   const thumbnailImageUrl = getThumbnailProductImageUrl(product);
   const isFreeProduct = product.is_free === true || !product.price || Number(product.price) <= 0;
   const hasExistingPaymentLink = !!(product.razorpay_payment_link_id || product.razorpay_payment_link_url);
+  const landing = product.landing_content && typeof product.landing_content === 'object' ? product.landing_content : {};
+
+  const features = Array.isArray(product.features) ? product.features : [];
+  const benefits = Array.isArray(product.benefits) ? product.benefits : [];
+  const compatibility = Array.isArray(product.compatibility) && product.compatibility.length
+    ? product.compatibility
+    : (Array.isArray(landing.compatibility) ? landing.compatibility : []);
+  const installation_steps = Array.isArray(product.installation_steps) && product.installation_steps.length
+    ? product.installation_steps
+    : (Array.isArray(landing.installation_steps) ? landing.installation_steps : []);
+  const faqs = Array.isArray(product.faqs) && product.faqs.length
+    ? product.faqs
+    : (Array.isArray(landing.faqs) ? landing.faqs : []);
+
   return {
     ...defaultProductForm,
     ...product,
+    features,
+    benefits,
+    compatibility,
+    installation_steps,
+    faqs,
     is_free: isFreeProduct,
     image_url: mainImageUrl,
     thumbnail_url: thumbnailImageUrl,
@@ -991,29 +1056,51 @@ const ProductForm = ({
           </span>
         </label>
 
-        {/* Arrays Editor */}
-        <ArrayEditor
-          label="Features"
-          items={formData.features}
-          newItem={newArrayItems.features}
-          onNewItemChange={(val) => setNewArrayItems((p) => ({ ...p, features: val }))}
-          onAdd={() => {
-            onArrayAdd('features', newArrayItems.features);
-            setNewArrayItems((p) => ({ ...p, features: '' }));
-          }}
-          onRemove={(idx) => onArrayRemove('features', idx)}
+        {/* Features / Included with your asset */}
+        <StringListEditor
+          label="Included with your asset (Features)"
+          subtitle="Feature highlights shown under 'Engineered for a faster workflow' (e.g. Drag-and-drop workflow, High-resolution assets...)"
+          items={formData.features || []}
+          onChange={(val) => onFieldChange('features', val)}
+          placeholder="Add a feature (e.g. 10+ cinematic 3D LUTs)..."
+          defaultTemplate={DEFAULT_PRODUCT_FEATURES}
+          defaultLabel="Load Default Features"
         />
 
-        <ArrayEditor
-          label="Benefits"
-          items={formData.benefits}
-          newItem={newArrayItems.benefits}
-          onNewItemChange={(val) => setNewArrayItems((p) => ({ ...p, benefits: val }))}
-          onAdd={() => {
-            onArrayAdd('benefits', newArrayItems.benefits);
-            setNewArrayItems((p) => ({ ...p, benefits: '' }));
-          }}
-          onRemove={(idx) => onArrayRemove('benefits', idx)}
+        {/* Benefits / Why download from PranvithDOP */}
+        <StringListEditor
+          label="Why download from PranvithDOP (Benefits)"
+          subtitle="Key benefit points shown under 'Why download from PranvithDOP'"
+          items={formData.benefits || []}
+          onChange={(val) => onFieldChange('benefits', val)}
+          placeholder="Add a benefit (e.g. Save grading time, Instant delivery)..."
+          defaultTemplate={DEFAULT_PRODUCT_BENEFITS}
+          defaultLabel="Load Default Benefits"
+        />
+
+        {/* Compatibility / Works with your editor */}
+        <StringListEditor
+          label="Compatibility (Works with your editor)"
+          subtitle="Supported software and platforms (e.g. Premiere Pro, DaVinci Resolve, Final Cut Pro, Windows, macOS)"
+          items={formData.compatibility || []}
+          onChange={(val) => onFieldChange('compatibility', val)}
+          placeholder="Add software / OS (e.g. Premiere Pro)..."
+          defaultTemplate={DEFAULT_PRODUCT_COMPATIBILITY}
+          defaultLabel="Load Default Compatibility"
+        />
+
+        {/* Installation & Usage Guide */}
+        <InstallationStepsEditor
+          items={formData.installation_steps || []}
+          onChange={(val) => onFieldChange('installation_steps', val)}
+          defaultTemplate={DEFAULT_INSTALLATION_STEPS}
+        />
+
+        {/* FAQs */}
+        <FaqsEditor
+          items={formData.faqs || []}
+          onChange={(val) => onFieldChange('faqs', val)}
+          defaultTemplate={DEFAULT_FAQS}
         />
 
         <ArrayEditor
@@ -1603,6 +1690,398 @@ const SingleImageField = ({
     )}
   </div>
 );
+
+const StringListEditor = ({
+  label,
+  subtitle = '',
+  items = [],
+  onChange,
+  placeholder = 'Add an item...',
+  defaultTemplate = [],
+  defaultLabel = 'Load Defaults',
+}) => {
+  const [newItemText, setNewItemText] = useState('');
+
+  const handleAdd = () => {
+    const trimmed = newItemText.trim();
+    if (!trimmed) return;
+    onChange([...items, trimmed]);
+    setNewItemText('');
+  };
+
+  const handleUpdate = (index, value) => {
+    const next = [...items];
+    next[index] = value;
+    onChange(next);
+  };
+
+  const handleRemove = (index) => {
+    onChange(items.filter((_, i) => i !== index));
+  };
+
+  const handleMove = (index, direction) => {
+    const targetIndex = index + direction;
+    if (targetIndex < 0 || targetIndex >= items.length) return;
+    const next = [...items];
+    const temp = next[index];
+    next[index] = next[targetIndex];
+    next[targetIndex] = temp;
+    onChange(next);
+  };
+
+  const handleLoadDefaults = () => {
+    if (!defaultTemplate.length) return;
+    onChange([...defaultTemplate]);
+  };
+
+  return (
+    <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-4 sm:p-5">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <div className="flex items-center gap-2">
+            <label className="text-sm font-semibold text-white">{label}</label>
+            <span className="rounded-full bg-slate-800 px-2 py-0.5 text-xs text-slate-400">
+              {items.length} {items.length === 1 ? 'item' : 'items'}
+            </span>
+          </div>
+          {subtitle && <p className="mt-1 text-xs text-slate-400">{subtitle}</p>}
+        </div>
+        {defaultTemplate.length > 0 && (
+          <button
+            type="button"
+            onClick={handleLoadDefaults}
+            className="rounded-lg border border-slate-700 bg-slate-800/80 px-3 py-1 text-xs font-medium text-slate-300 transition hover:border-violet-500 hover:text-white"
+          >
+            {items.length === 0 ? defaultLabel : 'Reset to Defaults'}
+          </button>
+        )}
+      </div>
+
+      <div className="space-y-2">
+        {items.map((item, index) => (
+          <div key={index} className="flex items-center gap-2 rounded-lg border border-slate-800 bg-slate-950/80 p-1.5 focus-within:border-violet-500/60">
+            <span className="flex h-6 w-6 shrink-0 items-center justify-center text-xs font-semibold text-slate-500">
+              {index + 1}.
+            </span>
+            <input
+              type="text"
+              value={item}
+              onChange={(e) => handleUpdate(index, e.target.value)}
+              className="min-w-0 flex-1 bg-transparent px-2 py-1 text-sm text-white placeholder:text-slate-600 focus:outline-none"
+              placeholder="Enter text..."
+            />
+            <div className="flex shrink-0 items-center gap-1 pr-1">
+              <button
+                type="button"
+                disabled={index === 0}
+                onClick={() => handleMove(index, -1)}
+                className="rounded p-1 text-slate-400 transition hover:bg-slate-800 hover:text-white disabled:opacity-30"
+                title="Move up"
+              >
+                <ChevronUp size={15} />
+              </button>
+              <button
+                type="button"
+                disabled={index === items.length - 1}
+                onClick={() => handleMove(index, 1)}
+                className="rounded p-1 text-slate-400 transition hover:bg-slate-800 hover:text-white disabled:opacity-30"
+                title="Move down"
+              >
+                <ChevronDown size={15} />
+              </button>
+              <button
+                type="button"
+                onClick={() => handleRemove(index)}
+                className="rounded p-1 text-slate-400 transition hover:bg-red-500/20 hover:text-red-400"
+                title="Remove"
+              >
+                <Trash2 size={15} />
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-3 flex gap-2">
+        <input
+          type="text"
+          value={newItemText}
+          onChange={(e) => setNewItemText(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              handleAdd();
+            }
+          }}
+          placeholder={placeholder}
+          className="min-w-0 flex-1 rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white placeholder:text-slate-600 focus:border-violet-500 focus:outline-none"
+        />
+        <button
+          type="button"
+          onClick={handleAdd}
+          className="inline-flex items-center gap-1 rounded-lg bg-violet-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-violet-500"
+        >
+          <Plus size={15} /> Add
+        </button>
+      </div>
+    </div>
+  );
+};
+
+const InstallationStepsEditor = ({
+  items = [],
+  onChange,
+  defaultTemplate = DEFAULT_INSTALLATION_STEPS,
+}) => {
+  const handleAdd = () => {
+    onChange([...items, { title: '', description: '' }]);
+  };
+
+  const handleUpdate = (index, field, value) => {
+    const next = [...items];
+    const current = typeof next[index] === 'string' ? { title: next[index], description: '' } : { ...(next[index] || {}) };
+    current[field] = value;
+    next[index] = current;
+    onChange(next);
+  };
+
+  const handleRemove = (index) => {
+    onChange(items.filter((_, i) => i !== index));
+  };
+
+  const handleMove = (index, direction) => {
+    const targetIndex = index + direction;
+    if (targetIndex < 0 || targetIndex >= items.length) return;
+    const next = [...items];
+    const temp = next[index];
+    next[index] = next[targetIndex];
+    next[targetIndex] = temp;
+    onChange(next);
+  };
+
+  const handleLoadDefaults = () => {
+    onChange([...defaultTemplate]);
+  };
+
+  return (
+    <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-4 sm:p-5">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <div className="flex items-center gap-2">
+            <label className="text-sm font-semibold text-white">Installation & Usage Guide</label>
+            <span className="rounded-full bg-slate-800 px-2 py-0.5 text-xs text-slate-400">
+              {items.length} {items.length === 1 ? 'step' : 'steps'}
+            </span>
+          </div>
+          <p className="mt-1 text-xs text-slate-400">
+            Step-by-step setup instructions shown under "Installation and usage guide".
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={handleLoadDefaults}
+            className="rounded-lg border border-slate-700 bg-slate-800/80 px-3 py-1 text-xs font-medium text-slate-300 transition hover:border-violet-500 hover:text-white"
+          >
+            {items.length === 0 ? 'Load Default Steps' : 'Reset to Defaults'}
+          </button>
+          <button
+            type="button"
+            onClick={handleAdd}
+            className="inline-flex items-center gap-1 rounded-lg bg-violet-600 px-3 py-1 text-xs font-semibold text-white transition hover:bg-violet-500"
+          >
+            <Plus size={14} /> Add Step
+          </button>
+        </div>
+      </div>
+
+      <div className="space-y-3">
+        {items.map((rawStep, index) => {
+          const step = typeof rawStep === 'string' ? { title: rawStep, description: '' } : (rawStep || {});
+          return (
+            <div key={index} className="rounded-xl border border-slate-800 bg-slate-950 p-3.5 sm:p-4">
+              <div className="mb-2 flex items-center justify-between">
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-sky-500/30 bg-sky-500/10 px-2.5 py-0.5 text-xs font-bold text-sky-400">
+                  Step {index + 1}
+                </span>
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    disabled={index === 0}
+                    onClick={() => handleMove(index, -1)}
+                    className="rounded p-1 text-slate-400 transition hover:bg-slate-800 hover:text-white disabled:opacity-30"
+                    title="Move up"
+                  >
+                    <ChevronUp size={15} />
+                  </button>
+                  <button
+                    type="button"
+                    disabled={index === items.length - 1}
+                    onClick={() => handleMove(index, 1)}
+                    className="rounded p-1 text-slate-400 transition hover:bg-slate-800 hover:text-white disabled:opacity-30"
+                    title="Move down"
+                  >
+                    <ChevronDown size={15} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleRemove(index)}
+                    className="rounded p-1 text-slate-400 transition hover:bg-red-500/20 hover:text-red-400"
+                    title="Remove step"
+                  >
+                    <Trash2 size={15} />
+                  </button>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <input
+                  type="text"
+                  value={step.title || ''}
+                  onChange={(e) => handleUpdate(index, 'title', e.target.value)}
+                  placeholder="Step title (e.g. Download the Pack)"
+                  className="w-full rounded-lg border border-slate-800 bg-slate-900 px-3 py-1.5 text-sm font-semibold text-white placeholder:text-slate-600 focus:border-violet-500 focus:outline-none"
+                />
+                <textarea
+                  value={step.description || ''}
+                  onChange={(e) => handleUpdate(index, 'description', e.target.value)}
+                  placeholder="Step description (e.g. Complete checkout and use the secure link...)"
+                  rows={2}
+                  className="w-full resize-none rounded-lg border border-slate-800 bg-slate-900 px-3 py-1.5 text-xs text-slate-200 placeholder:text-slate-600 focus:border-violet-500 focus:outline-none"
+                />
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
+const FaqsEditor = ({
+  items = [],
+  onChange,
+  defaultTemplate = DEFAULT_FAQS,
+}) => {
+  const handleAdd = () => {
+    onChange([...items, { q: '', a: '' }]);
+  };
+
+  const handleUpdate = (index, field, value) => {
+    const next = [...items];
+    const current = next[index] ? { ...next[index] } : { q: '', a: '' };
+    current[field] = value;
+    next[index] = current;
+    onChange(next);
+  };
+
+  const handleRemove = (index) => {
+    onChange(items.filter((_, i) => i !== index));
+  };
+
+  const handleMove = (index, direction) => {
+    const targetIndex = index + direction;
+    if (targetIndex < 0 || targetIndex >= items.length) return;
+    const next = [...items];
+    const temp = next[index];
+    next[index] = next[targetIndex];
+    next[targetIndex] = temp;
+    onChange(next);
+  };
+
+  const handleLoadDefaults = () => {
+    onChange([...defaultTemplate]);
+  };
+
+  return (
+    <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-4 sm:p-5">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <div className="flex items-center gap-2">
+            <label className="text-sm font-semibold text-white">Frequently Asked Questions (FAQs)</label>
+            <span className="rounded-full bg-slate-800 px-2 py-0.5 text-xs text-slate-400">
+              {items.length} {items.length === 1 ? 'FAQ' : 'FAQs'}
+            </span>
+          </div>
+          <p className="mt-1 text-xs text-slate-400">
+            Q&A accordion items shown on the asset landing page.
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={handleLoadDefaults}
+            className="rounded-lg border border-slate-700 bg-slate-800/80 px-3 py-1 text-xs font-medium text-slate-300 transition hover:border-violet-500 hover:text-white"
+          >
+            {items.length === 0 ? 'Load Default FAQs' : 'Reset to Defaults'}
+          </button>
+          <button
+            type="button"
+            onClick={handleAdd}
+            className="inline-flex items-center gap-1 rounded-lg bg-violet-600 px-3 py-1 text-xs font-semibold text-white transition hover:bg-violet-500"
+          >
+            <Plus size={14} /> Add FAQ
+          </button>
+        </div>
+      </div>
+
+      <div className="space-y-3">
+        {items.map((faq, index) => (
+          <div key={index} className="rounded-xl border border-slate-800 bg-slate-950 p-3.5 sm:p-4">
+            <div className="mb-2 flex items-center justify-between">
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-violet-500/30 bg-violet-500/10 px-2.5 py-0.5 text-xs font-bold text-violet-300">
+                FAQ #{index + 1}
+              </span>
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  disabled={index === 0}
+                  onClick={() => handleMove(index, -1)}
+                  className="rounded p-1 text-slate-400 transition hover:bg-slate-800 hover:text-white disabled:opacity-30"
+                  title="Move up"
+                >
+                  <ChevronUp size={15} />
+                </button>
+                <button
+                  type="button"
+                  disabled={index === items.length - 1}
+                  onClick={() => handleMove(index, 1)}
+                  className="rounded p-1 text-slate-400 transition hover:bg-slate-800 hover:text-white disabled:opacity-30"
+                  title="Move down"
+                >
+                  <ChevronDown size={15} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleRemove(index)}
+                  className="rounded p-1 text-slate-400 transition hover:bg-red-500/20 hover:text-red-400"
+                  title="Remove FAQ"
+                >
+                  <Trash2 size={15} />
+                </button>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <input
+                type="text"
+                value={faq?.q || faq?.question || ''}
+                onChange={(e) => handleUpdate(index, 'q', e.target.value)}
+                placeholder="Question (e.g. Which editing applications support this asset pack?)"
+                className="w-full rounded-lg border border-slate-800 bg-slate-900 px-3 py-1.5 text-sm font-semibold text-white placeholder:text-slate-600 focus:border-violet-500 focus:outline-none"
+              />
+              <textarea
+                value={faq?.a || faq?.answer || ''}
+                onChange={(e) => handleUpdate(index, 'a', e.target.value)}
+                placeholder="Answer details..."
+                rows={2}
+                className="w-full resize-none rounded-lg border border-slate-800 bg-slate-900 px-3 py-1.5 text-xs text-slate-200 placeholder:text-slate-600 focus:border-violet-500 focus:outline-none"
+              />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
 
 const ArrayEditor = ({
   label,

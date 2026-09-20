@@ -692,6 +692,8 @@ class Product(BaseModel):
     description: Optional[str] = None
     features: List[str] = []
     benefits: List[str] = []
+    compatibility: List[str] = []
+    installation_steps: List[Dict[str, Any]] = []
     faqs: List[Dict[str, str]] = []
     before_images: List[str] = []
     after_images: List[str] = []
@@ -740,6 +742,8 @@ class ProductIn(BaseModel):
     description: Optional[str] = None
     features: List[str] = []
     benefits: List[str] = []
+    compatibility: List[str] = []
+    installation_steps: List[Dict[str, Any]] = []
     faqs: List[Dict[str, str]] = []
     before_images: List[str] = []
     after_images: List[str] = []
@@ -1562,27 +1566,6 @@ async def camera_ai_assistant(payload: CameraAiRequest):
         "• **Support / Orders:** Instant download access after checkout; support via **info@pranvithdop.com**."
     )
     return {"response": resp, "source": "pranvith_ai"}
-
-    elif any(k in q for k in ["wedding", "bride", "groom", "reception", "ceremony", "couple"]):
-        resp = (
-            "💍 **Wedding Cinematography On-Set Workflow:**\n\n"
-            "• **Pre-Wedding / Couple Shoot:** 85mm f/1.4 or 50mm f/1.2 at Golden Hour (5600K WB, 60fps slow-motion b-roll).\n"
-            "• **Ceremony (Mandap / Altar):** Dual camera setup:\n"
-            "  - Cam A (Wide Master): 24-70mm f/2.8 on tripod (24fps 4K 10-bit).\n"
-            "  - Cam B (Closeups/Emotions): 70-200mm f/2.8 or 85mm f/1.4 handheld/monopod.\n"
-            "• **Low-Light Sangeet / Reception:** Dual Base ISO (e.g. ISO 12,800), on-camera tube light (Nanlite/Aputure) dimmed to 10% warm fill.\n"
-            "• **Audio:** Wireless lavalier (DJI Mic 2 / Rode Wireless PRO) with 32-bit float backup."
-        )
-        return {"response": resp, "source": "pranvith_camera_ai"}
-
-    resp = (
-        f"🎬 **Pranvith Camera AI Recommendation for: \"{query}\"**\n\n"
-        "• **Recommended Profile:** 10-Bit 4:2:2 Log (S-Log3 / C-Log3 / V-Log) for 14+ stops dynamic range.\n"
-        "• **Exposure Priority:** 180° Shutter Angle (1/50s for 24fps) with circular variable ND filter.\n"
-        "• **Color Pipeline:** Expose to the right (ETTR +1.7 EV) and convert with custom PranvithDOP Rec.709 conversion LUTs.\n"
-        "• **Workflow Tip:** Always lock Manual White Balance (Kelvin) before shooting so color matching across cuts is seamless!"
-    )
-    return {"response": resp, "source": "pranvith_camera_ai"}
 
 
 PUBLIC_SETTINGS_FIELDS = {
@@ -2687,13 +2670,24 @@ def _normalize_product_media_fields(doc: dict) -> dict:
     ):
         if field_name in doc and doc.get(field_name) is not None:
             doc[field_name] = _normalize_text_value(doc.get(field_name), 5000 if field_name == "description" else 220)
-    for list_field in ("features", "benefits"):
+    for list_field in ("features", "benefits", "compatibility"):
         if list_field in doc:
             doc[list_field] = [
                 _normalize_text_value(item, 1000)
                 for item in (doc.get(list_field) or [])[:200]
                 if str(_decode_html_entities(item or "")).strip()
             ]
+    if "installation_steps" in doc:
+        safe_steps = []
+        for item in (doc.get("installation_steps") or [])[:50]:
+            if isinstance(item, dict):
+                title = _normalize_text_value(item.get("title") or "", 300)
+                desc = _normalize_text_value(item.get("description") or item.get("desc") or "", 2000)
+                if title or desc:
+                    safe_steps.append({"title": title, "description": desc})
+            elif isinstance(item, str) and item.strip():
+                safe_steps.append({"title": _normalize_text_value(item, 300), "description": ""})
+        doc["installation_steps"] = safe_steps
     if "faqs" in doc:
         safe_faqs = []
         for item in (doc.get("faqs") or [])[:100]:
