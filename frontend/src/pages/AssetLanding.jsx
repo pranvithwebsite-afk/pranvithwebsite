@@ -419,7 +419,6 @@ const AssetLanding = () => {
                 <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem] xl:grid-cols-[minmax(0,1fr)_22rem] lg:items-start">
                   <div className="min-w-0 space-y-6">
                     <ProductHeroImage heroImage={heroImage} name={name} />
-                    <ProductDescription value={heroSubhead} className="space-y-4 text-sm leading-7 text-white/60 sm:text-base" />
                     <FileInformation rows={fileInformation} />
                   </div>
 
