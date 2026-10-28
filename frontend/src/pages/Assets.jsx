@@ -14,13 +14,8 @@ import HeroLightSticks from '../components/HeroLightSticks';
 
 const assetCategories = [
   'All Assets',
-  'PSD',
-  'Wedding Invitation',
-  'After Effects',
-  'Premiere Pro',
-  'Photoshop',
-  'LUTs',
-  'Sound Packs',
+  'Camera Settings',
+  'Editing Assets',
 ];
 
 const defaultBackgrounds = [
@@ -39,19 +34,25 @@ const findSection = (sections = [], idOrType) =>
   || sections.find((section) => section.type === idOrType);
 
 const getAssetCategory = (item, name) => {
-  const source = `${item.category || ''} ${name} ${item.description || ''}`.toLowerCase();
-  if (source.includes('lut')) return 'LUTs';
-  if (source.includes('sound') || source.includes('sfx') || source.includes('sound fx')) return 'Sound Packs';
-  if (source.includes('after effects') || source.includes(' after effect') || source.includes(' ae ')) return 'After Effects';
-  if (source.includes('premiere pro')) return 'Premiere Pro';
-  if (source.includes('photoshop')) return 'Photoshop';
-  if (source.includes('psd')) return 'PSD';
-  return item.category || 'Asset';
+  const rawCat = (item.category || '').trim();
+  const rawSubcat = (item.subcategory || item.sub_category || '').trim();
+  const source = `${rawCat} ${rawSubcat} ${name || ''} ${item.description || ''}`.toLowerCase();
+
+  if (
+    rawCat.toLowerCase().includes('camera') ||
+    rawCat.toLowerCase().includes('setting') ||
+    source.includes('camera setting') ||
+    source.includes('camera') ||
+    source.includes('picture profile')
+  ) {
+    return 'Camera Settings';
+  }
+
+  return 'Editing Assets';
 };
 
 const getAssetSubcategory = (item, name) => {
-  const source = `${item.subcategory || item.sub_category || ''} ${name} ${item.description || ''}`.toLowerCase();
-  return source.includes('wedding') && source.includes('invitation') ? 'Wedding Invitation' : (item.subcategory || item.sub_category || '');
+  return item.subcategory || item.sub_category || '';
 };
 
 const normalize = (item = {}, index) => {
@@ -125,7 +126,8 @@ const Assets = () => {
       .filter((asset) => {
         const matchesCategory = selectedCategory === 'All Assets'
           || asset.category === selectedCategory
-          || asset.subcategory === selectedCategory;
+          || (selectedCategory === 'Camera Settings' && (asset.category === 'Camera Setting' || asset.category === 'Camera Settings'))
+          || (selectedCategory === 'Editing Assets' && (asset.category === 'Editing Assets' || asset.category === 'Editing Asset'));
         const matchesSearch = !normalizedQuery || asset.title.toLowerCase().includes(normalizedQuery);
         const matchesPrice = priceFilter === 'all'
           || (priceFilter === 'free' && asset.isFree)

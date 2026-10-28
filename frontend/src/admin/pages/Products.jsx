@@ -938,13 +938,31 @@ const ProductForm = ({
         )}
 
         <div>
-          <label className="block text-sm font-semibold text-white mb-2">Category</label>
+          <div className="flex items-center justify-between mb-2">
+            <label className="block text-sm font-semibold text-white">Category</label>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => onInputChange({ target: { name: 'category', value: 'Camera Settings' } })}
+                className={`text-xs px-2.5 py-1 rounded-md border transition ${formData.category === 'Camera Settings' ? 'border-violet-500 bg-violet-600/30 text-white font-medium' : 'border-slate-700 bg-slate-800 text-slate-300 hover:text-white hover:border-slate-600'}`}
+              >
+                Camera Settings
+              </button>
+              <button
+                type="button"
+                onClick={() => onInputChange({ target: { name: 'category', value: 'Editing Assets' } })}
+                className={`text-xs px-2.5 py-1 rounded-md border transition ${formData.category === 'Editing Assets' ? 'border-violet-500 bg-violet-600/30 text-white font-medium' : 'border-slate-700 bg-slate-800 text-slate-300 hover:text-white hover:border-slate-600'}`}
+              >
+                Editing Assets
+              </button>
+            </div>
+          </div>
           <input
             type="text"
             name="category"
             value={formData.category}
             onChange={onInputChange}
-            placeholder="e.g., LUT Pack"
+            placeholder="e.g. Camera Settings or Editing Assets"
             className="w-full px-4 py-2 rounded-lg bg-slate-900 border border-slate-700 text-white placeholder:text-slate-600 focus:outline-none focus:border-violet-500"
           />
         </div>
