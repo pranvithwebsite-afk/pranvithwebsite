@@ -5900,9 +5900,8 @@ async def synchronize_default_admin():
             "permissions": ["super_admin", "admin", "editor"],
             "is_active": True,
             "updated_at": now,
+            "hashed_password": get_password_hash(default_password),
         }
-        if not existing.get("hashed_password"):
-            updates["hashed_password"] = get_password_hash(default_password)
         await db.admins.update_one({"email": default_email}, {"$set": updates})
         logger.info("Default admin synchronized")
         return {"action": "synchronized", "email": default_email}
