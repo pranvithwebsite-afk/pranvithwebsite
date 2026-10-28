@@ -318,7 +318,6 @@ const AssetLanding = () => {
     compatibility,
     installationSteps,
     marketTable,
-    faqs,
     beforeImageUrl,
     afterImageUrl,
   } = asset;
@@ -598,25 +597,6 @@ const AssetLanding = () => {
                         ))}
                       </tbody>
                     </table>
-                  </div>
-                </div>
-              </section>
-            )}
-
-            {faqs.length > 0 && (
-              <section className="section-block pt-0">
-                <div className="page-shell max-w-4xl">
-                  <h2 className="mb-8 text-3xl font-bold tracking-tight">Frequently Asked Questions</h2>
-                  <div className="grid gap-2">
-                    {faqs.map((item, index) => (
-                      <details key={item.q || `${item.a}-${index}`} className="group rounded-xl border border-white/10 bg-[#090a0c] px-5 py-4 open:border-[#ff5a1f]/30">
-                        <summary className="flex cursor-pointer list-none items-center justify-between gap-4 text-sm font-semibold text-white">
-                          {item.q || 'Question'}
-                          <span className="text-lg text-[#ff8a5c] transition-transform group-open:rotate-45">+</span>
-                        </summary>
-                        <p className="mt-4 border-t border-white/8 pt-4 text-sm leading-relaxed text-white/60">{item.a || 'Answer coming soon.'}</p>
-                      </details>
-                    ))}
                   </div>
                 </div>
               </section>
