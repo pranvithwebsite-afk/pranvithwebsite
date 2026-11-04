@@ -13,12 +13,14 @@ import {
   Settings,
   MessageSquare,
   ShieldCheck,
+  Share2,
 } from 'lucide-react';
 
 const navItems = [
   { label: 'Dashboard', to: '/admin/dashboard', icon: LayoutDashboard },
   { label: 'Website (CMS)', to: '/admin/website', icon: Globe },
   { label: 'Reels (9:16)', to: '/admin/reels', icon: Clapperboard },
+  { label: 'Social Media Manager', to: '/admin/social-media', icon: Share2 },
   { label: 'Services', to: '/admin/services', icon: BriefcaseBusiness },
   { label: 'Products & Assets', to: '/admin/products', icon: Box },
   { label: 'Coupons & Offers', to: '/admin/coupons', icon: Ticket },

@@ -19,6 +19,7 @@ const Enquiries = lazy(() => import('./pages/Enquiries'));
 const Media = lazy(() => import('./pages/Media'));
 const Settings = lazy(() => import('./pages/Settings'));
 const AdminUsers = lazy(() => import('./pages/AdminUsers'));
+const SocialMediaManager = lazy(() => import('./pages/SocialMediaManager'));
 
 const RouteFallback = () => (
   <main className="min-h-screen bg-[var(--bg-main)] text-white">
@@ -84,6 +85,8 @@ const AdminApp = () => {
               <Route path="dashboard" element={<AdminDashboard />} />
               <Route path="website" element={<Website />} />
               <Route path="reels" element={<Reels />} />
+              <Route path="social-media" element={<SocialMediaManager />} />
+              <Route path="social-automation" element={<SocialMediaManager />} />
               <Route path="services" element={<AdminServices />} />
               <Route path="products" element={<Products />} />
               <Route path="coupons" element={<Coupons />} />

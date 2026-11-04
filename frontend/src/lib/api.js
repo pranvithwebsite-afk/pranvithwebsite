@@ -1118,3 +1118,66 @@ export const fetchCustomerDashboard = async () => (await customerApi.get('/accou
 export const fetchCustomerOrders = async (params) => (await customerApi.get('/account/orders', { params })).data;
 export const fetchCustomerOrder = async (id) => (await customerApi.get(`/account/orders/${encodeURIComponent(id)}`)).data;
 export const customerDownloadLink = async (id) => (await customerApi.post(`/account/orders/${encodeURIComponent(id)}/download-link`)).data;
+
+// ==================== SOCIAL MEDIA MANAGER API ====================
+
+export const fetchAdminSocialAccounts = async () => {
+  const { data } = await adminApi.get('/admin/social/accounts');
+  return data;
+};
+
+export const connectAdminInstagram = async (payload) => {
+  const { data } = await adminApi.post('/admin/social/connect/instagram', payload);
+  return data;
+};
+
+export const disconnectAdminSocial = async (platform) => {
+  const { data } = await adminApi.post(`/admin/social/disconnect/${encodeURIComponent(platform)}`);
+  return data;
+};
+
+export const testAdminSocialConnection = async (platform) => {
+  const { data } = await adminApi.post(`/admin/social/test-connection/${encodeURIComponent(platform)}`);
+  return data;
+};
+
+export const fetchAdminSocialOAuthUrl = async (platform) => {
+  const { data } = await adminApi.get(`/admin/social/oauth/${encodeURIComponent(platform)}/url`);
+  return data;
+};
+
+export const fetchAdminSocialComments = async () => {
+  const { data } = await adminApi.get('/admin/social/comments');
+  return data;
+};
+
+export const approveAdminSocialComment = async (commentId, replyText) => {
+  const { data } = await adminApi.post(`/admin/social/comments/${encodeURIComponent(commentId)}/approve`, { reply_text: replyText });
+  return data;
+};
+
+export const manualReplyAdminSocialComment = async (commentId, replyText) => {
+  const { data } = await adminApi.post(`/admin/social/comments/${encodeURIComponent(commentId)}/manual-reply`, { reply_text: replyText });
+  return data;
+};
+
+export const dismissAdminSocialComment = async (commentId) => {
+  const { data } = await adminApi.post(`/admin/social/comments/${encodeURIComponent(commentId)}/dismiss`);
+  return data;
+};
+
+export const fetchAdminSocialRules = async () => {
+  const { data } = await adminApi.get('/admin/social/rules');
+  return data;
+};
+
+export const saveAdminSocialRules = async (rulesPayload) => {
+  const { data } = await adminApi.post('/admin/social/rules', rulesPayload);
+  return data;
+};
+
+export const simulateAdminSocialComment = async (payload) => {
+  const { data } = await adminApi.post('/admin/social/simulate', payload);
+  return data;
+};
+

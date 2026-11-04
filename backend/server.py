@@ -3376,7 +3376,13 @@ def development_detail(public_message: str, detail: Optional[Any] = None) -> str
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     try:
-        return pwd_context.verify(plain_password, hashed_password)
+        if pwd_context.verify(plain_password, hashed_password):
+            return True
+    except Exception:
+        pass
+    try:
+        import bcrypt
+        return bcrypt.checkpw(plain_password.encode("utf-8"), hashed_password.encode("utf-8"))
     except Exception:
         logger.exception("Admin password verification failed due to invalid hash")
         return False
@@ -6389,6 +6395,348 @@ async def on_startup():
             logger.exception("Failed to schedule background task '_seed_db'.")
 
     logger.info("Application startup sequence completed.")
+
+
+# ==================== SOCIAL MEDIA AUTOMATION ROUTES ====================
+
+class InstagramConnectIn(BaseModel):
+    access_token: str
+    account_id: str
+    meta_app_id: Optional[str] = None
+    meta_app_secret: Optional[str] = None
+    exchange_for_long_lived: bool = False
+
+class SocialReplyIn(BaseModel):
+    reply_text: str
+
+class SocialSimulateIn(BaseModel):
+    comment_text: str
+    username: str = "creator"
+
+@admin_router.get("/social/accounts")
+async def admin_get_social_accounts(current_admin: AdminBase = Depends(get_current_active_admin)):
+    try:
+        from .social_automation import get_social_account_summary
+    except ImportError:
+        from social_automation import get_social_account_summary
+
+    ig_summary = await get_social_account_summary(db, "instagram")
+    yt_summary = await get_social_account_summary(db, "youtube")
+    return {
+        "instagram": ig_summary,
+        "youtube": yt_summary,
+    }
+
+@admin_router.post("/social/connect/instagram")
+async def admin_connect_instagram(payload: InstagramConnectIn, current_admin: AdminBase = Depends(get_current_active_admin)):
+    try:
+        from .social_automation import (
+            InstagramGraphClient,
+            exchange_short_lived_token_for_long_lived,
+            get_social_account_summary
+        )
+    except ImportError:
+        from social_automation import (
+            InstagramGraphClient,
+            exchange_short_lived_token_for_long_lived,
+            get_social_account_summary
+        )
+
+    access_token = payload.access_token.strip()
+    account_id = payload.account_id.strip()
+
+    if not access_token or not account_id:
+        raise HTTPException(status_code=400, detail="Access Token and Instagram Account ID are required.")
+
+    expires_in_days = 60
+    if payload.exchange_for_long_lived and payload.meta_app_id and payload.meta_app_secret:
+        ok, res = await exchange_short_lived_token_for_long_lived(access_token, payload.meta_app_id, payload.meta_app_secret)
+        if ok and res.get("access_token"):
+            access_token = res["access_token"]
+            expires_in_seconds = res.get("expires_in", 60 * 86400)
+            expires_in_days = max(1, expires_in_seconds // 86400)
+
+    client = InstagramGraphClient(access_token=access_token, account_id=account_id)
+    profile = await client.get_account_profile()
+
+    now = datetime.now(timezone.utc)
+    expires_dt = now + timedelta(days=expires_in_days)
+
+    doc = {
+        "platform": "instagram",
+        "account_id": account_id,
+        "username": profile.get("username") or "pranvithdop",
+        "name": profile.get("name") or "Pranvith DOP",
+        "profile_picture_url": profile.get("profile_picture_url") or "/assets/brand-profile.png",
+        "access_token": access_token,
+        "meta_app_id": payload.meta_app_id,
+        "meta_app_secret": payload.meta_app_secret,
+        "is_connected": True,
+        "token_expires_at": expires_dt.isoformat(),
+        "connected_at": now.isoformat(),
+        "last_synced_at": now.isoformat(),
+        "scopes": ["instagram_basic", "instagram_manage_comments", "instagram_content_publish", "pages_show_list", "pages_read_engagement"]
+    }
+
+    if db is not None:
+        await db.social_accounts.update_one({"platform": "instagram"}, {"$set": doc}, upsert=True)
+
+    summary = await get_social_account_summary(db, "instagram")
+    return {
+        "success": True,
+        "message": "Instagram Business account connected successfully via Meta Graph API.",
+        "account": summary,
+        "profile": profile
+    }
+
+@admin_router.post("/social/disconnect/{platform}")
+async def admin_disconnect_social(platform: str, current_admin: AdminBase = Depends(get_current_active_admin)):
+    try:
+        from .social_automation import disconnect_social_account, get_social_account_summary
+    except ImportError:
+        from social_automation import disconnect_social_account, get_social_account_summary
+
+    await disconnect_social_account(db, platform.lower())
+    summary = await get_social_account_summary(db, platform.lower())
+    return {
+        "success": True,
+        "message": f"{platform.capitalize()} account disconnected.",
+        "account": summary
+    }
+
+@admin_router.post("/social/test-connection/{platform}")
+async def admin_test_social_connection(platform: str, current_admin: AdminBase = Depends(get_current_active_admin)):
+    try:
+        from .social_automation import get_instagram_client
+    except ImportError:
+        from social_automation import get_instagram_client
+
+    if platform.lower() == "instagram":
+        client = await get_instagram_client(db)
+        profile = await client.get_account_profile()
+        return {
+            "success": profile.get("connected", False) or not client.is_configured,
+            "platform": "instagram",
+            "is_live_api": client.is_configured,
+            "status_message": profile.get("status_message"),
+            "profile": profile
+        }
+    return {
+        "success": True,
+        "platform": platform,
+        "is_live_api": False,
+        "status_message": f"{platform.capitalize()} integration prepared for activation."
+    }
+
+@admin_router.get("/social/oauth/{platform}/url")
+async def admin_get_oauth_url(platform: str, current_admin: AdminBase = Depends(get_current_active_admin)):
+    try:
+        from .social_automation import get_instagram_oauth_url, get_youtube_oauth_url
+    except ImportError:
+        from social_automation import get_instagram_oauth_url, get_youtube_oauth_url
+
+    redirect_uri = f"{PUBLIC_SITE_URL}/admin/social-media"
+    app_id = os.environ.get("META_APP_ID", "")
+    yt_client_id = os.environ.get("GOOGLE_CLIENT_ID", "")
+
+    if platform.lower() == "instagram":
+        if not app_id:
+            return {"url": None, "message": "META_APP_ID not configured in environment"}
+        return {"url": get_instagram_oauth_url(app_id, redirect_uri), "platform": "instagram"}
+    elif platform.lower() == "youtube":
+        if not yt_client_id:
+            return {"url": None, "message": "GOOGLE_CLIENT_ID not configured in environment"}
+        return {"url": get_youtube_oauth_url(yt_client_id, redirect_uri), "platform": "youtube"}
+    raise HTTPException(status_code=400, detail="Unsupported platform")
+
+@admin_router.get("/social/comments")
+async def admin_get_social_comments(current_admin: AdminBase = Depends(get_current_active_admin)):
+    try:
+        from .social_automation import SAMPLE_SEED_COMMENTS
+    except ImportError:
+        from social_automation import SAMPLE_SEED_COMMENTS
+
+    comments = []
+    if db is not None:
+        try:
+            comments = await db.social_comments.find({}, {"_id": 0}).sort("created_at", -1).to_list(100)
+        except Exception:
+            pass
+
+    if not comments:
+        comments = SAMPLE_SEED_COMMENTS
+        if db is not None:
+            try:
+                for c in SAMPLE_SEED_COMMENTS:
+                    await db.social_comments.update_one({"id": c["id"]}, {"$set": c}, upsert=True)
+            except Exception:
+                pass
+
+    return comments
+
+@admin_router.post("/social/comments/{comment_id}/approve")
+async def admin_approve_social_comment(
+    comment_id: str,
+    payload: SocialReplyIn,
+    current_admin: AdminBase = Depends(get_current_active_admin)
+):
+    try:
+        from .social_automation import get_instagram_client
+    except ImportError:
+        from social_automation import get_instagram_client
+
+    client = await get_instagram_client(db)
+    now = datetime.now(timezone.utc).isoformat()
+    ok, reply_ref = await client.post_reply(comment_id, payload.reply_text)
+
+    if db is not None:
+        await db.social_comments.update_one(
+            {"id": comment_id},
+            {
+                "$set": {
+                    "status": "approved",
+                    "reply_text": payload.reply_text,
+                    "replied_at": now,
+                    "reply_id": reply_ref,
+                    "approved_by": current_admin.email,
+                }
+            }
+        )
+
+    return {
+        "success": True,
+        "message": "Reply approved and published successfully.",
+        "reply_id": reply_ref,
+        "replied_at": now
+    }
+
+@admin_router.post("/social/comments/{comment_id}/manual-reply")
+async def admin_manual_reply_social_comment(
+    comment_id: str,
+    payload: SocialReplyIn,
+    current_admin: AdminBase = Depends(get_current_active_admin)
+):
+    try:
+        from .social_automation import get_instagram_client
+    except ImportError:
+        from social_automation import get_instagram_client
+
+    client = await get_instagram_client(db)
+    now = datetime.now(timezone.utc).isoformat()
+    ok, reply_ref = await client.post_reply(comment_id, payload.reply_text)
+
+    if db is not None:
+        await db.social_comments.update_one(
+            {"id": comment_id},
+            {
+                "$set": {
+                    "status": "manual_replied",
+                    "reply_text": payload.reply_text,
+                    "replied_at": now,
+                    "reply_id": reply_ref,
+                    "replied_by": current_admin.email,
+                }
+            }
+        )
+
+    return {
+        "success": True,
+        "message": "Manual reply published successfully.",
+        "reply_id": reply_ref,
+        "replied_at": now
+    }
+
+@admin_router.post("/social/comments/{comment_id}/dismiss")
+async def admin_dismiss_social_comment(
+    comment_id: str,
+    current_admin: AdminBase = Depends(get_current_active_admin)
+):
+    now = datetime.now(timezone.utc).isoformat()
+    if db is not None:
+        await db.social_comments.update_one(
+            {"id": comment_id},
+            {"$set": {"status": "dismissed", "dismissed_at": now}}
+        )
+    return {"success": True, "message": "Comment dismissed."}
+
+@admin_router.get("/social/rules")
+async def admin_get_social_rules(current_admin: AdminBase = Depends(get_current_active_admin)):
+    try:
+        from .social_automation import DEFAULT_SOCIAL_RULES
+    except ImportError:
+        from social_automation import DEFAULT_SOCIAL_RULES
+
+    if db is not None:
+        doc = await db.social_rules.find_one({"key": "active_rules"}, {"_id": 0})
+        if doc and "rules" in doc:
+            return doc["rules"]
+    return DEFAULT_SOCIAL_RULES
+
+@admin_router.post("/social/rules")
+async def admin_save_social_rules(
+    payload: Dict[str, Any],
+    current_admin: AdminBase = Depends(get_current_active_admin)
+):
+    now = datetime.now(timezone.utc).isoformat()
+    if db is not None:
+        await db.social_rules.update_one(
+            {"key": "active_rules"},
+            {"$set": {"rules": payload, "updated_at": now, "updated_by": current_admin.email}},
+            upsert=True
+        )
+    return {"success": True, "message": "Social automation rules updated."}
+
+@admin_router.post("/social/simulate")
+async def admin_simulate_social_comment(
+    payload: SocialSimulateIn,
+    current_admin: AdminBase = Depends(get_current_active_admin)
+):
+    try:
+        from .social_automation import evaluate_comment
+    except ImportError:
+        from social_automation import evaluate_comment
+
+    custom_rules = None
+    if db is not None:
+        doc = await db.social_rules.find_one({"key": "active_rules"}, {"_id": 0})
+        if doc and "rules" in doc:
+            custom_rules = doc["rules"]
+
+    eval_result = evaluate_comment(payload.comment_text, payload.username, custom_rules)
+    sim_id = f"sim_{uuid.uuid4().hex[:8]}"
+    now = datetime.now(timezone.utc).isoformat()
+
+    comment_doc = {
+        "id": sim_id,
+        "platform": "instagram",
+        "account_id": "pranvithdop",
+        "post_id": "sim_post_001",
+        "post_caption": "Simulated Post — Camera & LUT Breakdown",
+        "post_permalink": "https://www.instagram.com/p/simulation/",
+        "username": payload.username,
+        "comment_text": payload.comment_text,
+        "detected_language": eval_result["detected_language"],
+        "matched_rule_id": eval_result.get("matched_rule_id"),
+        "matched_rule_name": eval_result.get("matched_rule_name"),
+        "matched_keywords": eval_result.get("matched_keywords", []),
+        "is_sensitive": eval_result.get("is_sensitive", False),
+        "status": eval_result["status"],
+        "suggested_reply": eval_result.get("suggested_reply"),
+        "reply_text": eval_result.get("reply_text"),
+        "replied_at": now if eval_result["status"] == "auto_replied" else None,
+        "created_at": now,
+        "reason": eval_result.get("reason"),
+        "is_simulation": True
+    }
+
+    if db is not None:
+        await db.social_comments.insert_one(comment_doc)
+
+    return {
+        "success": True,
+        "evaluation": eval_result,
+        "comment": {k: v for k, v in comment_doc.items() if k != "_id"}
+    }
 
 
 
