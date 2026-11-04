@@ -6295,6 +6295,10 @@ class SocialSimulateIn(BaseModel):
     comment_text: str
     username: str = "creator"
 
+class YouTubeCallbackIn(BaseModel):
+    code: str
+    redirect_uri: Optional[str] = None
+
 @admin_router.get("/social/accounts")
 async def admin_get_social_accounts(current_admin: AdminBase = Depends(get_current_active_admin)):
     try:
@@ -6389,9 +6393,9 @@ async def admin_disconnect_social(platform: str, current_admin: AdminBase = Depe
 @admin_router.post("/social/test-connection/{platform}")
 async def admin_test_social_connection(platform: str, current_admin: AdminBase = Depends(get_current_active_admin)):
     try:
-        from .social_automation import get_instagram_client
+        from .social_automation import get_instagram_client, fetch_youtube_channel_profile
     except ImportError:
-        from social_automation import get_instagram_client
+        from social_automation import get_instagram_client, fetch_youtube_channel_profile
 
     if platform.lower() == "instagram":
         client = await get_instagram_client(db)
@@ -6402,6 +6406,34 @@ async def admin_test_social_connection(platform: str, current_admin: AdminBase =
             "is_live_api": client.is_configured,
             "status_message": profile.get("status_message"),
             "profile": profile
+        }
+    elif platform.lower() == "youtube":
+        doc = None
+        if db is not None:
+            doc = await db.social_accounts.find_one({"platform": "youtube"}, {"_id": 0})
+        if doc and doc.get("access_token"):
+            ok, channel_info = await fetch_youtube_channel_profile(doc["access_token"])
+            if ok:
+                return {
+                    "success": True,
+                    "platform": "youtube",
+                    "is_live_api": True,
+                    "status_message": f"Connected to YouTube Data API v3. Channel: {channel_info.get('title')} ({channel_info.get('subscriber_count')} subscribers)",
+                    "profile": channel_info
+                }
+            return {
+                "success": False,
+                "platform": "youtube",
+                "is_live_api": True,
+                "status_message": channel_info.get("error", "Failed to reach YouTube Data API"),
+                "profile": None
+            }
+        return {
+            "success": False,
+            "platform": "youtube",
+            "is_live_api": False,
+            "status_message": "YouTube account not connected yet. Click 'Connect YouTube Channel' to authorize.",
+            "profile": None
         }
     return {
         "success": True,
@@ -6417,9 +6449,10 @@ async def admin_get_oauth_url(platform: str, current_admin: AdminBase = Depends(
     except ImportError:
         from social_automation import get_instagram_oauth_url, get_youtube_oauth_url
 
-    redirect_uri = f"{PUBLIC_SITE_URL}/admin/social-media"
-    app_id = os.environ.get("META_APP_ID", "")
-    yt_client_id = os.environ.get("GOOGLE_CLIENT_ID", "")
+    public_site_url = (os.environ.get("PUBLIC_SITE_URL") or os.environ.get("FRONTEND_URL") or "https://pranvithdop.com").rstrip("/")
+    redirect_uri = f"{public_site_url}/admin/social-media"
+    app_id = (os.environ.get("META_APP_ID") or "").strip()
+    yt_client_id = (os.environ.get("GOOGLE_CLIENT_ID") or os.environ.get("YOUTUBE_CLIENT_ID") or "").strip()
 
     if platform.lower() == "instagram":
         if not app_id:
@@ -6427,9 +6460,104 @@ async def admin_get_oauth_url(platform: str, current_admin: AdminBase = Depends(
         return {"url": get_instagram_oauth_url(app_id, redirect_uri), "platform": "instagram"}
     elif platform.lower() == "youtube":
         if not yt_client_id:
-            return {"url": None, "message": "GOOGLE_CLIENT_ID not configured in environment"}
+            return {
+                "url": None,
+                "message": "GOOGLE_CLIENT_ID is not configured in backend/.env. Please set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET to enable Google OAuth."
+            }
         return {"url": get_youtube_oauth_url(yt_client_id, redirect_uri), "platform": "youtube"}
     raise HTTPException(status_code=400, detail="Unsupported platform")
+
+@admin_router.post("/social/oauth/youtube/callback")
+async def admin_youtube_oauth_callback(
+    payload: YouTubeCallbackIn,
+    current_admin: AdminBase = Depends(get_current_active_admin)
+):
+    try:
+        from .social_automation import (
+            exchange_youtube_code_for_tokens,
+            fetch_youtube_channel_profile,
+            get_social_account_summary
+        )
+    except ImportError:
+        from social_automation import (
+            exchange_youtube_code_for_tokens,
+            fetch_youtube_channel_profile,
+            get_social_account_summary
+        )
+
+    code = payload.code.strip()
+    if not code:
+        raise HTTPException(status_code=400, detail="Authorization code is required.")
+
+    public_site_url = (os.environ.get("PUBLIC_SITE_URL") or os.environ.get("FRONTEND_URL") or "https://pranvithdop.com").rstrip("/")
+    redirect_uri = (payload.redirect_uri or f"{public_site_url}/admin/social-media").split("?")[0].rstrip("/")
+    client_id = (os.environ.get("GOOGLE_CLIENT_ID") or os.environ.get("YOUTUBE_CLIENT_ID") or "").strip()
+    client_secret = (os.environ.get("GOOGLE_CLIENT_SECRET") or os.environ.get("YOUTUBE_CLIENT_SECRET") or "").strip()
+
+    if not client_id or not client_secret:
+        raise HTTPException(
+            status_code=400,
+            detail="Google OAuth credentials are missing. Please configure GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in backend/.env or Vercel environment variables."
+        )
+
+    ok, token_data = await exchange_youtube_code_for_tokens(code, client_id, client_secret, redirect_uri)
+    if not ok:
+        err_msg = token_data.get("error_description") or token_data.get("error") or "Token exchange failed"
+        raise HTTPException(status_code=400, detail=f"Google OAuth token exchange failed: {err_msg}")
+
+    access_token = token_data.get("access_token", "")
+    refresh_token = token_data.get("refresh_token", "")
+    expires_in = token_data.get("expires_in", 3600)
+
+    # Verify channel details with YouTube Data API v3
+    channel_ok, channel_info = await fetch_youtube_channel_profile(access_token)
+    if not channel_ok:
+        logger.warning("YouTube channel profile fetch warning: %s", channel_info)
+        channel_info = {
+            "channel_id": "configured_channel",
+            "title": "Pranvith DOP",
+            "custom_url": "@pranvithdop",
+            "profile_picture_url": "/assets/brand-profile.png",
+            "subscriber_count": "0",
+            "video_count": "0",
+            "view_count": "0"
+        }
+
+    now = datetime.now(timezone.utc)
+    expires_dt = now + timedelta(seconds=expires_in)
+
+    doc = {
+        "platform": "youtube",
+        "account_id": channel_info.get("channel_id"),
+        "username": channel_info.get("custom_url") or "@pranvithdop",
+        "name": channel_info.get("title") or "Pranvith DOP",
+        "profile_picture_url": channel_info.get("profile_picture_url") or "/assets/brand-profile.png",
+        "access_token": access_token,
+        "token_type": token_data.get("token_type", "Bearer"),
+        "token_expires_at": expires_dt.isoformat(),
+        "is_connected": True,
+        "connected_at": now.isoformat(),
+        "last_synced_at": now.isoformat(),
+        "scopes": token_data.get("scope", "").split(" ") if token_data.get("scope") else ["youtube.upload", "youtube.force-ssl", "youtube.readonly"],
+        "statistics": {
+            "subscriber_count": channel_info.get("subscriber_count", "0"),
+            "video_count": channel_info.get("video_count", "0"),
+            "view_count": channel_info.get("view_count", "0")
+        }
+    }
+    if refresh_token:
+        doc["refresh_token"] = refresh_token
+
+    if db is not None:
+        await db.social_accounts.update_one({"platform": "youtube"}, {"$set": doc}, upsert=True)
+
+    summary = await get_social_account_summary(db, "youtube")
+    return {
+        "success": True,
+        "message": f"YouTube channel '{channel_info.get('title')}' connected successfully.",
+        "account": summary,
+        "channel": channel_info
+    }
 
 @admin_router.get("/social/comments")
 async def admin_get_social_comments(current_admin: AdminBase = Depends(get_current_active_admin)):

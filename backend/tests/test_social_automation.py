@@ -77,3 +77,22 @@ def test_oauth_urls():
     yt_url = get_youtube_oauth_url("test_client_id", "https://pranvithdop.com/admin/social-media")
     assert "client_id=test_client_id" in yt_url
     assert "youtube.upload" in yt_url
+    assert "redirect_uri=https://pranvithdop.com/admin/social-media" in yt_url
+
+
+def test_youtube_callback_requires_code():
+    from fastapi.testclient import TestClient
+    import backend.server as server
+
+    client = TestClient(server.app)
+    token = server.create_access_token({'id': '6e14307b-cb07-4328-a8c9-35de3912349c', 'sub': '6e14307b-cb07-4328-a8c9-35de3912349c', 'role': 'super_admin'})
+    res = client.post(
+        '/api/admin/social/oauth/youtube/callback',
+        json={'code': '', 'redirect_uri': 'https://pranvithdop.com/admin/social-media'},
+        headers={'Authorization': f'Bearer {token}'}
+    )
+    assert res.status_code == 400
+    msg = res.json().get("detail") or res.json().get("message") or ""
+    assert "Authorization code is required" in msg
+
+

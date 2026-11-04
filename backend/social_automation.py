@@ -555,6 +555,118 @@ def get_youtube_oauth_url(client_id: str, redirect_uri: str, state: str = "pranv
     )
 
 
+async def exchange_youtube_code_for_tokens(
+    code: str,
+    client_id: str,
+    client_secret: str,
+    redirect_uri: str
+) -> Tuple[bool, Dict[str, Any]]:
+    """
+    Exchanges Google OAuth 2.0 authorization code for access and refresh tokens.
+    """
+    url = "https://oauth2.googleapis.com/token"
+    data = {
+        "code": code,
+        "client_id": client_id,
+        "client_secret": client_secret,
+        "redirect_uri": redirect_uri,
+        "grant_type": "authorization_code"
+    }
+    try:
+        async with httpx.AsyncClient(timeout=12.0) as client:
+            res = await client.post(url, data=data)
+            if res.status_code == 200:
+                return True, res.json()
+            err_data = {}
+            try:
+                err_data = res.json()
+            except Exception:
+                err_data = {"error": res.text}
+            logger.error("Google OAuth token exchange failed: %s", err_data)
+            return False, err_data
+    except Exception as e:
+        logger.exception("Exception during Google OAuth token exchange: %s", e)
+        return False, {"error": str(e)}
+
+
+async def fetch_youtube_channel_profile(access_token: str) -> Tuple[bool, Dict[str, Any]]:
+    """
+    Fetches the authenticated user's YouTube Channel snippet and statistics via YouTube Data API v3.
+    """
+    url = "https://www.googleapis.com/youtube/v3/channels"
+    params = {
+        "part": "snippet,contentDetails,statistics",
+        "mine": "true"
+    }
+    headers = {
+        "Authorization": f"Bearer {access_token}"
+    }
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            res = await client.get(url, params=params, headers=headers)
+            if res.status_code == 200:
+                data = res.json()
+                items = data.get("items", [])
+                if not items:
+                    return False, {"error": "No YouTube channel found for the authenticated Google account."}
+                item = items[0]
+                snippet = item.get("snippet", {})
+                statistics = item.get("statistics", {})
+                thumbs = snippet.get("thumbnails", {})
+                best_thumb = (
+                    thumbs.get("high", {}).get("url")
+                    or thumbs.get("medium", {}).get("url")
+                    or thumbs.get("default", {}).get("url")
+                    or "/assets/brand-profile.png"
+                )
+                custom_url = snippet.get("customUrl", "")
+                title = snippet.get("title", "Pranvith DOP")
+                return True, {
+                    "channel_id": item.get("id"),
+                    "title": title,
+                    "custom_url": custom_url or f"@{title.lower().replace(' ', '')}",
+                    "description": snippet.get("description", ""),
+                    "profile_picture_url": best_thumb,
+                    "subscriber_count": statistics.get("subscriberCount", "0"),
+                    "video_count": statistics.get("videoCount", "0"),
+                    "view_count": statistics.get("viewCount", "0")
+                }
+            else:
+                err = res.text
+                try:
+                    err = res.json().get("error", {}).get("message", res.text)
+                except Exception:
+                    pass
+                return False, {"error": f"YouTube API Error ({res.status_code}): {err}"}
+    except Exception as e:
+        return False, {"error": f"Exception connecting to YouTube API: {str(e)}"}
+
+
+async def refresh_youtube_token(
+    refresh_token: str,
+    client_id: str,
+    client_secret: str
+) -> Tuple[bool, Dict[str, Any]]:
+    """
+    Refreshes an expired YouTube OAuth access token using the stored refresh token.
+    """
+    url = "https://oauth2.googleapis.com/token"
+    data = {
+        "client_id": client_id,
+        "client_secret": client_secret,
+        "refresh_token": refresh_token,
+        "grant_type": "refresh_token"
+    }
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            res = await client.post(url, data=data)
+            if res.status_code == 200:
+                return True, res.json()
+            return False, res.json()
+    except Exception as e:
+        return False, {"error": str(e)}
+
+
 async def get_social_account_summary(db, platform: str) -> Dict[str, Any]:
     """
     Returns public summary of connected account without exposing raw secrets.
@@ -646,6 +758,8 @@ async def get_social_account_summary(db, platform: str) -> Dict[str, Any]:
                 "scopes": doc.get("scopes", ["youtube.upload", "youtube.force-ssl", "youtube.readonly"]),
                 "connected_at": doc.get("connected_at"),
                 "last_synced_at": doc.get("last_synced_at"),
+                "statistics": doc.get("statistics", {}),
+                "has_refresh_token": bool(doc.get("refresh_token")),
                 "note": "Connected via YouTube Data API v3"
             }
         else:

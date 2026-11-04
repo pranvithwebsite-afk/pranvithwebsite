@@ -1146,6 +1146,11 @@ export const fetchAdminSocialOAuthUrl = async (platform) => {
   return data;
 };
 
+export const callbackAdminYouTubeOAuth = async (payload) => {
+  const { data } = await adminApi.post('/admin/social/oauth/youtube/callback', payload);
+  return data;
+};
+
 export const fetchAdminSocialComments = async () => {
   const { data } = await adminApi.get('/admin/social/comments');
   return data;

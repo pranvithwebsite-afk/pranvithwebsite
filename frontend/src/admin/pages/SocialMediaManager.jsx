@@ -32,6 +32,7 @@ import {
   disconnectAdminSocial,
   testAdminSocialConnection,
   fetchAdminSocialOAuthUrl,
+  callbackAdminYouTubeOAuth,
   fetchAdminSocialComments,
   approveAdminSocialComment,
   manualReplyAdminSocialComment,
@@ -99,6 +100,32 @@ export default function SocialMediaManager() {
 
   useEffect(() => {
     loadData();
+
+    // Check for Google OAuth callback params (?code=...&state=pranvith_yt)
+    const urlParams = new URLSearchParams(window.location.search);
+    const code = urlParams.get('code');
+    const state = urlParams.get('state');
+
+    if (code && (state === 'pranvith_yt' || state?.startsWith('pranvith'))) {
+      const cleanUrl = window.location.origin + window.location.pathname;
+      // Immediately clean the URL to prevent double execution on reload
+      window.history.replaceState({}, document.title, cleanUrl);
+
+      const completeYouTubeAuth = async () => {
+        const toastId = toast.loading('Connecting YouTube channel via Google OAuth 2.0...');
+        try {
+          const res = await callbackAdminYouTubeOAuth({
+            code,
+            redirect_uri: cleanUrl
+          });
+          toast.success(res.message || 'YouTube channel connected successfully!', { id: toastId });
+          loadData();
+        } catch (err) {
+          toast.error(`YouTube connection failed: ${formatApiErrorDetail(err)}`, { id: toastId });
+        }
+      };
+      completeYouTubeAuth();
+    }
   }, []);
 
   const handleTestConnection = async (platform) => {
@@ -508,6 +535,13 @@ export default function SocialMediaManager() {
                       <p className="text-[11px] text-neutral-500 font-mono mt-0.5 truncate">
                         Channel ID: {yt.account_id || 'Configured via Google OAuth'}
                       </p>
+                      {yt.statistics?.subscriber_count && (
+                        <div className="flex items-center gap-2.5 mt-1.5 text-[11px] text-neutral-400">
+                          <span className="text-white font-medium">{Number(yt.statistics.subscriber_count).toLocaleString()} subscribers</span>
+                          <span>•</span>
+                          <span>{yt.statistics.video_count || '0'} videos</span>
+                        </div>
+                      )}
                     </div>
                   </div>
 
@@ -518,8 +552,18 @@ export default function SocialMediaManager() {
                         <Key className="w-3.5 h-3.5 text-neutral-500" />
                         Token Status:
                       </span>
-                      <span className="font-semibold text-neutral-400">
-                        {yt.token_status?.status_text || 'Ready for OAuth activation in Phase 1'}
+                      <span
+                        className={`font-semibold ${
+                          yt.token_status?.severity === 'success'
+                            ? 'text-emerald-400'
+                            : yt.token_status?.severity === 'warning'
+                            ? 'text-amber-400'
+                            : yt.token_status?.severity === 'danger'
+                            ? 'text-rose-400'
+                            : 'text-neutral-400'
+                        }`}
+                      >
+                        {yt.token_status?.status_text || (yt.is_connected ? 'Connected' : 'Ready for OAuth activation')}
                       </span>
                     </div>
 
@@ -555,16 +599,16 @@ export default function SocialMediaManager() {
                       if (res?.url) {
                         window.location.href = res.url;
                       } else {
-                        toast.info(res?.message || 'Google OAuth client configuration ready for YouTube integration.');
+                        toast.error(res?.message || 'Google OAuth client configuration required. Please set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET.');
                       }
                     } catch (err) {
-                      toast.info('Google OAuth ready. You can connect YouTube account following the setup guidelines.');
+                      toast.error('Failed to initiate Google OAuth: ' + formatApiErrorDetail(err));
                     }
                   }}
                   className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-red-600/20 hover:bg-red-600/30 border border-red-500/30 text-red-400 text-xs font-semibold transition-all"
                 >
                   <Youtube className="w-3.5 h-3.5" />
-                  Connect YouTube Channel
+                  {yt.is_connected ? 'Reconnect / Re-authorize' : 'Connect YouTube Channel'}
                 </button>
 
                 <button
@@ -577,6 +621,16 @@ export default function SocialMediaManager() {
                   />
                   Test API
                 </button>
+
+                {yt.is_connected && (
+                  <button
+                    onClick={() => handleDisconnect('youtube')}
+                    className="inline-flex items-center justify-center px-3 py-2.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 text-rose-400 text-xs font-medium transition-colors"
+                    title="Disconnect YouTube Channel"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                )}
               </div>
             </div>
           </div>
@@ -872,3 +926,4 @@ export default function SocialMediaManager() {
     </div>
   );
 }
+
