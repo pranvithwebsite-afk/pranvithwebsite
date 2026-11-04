@@ -23,7 +23,10 @@ import {
   ListOrdered,
   Layers,
   ChevronRight,
-  Database
+  Database,
+  CheckCheck,
+  Eye,
+  Power
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -39,6 +42,11 @@ import {
   dismissAdminSocialComment,
   fetchAdminSocialRules,
   simulateAdminSocialComment,
+  fetchAdminYouTubeSettings,
+  saveAdminYouTubeSettings,
+  syncAdminYouTubeComments,
+  fetchAdminYouTubeComments,
+  previewAdminYouTubeReply,
   formatApiErrorDetail
 } from '../../lib/api';
 
@@ -47,7 +55,7 @@ const TABS = [
   { id: 'video_publishing', label: 'Video Publishing', icon: Video, badge: 'Phase 2' },
   { id: 'scheduled_posts', label: 'Scheduled Posts', icon: Clock, badge: 'Upcoming' },
   { id: 'instagram_comments', label: 'Instagram Comments', icon: Instagram, badge: 'Phase 3' },
-  { id: 'youtube_comments', label: 'YouTube Comments', icon: Youtube, badge: 'Phase 3' },
+  { id: 'youtube_comments', label: 'YouTube Comments', icon: Youtube, badge: 'Active AI' },
   { id: 'keyword_automation', label: 'Keyword Automation', icon: Sliders, badge: 'Phase 6' },
   { id: 'ai_reply_manager', label: 'AI Reply Manager', icon: Sparkles, badge: 'Phase 4' },
   { id: 'digital_resources', label: 'Digital Resources', icon: FileText, badge: 'Assets' },
@@ -61,6 +69,24 @@ export default function SocialMediaManager() {
   const [accounts, setAccounts] = useState({ instagram: null, youtube: null });
   const [comments, setComments] = useState([]);
   const [rules, setRules] = useState(null);
+
+  // YouTube Auto-Reply & Comments state
+  const [ytSettings, setYtSettings] = useState({
+    auto_reply_enabled: false,
+    safe_testing_mode: true,
+    sync_interval_minutes: 15
+  });
+  const [ytComments, setYtComments] = useState([]);
+  const [ytFilter, setYtFilter] = useState('all');
+  const [syncingYt, setSyncingYt] = useState(false);
+  const [savingSettings, setSavingSettings] = useState(false);
+  const [editingReplyId, setEditingReplyId] = useState(null);
+  const [editedReplyText, setEditedReplyText] = useState({});
+  const [ytPlaygroundText, setYtPlaygroundText] = useState('Z6ii. Setting kavali plz');
+  const [ytPlaygroundAuthor, setYtPlaygroundAuthor] = useState('rambabududdu1714');
+  const [ytPlaygroundResult, setYtPlaygroundResult] = useState(null);
+  const [testingPlayground, setTestingPlayground] = useState(false);
+  const [actionLoadingId, setActionLoadingId] = useState(null);
 
   // Instagram Connect Modal
   const [showIgModal, setShowIgModal] = useState(false);
@@ -83,14 +109,18 @@ export default function SocialMediaManager() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [accData, commData, ruleData] = await Promise.all([
+      const [accData, commData, ruleData, ytSetData, ytCommData] = await Promise.all([
         fetchAdminSocialAccounts().catch(() => ({ instagram: null, youtube: null })),
         fetchAdminSocialComments().catch(() => []),
-        fetchAdminSocialRules().catch(() => null)
+        fetchAdminSocialRules().catch(() => null),
+        fetchAdminYouTubeSettings().catch(() => ({ auto_reply_enabled: false, safe_testing_mode: true })),
+        fetchAdminYouTubeComments('all').catch(() => [])
       ]);
       setAccounts(accData || {});
       setComments(commData || []);
       setRules(ruleData || null);
+      if (ytSetData) setYtSettings(ytSetData);
+      if (ytCommData) setYtComments(ytCommData);
     } catch (err) {
       toast.error('Failed to load social automation data: ' + formatApiErrorDetail(err));
     } finally {
@@ -222,6 +252,115 @@ export default function SocialMediaManager() {
       loadData();
     } catch (err) {
       toast.error('Dismiss failed: ' + formatApiErrorDetail(err));
+    }
+  };
+
+  // YouTube specific actions
+  const handleToggleAutoReply = async () => {
+    const nextVal = !ytSettings.auto_reply_enabled;
+    setSavingSettings(true);
+    try {
+      const res = await saveAdminYouTubeSettings({ auto_reply_enabled: nextVal });
+      setYtSettings(res);
+      if (nextVal) {
+        toast.success('YouTube Auto-Reply ENABLED. (Safe Testing Mode determines if replies preview or publish)');
+      } else {
+        toast.info('YouTube Auto-Reply DISABLED. Incoming comments will wait for approval.');
+      }
+    } catch (err) {
+      toast.error('Failed to toggle Auto-Reply: ' + formatApiErrorDetail(err));
+    } finally {
+      setSavingSettings(false);
+    }
+  };
+
+  const handleToggleSafeMode = async () => {
+    const nextVal = !ytSettings.safe_testing_mode;
+    setSavingSettings(true);
+    try {
+      const res = await saveAdminYouTubeSettings({ safe_testing_mode: nextVal });
+      setYtSettings(res);
+      if (nextVal) {
+        toast.success('Safe Testing Mode ACTIVATED! Live publishing to YouTube is disabled for safety.');
+      } else {
+        toast.warning('Safe Testing Mode turned OFF. Approved and auto-replied comments will publish live to YouTube!');
+      }
+    } catch (err) {
+      toast.error('Failed to update Safe Mode: ' + formatApiErrorDetail(err));
+    } finally {
+      setSavingSettings(false);
+    }
+  };
+
+  const handleSyncYouTube = async () => {
+    setSyncingYt(true);
+    const toastId = toast.loading('Syncing latest comments from connected YouTube channel...');
+    try {
+      const res = await syncAdminYouTubeComments({ max_results: 25 });
+      if (res?.success) {
+        toast.success(`Synced ${res.total_fetched} comments (${res.new_evaluated} analyzed with AI)`, { id: toastId });
+        const fresh = await fetchAdminYouTubeComments('all');
+        setYtComments(fresh || []);
+      } else {
+        toast.error(`Sync failed: ${res?.error || 'Unknown error'}`, { id: toastId });
+      }
+    } catch (err) {
+      toast.error('Failed to sync YouTube comments: ' + formatApiErrorDetail(err), { id: toastId });
+    } finally {
+      setSyncingYt(false);
+    }
+  };
+
+  const handleApproveYouTubeComment = async (commentId, defaultReply) => {
+    const text = editedReplyText[commentId] !== undefined ? editedReplyText[commentId] : defaultReply;
+    if (!text || !text.trim()) {
+      toast.error('Reply text cannot be empty');
+      return;
+    }
+    setActionLoadingId(commentId);
+    try {
+      const res = await approveAdminSocialComment(commentId, text.trim());
+      toast.success(res?.message || 'Reply approved successfully!');
+      const fresh = await fetchAdminYouTubeComments('all');
+      setYtComments(fresh || []);
+      setEditingReplyId(null);
+    } catch (err) {
+      toast.error('Approval failed: ' + formatApiErrorDetail(err));
+    } finally {
+      setActionLoadingId(null);
+    }
+  };
+
+  const handleDismissYouTubeComment = async (commentId) => {
+    setActionLoadingId(commentId);
+    try {
+      await dismissAdminSocialComment(commentId);
+      toast.success('Comment dismissed.');
+      const fresh = await fetchAdminYouTubeComments('all');
+      setYtComments(fresh || []);
+    } catch (err) {
+      toast.error('Failed to dismiss comment: ' + formatApiErrorDetail(err));
+    } finally {
+      setActionLoadingId(null);
+    }
+  };
+
+  const handleTestPlayground = async (e) => {
+    if (e) e.preventDefault();
+    if (!ytPlaygroundText.trim()) return;
+    setTestingPlayground(true);
+    setYtPlaygroundResult(null);
+    try {
+      const res = await previewAdminYouTubeReply({
+        comment_text: ytPlaygroundText.trim(),
+        author_name: ytPlaygroundAuthor.trim() || 'creator'
+      });
+      setYtPlaygroundResult(res?.evaluation || null);
+      toast.success('AI reply generated and evaluated!');
+    } catch (err) {
+      toast.error('AI Preview error: ' + formatApiErrorDetail(err));
+    } finally {
+      setTestingPlayground(false);
     }
   };
 
@@ -767,9 +906,531 @@ export default function SocialMediaManager() {
       )}
 
       {/* ============================================================== */}
+      {/* YOUTUBE COMMENTS AI AUTO-REPLY AUTOMATION (PHASE 3)          */}
+      {/* ============================================================== */}
+      {activeTab === 'youtube_comments' && (
+        <div className="space-y-6">
+          {/* Header Controls Bar */}
+          <div className="rounded-2xl border border-white/10 bg-neutral-900/60 p-6 space-y-6">
+            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6 border-b border-white/10 pb-6">
+              <div className="flex items-center gap-4">
+                <div className="relative">
+                  <img
+                    src={yt.profile_picture_url || '/assets/brand-profile.png'}
+                    alt="YouTube Channel"
+                    className="w-14 h-14 rounded-2xl object-cover border-2 border-red-500/30 shadow-lg shadow-red-500/10"
+                  />
+                  <div className="absolute -bottom-1 -right-1 p-1 rounded-lg bg-red-600 text-white shadow">
+                    <Youtube className="w-3.5 h-3.5" />
+                  </div>
+                </div>
+
+                <div>
+                  <div className="flex items-center gap-2.5">
+                    <h2 className="text-lg font-bold text-white">{yt.name || 'Pranvith DOP'}</h2>
+                    <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-red-500/10 text-red-400 border border-red-500/20">
+                      {yt.username || '@pranvithdop'}
+                    </span>
+                    {yt.is_connected && (
+                      <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center gap-1">
+                        <Check className="w-3 h-3" /> OAuth Active
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-neutral-400 mt-1">
+                    YouTube Data API v3 Multi-Lingual Comment Monitor & Dynamic Creator AI Reply Engine
+                  </p>
+                </div>
+              </div>
+
+              {/* Sync Action */}
+              <div className="flex flex-wrap items-center gap-3">
+                <button
+                  onClick={handleSyncYouTube}
+                  disabled={syncingYt}
+                  className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-semibold shadow-lg shadow-red-600/20 transition-all disabled:opacity-50"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${syncingYt ? 'animate-spin' : ''}`} />
+                  {syncingYt ? 'Syncing...' : 'Fetch Channel Comments'}
+                </button>
+
+                <button
+                  onClick={() => loadData()}
+                  className="p-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-neutral-300 text-xs transition-colors"
+                  title="Reload Data"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Automation Mode Toggles */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Toggle 1: Auto-Reply Switch */}
+              <div className="p-4 rounded-xl border border-white/10 bg-white/[0.02] flex items-center justify-between">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold uppercase tracking-wider text-neutral-400">
+                      Auto-Reply Engine:
+                    </span>
+                    <span
+                      className={`text-xs font-bold px-2 py-0.5 rounded ${
+                        ytSettings.auto_reply_enabled
+                          ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                          : 'bg-neutral-800 text-neutral-400 border border-neutral-700'
+                      }`}
+                    >
+                      {ytSettings.auto_reply_enabled ? 'ENABLED (ON)' : 'PAUSED (OFF)'}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-neutral-400">
+                    Automatically processes new comments. Sensitive inquiries (pricing/bookings) always pause for approval.
+                  </p>
+                </div>
+
+                <button
+                  onClick={handleToggleAutoReply}
+                  disabled={savingSettings}
+                  className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                    ytSettings.auto_reply_enabled ? 'bg-emerald-600' : 'bg-neutral-800'
+                  }`}
+                  role="switch"
+                  aria-checked={ytSettings.auto_reply_enabled}
+                >
+                  <span
+                    aria-hidden="true"
+                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                      ytSettings.auto_reply_enabled ? 'translate-x-5' : 'translate-x-0'
+                    }`}
+                  />
+                </button>
+              </div>
+
+              {/* Toggle 2: Safe Testing Mode */}
+              <div className="p-4 rounded-xl border border-white/10 bg-white/[0.02] flex items-center justify-between">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold uppercase tracking-wider text-neutral-400">
+                      Safe Testing Mode:
+                    </span>
+                    <span
+                      className={`text-xs font-bold px-2 py-0.5 rounded ${
+                        ytSettings.safe_testing_mode
+                          ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
+                          : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                      }`}
+                    >
+                      {ytSettings.safe_testing_mode ? 'ACTIVE (Previews Only)' : 'LIVE PUBLISHING ACTIVE'}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-neutral-400">
+                    {ytSettings.safe_testing_mode
+                      ? 'AI generates natural replies safely in preview mode. Zero live responses posted to YouTube.'
+                      : 'Live Mode: Approved replies will be published publicly to your YouTube comment threads.'}
+                  </p>
+                </div>
+
+                <button
+                  onClick={handleToggleSafeMode}
+                  disabled={savingSettings}
+                  className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                    ytSettings.safe_testing_mode ? 'bg-blue-600' : 'bg-neutral-800'
+                  }`}
+                  role="switch"
+                  aria-checked={ytSettings.safe_testing_mode}
+                >
+                  <span
+                    aria-hidden="true"
+                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                      ytSettings.safe_testing_mode ? 'translate-x-5' : 'translate-x-0'
+                    }`}
+                  />
+                </button>
+              </div>
+            </div>
+
+            {/* Metrics ribbon */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2">
+              <div className="p-3.5 rounded-xl bg-white/[0.02] border border-white/5">
+                <span className="text-[11px] text-neutral-400 block font-medium">Channel Comments</span>
+                <span className="text-xl font-bold text-white mt-1 block">
+                  {ytComments.length}
+                </span>
+              </div>
+
+              <div className="p-3.5 rounded-xl bg-white/[0.02] border border-white/5">
+                <span className="text-[11px] text-amber-400/90 block font-medium">Pending Approval</span>
+                <span className="text-xl font-bold text-amber-400 mt-1 block">
+                  {ytComments.filter((c) => c.status === 'pending_approval').length}
+                </span>
+              </div>
+
+              <div className="p-3.5 rounded-xl bg-white/[0.02] border border-white/5">
+                <span className="text-[11px] text-blue-400/90 block font-medium">Safe Previews Ready</span>
+                <span className="text-xl font-bold text-blue-400 mt-1 block">
+                  {ytComments.filter((c) => c.status === 'preview_ready').length}
+                </span>
+              </div>
+
+              <div className="p-3.5 rounded-xl bg-white/[0.02] border border-white/5">
+                <span className="text-[11px] text-emerald-400/90 block font-medium">Approved / Published</span>
+                <span className="text-xl font-bold text-emerald-400 mt-1 block">
+                  {ytComments.filter((c) => c.status === 'approved' || c.status === 'auto_replied' || c.status === 'manual_replied').length}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Safe AI Comment Tester Playground */}
+          <div className="rounded-2xl border border-white/10 bg-neutral-900/60 p-6 space-y-5">
+            <div className="flex items-center justify-between border-b border-white/10 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-xl bg-red-500/10 text-red-400 border border-red-500/20">
+                  <Sparkles className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white">Multilingual AI Reply Playground</h3>
+                  <p className="text-xs text-neutral-400">
+                    Test how the AI understands Telugu, Romanized Teluglish & English, classifies intent, and crafts varied creator responses
+                  </p>
+                </div>
+              </div>
+              <span className="text-xs font-medium px-2.5 py-1 rounded-lg bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                Safe Sandbox
+              </span>
+            </div>
+
+            <form onSubmit={handleTestPlayground} className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-xs font-medium text-neutral-400 mb-1.5">Viewer Username</label>
+                <input
+                  type="text"
+                  value={ytPlaygroundAuthor}
+                  onChange={(e) => setYtPlaygroundAuthor(e.target.value)}
+                  placeholder="e.g. rambabududdu1714"
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-white/5 border border-white/10 text-sm text-white focus:outline-none focus:border-red-500"
+                />
+              </div>
+
+              <div className="md:col-span-2">
+                <label className="block text-xs font-medium text-neutral-400 mb-1.5">Comment Text</label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={ytPlaygroundText}
+                    onChange={(e) => setYtPlaygroundText(e.target.value)}
+                    placeholder="e.g. Z6ii. Setting kavali plz or Short films theeyocha bro price entha"
+                    className="flex-1 px-3.5 py-2.5 rounded-xl bg-white/5 border border-white/10 text-sm text-white focus:outline-none focus:border-red-500"
+                  />
+                  <button
+                    type="submit"
+                    disabled={testingPlayground}
+                    className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-semibold shadow-md shadow-red-600/20 transition-all disabled:opacity-50"
+                  >
+                    <Send className={`w-3.5 h-3.5 ${testingPlayground ? 'animate-pulse' : ''}`} />
+                    Test Reply
+                  </button>
+                </div>
+              </div>
+            </form>
+
+            {/* Quick Test Samples */}
+            <div className="flex flex-wrap items-center gap-2 text-xs">
+              <span className="text-neutral-500">Live Samples:</span>
+              {[
+                { label: 'Z6II Settings (Teluglish)', text: 'Z6ii. Setting kavali plz', author: 'rambabududdu1714' },
+                { label: 'Short film + Price (Telugu script)', text: 'Short films theeyocha బ్రో దీనితో ప్రైస్ ఎంత ఉంటుంది', author: 'agentx0073' },
+                { label: 'Nikon ZR details (English)', text: 'The Nikon ZR shows good details.', author: 'shakeel_raj_photography' },
+                { label: 'LUT Pack Inquiry', text: 'Bro send Sony S-Log3 Creative LUT pack link please', author: 'kiran_creative' },
+                { label: 'Wedding Shoot Booking', text: 'Bro wedding film shoot booking available next month in Hyderabad?', author: 'suresh_films' }
+              ].map((sample) => (
+                <button
+                  key={sample.label}
+                  type="button"
+                  onClick={() => {
+                    setYtPlaygroundText(sample.text);
+                    setYtPlaygroundAuthor(sample.author);
+                  }}
+                  className="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 border border-white/5 text-neutral-300 transition-colors"
+                >
+                  {sample.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Playground Result Display */}
+            {ytPlaygroundResult && (
+              <div className="p-4 rounded-xl border border-white/10 bg-white/[0.02] space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/5 pb-2.5">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-semibold text-white">Detected Language:</span>
+                    <span className="text-xs font-bold px-2 py-0.5 rounded bg-blue-500/20 text-blue-400 uppercase font-mono">
+                      {ytPlaygroundResult.detected_language}
+                    </span>
+                    <span className="text-xs font-semibold text-white ml-2">Intent:</span>
+                    <span className="text-xs font-bold px-2 py-0.5 rounded bg-purple-500/20 text-purple-400 uppercase font-mono">
+                      {ytPlaygroundResult.intent}
+                    </span>
+                  </div>
+
+                  <div>
+                    {ytPlaygroundResult.is_sensitive ? (
+                      <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/30 flex items-center gap-1">
+                        <AlertCircle className="w-3.5 h-3.5" /> Requires Admin Approval
+                      </span>
+                    ) : (
+                      <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
+                        <Check className="w-3.5 h-3.5" /> Safe for Auto-Reply
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="space-y-1.5 text-xs">
+                  <p className="text-neutral-400">
+                    <span className="text-neutral-500 font-semibold">Evaluation Reason: </span>
+                    {ytPlaygroundResult.reason}
+                  </p>
+                  <div className="mt-2 p-3.5 rounded-lg bg-neutral-950 border border-white/10">
+                    <span className="text-neutral-400 block font-semibold mb-1 text-[11px] uppercase tracking-wider">
+                      Generated Dynamic Response:
+                    </span>
+                    <span className="text-neutral-100 font-sans leading-relaxed text-sm">
+                      {ytPlaygroundResult.reply_text}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* YouTube Comments Feed & Management Table */}
+          <div className="rounded-2xl border border-white/10 bg-neutral-900/60 p-6 space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-white/10 pb-4">
+              <div>
+                <h3 className="text-base font-bold text-white flex items-center gap-2">
+                  <MessageSquare className="w-4 h-4 text-red-400" />
+                  Channel Comments & AI Suggestions
+                </h3>
+                <p className="text-xs text-neutral-400">
+                  Review incoming comments from your connected YouTube channel, edit AI suggestions, or approve responses.
+                </p>
+              </div>
+
+              {/* Filter Tabs */}
+              <div className="flex flex-wrap items-center gap-1 bg-white/5 p-1 rounded-xl border border-white/10 text-xs">
+                {[
+                  { id: 'all', label: 'All', count: ytComments.length },
+                  { id: 'pending_approval', label: 'Pending Approval', count: ytComments.filter((c) => c.status === 'pending_approval').length },
+                  { id: 'preview_ready', label: 'Previews Ready', count: ytComments.filter((c) => c.status === 'preview_ready').length },
+                  { id: 'approved', label: 'Approved / Replied', count: ytComments.filter((c) => c.status === 'approved' || c.status === 'auto_replied' || c.status === 'manual_replied').length },
+                  { id: 'dismissed', label: 'Dismissed', count: ytComments.filter((c) => c.status === 'dismissed').length }
+                ].map((f) => (
+                  <button
+                    key={f.id}
+                    onClick={() => setYtFilter(f.id)}
+                    className={`px-3 py-1.5 rounded-lg font-medium transition-colors ${
+                      ytFilter === f.id
+                        ? 'bg-red-600 text-white font-semibold'
+                        : 'text-neutral-400 hover:text-white'
+                    }`}
+                  >
+                    {f.label} ({f.count})
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Comments List */}
+            {ytComments.length === 0 ? (
+              <div className="p-12 text-center space-y-3">
+                <Youtube className="w-10 h-10 text-neutral-600 mx-auto" />
+                <h4 className="text-sm font-semibold text-neutral-300">No YouTube Comments Loaded</h4>
+                <p className="text-xs text-neutral-500 max-w-sm mx-auto">
+                  Click the "Fetch Channel Comments" button above to import recent comments from your connected YouTube channel.
+                </p>
+                <button
+                  onClick={handleSyncYouTube}
+                  disabled={syncingYt}
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-semibold shadow-md transition-all"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${syncingYt ? 'animate-spin' : ''}`} />
+                  Sync Channel Comments
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {ytComments
+                  .filter((c) => {
+                    if (ytFilter === 'all') return true;
+                    if (ytFilter === 'approved') {
+                      return c.status === 'approved' || c.status === 'auto_replied' || c.status === 'manual_replied';
+                    }
+                    return c.status === ytFilter;
+                  })
+                  .map((c) => {
+                    const isPending = c.status === 'pending_approval';
+                    const isPreview = c.status === 'preview_ready';
+                    const isDone = c.status === 'approved' || c.status === 'auto_replied' || c.status === 'manual_replied';
+                    const isEditing = editingReplyId === c.id;
+                    const replyVal = editedReplyText[c.id] !== undefined ? editedReplyText[c.id] : (c.reply_text || c.suggested_reply || '');
+
+                    return (
+                      <div
+                        key={c.id}
+                        className={`p-5 rounded-2xl border transition-all ${
+                          isPending
+                            ? 'bg-amber-500/[0.03] border-amber-500/30'
+                            : isDone
+                            ? 'bg-emerald-500/[0.02] border-emerald-500/20'
+                            : 'bg-white/[0.02] border-white/10'
+                        } space-y-4`}
+                      >
+                        {/* Top row: Author & Metadata */}
+                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5">
+                          <div className="flex items-center gap-3">
+                            <img
+                              src={c.author_profile_image || '/assets/brand-profile.png'}
+                              alt={c.author_name}
+                              className="w-9 h-9 rounded-full object-cover border border-white/10"
+                            />
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs font-bold text-white">
+                                  {c.author_name || 'Viewer'}
+                                </span>
+                                {c.video_id && (
+                                  <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-white/5 text-neutral-400">
+                                    Video: {c.video_id}
+                                  </span>
+                                )}
+                              </div>
+                              <span className="text-[11px] text-neutral-500">
+                                {c.published_at ? new Date(c.published_at).toLocaleString() : 'Recent'}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Status and language badges */}
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            {c.detected_language && (
+                              <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-blue-500/20 text-blue-400 uppercase">
+                                {c.detected_language}
+                              </span>
+                            )}
+
+                            {c.intent && (
+                              <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-purple-500/20 text-purple-400 uppercase">
+                                {c.intent.replace('SENSITIVE_', '')}
+                              </span>
+                            )}
+
+                            {isPending && (
+                              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/30">
+                                Pending Approval
+                              </span>
+                            )}
+
+                            {isPreview && (
+                              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-400 border border-blue-500/30">
+                                Preview Ready (Safe Mode)
+                              </span>
+                            )}
+
+                            {isDone && (
+                              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
+                                <Check className="w-3 h-3" />
+                                {c.status === 'auto_replied' ? 'Auto-Replied' : 'Approved'}
+                              </span>
+                            )}
+
+                            {c.status === 'dismissed' && (
+                              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-neutral-800 text-neutral-400">
+                                Dismissed
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Comment text */}
+                        <div className="p-3.5 rounded-xl bg-neutral-950/80 border border-white/5">
+                          <p className="text-sm text-neutral-200 leading-relaxed font-sans">
+                            {c.comment_text}
+                          </p>
+                        </div>
+
+                        {/* AI Suggested Response Box */}
+                        <div className="p-3.5 rounded-xl bg-white/[0.02] border border-white/5 space-y-2">
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="font-semibold text-neutral-400 flex items-center gap-1.5">
+                              <Sparkles className="w-3.5 h-3.5 text-red-400" />
+                              {isDone ? 'Published Response:' : 'AI Suggested Response:'}
+                            </span>
+                            {!isDone && (
+                              <button
+                                type="button"
+                                onClick={() => setEditingReplyId(isEditing ? null : c.id)}
+                                className="text-[11px] text-neutral-400 hover:text-white underline"
+                              >
+                                {isEditing ? 'Cancel Edit' : 'Edit Response'}
+                              </button>
+                            )}
+                          </div>
+
+                          {isEditing ? (
+                            <textarea
+                              rows={3}
+                              value={replyVal}
+                              onChange={(e) =>
+                                setEditedReplyText({ ...editedReplyText, [c.id]: e.target.value })
+                              }
+                              className="w-full px-3 py-2 rounded-xl bg-neutral-950 border border-red-500/40 text-xs text-white focus:outline-none"
+                            />
+                          ) : (
+                            <p className="text-xs text-neutral-300 leading-relaxed font-sans">
+                              {replyVal || 'No response draft generated.'}
+                            </p>
+                          )}
+                        </div>
+
+                        {/* Actions row */}
+                        {!isDone && c.status !== 'dismissed' && (
+                          <div className="flex flex-wrap items-center justify-end gap-2.5 pt-1">
+                            <button
+                              type="button"
+                              onClick={() => handleDismissYouTubeComment(c.id)}
+                              disabled={actionLoadingId === c.id}
+                              className="px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-xs text-neutral-400 transition-colors"
+                            >
+                              Dismiss
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => handleApproveYouTubeComment(c.id, c.suggested_reply)}
+                              disabled={actionLoadingId === c.id}
+                              className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold shadow-md shadow-emerald-600/20 transition-all disabled:opacity-50"
+                            >
+                              <Check className="w-3.5 h-3.5" />
+                              {ytSettings.safe_testing_mode
+                                ? 'Approve (Safe Preview Mode)'
+                                : 'Approve & Publish to YouTube'}
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================== */}
       {/* OTHER TABS: ROADMAP / COMING PHASES                           */}
       {/* ============================================================== */}
-      {activeTab !== 'connected_accounts' && (
+      {activeTab !== 'connected_accounts' && activeTab !== 'youtube_comments' && (
         <div className="rounded-2xl border border-white/10 bg-neutral-900/60 p-8 text-center space-y-4">
           <div className="w-12 h-12 rounded-2xl bg-orange-500/10 border border-orange-500/20 text-orange-400 flex items-center justify-center mx-auto">
             {React.createElement(TABS.find((t) => t.id === activeTab)?.icon || Share2, { className: 'w-6 h-6' })}

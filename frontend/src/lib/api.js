@@ -1186,3 +1186,30 @@ export const simulateAdminSocialComment = async (payload) => {
   return data;
 };
 
+export const fetchAdminYouTubeSettings = async () => {
+  const { data } = await adminApi.get('/admin/social/youtube/settings');
+  return data;
+};
+
+export const saveAdminYouTubeSettings = async (payload) => {
+  const { data } = await adminApi.post('/admin/social/youtube/settings', payload);
+  return data;
+};
+
+export const syncAdminYouTubeComments = async (payload = {}) => {
+  const { data } = await adminApi.post('/admin/social/youtube/sync', payload);
+  return data;
+};
+
+export const fetchAdminYouTubeComments = async (status = 'all') => {
+  const params = status && status !== 'all' ? `?status=${encodeURIComponent(status)}` : '';
+  const { data } = await adminApi.get(`/admin/social/youtube/comments${params}`);
+  return data;
+};
+
+export const previewAdminYouTubeReply = async (payload) => {
+  const { data } = await adminApi.post('/admin/social/youtube/preview-reply', payload);
+  return data;
+};
+
+

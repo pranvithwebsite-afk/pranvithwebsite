@@ -6,8 +6,9 @@ Supports Instagram now; extensible to Facebook and YouTube.
 import os
 import re
 import uuid
+import random
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import Dict, List, Optional, Any, Tuple
 import httpx
 
@@ -22,27 +23,35 @@ TELUGU_WORDS = [
     "ela", "cheyyali", "cheyali", "cheppandi", "cheppava", "enti", "undha", "undhi", "kavali",
     "baguntundi", "eppudu", "chala", "manchi", "chesukovali", "gurinchi", "pettali", "telugulo",
     "pedithe", "chusthe", "vadali", "vaadali", "pelliki", "pelli", "edhi", "ekkada", "chesi",
-    "bagundi", "bavundi", "anna", "bro", "dharalu", "dara", "entha", "emi",
+    "bagundi", "bavundi", "anna", "dharalu", "dara", "entha", "emi", "theeyocha", "ivvandi",
+    "pampandi", "pampinchandi", "chudandi", "chepparu", "meeru", "miku", "maku", "naku", "bro", "plz",
     "అలా", "ఎలా", "ఏంటి", "చెప్పండి", "ఉంది", "ఉందా", "కావాలి", "బాగుంటుంది", "తెలుగు", "పెళ్లి",
-    "బాగుంది", "ఎంత", "ధర"
+    "బాగుంది", "ఎంత", "ధర", "బ్రో", "దీనితో", "ప్రైస్", "అన్నా", "పంపిస్తారా", "పంపండి", "చూడండి"
 ]
 
 def detect_comment_language(text: str) -> str:
-    """Detects if comment is in Telugu, English, or Hindi."""
+    """
+    Detects if comment is in Telugu, English, or Hindi.
+    Handles native Unicode Telugu script and Romanized Teluglish.
+    """
     raw = (text or "").lower()
     
-    # 1. Native script
+    # 1. Native script detection
     if re.search(r'[\u0C00-\u0C7F]', raw):
         return "telugu"
     if re.search(r'[\u0900-\u097F]', raw):
         return "hindi"
         
     # 2. Explicit or Romanized Telugu
-    telugu_score = sum(1 for w in TELUGU_WORDS if re.search(rf'\b{re.escape(w)}\b', raw))
-    if telugu_score >= 1:
-        return "telugu"
+    matched_te = [w for w in TELUGU_WORDS if re.search(rf'\b{re.escape(w)}\b', raw)]
+    if not matched_te:
+        return "english"
         
-    return "english"
+    # If the only match is 'bro' or 'plz' (borrowed words common in English), treat as english
+    if set(matched_te).issubset({"bro", "plz"}):
+        return "english"
+        
+    return "telugu"
 
 # ==================== DEFAULT KEYWORD RULES ====================
 
@@ -789,3 +798,751 @@ async def disconnect_social_account(db, platform: str) -> bool:
         upsert=True
     )
     return True
+
+
+# ==================== YOUTUBE AI AUTO-REPLY POOLS & INTENT ENGINE ====================
+
+YOUTUBE_REPLY_POOLS: Dict[str, Dict[str, List[str]]] = {
+    "CAMERA_SETTINGS": {
+        "telugu": [
+            "నమస్కారం @{author}! కెమెరా బెస్ట్ వీడియో సెట్టింగ్స్ & సినీమాటోగ్రఫీ గైడ్స్ కోసం మన వెబ్‌సైట్ చూడండి: https://pranvithdop.com/assets. ఇంకా ఏమైనా డౌట్స్ ఉంటే తప్పకుండా అడగండి!",
+            "హాయ్ @{author}! Z-సిరీస్ / Sony కెమెరాల కంప్లీట్ సెట్టింగ్స్ PDF మరియు సినీమాటిక్ అసెట్స్ ఇక్కడ ఉన్నాయి: https://pranvithdop.com/assets. ట్రై చేసి రిజల్ట్ ఎలా ఉందో చెప్పండి bro 🔥",
+            "Thanks for watching @{author}! మా రికమండెడ్ కెమెరా సెట్టింగ్స్ చీట్ షీట్స్ అన్నీ ఇక్కడ అందుబాటులో ఉన్నాయి: https://pranvithdop.com/assets. కీప్ షూటింగ్ 🎬",
+            "నమస్కారం @{author}! N-Log / S-Log3 ప్రొఫైల్స్ మరియు ఎక్స్‌పోజర్ సెట్టింగ్స్ గైడ్ కోసం https://pranvithdop.com/assets విజిట్ చేయండి!"
+        ],
+        "english": [
+            "Hi @{author}! You can download our verified camera settings guide and cinematography cheat sheets here: https://pranvithdop.com/assets. Hope it helps your workflow!",
+            "Thanks for watching @{author}! We have detailed settings breakdowns and filmmaking packs available on our site: https://pranvithdop.com/assets. Keep creating 🎬",
+            "Hey @{author}! Check out the complete camera profile & exposure guide on https://pranvithdop.com/assets. Let me know if you have any questions!",
+            "Appreciate the comment @{author}! Full camera settings, picture profiles, and creative gear lists are right here: https://pranvithdop.com/assets"
+        ]
+    },
+    "LUT_REQUEST": {
+        "telugu": [
+            "🎨 నమస్కారం @{author}! Sony S-Log3, Canon C-Log3 & Rec.709 కోసం క్రియేటివ్ సినిమాటిక్ LUT ప్యాక్ (₹49) లింక్: https://pranvithdop.com/assets/creative-lut-pack. కలర్ గ్రేడింగ్ ఈజీగా అయిపోతుంది!",
+            "🎨 హాయ్ @{author}! మా అఫీషియల్ సినిమాటిక్ 3D LUT ప్యాక్ కేవలం ₹49 కే అందుబాటులో ఉంది: https://pranvithdop.com/assets/creative-lut-pack. డౌన్‌లోడ్ చేసుకుని ట్రై చేయండి bro!",
+            "🎨 Thanks @{author}! 10+ సినిమాటిక్ క్యూబ్ LUTs తో కూడిన ప్యాక్ లింక్: https://pranvithdop.com/assets/creative-lut-pack. హ్యాపీ కలర్ గ్రేడింగ్!"
+        ],
+        "english": [
+            "🎨 Hi @{author}! Check out our Creative LUT Pack (₹49) crafted specifically for cinematic S-Log3/C-Log3 workflows: https://pranvithdop.com/assets/creative-lut-pack",
+            "🎨 Thanks @{author}! You can get the 10+ 3D cinematic LUT pack here: https://pranvithdop.com/assets/creative-lut-pack. Happy grading!",
+            "🎨 Hey @{author}! Grab our official cinematic LUTs to achieve clean skin tones and film contrast: https://pranvithdop.com/assets/creative-lut-pack"
+        ]
+    },
+    "GEAR_LIST": {
+        "telugu": [
+            "🎥 నమస్కారం @{author}! మేము షూట్ లో వాడే కెమెరాలు, లెన్సులు మరియు లైటింగ్ గేర్ లిస్ట్ ఇక్కడ చూడండి: https://pranvithdop.com/assets",
+            "హాయ్ @{author}! మా కంప్లీట్ ఫిల్మ్‌మేకింగ్ గేర్ & రికమండేషన్స్ కోసం మన వెబ్‌సైట్ ని విజిట్ చేయండి: https://pranvithdop.com/assets"
+        ],
+        "english": [
+            "🎥 Hi @{author}! You can check our complete camera, lens, and lighting gear list at https://pranvithdop.com/assets",
+            "Thanks for asking @{author}! Full production kit details and recommended creator gear are available at https://pranvithdop.com/assets"
+        ]
+    },
+    "CAMERA_TECHNICAL": {
+        "telugu": [
+            "చాలా మంచి ప్రశ్న @{author}! ఈ కెమెరాతో సరైన ఎక్స్‌పోజర్ & ప్రొఫైల్స్ వాడితే సినీమాటిక్ రిజల్ట్స్ అద్భుతంగా వస్తాయి. డీటెయిల్డ్ గైడ్ కోసం https://pranvithdop.com/assets చూడండి!",
+            "కరెక్ట్ @{author} bro! సెట్టింగ్స్ కరెక్ట్ గా పెడితే డైనమిక్ రేంజ్ మరియు కలర్స్ చాలా బాగుంటాయి. కీప్ సపోర్టింగ్!"
+        ],
+        "english": [
+            "Great observation @{author}! When exposed correctly with the right picture profile, this camera delivers exceptional dynamic range and skin tones. Check https://pranvithdop.com/assets for full guides!",
+            "Spot on @{author}! The sensor readout and color rendition really shine in this setup. Thanks for watching and supporting 🎬"
+        ]
+    },
+    "APPRECIATION": {
+        "telugu": [
+            "చాలా థాంక్స్ @{author} bro! మీ సపోర్ట్ చాలా వాల్యుబుల్. మరిన్ని సినిమాటోగ్రఫీ వీడియోస్ త్వరలోనే వస్తున్నాయి 🔥",
+            "థాంక్యూ సో మచ్ @{author} anna! వీడియో నచ్చినందుకు సంతోషం. కీప్ సపోర్టింగ్ 🎬",
+            "Thanks a lot @{author}! మీలాంటి క్రియేటర్స్ సపోర్ట్ వల్లే కొత్త కంటెంట్ చేయాలనిపిస్తుంది. స్టే ట్యూన్డ్!",
+            "ధన్యవాదాలు @{author}! నెక్స్ట్ ఏ కెమెరా లేదా లైటింగ్ టాపిక్ పై వీడియో కావాలో కూడా కామెంట్ చేయండి!"
+        ],
+        "english": [
+            "Thank you so much @{author}! Really glad you enjoyed the breakdown. More filmmaking content coming soon 🔥",
+            "Appreciate the kind words @{author}! Keep creating and stay tuned for our next video 🎬",
+            "Thanks a lot @{author}! It means a lot to the team. Let us know what topics you want to see next!",
+            "Much appreciated @{author}! Glad you found the video helpful. Have a great shoot ahead!"
+        ]
+    },
+    "SENSITIVE_PRICE": {
+        "telugu": [
+            "నమస్కారం @{author}! మా క్రియేటివ్ LUT ప్యాక్ ₹49, Sound FX ₹149, మరియు వెడ్డింగ్ టెంప్లేట్స్ ₹299. ప్రాజెక్ట్ / షూట్ కొటేషన్ కోసం వెబ్‌సైట్ https://pranvithdop.com/hire లేదా WhatsApp +91 9059867883 లో సంప్రదించండి.",
+            "హాయ్ @{author}! మా ప్రొడక్ట్స్ మరియు సర్వీస్ ధరల పూర్తి వివరాల కోసం https://pranvithdop.com ని సందర్శించండి లేదా డైరెక్ట్ గా వాట్సాప్ చేయండి: +91 9059867883."
+        ],
+        "english": [
+            "Hi @{author}! Our Creative LUT Pack is ₹49, Sound FX Pack is ₹149, and Wedding Templates are ₹299. For commercial shoot quotes or wedding bookings, please visit https://pranvithdop.com/hire or WhatsApp +91 9059867883.",
+            "Thanks for inquiring @{author}! Full digital asset pricing is available at https://pranvithdop.com/assets. For bespoke commercial cinematography bookings, please reach out via https://pranvithdop.com/hire"
+        ]
+    },
+    "SENSITIVE_BOOKING": {
+        "telugu": [
+            "నమస్కారం @{author}! సినిమాటోగ్రఫీ మరియు వెడ్డింగ్ షూట్ బుకింగ్స్ కోసం మా వెబ్‌సైట్ https://pranvithdop.com/hire లో లేదా WhatsApp +91 9059867883 లో సంప్రదించండి. థాంక్యూ!",
+            "హాయ్ @{author}! కమర్షియల్ ప్రాజెక్ట్స్ మరియు ఈవెంట్ షూట్ అవైలబిలిటీ కోసం దయచేసి https://pranvithdop.com/hire లో ఎంక్వైరీ ఫారమ్ ఫిల్ చేయండి లేదా +91 9059867883 కి వాట్సాప్ చేయండి."
+        ],
+        "english": [
+            "Hi @{author}! For commercial video production, wedding films, or cinematography bookings, please fill our enquiry form at https://pranvithdop.com/hire or WhatsApp +91 9059867883.",
+            "Thanks for reaching out @{author}! To check our shoot dates and availability, please visit https://pranvithdop.com/hire or contact us on WhatsApp (+91 9059867883)."
+        ]
+    },
+    "SENSITIVE_COURSE": {
+        "telugu": [
+            "నమస్కారం @{author}! మా మాస్టర్ సినిమాటోగ్రఫీ కోర్స్ సిలబస్, ప్రాక్టికల్ క్లాసెస్ మరియు అడ్మిషన్స్ వివరాల కోసం https://pranvithdop.com/courses లో చూడండి లేదా WhatsApp +91 9059867883 లో మెసేజ్ చేయండి.",
+            "హాయ్ @{author}! సినిమాటోగ్రఫీ & కలర్ గ్రేడింగ్ ట్రైనింగ్ వివరాల కోసం https://pranvithdop.com/courses విజిట్ చేయండి!"
+        ],
+        "english": [
+            "Hi @{author}! Our Master Cinematography Course covers practical camera operation, lighting, S-Log3/C-Log3 exposure, and color grading. Details at https://pranvithdop.com/courses",
+            "Thanks @{author}! You can explore course modules, offline batches, and registration details on https://pranvithdop.com/courses"
+        ]
+    },
+    "GENERAL": {
+        "telugu": [
+            "నమస్కారం @{author}! కామెంట్ చేసినందుకు ధన్యవాదాలు. మా లేటెస్ట్ సినీమాటోగ్రఫీ అసెట్స్ మరియు గైడ్స్ కోసం https://pranvithdop.com ని విజిట్ చేయండి!",
+            "థాంక్స్ ఫర్ వాచింగ్ @{author} bro! ఇంకా ఏమైనా డౌట్స్ ఉంటే కామెంట్ చేయండి, తప్పకుండా రిప్లై ఇస్తాను 🎬"
+        ],
+        "english": [
+            "Hi @{author}! Thanks for watching and dropping a comment. Check out our editing packs and cinematography resources at https://pranvithdop.com",
+            "Thanks for connecting @{author}! Feel free to ask any filmmaking or camera questions anytime 🎬"
+        ]
+    }
+}
+
+
+def classify_comment_intent(comment_text: str) -> Dict[str, Any]:
+    """
+    Classifies a comment into intent categories with sensitivity flag.
+    Sensitive comments (price, booking, course) require admin approval before replying.
+    """
+    text_lower = (comment_text or "").lower()
+
+    # 1. Sensitive checks first (Pricing, Shoot Booking, Masterclass)
+    price_keywords = ["price", "cost", "how much", "rate", "fee", "fees", "charges", "ధర", "ఎంత", "రేట్", "ప్రైస్"]
+    matched_price = [k for k in price_keywords if k in text_lower]
+    if matched_price:
+        return {
+            "intent": "SENSITIVE_PRICE",
+            "is_sensitive": True,
+            "requires_approval": True,
+            "matched_keywords": matched_price,
+            "reason": f"Pricing inquiry matched keyword '{matched_price[0]}'. Requires admin approval."
+        }
+
+    booking_keywords = ["book", "booking", "hire", "service", "shoot", "event", "commercial", "available", "బుకింగ్", "షూట్", "రెంట్"]
+    matched_booking = [k for k in booking_keywords if k in text_lower]
+    if matched_booking:
+        return {
+            "intent": "SENSITIVE_BOOKING",
+            "is_sensitive": True,
+            "requires_approval": True,
+            "matched_keywords": matched_booking,
+            "reason": f"Shoot / production booking inquiry matched '{matched_booking[0]}'. Requires admin approval."
+        }
+
+    course_keywords = ["course", "class", "training", "offline", "learn", "academy", "కోర్స్", "క్లాస్"]
+    matched_course = [k for k in course_keywords if k in text_lower]
+    if matched_course:
+        return {
+            "intent": "SENSITIVE_COURSE",
+            "is_sensitive": True,
+            "requires_approval": True,
+            "matched_keywords": matched_course,
+            "reason": f"Course / training inquiry matched '{matched_course[0]}'. Requires admin approval."
+        }
+
+    # 2. LUTs & Color Grading Presets
+    lut_keywords = ["lut", "luts", "preset", "presets", "color grade", "grading", "cube", "కలర్ గ్రేడింగ్"]
+    matched_lut = [k for k in lut_keywords if k in text_lower]
+    if matched_lut:
+        return {
+            "intent": "LUT_REQUEST",
+            "is_sensitive": False,
+            "requires_approval": False,
+            "matched_keywords": matched_lut,
+            "reason": "Cinematic LUT / preset request"
+        }
+
+    # 3. Camera Settings / Cheat Sheet PDF
+    settings_keywords = ["setting", "settings", "cheat sheet", "pdf", "cheat", "profile", "n-log", "s-log", "nlog", "slog", "iso", "shutter", "సెట్టింగ్స్", "సెట్టింగ్"]
+    matched_settings = [k for k in settings_keywords if k in text_lower]
+    if matched_settings:
+        return {
+            "intent": "CAMERA_SETTINGS",
+            "is_sensitive": False,
+            "requires_approval": False,
+            "matched_keywords": matched_settings,
+            "reason": "Camera settings & cheat sheet request"
+        }
+
+    # 4. Gear list
+    gear_keywords = ["gear", "lens", "lenses", "mic", "tripod", "gimbal", "list", "equipment", "లిస్ట్"]
+    matched_gear = [k for k in gear_keywords if k in text_lower]
+    if matched_gear:
+        return {
+            "intent": "GEAR_LIST",
+            "is_sensitive": False,
+            "requires_approval": False,
+            "matched_keywords": matched_gear,
+            "reason": "Filmmaking gear / equipment inquiry"
+        }
+
+    # 5. Technical camera discussions
+    camera_keywords = ["nikon", "sony", "canon", "fx3", "z6iii", "z6ii", "z8", "z9", "zr", "r5", "r6", "dji", "slow motion", "4k 120", "autofocus", "details"]
+    matched_cam = [k for k in camera_keywords if k in text_lower]
+    if matched_cam:
+        return {
+            "intent": "CAMERA_TECHNICAL",
+            "is_sensitive": False,
+            "requires_approval": False,
+            "matched_keywords": matched_cam,
+            "reason": f"Technical discussion on camera model / feature: {matched_cam[0]}"
+        }
+
+    # 6. Appreciation & praise
+    apprec_keywords = ["super", "nice", "great", "awesome", "loved", "bagundi", "bavundi", "chala bagundi", "fire", "wonderful", "excellent", "good details"]
+    matched_apprec = [k for k in apprec_keywords if k in text_lower]
+    if matched_apprec:
+        return {
+            "intent": "APPRECIATION",
+            "is_sensitive": False,
+            "requires_approval": False,
+            "matched_keywords": matched_apprec,
+            "reason": "Viewer appreciation / praise"
+        }
+
+    return {
+        "intent": "GENERAL",
+        "is_sensitive": False,
+        "requires_approval": False,
+        "matched_keywords": [],
+        "reason": "General comment"
+    }
+
+
+async def generate_youtube_ai_reply(
+    comment_text: str,
+    author_name: str = "creator",
+    video_title: Optional[str] = None,
+    gemini_api_key: Optional[str] = None
+) -> Dict[str, Any]:
+    """
+    Generates a natural, context-rich, non-static reply to a YouTube comment.
+    Understands Telugu (native + Teluglish), English, and mixed comments.
+    Uses Gemini API if key is present, with an offline verified creator AI engine fallback.
+    """
+    lang = detect_comment_language(comment_text)
+    intent_info = classify_comment_intent(comment_text)
+    intent = intent_info["intent"]
+    is_sensitive = intent_info["is_sensitive"]
+    clean_author = author_name.lstrip("@").strip() or "creator"
+
+    # 1. Try Gemini 1.5 Flash if API key provided or available in environment
+    key = (gemini_api_key or os.environ.get("GEMINI_API_KEY", "")).strip()
+    if key:
+        try:
+            system_prompt = (
+                "You are Pranvith DOP, a professional cinematographer, filmmaker, and colorist replying to a YouTube comment.\n"
+                f"Commenter: @{clean_author}\n"
+                f"Detected Language: {lang}\n"
+                f"Comment: \"{comment_text}\"\n"
+                "RULES:\n"
+                "1. Reply in the exact same language (Telugu in native script if comment is in Telugu; Telugu written in English letters / Teluglish if comment is Teluglish; English if English).\n"
+                "2. Tone: Friendly, humble, professional cinematographer ('Thanks bro!', 'Glad you liked the lighting', etc.).\n"
+                "3. Keep it brief (1 to 2 concise sentences suitable for YouTube comments).\n"
+                "4. If they ask for settings/PDF, point to https://pranvithdop.com/assets.\n"
+                "5. If they ask for LUTs, mention the Creative LUT Pack (₹49) at https://pranvithdop.com/assets/creative-lut-pack.\n"
+                "6. If price or shoot booking, state that quotes and bookings can be made at https://pranvithdop.com/hire or WhatsApp +91 9059867883.\n"
+                "7. Output only the final reply text without quotes or explanation."
+            )
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                res = await client.post(
+                    f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={key}",
+                    json={"contents": [{"parts": [{"text": system_prompt}]}]}
+                )
+                if res.status_code == 200:
+                    data = res.json()
+                    candidates = data.get("candidates", [])
+                    if candidates:
+                        content = candidates[0].get("content", {}).get("parts", [{}])[0].get("text", "").strip()
+                        if content:
+                            return {
+                                "reply_text": content,
+                                "detected_language": lang,
+                                "intent": intent,
+                                "is_sensitive": is_sensitive,
+                                "requires_approval": intent_info["requires_approval"],
+                                "matched_keywords": intent_info.get("matched_keywords", []),
+                                "reason": intent_info["reason"],
+                                "source": "gemini-1.5-flash"
+                            }
+        except Exception as e:
+            logger.warning("Gemini AI generation failed, falling back to dynamic creator engine: %s", e)
+
+    # 2. Dynamic multi-lingual creator engine (never monotonous, randomized variations)
+    pool = YOUTUBE_REPLY_POOLS.get(intent, YOUTUBE_REPLY_POOLS["GENERAL"])
+    lang_key = "telugu" if lang in ("telugu", "hindi") else "english"
+    replies = pool.get(lang_key, pool["english"])
+    chosen = random.choice(replies).replace("{author}", clean_author)
+
+    return {
+        "reply_text": chosen,
+        "detected_language": lang,
+        "intent": intent,
+        "is_sensitive": is_sensitive,
+        "requires_approval": intent_info["requires_approval"],
+        "matched_keywords": intent_info.get("matched_keywords", []),
+        "reason": intent_info["reason"],
+        "source": "pranvith_dynamic_ai"
+    }
+
+
+# ==================== YOUTUBE AUTOMATION CLIENT ====================
+
+class YouTubeAutomationClient:
+    """
+    Client for YouTube Data API v3 operations:
+    - OAuth token auto-refresh with 5-minute safety threshold
+    - Comment thread fetching across channel
+    - Multilingual AI evaluation with duplicate prevention
+    - Safe testing mode guard (never sends live replies unless explicitly approved and enabled)
+    - Public comment reply posting
+    """
+    def __init__(self, db, client_id: Optional[str] = None, client_secret: Optional[str] = None):
+        self.db = db
+        self.client_id = (client_id or os.environ.get("GOOGLE_CLIENT_ID") or os.environ.get("YOUTUBE_CLIENT_ID") or "").strip()
+        self.client_secret = (client_secret or os.environ.get("GOOGLE_CLIENT_SECRET") or os.environ.get("YOUTUBE_CLIENT_SECRET") or "").strip()
+
+    async def get_valid_access_token(self) -> Tuple[bool, Optional[str], Optional[str]]:
+        """
+        Retrieves the valid access token, auto-refreshing via Google OAuth if expired or expiring soon.
+        """
+        if self.db is None:
+            return False, None, "Database connection not available."
+
+        doc = await self.db.social_accounts.find_one({"platform": "youtube"})
+        if not doc or not doc.get("is_connected") or not doc.get("access_token"):
+            return False, None, "YouTube account is not connected. Please connect your YouTube channel via Google OAuth in Social Media Manager."
+
+        access_token = doc.get("access_token")
+        refresh_token = doc.get("refresh_token")
+        expires_at_str = doc.get("token_expires_at")
+
+        is_expired = False
+        if expires_at_str:
+            try:
+                exp = datetime.fromisoformat(expires_at_str)
+                if exp.tzinfo is None:
+                    exp = exp.replace(tzinfo=timezone.utc)
+                now = datetime.now(timezone.utc)
+                # Refresh if within 300 seconds (5 mins) of expiration
+                if (exp - now).total_seconds() < 300:
+                    is_expired = True
+            except Exception:
+                pass
+
+        if is_expired:
+            if not refresh_token:
+                return False, None, "Access token has expired and no refresh token is stored. Please reconnect YouTube."
+            if not self.client_id or not self.client_secret:
+                return False, None, "GOOGLE_CLIENT_ID or GOOGLE_CLIENT_SECRET is missing. Cannot refresh token."
+
+            logger.info("YouTube access token expiring/expired. Refreshing using stored refresh token...")
+            ok, refresh_res = await refresh_youtube_token(refresh_token, self.client_id, self.client_secret)
+            if not ok or "access_token" not in refresh_res:
+                err_msg = refresh_res.get("error", "Unknown token refresh error")
+                return False, None, f"Failed to refresh YouTube token: {err_msg}"
+
+            new_token = refresh_res["access_token"]
+            expires_in = int(refresh_res.get("expires_in", 3600))
+            new_expires_at = (datetime.now(timezone.utc) + timedelta(seconds=expires_in)).isoformat()
+
+            await self.db.social_accounts.update_one(
+                {"platform": "youtube"},
+                {
+                    "$set": {
+                        "access_token": new_token,
+                        "token_expires_at": new_expires_at,
+                        "last_refreshed_at": datetime.now(timezone.utc).isoformat(),
+                        "token_type": refresh_res.get("token_type", "Bearer")
+                    }
+                }
+            )
+            access_token = new_token
+            logger.info("YouTube access token refreshed successfully. Next expiry: %s", new_expires_at)
+
+        return True, access_token, None
+
+    async def fetch_recent_comments(self, max_results: int = 25) -> Tuple[bool, List[Dict[str, Any]], Optional[str]]:
+        """
+        Fetches the latest comment threads related to the connected channel via YouTube Data API v3.
+        """
+        ok, access_token, err = await self.get_valid_access_token()
+        if not ok:
+            return False, [], err
+
+        doc = await self.db.social_accounts.find_one({"platform": "youtube"})
+        channel_id = doc.get("account_id") if doc else None
+        if not channel_id:
+            return False, [], "Connected YouTube channel ID not found in database."
+
+        url = "https://www.googleapis.com/youtube/v3/commentThreads"
+        params = {
+            "part": "snippet",
+            "allThreadsRelatedToChannelId": channel_id,
+            "maxResults": min(max_results, 50),
+            "order": "time"
+        }
+        headers = {"Authorization": f"Bearer {access_token}"}
+
+        try:
+            async with httpx.AsyncClient(timeout=12.0) as client:
+                res = await client.get(url, params=params, headers=headers)
+                if res.status_code == 200:
+                    data = res.json()
+                    items = data.get("items", [])
+                    parsed = []
+                    for item in items:
+                        snippet = item.get("snippet", {})
+                        top_comment = snippet.get("topLevelComment", {}).get("snippet", {})
+                        comm_id = item.get("id")
+                        author_name = top_comment.get("authorDisplayName", "Viewer")
+                        comment_text = top_comment.get("textDisplay") or top_comment.get("textOriginal", "")
+                        parsed.append({
+                            "id": f"yt_{comm_id}",
+                            "comment_id": comm_id,
+                            "thread_id": comm_id,
+                            "platform": "youtube",
+                            "author_name": author_name,
+                            "author_profile_image": top_comment.get("authorProfileImageUrl"),
+                            "author_channel_url": top_comment.get("authorChannelUrl"),
+                            "comment_text": comment_text,
+                            "published_at": top_comment.get("publishedAt"),
+                            "video_id": snippet.get("videoId"),
+                            "total_reply_count": snippet.get("totalReplyCount", 0),
+                            "like_count": top_comment.get("likeCount", 0)
+                        })
+                    return True, parsed, None
+                else:
+                    err_msg = res.text
+                    try:
+                        err_msg = res.json().get("error", {}).get("message", res.text)
+                    except Exception:
+                        pass
+                    return False, [], f"YouTube Data API Error ({res.status_code}): {err_msg}"
+        except Exception as e:
+            return False, [], f"Exception fetching YouTube comments: {str(e)}"
+
+    async def post_reply(self, thread_id: str, reply_text: str) -> Tuple[bool, Optional[str], Optional[str]]:
+        """
+        Posts a public reply to a YouTube comment thread via YouTube Data API v3.
+        """
+        ok, access_token, err = await self.get_valid_access_token()
+        if not ok:
+            return False, None, err
+
+        url = "https://www.googleapis.com/youtube/v3/comments"
+        params = {"part": "snippet"}
+        headers = {
+            "Authorization": f"Bearer {access_token}",
+            "Content-Type": "application/json"
+        }
+        payload = {
+            "snippet": {
+                "parentId": thread_id,
+                "textOriginal": reply_text
+            }
+        }
+        try:
+            async with httpx.AsyncClient(timeout=12.0) as client:
+                res = await client.post(url, params=params, headers=headers, json=payload)
+                if res.status_code in (200, 201):
+                    data = res.json()
+                    return True, data.get("id"), None
+                else:
+                    err_msg = res.text
+                    try:
+                        err_msg = res.json().get("error", {}).get("message", res.text)
+                    except Exception:
+                        pass
+                    return False, None, f"Failed to post YouTube reply ({res.status_code}): {err_msg}"
+        except Exception as e:
+            return False, None, f"Exception posting reply to YouTube: {str(e)}"
+
+    async def sync_and_process_comments(
+        self,
+        auto_reply_enabled: bool = False,
+        safe_testing_mode: bool = True,
+        max_results: int = 25,
+        gemini_api_key: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Synchronizes latest comments, evaluates with multilingual AI, and respects safe testing mode:
+        - If safe_testing_mode is True: generates AI reply preview, stores as 'preview_ready', NEVER posts to YouTube.
+        - If safe_testing_mode is False and auto_reply_enabled is True:
+            - If sensitive (Price, Booking, Course): flags as 'pending_approval' for human verification.
+            - If non-sensitive: posts public reply to YouTube, marks as 'auto_replied'.
+        - Prevents duplicate replies by checking stored comment IDs.
+        """
+        ok, comments, err = await self.fetch_recent_comments(max_results=max_results)
+        if not ok:
+            return {
+                "success": False,
+                "error": err,
+                "total_fetched": 0,
+                "new_evaluated": 0
+            }
+
+        now_iso = datetime.now(timezone.utc).isoformat()
+        new_count = 0
+        preview_count = 0
+        pending_count = 0
+        auto_replied_count = 0
+
+        for comm in comments:
+            comm_id = comm["id"]
+            existing = None
+            if self.db is not None:
+                existing = await self.db.social_comments.find_one({"id": comm_id})
+
+            # If already processed and has a terminal status, preserve it
+            if existing and existing.get("status") in ("approved", "auto_replied", "manual_replied", "dismissed"):
+                continue
+
+            # Run AI multi-lingual evaluation
+            evaluation = await generate_youtube_ai_reply(
+                comment_text=comm["comment_text"],
+                author_name=comm["author_name"],
+                gemini_api_key=gemini_api_key
+            )
+
+            status = "preview_ready"
+            published_reply_id = None
+            replied_at = None
+
+            # Determine workflow based on sensitivity and safe mode
+            if evaluation["is_sensitive"]:
+                status = "pending_approval"
+                pending_count += 1
+            elif safe_testing_mode:
+                # Safe testing mode: preview only
+                status = "preview_ready"
+                preview_count += 1
+            elif auto_reply_enabled:
+                # Live auto-reply mode (only when safe_mode is explicitly turned off)
+                post_ok, reply_ref, post_err = await self.post_reply(comm["thread_id"], evaluation["reply_text"])
+                if post_ok:
+                    status = "auto_replied"
+                    published_reply_id = reply_ref
+                    replied_at = now_iso
+                    auto_replied_count += 1
+                else:
+                    status = "failed"
+                    evaluation["publish_error"] = post_err
+            else:
+                status = "preview_ready"
+                preview_count += 1
+
+            record = {
+                **comm,
+                "detected_language": evaluation["detected_language"],
+                "intent": evaluation["intent"],
+                "is_sensitive": evaluation["is_sensitive"],
+                "requires_approval": evaluation["requires_approval"],
+                "matched_keywords": evaluation.get("matched_keywords", []),
+                "suggested_reply": evaluation["reply_text"],
+                "reply_text": evaluation["reply_text"] if status == "auto_replied" else None,
+                "status": status,
+                "evaluation_reason": evaluation["reason"],
+                "ai_source": evaluation.get("source", "pranvith_dynamic_ai"),
+                "reply_id": published_reply_id,
+                "replied_at": replied_at,
+                "safe_mode": safe_testing_mode,
+                "synced_at": now_iso,
+                "updated_at": now_iso
+            }
+
+            if self.db is not None:
+                await self.db.social_comments.update_one(
+                    {"id": comm_id},
+                    {"$set": record},
+                    upsert=True
+                )
+            new_count += 1
+
+        # Update YouTube settings metrics
+        if self.db is not None:
+            await self.db.social_settings.update_one(
+                {"platform": "youtube"},
+                {
+                    "$set": {
+                        "platform": "youtube",
+                        "auto_reply_enabled": auto_reply_enabled,
+                        "safe_testing_mode": safe_testing_mode,
+                        "last_sync_at": now_iso,
+                        "updated_at": now_iso
+                    },
+                    "$inc": {
+                        "total_comments_synced": new_count,
+                        "total_replies_published": auto_replied_count
+                    }
+                },
+                upsert=True
+            )
+
+        return {
+            "success": True,
+            "total_fetched": len(comments),
+            "new_evaluated": new_count,
+            "previews_ready": preview_count,
+            "pending_approval": pending_count,
+            "auto_replied": auto_replied_count,
+            "safe_testing_mode": safe_testing_mode,
+            "auto_reply_enabled": auto_reply_enabled,
+            "synced_at": now_iso
+        }
+
+    async def approve_and_publish(
+        self,
+        comment_id: str,
+        reply_text: str,
+        admin_email: str,
+        safe_testing_mode: bool = False
+    ) -> Tuple[bool, Optional[str], Optional[str]]:
+        """
+        Approves an AI suggested reply (or manual edit) and publishes it.
+        If safe_testing_mode is True, simulates approval without calling YouTube API.
+        """
+        if self.db is None:
+            return False, None, "Database not available"
+
+        comm = await self.db.social_comments.find_one({"id": comment_id})
+        if not comm:
+            return False, None, "Comment not found"
+
+        now_iso = datetime.now(timezone.utc).isoformat()
+        reply_id = None
+
+        if not safe_testing_mode:
+            thread_id = comm.get("thread_id") or comm.get("comment_id")
+            ok, reply_id, err = await self.post_reply(thread_id, reply_text)
+            if not ok:
+                return False, None, err
+
+        await self.db.social_comments.update_one(
+            {"id": comment_id},
+            {
+                "$set": {
+                    "status": "approved",
+                    "reply_text": reply_text,
+                    "reply_id": reply_id,
+                    "replied_at": now_iso,
+                    "approved_by": admin_email,
+                    "safe_mode": safe_testing_mode,
+                    "updated_at": now_iso
+                }
+            }
+        )
+        return True, reply_id, None
+
+    async def manual_reply(
+        self,
+        comment_id: str,
+        reply_text: str,
+        admin_email: str,
+        safe_testing_mode: bool = False
+    ) -> Tuple[bool, Optional[str], Optional[str]]:
+        """
+        Sends an explicit manual reply to a comment thread.
+        """
+        if self.db is None:
+            return False, None, "Database not available"
+
+        comm = await self.db.social_comments.find_one({"id": comment_id})
+        if not comm:
+            return False, None, "Comment not found"
+
+        now_iso = datetime.now(timezone.utc).isoformat()
+        reply_id = None
+
+        if not safe_testing_mode:
+            thread_id = comm.get("thread_id") or comm.get("comment_id")
+            ok, reply_id, err = await self.post_reply(thread_id, reply_text)
+            if not ok:
+                return False, None, err
+
+        await self.db.social_comments.update_one(
+            {"id": comment_id},
+            {
+                "$set": {
+                    "status": "manual_replied",
+                    "reply_text": reply_text,
+                    "reply_id": reply_id,
+                    "replied_at": now_iso,
+                    "replied_by": admin_email,
+                    "safe_mode": safe_testing_mode,
+                    "updated_at": now_iso
+                }
+            }
+        )
+        return True, reply_id, None
+
+    async def dismiss_comment(self, comment_id: str) -> bool:
+        """Dismisses comment from active action queues."""
+        if self.db is None:
+            return False
+        now_iso = datetime.now(timezone.utc).isoformat()
+        await self.db.social_comments.update_one(
+            {"id": comment_id},
+            {"$set": {"status": "dismissed", "dismissed_at": now_iso, "updated_at": now_iso}}
+        )
+        return True
+
+
+async def get_youtube_client(db=None) -> YouTubeAutomationClient:
+    """Helper factory for YouTubeAutomationClient."""
+    return YouTubeAutomationClient(db)
+
+
+async def get_youtube_automation_settings(db) -> Dict[str, Any]:
+    """Retrieves current YouTube automation settings or sensible defaults."""
+    default_settings = {
+        "platform": "youtube",
+        "auto_reply_enabled": False,
+        "safe_testing_mode": True,
+        "sync_interval_minutes": 15,
+        "ai_provider": "gemini_with_creator_fallback",
+        "last_sync_at": None,
+        "total_comments_synced": 0,
+        "total_replies_published": 0
+    }
+    if db is None:
+        return default_settings
+
+    try:
+        doc = await db.social_settings.find_one({"platform": "youtube"}, {"_id": 0})
+        if doc:
+            return {**default_settings, **doc}
+    except Exception as e:
+        logger.warning("Could not read youtube settings from db: %s", e)
+    return default_settings
+
+
+async def update_youtube_automation_settings(db, updates: Dict[str, Any]) -> Dict[str, Any]:
+    """Updates YouTube automation settings in database."""
+    if db is None:
+        return updates
+
+    allowed_keys = {
+        "auto_reply_enabled",
+        "safe_testing_mode",
+        "sync_interval_minutes",
+        "ai_provider",
+        "reply_tone"
+    }
+    filtered = {k: v for k, v in updates.items() if k in allowed_keys}
+    filtered["platform"] = "youtube"
+    filtered["updated_at"] = datetime.now(timezone.utc).isoformat()
+
+    await db.social_settings.update_one(
+        {"platform": "youtube"},
+        {"$set": filtered},
+        upsert=True
+    )
+    return await get_youtube_automation_settings(db)

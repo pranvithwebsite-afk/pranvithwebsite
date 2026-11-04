@@ -6300,6 +6300,21 @@ class YouTubeCallbackIn(BaseModel):
     code: str
     redirect_uri: Optional[str] = None
 
+class YouTubeSettingsIn(BaseModel):
+    auto_reply_enabled: Optional[bool] = None
+    safe_testing_mode: Optional[bool] = None
+    sync_interval_minutes: Optional[int] = None
+    reply_tone: Optional[str] = None
+
+class YouTubeSyncIn(BaseModel):
+    max_results: int = 25
+    auto_reply_enabled: Optional[bool] = None
+    safe_testing_mode: Optional[bool] = None
+
+class YouTubePreviewIn(BaseModel):
+    comment_text: str
+    author_name: str = "creator"
+
 @admin_router.get("/social/accounts")
 async def admin_get_social_accounts(current_admin: AdminBase = Depends(get_current_active_admin)):
     try:
@@ -6592,34 +6607,60 @@ async def admin_approve_social_comment(
     current_admin: AdminBase = Depends(get_current_active_admin)
 ):
     try:
-        from .social_automation import get_instagram_client
+        from .social_automation import get_instagram_client, get_youtube_client, get_youtube_automation_settings
     except ImportError:
-        from social_automation import get_instagram_client
+        from social_automation import get_instagram_client, get_youtube_client, get_youtube_automation_settings
 
-    client = await get_instagram_client(db)
-    now = datetime.now(timezone.utc).isoformat()
-    ok, reply_ref = await client.post_reply(comment_id, payload.reply_text)
-
+    comm = None
     if db is not None:
-        await db.social_comments.update_one(
-            {"id": comment_id},
-            {
-                "$set": {
-                    "status": "approved",
-                    "reply_text": payload.reply_text,
-                    "replied_at": now,
-                    "reply_id": reply_ref,
-                    "approved_by": current_admin.email,
-                }
-            }
-        )
+        comm = await db.social_comments.find_one({"id": comment_id})
 
-    return {
-        "success": True,
-        "message": "Reply approved and published successfully.",
-        "reply_id": reply_ref,
-        "replied_at": now
-    }
+    platform = (comm.get("platform") if comm else "instagram") or "instagram"
+    now = datetime.now(timezone.utc).isoformat()
+    reply_ref = None
+
+    if platform.lower() == "youtube":
+        settings = await get_youtube_automation_settings(db)
+        safe_mode = settings.get("safe_testing_mode", True)
+        yt_client = await get_youtube_client(db)
+        ok, reply_ref, err = await yt_client.approve_and_publish(
+            comment_id=comment_id,
+            reply_text=payload.reply_text,
+            admin_email=current_admin.email,
+            safe_testing_mode=safe_mode
+        )
+        if not ok and not safe_mode:
+            raise HTTPException(status_code=400, detail=err or "Failed to post YouTube reply")
+        msg = "Reply approved in Safe Testing Mode (preview recorded, not published to live YouTube)." if safe_mode else "Reply approved and published to YouTube."
+        return {
+            "success": True,
+            "message": msg,
+            "reply_id": reply_ref,
+            "replied_at": now,
+            "safe_mode": safe_mode
+        }
+    else:
+        client = await get_instagram_client(db)
+        ok, reply_ref = await client.post_reply(comment_id, payload.reply_text)
+        if db is not None:
+            await db.social_comments.update_one(
+                {"id": comment_id},
+                {
+                    "$set": {
+                        "status": "approved",
+                        "reply_text": payload.reply_text,
+                        "replied_at": now,
+                        "reply_id": reply_ref,
+                        "approved_by": current_admin.email,
+                    }
+                }
+            )
+        return {
+            "success": True,
+            "message": "Reply approved and published successfully.",
+            "reply_id": reply_ref,
+            "replied_at": now
+        }
 
 @admin_router.post("/social/comments/{comment_id}/manual-reply")
 async def admin_manual_reply_social_comment(
@@ -6628,34 +6669,60 @@ async def admin_manual_reply_social_comment(
     current_admin: AdminBase = Depends(get_current_active_admin)
 ):
     try:
-        from .social_automation import get_instagram_client
+        from .social_automation import get_instagram_client, get_youtube_client, get_youtube_automation_settings
     except ImportError:
-        from social_automation import get_instagram_client
+        from social_automation import get_instagram_client, get_youtube_client, get_youtube_automation_settings
 
-    client = await get_instagram_client(db)
-    now = datetime.now(timezone.utc).isoformat()
-    ok, reply_ref = await client.post_reply(comment_id, payload.reply_text)
-
+    comm = None
     if db is not None:
-        await db.social_comments.update_one(
-            {"id": comment_id},
-            {
-                "$set": {
-                    "status": "manual_replied",
-                    "reply_text": payload.reply_text,
-                    "replied_at": now,
-                    "reply_id": reply_ref,
-                    "replied_by": current_admin.email,
-                }
-            }
-        )
+        comm = await db.social_comments.find_one({"id": comment_id})
 
-    return {
-        "success": True,
-        "message": "Manual reply published successfully.",
-        "reply_id": reply_ref,
-        "replied_at": now
-    }
+    platform = (comm.get("platform") if comm else "instagram") or "instagram"
+    now = datetime.now(timezone.utc).isoformat()
+    reply_ref = None
+
+    if platform.lower() == "youtube":
+        settings = await get_youtube_automation_settings(db)
+        safe_mode = settings.get("safe_testing_mode", True)
+        yt_client = await get_youtube_client(db)
+        ok, reply_ref, err = await yt_client.manual_reply(
+            comment_id=comment_id,
+            reply_text=payload.reply_text,
+            admin_email=current_admin.email,
+            safe_testing_mode=safe_mode
+        )
+        if not ok and not safe_mode:
+            raise HTTPException(status_code=400, detail=err or "Failed to post manual YouTube reply")
+        msg = "Manual reply saved in Safe Testing Mode (preview recorded, not published to live YouTube)." if safe_mode else "Manual reply published to YouTube."
+        return {
+            "success": True,
+            "message": msg,
+            "reply_id": reply_ref,
+            "replied_at": now,
+            "safe_mode": safe_mode
+        }
+    else:
+        client = await get_instagram_client(db)
+        ok, reply_ref = await client.post_reply(comment_id, payload.reply_text)
+        if db is not None:
+            await db.social_comments.update_one(
+                {"id": comment_id},
+                {
+                    "$set": {
+                        "status": "manual_replied",
+                        "reply_text": payload.reply_text,
+                        "replied_at": now,
+                        "reply_id": reply_ref,
+                        "replied_by": current_admin.email,
+                    }
+                }
+            )
+        return {
+            "success": True,
+            "message": "Manual reply published successfully.",
+            "reply_id": reply_ref,
+            "replied_at": now
+        }
 
 @admin_router.post("/social/comments/{comment_id}/dismiss")
 async def admin_dismiss_social_comment(
@@ -6666,9 +6733,89 @@ async def admin_dismiss_social_comment(
     if db is not None:
         await db.social_comments.update_one(
             {"id": comment_id},
-            {"$set": {"status": "dismissed", "dismissed_at": now}}
+            {"$set": {"status": "dismissed", "dismissed_at": now, "dismissed_by": current_admin.email}}
         )
     return {"success": True, "message": "Comment dismissed."}
+
+# ==================== YOUTUBE SPECIFIC SOCIAL ROUTES ====================
+
+@admin_router.get("/social/youtube/settings")
+async def admin_get_youtube_settings(current_admin: AdminBase = Depends(get_current_active_admin)):
+    try:
+        from .social_automation import get_youtube_automation_settings
+    except ImportError:
+        from social_automation import get_youtube_automation_settings
+    return await get_youtube_automation_settings(db)
+
+@admin_router.post("/social/youtube/settings")
+async def admin_update_youtube_settings(
+    payload: YouTubeSettingsIn,
+    current_admin: AdminBase = Depends(get_current_active_admin)
+):
+    try:
+        from .social_automation import update_youtube_automation_settings
+    except ImportError:
+        from social_automation import update_youtube_automation_settings
+    updates = payload.model_dump(exclude_unset=True)
+    return await update_youtube_automation_settings(db, updates)
+
+@admin_router.post("/social/youtube/sync")
+async def admin_sync_youtube_comments(
+    payload: YouTubeSyncIn = YouTubeSyncIn(),
+    current_admin: AdminBase = Depends(get_current_active_admin)
+):
+    try:
+        from .social_automation import get_youtube_client, get_youtube_automation_settings
+    except ImportError:
+        from social_automation import get_youtube_client, get_youtube_automation_settings
+
+    settings = await get_youtube_automation_settings(db)
+    auto_reply = payload.auto_reply_enabled if payload.auto_reply_enabled is not None else settings.get("auto_reply_enabled", False)
+    safe_mode = payload.safe_testing_mode if payload.safe_testing_mode is not None else settings.get("safe_testing_mode", True)
+
+    client = await get_youtube_client(db)
+    res = await client.sync_and_process_comments(
+        auto_reply_enabled=auto_reply,
+        safe_testing_mode=safe_mode,
+        max_results=payload.max_results
+    )
+    return res
+
+@admin_router.get("/social/youtube/comments")
+async def admin_get_youtube_comments(
+    status: Optional[str] = None,
+    current_admin: AdminBase = Depends(get_current_active_admin)
+):
+    query = {"platform": "youtube"}
+    if status and status.lower() != "all":
+        query["status"] = status.lower()
+
+    comments = []
+    if db is not None:
+        try:
+            comments = await db.social_comments.find(query, {"_id": 0}).sort("published_at", -1).to_list(100)
+        except Exception:
+            pass
+    return comments
+
+@admin_router.post("/social/youtube/preview-reply")
+async def admin_preview_youtube_reply(
+    payload: YouTubePreviewIn,
+    current_admin: AdminBase = Depends(get_current_active_admin)
+):
+    try:
+        from .social_automation import generate_youtube_ai_reply
+    except ImportError:
+        from social_automation import generate_youtube_ai_reply
+
+    evaluation = await generate_youtube_ai_reply(
+        comment_text=payload.comment_text,
+        author_name=payload.author_name
+    )
+    return {
+        "success": True,
+        "evaluation": evaluation
+    }
 
 @admin_router.get("/social/rules")
 async def admin_get_social_rules(current_admin: AdminBase = Depends(get_current_active_admin)):
