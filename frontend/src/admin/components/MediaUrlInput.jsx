@@ -18,7 +18,7 @@ import {
   validateImageUploadFile,
   validateVideoUploadFile,
 } from '../../lib/mediaUpload';
-import { detectMediaType, isDirectVideoUrl, isImageUrl, isVimeoUrl, isYouTubeUrl } from '../../components/SafeVideoEmbed';
+import { detectMediaType, isDirectVideoUrl, isImageUrl, isInstagramUrl, isVimeoUrl, isYouTubeUrl } from '../../components/SafeVideoEmbed';
 import { handleImageError, safeImageSrc } from '../../lib/utils';
 
 const buttonClass = 'inline-flex items-center justify-center gap-2 rounded-lg border border-slate-700 px-3 py-2 text-xs font-semibold text-white transition hover:border-violet-500 disabled:cursor-not-allowed disabled:opacity-60';
@@ -27,7 +27,7 @@ const itemUrl = (item = {}) => item.public_url || item.url || '';
 const itemMime = (item = {}) => item.type || item.mime_type || '';
 const itemName = (item = {}) => item.original_filename || item.filename || item.title || 'Media';
 const itemUploadedAt = (item = {}) => item.uploaded_at || item.created_at || '';
-const videoMediaTypes = new Set(['video_file', 'video_url', 'youtube', 'vimeo', 'direct']);
+const videoMediaTypes = new Set(['video_file', 'video_url', 'youtube', 'vimeo', 'instagram', 'direct']);
 const posterFieldPattern = /(poster|thumbnail)/i;
 const posterMessage = 'Poster/thumbnail must be an image URL. Leave it empty for videos or upload a thumbnail image.';
 
@@ -78,6 +78,7 @@ const MediaUrlInput = ({
     isDirectVideoUrl(trimmedValue)
     || isYouTubeUrl(trimmedValue)
     || isVimeoUrl(trimmedValue)
+    || isInstagramUrl(trimmedValue)
   );
   const filteredItems = useMemo(() => {
     const items = sortLatestFirst(pickerItems);

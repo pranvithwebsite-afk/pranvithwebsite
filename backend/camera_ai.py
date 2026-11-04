@@ -14,7 +14,7 @@ CAMERA_DATABASE: Dict[str, Dict[str, Any]] = {
         "aliases": ["z6iii", "z6 iii", "z63", "z 6 iii", "nikon z6 3", "nikon z6iii"],
         "sensor": "24.5MP Partially-Stacked CMOS (Full-Frame)",
         "mount": "Nikon Z-Mount (55mm diameter, 16mm flange distance)",
-        "max_video": "6K 60p N-RAW (12-bit), 4K 120p (with 1.5x DX Crop), 4K 60p (Oversampled 6K, Full-Frame)",
+        "max_video": "6K 60p N-RAW (12-bit internal), 4K 120p (with 1.5x DX Crop), 4K 60p (Oversampled 6K, Full-Frame)",
         "slow_motion": "4K up to 120fps (1.5x DX Crop in N-RAW / ProRes 422 HQ / H.265), Full HD up to 240fps",
         "raw_recording": "Internal 12-bit N-RAW up to 6K 60p, 12-bit ProRes RAW HQ up to 6K 30p (internal!)",
         "codecs": ["N-RAW (12-bit)", "ProRes RAW HQ (12-bit)", "ProRes 422 HQ (10-bit)", "H.265 / HEVC (10-bit & 8-bit)", "H.264 (8-bit)"],
@@ -41,6 +41,7 @@ CAMERA_DATABASE: Dict[str, Dict[str, Any]] = {
         "base_isos": "Dual Base ISO in N-Log: ISO 800 (Low Base) & ISO 4,000 (High Base)",
         "autofocus": "Deep-learning subject detection with aircraft/vehicle/human/animal tracking down to -9 EV",
         "card_slots": "Dual Slots: 1x CFexpress Type B + 1x SD (UHS-II)",
+        "stabilization": "6.0 stops 5-axis IBIS with Synchro VR",
         "battery": "EN-EL15c",
         "key_strengths": "8K internal RAW, uncropped 4K 120p, zero shutter distortion, cinema-grade body",
         "limitations": "Heavier body (~910g), higher power consumption when recording 8K RAW",
@@ -68,7 +69,31 @@ CAMERA_DATABASE: Dict[str, Dict[str, Any]] = {
         "color_profiles": ["N-Log (10-bit H.265 internal)", "HLG", "Monochrome"],
         "base_isos": "ISO 800 in N-Log",
         "card_slots": "1x SD (UHS-II) + 1x MicroSD (UHS-I)",
+        "stabilization": "8.0 stops 5-axis IBIS with Focus Point VR",
         "key_strengths": "Vintage retro dial styling, 8.0 stops IBIS, dedicated Black & White switch, 96MP Pixel Shift",
+    },
+    "nikon_z50ii": {
+        "brand": "Nikon",
+        "model": "Nikon Z50II",
+        "aliases": ["z50ii", "z50 ii", "z50 mark ii", "nikon z50ii"],
+        "sensor": "20.9MP APS-C (DX) CMOS",
+        "mount": "Nikon Z-Mount",
+        "max_video": "4K 30p uncropped (oversampled 5.6K), 4K 60p (with 1.5x additional crop)",
+        "color_profiles": ["N-Log 10-bit", "N-Rec.709", "Picture Controls"],
+        "base_isos": "ISO 400 (SDR) / ISO 800 (N-Log)",
+        "card_slots": "1x SD (UHS-II)",
+        "key_strengths": "EXPEED 7 processor with 9-subject autofocus detection, dedicated Picture Control button, product review mode for creators",
+    },
+    "nikon_z5": {
+        "brand": "Nikon",
+        "model": "Nikon Z5 / Z5II",
+        "aliases": ["z5", "z 5", "nikon z5", "z5ii", "z5 ii"],
+        "sensor": "24.3MP Full-Frame CMOS",
+        "mount": "Nikon Z-Mount",
+        "max_video": "4K 30p (1.7x crop on Z5) | 1080p 60p uncropped",
+        "card_slots": "Dual SD (UHS-II)",
+        "key_strengths": "Affordable entry into full-frame Nikon Z photography, dual SD card slots, solid 5-axis IBIS",
+        "limitations": "4K video incurs a 1.7x crop on original Z5; video focused creators should consider Z6III or Zf.",
     },
     "sony_fx3": {
         "brand": "Sony",
@@ -85,8 +110,35 @@ CAMERA_DATABASE: Dict[str, Dict[str, Any]] = {
         "audio": "Removable top handle with 2x XLR/TRS combo inputs (24-bit 4-channel audio)",
         "autofocus": "Real-time Eye AF (Humans/Animals/Birds), Touch Tracking, AF Transition Speed control",
         "card_slots": "Dual Slots: Both accept either CFexpress Type A or SD (UHS-II)",
+        "stabilization": "5.5 stops 5-axis IBIS with Active SteadyShot Mode",
         "key_strengths": "Best low-light performance on market at ISO 12,800, built-in active cooling, XLR handle, compact cage-free design",
         "limitations": "No electronic variable ND (unlike FX6), 12MP resolution limits high-res photography",
+    },
+    "sony_fx6": {
+        "brand": "Sony",
+        "model": "Sony FX6 (Cinema Line)",
+        "aliases": ["fx6", "fx-6", "sony fx6", "ilme-fx6"],
+        "sensor": "10.2MP Full-Frame Back-Illuminated CMOS",
+        "mount": "Sony E-Mount",
+        "max_video": "4K 120p Full-Frame, DCI 4K up to 60p, 10-bit 4:2:2",
+        "color_profiles": ["S-Log3 / S-Gamut3.Cine", "S-Cinetone"],
+        "base_isos": "Dual Base ISO in S-Log3: ISO 800 & ISO 12,800 (clean up to 25,600)",
+        "built_in_nd": "Electronic Variable ND (1/4 to 1/128 ND) with Auto ND mode",
+        "outputs": "12G-SDI, HDMI, timecode in/out, dual XLR inputs on body",
+        "key_strengths": "Built-in electronic variable ND, SDI output for broadcast, dual base ISO 800/12,800",
+    },
+    "sony_fx30": {
+        "brand": "Sony",
+        "model": "Sony FX30 (Cinema Line Super35)",
+        "aliases": ["fx30", "fx-30", "sony fx30"],
+        "sensor": "26MP APS-C / Super35 Exmor R BSI CMOS",
+        "mount": "Sony E-Mount (APS-C / E)",
+        "max_video": "4K 60p oversampled from 6K, 4K 120p (with 1.62x crop)",
+        "color_profiles": ["S-Log3 / S-Gamut3.Cine", "S-Cinetone"],
+        "base_isos": "Dual Base ISO in S-Log3: ISO 800 & ISO 2,500",
+        "cooling": "Active fan for unlimited continuous shooting",
+        "key_strengths": "Cinema Line ergonomics, dual base ISO 800/2500, affordable entry into professional 10-bit S-Log3",
+        "limitations": "APS-C sensor (1.5x crop vs full-frame), 4K 120p has additional 1.62x crop",
     },
     "sony_a7iv": {
         "brand": "Sony",
@@ -115,18 +167,12 @@ CAMERA_DATABASE: Dict[str, Dict[str, Any]] = {
         "evf": "9.44M-dot QXGA OLED viewfinder (highest in class)",
         "key_strengths": "Clean low light at ISO 12,800, identical video engine to FX3, incredible 9.44M EVF",
     },
-    "sony_fx30": {
+    "sony_a7v": {
         "brand": "Sony",
-        "model": "Sony FX30 (Cinema Line Super35)",
-        "aliases": ["fx30", "fx-30", "sony fx30"],
-        "sensor": "26MP APS-C / Super35 Exmor R BSI CMOS",
-        "mount": "Sony E-Mount (APS-C / E)",
-        "max_video": "4K 60p oversampled from 6K, 4K 120p (with 1.62x crop)",
-        "color_profiles": ["S-Log3 / S-Gamut3.Cine", "S-Cinetone"],
-        "base_isos": "Dual Base ISO in S-Log3: ISO 800 & ISO 2,500",
-        "cooling": "Active fan for unlimited continuous shooting",
-        "key_strengths": "Cinema Line ergonomics, dual base ISO 800/2500, affordable entry into professional 10-bit S-Log3",
-        "limitations": "APS-C sensor (1.5x crop vs full-frame), 4K 120p has additional 1.62x crop",
+        "model": "Sony A7 V (Anticipated / Unreleased)",
+        "aliases": ["a7v", "a7 v", "sony a7v", "a7 5", "a7m5"],
+        "status": "Unreleased / Industry Speculation",
+        "guidance": "Sony has not officially released or announced confirmed specifications for the Sony A7 V. For verified production gear today, rely on the Sony A7 IV, Sony FX3, or Sony A7S III.",
     },
     "canon_r5": {
         "brand": "Canon",
@@ -165,21 +211,52 @@ CAMERA_DATABASE: Dict[str, Dict[str, Any]] = {
         "base_isos": "Base ISO 800 in C-Log3",
         "key_strengths": "Uncropped 4K 60p with 6K oversampling, no overheating issues, class-leading autofocus tracking",
     },
-    "dji_gimbals": {
+    "canon_r7": {
+        "brand": "Canon",
+        "model": "Canon EOS R7",
+        "aliases": ["eos r7", "canon r7", "r7"],
+        "sensor": "32.5MP APS-C CMOS",
+        "mount": "Canon RF / RF-S",
+        "max_video": "4K 60p (uncropped), 4K 30p Fine (oversampled 7K)",
+        "color_profiles": ["C-Log3 10-bit"],
+        "base_isos": "Base ISO 800 in C-Log3",
+        "card_slots": "Dual SD (UHS-II)",
+        "key_strengths": "32.5MP high-resolution APS-C, up to 7-stop IBIS, dual SD cards, uncropped 4K 60p",
+    },
+    "dji_rs4": {
         "brand": "DJI",
-        "model": "DJI Ronin / RS Gimbal Series (RS 4, RS 4 Pro, RS 3, RS 3 Pro)",
-        "aliases": ["dji gimbal", "rs4", "rs 4", "rs4 pro", "rs 4 pro", "rs3", "rs 3", "rs 3 pro", "ronin"],
+        "model": "DJI RS 4 / RS 4 Pro Gimbal",
+        "aliases": ["dji rs4", "rs4", "rs 4", "rs4 pro", "rs 4 pro", "dji rs 4"],
         "payload": "RS 4: 3.0 kg (6.6 lbs) | RS 4 Pro: 4.5 kg (10 lbs) carbon fiber arms",
-        "vertical_shooting": "2nd-Gen native horizontal/vertical quick release switch without rebalancing",
-        "focus_support": "DJI Focus Pro LiDAR (76,800 ranging points, 20-meter range for cinema lenses)",
+        "vertical_shooting": "2nd-Gen native horizontal/vertical quick-release switch without rebalancing",
+        "focus_support": "DJI Focus Pro LiDAR (76,800 ranging points, 20-meter range for manual cinema lenses)",
         "motor_torque": "RS 4 Pro features 20% motor torque increase for cinema camera payloads",
+        "key_strengths": "Automated axis locks, native vertical switch for Reels/TikTok, LiDAR autofocus integration",
+    },
+    "dji_rs3": {
+        "brand": "DJI",
+        "model": "DJI RS 3 / RS 3 Pro Gimbal",
+        "aliases": ["dji rs3", "rs3", "rs 3", "rs3 pro", "rs 3 pro", "ronin rs3"],
+        "payload": "RS 3: 3.0 kg | RS 3 Pro: 4.5 kg carbon fiber",
+        "key_strengths": "SuperSmooth stabilization mode, automated axis locks, Bluetooth shutter control",
+    },
+    "dji_ronin_4d": {
+        "brand": "DJI",
+        "model": "DJI Ronin 4D (6K / 8K Cinema Camera)",
+        "aliases": ["ronin 4d", "ronin4d", "dji 4d"],
+        "sensor": "Full-Frame Zenmuse X9-6K / X9-8K",
+        "stabilization": "Revolutionary 4-Axis Active Stabilization (adds Z-axis vertical stabilization to eliminate walking shake)",
+        "codecs": "Internal Apple ProRes 422 HQ / Apple ProRes RAW / CinemaDNG",
+        "built_in_nd": "Built-in 9-stop physical ND filters (ND 0.3 to ND 2.7)",
+        "focus": "Integrated LiDAR range finder waveform focusing",
     },
     "dji_drones": {
         "brand": "DJI",
         "model": "DJI Cinematography Drones (Mavic 3 Pro, Air 3, Mini 4 Pro)",
-        "aliases": ["dji drone", "mavic 3", "mavic 3 pro", "air 3", "mini 4 pro"],
+        "aliases": ["dji drone", "dji drones", "mavic 3", "mavic 3 pro", "air 3", "mini 4 pro"],
         "mavic_3_pro": "Triple camera: Hasselblad 20MP 4/3 CMOS (24mm f/2.8-f/11), 70mm f/2.8 3x tele, 166mm 7x tele. 5.1K 50p, 4K 120p, 10-bit D-Log, D-Log M, HLG.",
         "mini_4_pro": "<249g ultralight, True Vertical 4K 60p shooting, 10-bit D-Log M, omnidirectional obstacle sensing.",
+        "air_3": "Dual primary cameras (24mm wide + 70mm medium tele), 48MP photos, 4K 60p HDR, 10-bit D-Log M.",
     },
 }
 
@@ -196,8 +273,9 @@ LENS_RECOMMENDATIONS = {
             {"lens": "NIKKOR Z 28-75mm f/2.8 (Budget Choice)", "role": "Lightweight, affordable f/2.8 constant zoom for versatile event filming."},
         ],
         "low_light": [
-            {"lens": "NIKKOR Z 50mm f/1.2 S", "role": "Incredible light gathering at f/1.2; clean night shots even without added lighting."},
-            {"lens": "NIKKOR Z 35mm f/1.8 S", "role": "Affordable, lightweight f/1.8 prime with zero focus breathing."},
+            {"lens": "NIKKOR Z 50mm f/1.2 S", "role": "The absolute low-light king on Z-mount. Incredible light transmission at f/1.2 with surgical sharpness."},
+            {"lens": "NIKKOR Z 35mm f/1.8 S", "role": "Compact, fast, lightweight prime with virtually zero focus breathing in dim wedding halls."},
+            {"lens": "NIKKOR Z 85mm f/1.8 S", "role": "Low-light portrait prime that renders dreamy falloff in candlelit receptions."},
         ],
     },
     "sony_e": {
@@ -208,6 +286,11 @@ LENS_RECOMMENDATIONS = {
             {"lens": "Sony FE 50mm f/1.2 GM", "role": "Breathtaking depth of field, razor-sharp wide open at f/1.2."},
             {"lens": "Sigma 24-70mm f/2.8 DG DN Art II", "role": "Top-tier optical performance at a fraction of GM cost."},
             {"lens": "Sony FE 70-200mm f/2.8 GM OSS II", "role": "Ultralight telephoto zoom for candid stage and ceremony coverage."},
+        ],
+        "low_light": [
+            {"lens": "Sony FE 50mm f/1.2 GM", "role": "Industry benchmark low-light cinema lens. Lets in 4x more light than f/2.8 zooms."},
+            {"lens": "Sony FE 35mm f/1.4 GM", "role": "Crisp wide low-light performance with dual XD linear motors."},
+            {"lens": "Sigma 85mm f/1.4 DG DN Art", "role": "Dreamy compression and exceptional low-light gathering for stage portraits."},
         ],
         "budget": [
             {"lens": "Tamron 28-75mm f/2.8 G2", "role": "Best budget full-frame wedding & commercial lens under ₹70,000."},
@@ -221,6 +304,11 @@ LENS_RECOMMENDATIONS = {
             {"lens": "Canon RF 28-70mm f/2L USM", "role": "A bag of primes in one zoom with revolutionary f/2 aperture throughout."},
             {"lens": "Canon RF 50mm f/1.2L USM", "role": "Creamy magical skin tones and iconic Canon color science."},
             {"lens": "Canon RF 70-200mm f/2.8L IS USM", "role": "Compact telescoping design, unobtrusive ceremony filming."},
+        ],
+        "low_light": [
+            {"lens": "Canon RF 50mm f/1.2L USM", "role": "Legendary low-light gathering, ultra-shallow depth of field, sublime color reproduction."},
+            {"lens": "Canon RF 28-70mm f/2L USM", "role": "Full-stop brighter than standard f/2.8 zooms across the entire range."},
+            {"lens": "Canon RF 35mm f/1.8 Macro IS STM", "role": "Affordable low-light prime with 5-stop optical stabilization."},
         ]
     }
 }
@@ -238,6 +326,17 @@ SCENARIO_RECIPES = {
         "autofocus": "Continuous AF (AF-C), Face/Eye Priority: Human. Set AF Transition Speed to Moderate (3/5) so focus racks smoothly without snapping.",
         "picture_profile": "10-bit Log (N-Log on Nikon | S-Log3 on Sony | C-Log3 on Canon). Expose to the right (ETTR +1.0 to +1.7 EV).",
         "resolution": "4K UHD (3840x2160) 10-Bit 4:2:2",
+    },
+    "indoor_wedding": {
+        "title": "Indoor Wedding Cinematography Settings (Banquet Halls & Mandap)",
+        "frame_rate": "25fps (in 50Hz countries like India/UK) or 24fps (60Hz countries like USA)",
+        "shutter_speed": "1/50s (at 25fps) or 1/100s (at 50fps). Use Variable Shutter / ECS / Synchro Scan to tune out fine LED frequency banding.",
+        "aperture": "f/1.8 – f/2.8 on fast primes or f/2.8 zooms to maximize light gathering under dimmer stage lights.",
+        "iso": "Switch directly to camera High Base ISO (Sony: ISO 12,800 | Nikon Z6III: ISO 6,400 | Canon R5 II: ISO 3,200). Avoid middle ISOs (like 2,500-6,400 on Sony) where noise is highest!",
+        "white_balance": "Manual Kelvin locked between 3800K and 4500K for mixed LED/Tungsten decor, or 3200K for golden mandap fire rituals. Do NOT use Auto WB to prevent fluctuating skin tones.",
+        "autofocus": "AF-C with Human Face/Eye Detection. Set AF Tracking Sensitivity to 'Delayed' (3 or 4) so guests walking past do not steal focus from the bride/groom.",
+        "picture_profile": "10-bit Log (N-Log / S-Log3 / C-Log3) exposed +1.0 to +1.5 EV over standard meter (ETTR).",
+        "resolution": "4K UHD 10-Bit 4:2:2",
     },
     "slow_motion": {
         "title": "Cinematic Slow-Motion Recipe",
@@ -266,38 +365,40 @@ SCENARIO_RECIPES = {
 
 # ==================== LANGUAGE & CONTEXT ENGINE ====================
 
-TELUGU_WORDS = [
-    "ela", "cheyyali", "cheppandi", "enti", "cheyali", "cheppava", "undha", "undhi", "em", "kavali",
-    "settings", "baguntundi", "eppudu", "chala", "manchi", "chesukovali", "elaaga", "gurinchi",
-    "అలా", "ఎలా", "ఏంటి", "చెప్పండి", "ఉంది", "ఉందా", "కావాలి", "బాగుంటుంది", "కెమెరా", "సెట్టింగ్స్",
-    "లెన్స్", "వెడ్డింగ్", "లైటింగ్", "స్లో", "మోషన్"
+TELUGU_SPECIFIC_WORDS = [
+    "ela", "cheyyali", "cheyali", "cheppandi", "cheppava", "enti", "undha", "undhi", "kavali",
+    "baguntundi", "eppudu", "chala", "manchi", "chesukovali", "gurinchi", "pettali", "telugulo",
+    "pedithe", "chusthe", "vadali", "vaadali", "pelliki", "pelli", "edhi", "ekkada", "chesi",
+    "అలా", "ఎలా", "ఏంటి", "చెప్పండి", "ఉంది", "ఉందా", "కావాలి", "బాగుంటుంది", "తెలుగు", "పెళ్లి"
 ]
 
-HINDI_WORDS = [
-    "kaise", "kare", "karna", "batao", "bataiye", "kya", "hai", "konsa", "accha", "hota", "chahiye",
-    "कैसा", "कैसे", "करना", "बताओ", "बताइए", "क्या", "है", "कौनसा", "अच्छा"
+HINDI_SPECIFIC_WORDS = [
+    "kaise", "kare", "karna", "karein", "batao", "bataiye", "kya", "hai", "konsa", "kaunsa",
+    "accha", "hota", "chahiye", "shadi", "me kaise",
+    "कैसा", "कैसे", "करना", "बताओ", "बताइए", "क्या", "है", "कौनसा", "अच्छा", "हिंदी"
 ]
 
 def detect_language(query: str) -> str:
     """Detects Telugu, Hindi, or English (including Romanized script)."""
     text = query.lower()
-    
-    # Explicit language requests
-    if "telugu" in text or "తెలుగు" in text or "telugulo" in text:
-        return "telugu"
-    if "hindi" in text or "हिंदी" in text or "hindime" in text or "hindi me" in text:
-        return "hindi"
 
-    # Telugu script
+    # Explicit language requests have highest priority
+    if "telugu" in text or "తెలుగు" in text or "telugulo" in text or "in telugu" in text:
+        return "telugu"
+    if "hindi" in text or "हिंदी" in text or "hindime" in text or "hindi me" in text or "in hindi" in text:
+        return "hindi"
+    if "english" in text or "in english" in text:
+        return "english"
+
+    # Native script detection
     if re.search(r'[\u0C00-\u0C7F]', query):
         return "telugu"
-    # Hindi script
     if re.search(r'[\u0900-\u097F]', query):
         return "hindi"
 
-    # Count Romanized keywords
-    telugu_score = sum(1 for w in TELUGU_WORDS if re.search(rf'\b{re.escape(w)}\b', text))
-    hindi_score = sum(1 for w in HINDI_WORDS if re.search(rf'\b{re.escape(w)}\b', text))
+    # Count language-specific Romanized words
+    telugu_score = sum(1 for w in TELUGU_SPECIFIC_WORDS if re.search(rf'\b{re.escape(w)}\b', text))
+    hindi_score = sum(1 for w in HINDI_SPECIFIC_WORDS if re.search(rf'\b{re.escape(w)}\b', text))
 
     if telugu_score >= 1 and telugu_score >= hindi_score:
         return "telugu"
@@ -308,14 +409,21 @@ def detect_language(query: str) -> str:
 def extract_camera_context(message: str, history: Optional[List[Dict[str, str]]] = None) -> Optional[str]:
     """Finds if a specific camera model was mentioned in current query or history."""
     all_text = (message or "").lower()
+    
+    # Check current message first
+    for cam_id, data in CAMERA_DATABASE.items():
+        for alias in data.get("aliases", []):
+            if re.search(rf'\b{re.escape(alias)}\b', all_text):
+                return cam_id
+
+    # If not found in current turn, check conversation history in reverse
     if history:
         for turn in reversed(history[-6:]):
-            all_text += " " + (turn.get("text") or turn.get("content") or "").lower()
-
-    for cam_id, data in CAMERA_DATABASE.items():
-        for alias in data["aliases"]:
-            if alias in all_text:
-                return cam_id
+            turn_text = (turn.get("text") or turn.get("content") or "").lower()
+            for cam_id, data in CAMERA_DATABASE.items():
+                for alias in data.get("aliases", []):
+                    if re.search(rf'\b{re.escape(alias)}\b', turn_text):
+                        return cam_id
     return None
 
 # ==================== RESPONSE BUILDERS ====================
@@ -413,6 +521,40 @@ def get_aperture_guide(lang: str = "english") -> str:
             "  - Best for: Landscapes, architecture, large family group stage photos."
         )
 
+def get_iso_guide(camera_id: Optional[str] = None, lang: str = "english") -> str:
+    cam = CAMERA_DATABASE.get(camera_id or "nikon_z6iii")
+    cam_name = cam["model"] if cam else "Camera"
+    base_iso = cam.get("base_isos", "Base ISO 800")
+
+    if lang == "telugu":
+        return (
+            f"💡 **ISO అంటే ఏమిటి? (సరళమైన తెలుగులో):**\n\n"
+            f"ISO అంటే కెమెరా సెన్సార్ కాంతిని ఎంత సున్నితంగా గ్రహిస్తుందో తెలిపే సంఖ్య (Sensor Light Sensitivity).\n\n"
+            f"• **తక్కువ ISO (ISO 100 – 800):**\n"
+            f"  - పగటిపూట లేదా మంచి లైటింగ్ ఉన్నప్పుడు వాడతారు.\n"
+            f"  - పిక్చర్ చాలా క్లీన్‌గా, నాయిస్/గ్రైన్ లేకుండా అత్యుత్తమ డైనమిక్ రేంజ్‌తో వస్తుంది.\n\n"
+            f"• **ఎక్కువ ISO (ISO 3200 – 12800):**\n"
+            f"  - రాత్రిపూట లేదా తక్కువ వెలుతురు ఉన్న హాల్స్‌లో ఫోటోలు/వీడియోలు తీయడానికి వాడతారు.\n"
+            f"  - అయితే ISO చాలా ఎక్కువ పెంచితే వీడియోలో చీమలు పాకినట్లు నాయిస్ (Grain) వస్తుంది.\n\n"
+            f"🎯 **డ్యూయల్ బేస్ ISO (Dual Base ISO) సీక్రెట్:**\n"
+            f"ఆధునిక సినిమా కెమెరాల్లో రెండు నేటివ్ బేస్ ISOలు ఉంటాయి. ఉదాహరణకు **{cam_name}** లో: **{base_iso}**.\n"
+            f"తక్కువ వెలుతురులో షూట్ చేసేటప్పుడు మధ్యలో ఉండే నాయిసీ ISOలలో ఉండకుండా, నేరుగా సెకండ్ బేస్ ISO కి మారితే షాడోస్ చాలా క్లీన్‌గా ఉంటాయి!"
+        )
+    else:
+        return (
+            f"💡 **ISO and Dual Base ISO Master Guide:**\n\n"
+            f"ISO measures the sensitivity of your camera's image sensor to light.\n\n"
+            f"• **Low ISO (ISO 100 - 800):** Maximum dynamic range, clean color reproduction, zero digital noise. Use in daylight or well-lit studios.\n"
+            f"• **High ISO (ISO 3200 - 12800):** Electronically amplifies the signal in dark scenes. In standard cameras, high ISO introduces noise and grain.\n\n"
+            f"### Dual Base ISO in Cinema & Mirrorless Cameras:\n"
+            f"Modern sensors feature two separate analog gain readout circuits per pixel:\n"
+            f"• **{cam_name} Base ISOs:** **{base_iso}**\n"
+            f"• **Sony FX3 / A7S III:** ISO 800 (Base 1) & ISO 12,800 (Base 2)\n"
+            f"• **Sony A7 IV:** ISO 800 (Base 1) & ISO 3,200 (Base 2)\n"
+            f"• **Canon R5 Mark II:** ISO 800 (Base 1) & ISO 3,200 (Base 2)\n\n"
+            f"💡 **Pro Filmmaking Rule:** Never shoot in no-man's land between the two bases (e.g. ISO 6400 or 10,000 on Sony FX3). Switch directly to Base 2 (ISO 12,800) for pristine, grain-free shadows!"
+        )
+
 def get_wedding_lens_guide(camera_id: Optional[str], lang: str = "english") -> str:
     cam = CAMERA_DATABASE.get(camera_id or "nikon_z6iii")
     brand = cam["brand"] if cam else "Nikon"
@@ -456,6 +598,38 @@ def get_wedding_lens_guide(camera_id: Optional[str], lang: str = "english") -> s
             f"2. **NIKKOR Z 85mm f/1.8 S (or 50mm f/1.8 S)** — Ultra-sharp, budget-friendly portrait primes for emotional vows, rings, and teary family moments."
         )
 
+def get_low_light_lens_guide(camera_id: Optional[str], lang: str = "english") -> str:
+    cam = CAMERA_DATABASE.get(camera_id or "nikon_z6iii")
+    brand = cam["brand"] if cam else "Nikon"
+
+    if brand == "Sony":
+        rec = LENS_RECOMMENDATIONS["sony_e"]["low_light"]
+        items = "\n".join([f"• **{r['lens']}**: {r['role']}" for r in rec])
+    elif brand == "Canon":
+        rec = LENS_RECOMMENDATIONS["canon_rf"]["low_light"]
+        items = "\n".join([f"• **{r['lens']}**: {r['role']}" for r in rec])
+    else:
+        rec = LENS_RECOMMENDATIONS["nikon_z"]["low_light"]
+        items = "\n".join([f"• **{r['lens']}**: {r['role']}" for r in rec])
+
+    if lang == "telugu":
+        return (
+            f"🌙 **తక్కువ వెలుతురు (Low-Light) వీడియో కోసం ఉత్తమ లెన్సులు:**\n\n"
+            f"తక్కువ వెలుతురులో వీడియో తీసేటప్పుడు పెద్ద ఎపర్చర్ (f/1.2, f/1.4, f/1.8) ఉన్న ప్రైమ్ లెన్సులు వాడాలి. f/1.4 లెన్స్ f/2.8 కంటే 4 రెట్లు ఎక్కువ కాంతిని లోపలికి రానిస్తుంది!\n\n"
+            f"### రికమండ్ చేయబడిన లెన్సులు ({brand}):\n{items}\n\n"
+            f"💡 **షూటింగ్ టిప్:** వైడ్ ఎపర్చర్ (f/1.4) తో పాటు కెమెరా యొక్క హై బేస్ ISO ని ఎంగేజ్ చేయండి."
+        )
+    return (
+        f"🌙 **Best Lenses for Low-Light Video & Cinematography:**\n\n"
+        f"In low-light environments, maximum aperture is everything. An **f/1.4 prime gathers 4x more light** (2 full stops) than a standard f/2.8 zoom!\n\n"
+        f"### Top Low-Light Prime Lenses ({brand}):\n{items}\n\n"
+        f"### What to Look for in Low-Light Lenses:\n"
+        f"1. **Aperture (f/1.2 - f/1.8):** Maximizes physical photonic transmission onto the sensor.\n"
+        f"2. **Linear AF Motors:** Fast, silent autofocus tracking in dim light without hunting.\n"
+        f"3. **Minimal Focus Breathing:** Keeps framing stable during focus transitions in dark scenes.\n\n"
+        f"💡 **Pro Tip:** Combine an f/1.4 prime with your camera's High Base ISO and keep shutter locked to 1/50s (180° rule)."
+    )
+
 def get_sony_fx3_vs_nikon_z6iii(lang: str = "english") -> str:
     return (
         "⚔️ **Sony FX3 vs Nikon Z6III for Filmmaking & Cinematography:**\n\n"
@@ -477,7 +651,7 @@ def get_sony_fx3_vs_nikon_z6iii(lang: str = "english") -> str:
 def get_wedding_settings_guide(camera_id: Optional[str] = None, lang: str = "english") -> str:
     cam = CAMERA_DATABASE.get(camera_id or "nikon_z6iii")
     cam_name = cam["model"] if cam else "Camera"
-    base_iso = cam["base_isos"] if cam else "Base ISO 800"
+    base_iso = cam.get("base_isos", "Base ISO 800")
 
     if lang == "telugu":
         return (
@@ -505,6 +679,70 @@ def get_wedding_settings_guide(camera_id: Optional[str] = None, lang: str = "eng
         f"👉 Color grade your footage in one click using the [Pranvith Creative LUT Pack (₹49)](/assets/creative-lut-pack)!"
     )
 
+def get_indoor_wedding_settings_guide(camera_id: Optional[str] = None, lang: str = "english") -> str:
+    cam = CAMERA_DATABASE.get(camera_id or "nikon_z6iii")
+    cam_name = cam["model"] if cam else "Camera"
+    base_iso = cam.get("base_isos", "Base ISO 800 / 6400")
+
+    if lang == "telugu":
+        return (
+            f"🏛️ **{cam_name} ఇండోర్ వెడ్డింగ్ & బాంక్వెట్ హాల్ సెట్టింగ్స్:**\n\n"
+            f"• **షట్టర్ స్పీడ్ (ఫ్లికర్ లేకుండా):** ఇండియాలో కరెంట్ 50Hz కాబట్టి, LED లైట్ల ఫ్లికర్ రాకుండా ఉండటానికి ఖచ్చితంగా **25fps @ 1/50s** లేదా **50fps @ 1/100s** వాడాలి.\n"
+            f"• **ఎపర్చర్:** f/1.8 – f/2.8 (వైడ్ ఓపెన్) ఉంచండి, తద్వారా హాల్ లోని తక్కువ కాంతిలో కూడా క్లీన్ ఇమేజ్ వస్తుంది.\n"
+            f"• **ISO:** {base_iso}. హాల్ చీకటిగా ఉంటే నేరుగా హై బేస్ ISO కి మారండి.\n"
+            f"• **వైట్ బ్యాలెన్స్:** ఆటో WB పెట్టవద్దు! హాల్ లోని మిక్స్‌డ్ లైట్ల కోసం Kelvin 3800K – 4200K మాన్యువల్ గా లాక్ చేయండి.\n"
+            f"• **ఆటోఫోకస్:** AF-C + Face/Eye Detection (People), AF Tracking Delay పెంచండి تاکہ జనాలు అడ్డం వచ్చినా ఫోకస్ తప్పదు."
+        )
+    return (
+        f"🏛️ **Indoor Wedding Cinematography Settings for {cam_name}:**\n\n"
+        f"Indoor banquet halls present tough challenges: low light, mixed color temperatures, and flickering LED panels. Here are the professional settings:\n\n"
+        f"| Setting | Recommendation | Why |\n"
+        f"|---|---|---|\n"
+        f"| **Frame Rate** | **25 fps** (in 50Hz regions like India/UK) or **24 fps** (60Hz USA) | Anti-flicker standard with electricity grid |\n"
+        f"| **Shutter Speed** | **1/50s** (for 25fps) or **1/100s** (for 50fps) | Strictly eliminates light banding; use Variable Shutter / ECS if fine banding appears |\n"
+        f"| **Aperture** | **f/1.8 – f/2.8** | Maximum photon collection on dim banquet stages |\n"
+        f"| **ISO Setting** | **{base_iso}** | Switch straight to the High Base ISO; avoids noisy analog amplification |\n"
+        f"| **White Balance** | **Manual 3800K - 4500K** | Halogen mandap fire + cool LED chandeliers. Lock WB to prevent fluctuating tints |\n"
+        f"| **Autofocus Mode** | **AF-C + Human Face/Eye Priority** | Keeps bride/groom sharp; set Tracking Sensitivity to *Delayed* so guests walking past don't pull focus |\n"
+        f"| **Picture Profile** | **10-bit Log (N-Log / S-Log3 / C-Log3)** | Expose to the right (ETTR +1.0 to +1.3 EV) for rich shadow recovery in post |\n\n"
+        f"💡 **Pro Tip:** In mixed banquet hall lighting, test shoot a white paper or grey card to lock custom Kelvin before the ceremonies start."
+    )
+
+def get_autofocus_guide(camera_id: Optional[str] = None, lang: str = "english") -> str:
+    cam = CAMERA_DATABASE.get(camera_id or "nikon_z6iii")
+    cam_name = cam["model"] if cam else "Nikon Z6III"
+
+    if "nikon" in cam_name.lower():
+        if lang == "telugu":
+            return (
+                f"🎯 **Nikon Z6III వెడ్డింగ్ ఆటోఫోకస్ (Autofocus) సెట్టింగ్స్:**\n\n"
+                f"• **AF-Area Mode:** **Wide-Area (L-People)** లేదా **3D-Tracking** ఎంచుకోండి.\n"
+                f"• **సబ్జెక్ట్ డిటెక్షన్:** **People** (మనుషులు/కళ్ళు). పెళ్లికూతురు ముసుగు (Veil) వేసుకున్నా కళ్ళను ఖచ్చితంగా గుర్తిస్తుంది.\n"
+                f"• **AF Speed (Custom Setting g6):** **-1 లేదా -2** (Slow/Smooth) గా ఉంచండి. దీనివల్ల ఫోకస్ ఉన్నట్టుండి ఝట్కా లాగకుండా సినిమాటిక్‌గా మారుతుంది.\n"
+                f"• **AF Tracking Sensitivity (Custom Setting g7):** **3 లేదా 4 (Delayed)** గా సెట్ చేయండి. దీనివల్ల పెళ్లికూతురు, పెళ్లికొడుకు మధ్యలోకి చుట్టాలు లేదా గెస్టులు అడ్డం వచ్చినా ఫోకస్ వాళ్ళపైకి మారకుండా కపుల్ పైనే లాక్ అయి ఉంటుంది.\n"
+                f"• **Focus Point VR:** On (కెమెరాలోని 8-స్టాప్ IBIS ఫోకస్ పాయింట్‌తో లింక్ అయి షేక్ లేకుండా చేస్తుంది)."
+            )
+        return (
+            f"🎯 **Nikon Z6III Cinema Autofocus Settings for Weddings:**\n\n"
+            f"| AF Parameter | Setting | Impact on Video |\n"
+            f"|---|---|---|\n"
+            f"| **AF Mode** | **AF-C** (Continuous AF) | Constant subject tracking |\n"
+            f"| **AF-Area Mode** | **Wide-Area (L-People)** or **3D-Tracking** | Locks specifically on the bride/groom without roaming |\n"
+            f"| **Subject Detection** | **People (Face/Eye AF)** | Tracks bride's eyes even through jewelry and wedding veils |\n"
+            f"| **AF Speed (Menu g6)** | **-1 to -2 (Slow / Cinematic)** | Prevents jarring, jerky focus snaps; gives smooth cinema rack focus |\n"
+            f"| **AF Tracking Sensitivity (Menu g7)** | **3 to 4 (Delayed)** | If guests or photographers walk across the frame, focus stays firmly locked on the couple |\n"
+            f"| **Focus Point VR** | **Enabled** | Concentrates 8.0-stop IBIS stability directly around your subject |\n\n"
+            f"💡 **Pro Tip:** Assign 'AF-ON' to the rear button for instant re-acquisition if the couple temporarily leaves the frame."
+        )
+    else:
+        return (
+            f"🎯 **Cinema Autofocus Settings for {cam_name}:**\n\n"
+            f"• **Focus Mode:** Continuous AF (AF-C / Movie AF).\n"
+            f"• **Subject Recognition:** Human Eye / Face Detection enabled.\n"
+            f"• **AF Transition Speed:** Set to 3 or 4 out of 7 (Moderate/Smooth) for natural focus transitions.\n"
+            f"• **AF Subject Shift Sensitivity:** Set to 1 or 2 (Locked-on / Persistent) to prevent guests crossing the aisle from stealing focus."
+        )
+
 # ==================== MASTER AI CONTROLLER ====================
 
 async def answer_camera_query(
@@ -516,7 +754,7 @@ async def answer_camera_query(
     """
     Main intelligence entry point.
     1. If gemini_api_key is available, calls Gemini with the comprehensive camera master prompt.
-    2. Otherwise, uses the built-in multi-lingual camera expert system.
+    2. Otherwise, uses the built-in multi-lingual verified camera expert system.
     """
     query = (message or "").strip()
     if not query:
@@ -526,10 +764,20 @@ async def answer_camera_query(
     camera_id = extract_camera_context(query, history)
     q_clean = query.lower()
 
+    # Check if admin disabled the chatbot
+    if admin_settings and admin_settings.get("camera_ai_enabled") is False:
+        return {
+            "response": "Camera AI Assistant is temporarily paused for maintenance. Please check back shortly or email info@pranvithdop.com.",
+            "source": "pranvith_admin"
+        }
+
     # If Gemini API Key is present, leverage Gemini with specialized prompt
     if gemini_api_key:
         try:
             import httpx
+            custom_instructions = (admin_settings or {}).get("camera_ai_system_instructions", "")
+            knowledge_notes = (admin_settings or {}).get("camera_ai_knowledge_notes", "")
+
             system_prompt = (
                 "You are Camera AI PRO, the official camera, lenses, cinematography, and filmmaking expert for PranvithDOP (https://pranvithdop.com).\n"
                 "You provide verified, highly accurate technical camera advice on Nikon (Z6III, Z8, Z9, Zf, Z50II), Sony (FX3, FX6, FX30, A7IV, A7SIII), Canon (R5, R6II, R5II), DJI gimbals and drones.\n"
@@ -543,8 +791,13 @@ async def answer_camera_query(
                 "ACCURACY & FORMATTING:\n"
                 "- Never invent camera features or crop factors (e.g. Nikon Z6III 4K 120p has a 1.5x DX crop; Sony FX3 has S-Log3 base ISOs 800 & 12,800).\n"
                 "- Use clean markdown headings, bullet points, and tables where helpful.\n"
-                "- When appropriate, mention PranvithDOP products: [Creative LUT Pack (₹49)](/assets/creative-lut-pack), [Sound FX Pack (₹149)](/assets/cinematic-sound-fx-pack), [Wedding Templates (₹299)](/assets/premiere-pro-wedding-templates)."
+                "- When appropriate, mention PranvithDOP products: [Creative LUT Pack (₹49)](/assets/creative-lut-pack), [Sound FX Pack (₹149)](/assets/cinematic-sound-fx-pack), [Wedding Templates (₹299)](/assets/premiere-pro-wedding-templates).\n"
             )
+            if custom_instructions:
+                system_prompt += f"\nADMIN CUSTOM INSTRUCTIONS:\n{custom_instructions}\n"
+            if knowledge_notes:
+                system_prompt += f"\nADMIN KNOWLEDGE BASE NOTES:\n{knowledge_notes}\n"
+
             chat_contents = []
             if history:
                 for h in history[-6:]:
@@ -571,7 +824,7 @@ async def answer_camera_query(
         except Exception:
             pass  # Fall through to built-in verified engine
 
-    # Built-in High-Precision Intelligence Engine
+    # ==================== BUILT-IN VERIFIED INTELLIGENCE ENGINE ====================
 
     # 1. Nikon Z6III 120fps question
     if ("z6" in q_clean or "z6iii" in q_clean or camera_id == "nikon_z6iii") and ("120" in q_clean or "slow" in q_clean or "fps" in q_clean):
@@ -585,19 +838,35 @@ async def answer_camera_query(
     if "aperture" in q_clean or "ఎపర్చర్" in q_clean:
         return {"response": get_aperture_guide(lang), "source": "pranvith_camera_ai"}
 
-    # 4. Sony FX3 vs Nikon Z6III comparison
+    # 4. ISO explanations
+    if re.search(r'\biso\b', q_clean) or "dual base iso" in q_clean or "ఐఎస్ఓ" in q_clean:
+        return {"response": get_iso_guide(camera_id, lang), "source": "pranvith_camera_ai"}
+
+    # 5. Sony FX3 vs Nikon Z6III comparison
     if ("fx3" in q_clean and "z6" in q_clean) or ("vs" in q_clean and ("fx3" in q_clean or "z6" in q_clean)):
         return {"response": get_sony_fx3_vs_nikon_z6iii(lang), "source": "pranvith_camera_ai"}
 
-    # 5. Lens recommendation for wedding
+    # 6. Autofocus settings (e.g. Nikon Z6III autofocus settings for wedding)
+    if any(k in q_clean for k in ["autofocus", "af settings", "focus settings", "ఆటోఫోకస్", "tracking sensitivity"]):
+        return {"response": get_autofocus_guide(camera_id, lang), "source": "pranvith_camera_ai"}
+
+    # 7. Low light lenses
+    if ("lens" in q_clean or "lenses" in q_clean or "లెన్స్" in q_clean) and any(k in q_clean for k in ["low light", "low-light", "night", "dark", "తక్కువ వెలుతురు"]):
+        return {"response": get_low_light_lens_guide(camera_id, lang), "source": "pranvith_camera_ai"}
+
+    # 8. General wedding lens recommendation
     if "lens" in q_clean or "lenses" in q_clean or "లెన్స్" in q_clean:
         return {"response": get_wedding_lens_guide(camera_id, lang), "source": "pranvith_camera_ai"}
 
-    # 6. Wedding settings
+    # 9. Indoor wedding settings
+    if any(k in q_clean for k in ["indoor", "banquet", "hall", "ఇండోర్"]) and any(k in q_clean for k in ["wedding", "marriage", "పెళ్లి", "వెడ్డింగ్"]):
+        return {"response": get_indoor_wedding_settings_guide(camera_id, lang), "source": "pranvith_camera_ai"}
+
+    # 10. General wedding settings
     if any(k in q_clean for k in ["wedding", "marriage", "పెళ్లి", "వెడ్డింగ్", "mandap"]):
         return {"response": get_wedding_settings_guide(camera_id, lang), "source": "pranvith_camera_ai"}
 
-    # 7. Slow motion general
+    # 11. Slow motion general
     if any(k in q_clean for k in ["slow motion", "slowmo", "స్లో మోషన్", "60fps", "120fps"]):
         recipe = SCENARIO_RECIPES["slow_motion"]
         resp = (
@@ -610,7 +879,7 @@ async def answer_camera_query(
         )
         return {"response": resp, "source": "pranvith_camera_ai"}
 
-    # 8. Instagram Reels
+    # 12. Instagram Reels & Vertical
     if any(k in q_clean for k in ["reel", "reels", "instagram", "vertical"]):
         recipe = SCENARIO_RECIPES["instagram_reels"]
         resp = (
@@ -623,7 +892,7 @@ async def answer_camera_query(
         )
         return {"response": resp, "source": "pranvith_camera_ai"}
 
-    # 9. Low light
+    # 13. Low light general
     if any(k in q_clean for k in ["low light", "low-light", "night", "dark", "తక్కువ వెలుతురు"]):
         recipe = SCENARIO_RECIPES["low_light"]
         resp = (
@@ -635,9 +904,11 @@ async def answer_camera_query(
         )
         return {"response": resp, "source": "pranvith_camera_ai"}
 
-    # 10. Specific camera inquiry
+    # 14. Specific camera inquiry
     if camera_id and camera_id in CAMERA_DATABASE:
         cam = CAMERA_DATABASE[camera_id]
+        if "guidance" in cam:
+            return {"response": f"ℹ️ **{cam['model']} Information:**\n\n{cam['guidance']}", "source": "pranvith_camera_ai"}
         resp = (
             f"🎥 **{cam['model']} Cinematography Profile:**\n\n"
             f"• **Sensor & Mount:** {cam['sensor']} | {cam['mount']}\n"
@@ -649,7 +920,7 @@ async def answer_camera_query(
         )
         return {"response": resp, "source": "pranvith_camera_ai"}
 
-    # 11. Products / LUTs / SFX fallback
+    # 15. Products / LUTs / SFX fallback
     if any(k in q_clean for k in ["lut", "preset", "sound", "pack", "template", "buy", "price"]):
         resp = (
             "🛍️ **PranvithDOP Digital Assets & Filmmaking Packs:**\n\n"

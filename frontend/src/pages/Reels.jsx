@@ -8,8 +8,10 @@ import {
   ChevronUp,
   Disc,
   ExternalLink,
+  Film,
   Heart,
   Info,
+  Instagram,
   Maximize2,
   Minimize2,
   Music,
@@ -24,7 +26,17 @@ import {
   VolumeX,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { fetchPublicReels, recordReelView, toggleReelLike } from '../lib/api';
+import {
+  fetchInstagramThumbnail,
+  fetchPublicReels,
+  recordReelView,
+  toggleReelLike,
+} from '../lib/api';
+import {
+  getInstagramEmbedUrl,
+  getInstagramShortcode,
+  isInstagramUrl,
+} from '../components/SafeVideoEmbed';
 import { FALLBACK_IMAGE, handleImageError, safeImageSrc } from '../lib/utils';
 import { Link } from 'react-router-dom';
 
@@ -72,6 +84,7 @@ const Reels = () => {
   const [expandedDesc, setExpandedDesc] = useState(false);
   const [simulatedAdsEnabled, setSimulatedAdsEnabled] = useState(true);
   const [copied, setCopied] = useState(false);
+  const [instagramCovers, setInstagramCovers] = useState({});
 
   // Ad states
   const [currentAd, setCurrentAd] = useState(null); // { type: 'preroll' | 'midroll', reelId, sponsor, timeLeft, canSkip }
@@ -90,7 +103,22 @@ const Reels = () => {
   const adTimerRef = useRef(null);
   const lastTapRef = useRef(0);
 
-  // 1. Fetch active reels from backend
+  // Helper to resolve cover image for any reel (custom thumbnail > fetched Instagram cover > fallback)
+  const getReelCover = useCallback(
+    (reel) => {
+      if (!reel) return FALLBACK_IMAGE;
+      if (reel.thumbnail_url) return reel.thumbnail_url;
+      if (instagramCovers[reel.id]) return instagramCovers[reel.id];
+      const shortcode = getInstagramShortcode(reel.video_url);
+      if (shortcode) {
+        return `https://www.instagram.com/p/${shortcode}/media/?size=l`;
+      }
+      return FALLBACK_IMAGE;
+    },
+    [instagramCovers]
+  );
+
+  // 1. Fetch active reels from backend and auto-resolve any missing Instagram covers
   useEffect(() => {
     let mounted = true;
     const loadData = async () => {
@@ -103,6 +131,15 @@ const Reels = () => {
           const initialLikes = {};
           list.forEach((r) => {
             initialLikes[r.id] = r.likes_count || 0;
+            if (isInstagramUrl(r.video_url) && !r.thumbnail_url) {
+              fetchInstagramThumbnail(r.video_url)
+                .then((res) => {
+                  if (mounted && res?.thumbnail_url) {
+                    setInstagramCovers((prev) => ({ ...prev, [r.id]: res.thumbnail_url }));
+                  }
+                })
+                .catch(() => {});
+            }
           });
           setLikeCounts(initialLikes);
         }
@@ -158,6 +195,13 @@ const Reels = () => {
 
   const playCurrentVideo = () => {
     if (!activeReel) return;
+    const isIg = isInstagramUrl(activeReel.video_url);
+    if (isIg) {
+      if (!userPaused) {
+        setIsPlaying(true);
+      }
+      return;
+    }
     const currentVideo = videoRefs.current[activeReel.id];
     if (currentVideo && !userPaused) {
       currentVideo.muted = isMuted;
@@ -173,8 +217,12 @@ const Reels = () => {
 
   // Trigger Google Ad Manager placeholder (pre-roll or mid-roll)
   const triggerAd = (type, reel) => {
-    const video = videoRefs.current[reel.id];
-    if (video) video.pause();
+    if (!reel) return;
+    const isIg = isInstagramUrl(reel.video_url);
+    if (!isIg) {
+      const video = videoRefs.current[reel.id];
+      if (video) video.pause();
+    }
     setIsPlaying(false);
 
     const randomSponsor = SPONSOR_ADS[Math.floor(Math.random() * SPONSOR_ADS.length)];
@@ -219,6 +267,14 @@ const Reels = () => {
     setAdTimeRemaining(0);
     setCanSkipAd(false);
 
+    const targetReel = reels.find((r) => r.id === reelId) || activeReel;
+    if (targetReel && isInstagramUrl(targetReel.video_url)) {
+      if (!userPaused) {
+        setIsPlaying(true);
+      }
+      return;
+    }
+
     const video = videoRefs.current[reelId];
     if (video && !userPaused) {
       video.muted = isMuted;
@@ -232,7 +288,7 @@ const Reels = () => {
     finishAd(currentAd.reelId);
   };
 
-  // Video time update: progress bar and mid-roll cue detector
+  // Video time update for standard HTML5 videos: progress bar and mid-roll cue detector
   const handleTimeUpdate = (e) => {
     const video = e.target;
     if (!video || !video.duration) return;
@@ -258,10 +314,57 @@ const Reels = () => {
     }
   };
 
+  // Instagram Reel progress tracking & mid-roll cue detection
+  useEffect(() => {
+    if (!activeReel || !isInstagramUrl(activeReel.video_url)) return;
+    if (!isPlaying || currentAd) return;
+
+    const targetDuration = Number(activeReel.duration) || 15;
+    setDuration(targetDuration);
+
+    const interval = setInterval(() => {
+      setCurrentTime((prev) => {
+        const next = prev + 0.25;
+        if (next >= targetDuration) {
+          setProgress(0);
+          return 0;
+        }
+        setProgress((next / targetDuration) * 100);
+
+        // Check mid-roll ad cue point
+        if (simulatedAdsEnabled) {
+          const ad = activeReel.ad_settings || {};
+          const cuePoint = Number(ad.mid_roll_cue_seconds) || 10;
+          if (
+            ad.mid_roll_enabled !== false &&
+            !midrollFiredReels.has(activeReel.id) &&
+            next >= cuePoint &&
+            next <= cuePoint + 0.6
+          ) {
+            triggerAd('midroll', activeReel);
+          }
+        }
+        return next;
+      });
+    }, 250);
+
+    return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeReel, isPlaying, currentAd, simulatedAdsEnabled]);
+
   // Toggle Play / Pause
   const togglePlayPause = () => {
     if (currentAd) return;
     if (!activeReel) return;
+    const isIg = isInstagramUrl(activeReel.video_url);
+    if (isIg) {
+      setIsPlaying((prev) => {
+        const next = !prev;
+        setUserPaused(!next);
+        return next;
+      });
+      return;
+    }
     const video = videoRefs.current[activeReel.id];
     if (!video) return;
 
@@ -479,6 +582,8 @@ const Reels = () => {
             const likesCount = likeCounts[reel.id] ?? reel.likes_count ?? 0;
             const midrollCue = reel.ad_settings?.mid_roll_cue_seconds || 10;
             const showMidrollMarker = reel.ad_settings?.mid_roll_enabled !== false;
+            const isIg = isInstagramUrl(reel.video_url);
+            const coverSrc = getReelCover(reel);
 
             return (
               <section
@@ -487,30 +592,62 @@ const Reels = () => {
                 className="relative h-[100dvh] w-full snap-start snap-always flex items-center justify-center bg-black"
               >
                 {/* Desktop ambient blurred backdrop */}
-                {reel.thumbnail_url && (
+                {coverSrc && (
                   <div
                     className="absolute inset-0 hidden md:block bg-cover bg-center blur-3xl opacity-20 scale-125 pointer-events-none"
-                    style={{ backgroundImage: `url(${safeImageSrc(reel.thumbnail_url)})` }}
+                    style={{ backgroundImage: `url(${safeImageSrc(coverSrc)})` }}
                   />
                 )}
 
                 {/* 9:16 Centered Video Frame */}
                 <div className="relative h-full w-full max-w-[430px] md:h-[95dvh] md:max-h-[880px] md:rounded-3xl md:overflow-hidden md:border md:border-white/10 md:shadow-2xl bg-slate-950 flex items-center justify-center">
-                  {/* HTML5 Vertical Video */}
-                  <video
-                    ref={(el) => {
-                      if (el) videoRefs.current[reel.id] = el;
-                    }}
-                    src={reel.video_url}
-                    poster={reel.thumbnail_url || undefined}
-                    loop
-                    playsInline
-                    webkit-playsinline="true"
-                    muted={isMuted}
-                    onTimeUpdate={isActive ? handleTimeUpdate : undefined}
-                    onClick={handleVideoTap}
-                    className="h-full w-full object-cover cursor-pointer"
-                  />
+                  {isIg ? (
+                    <div className="relative h-full w-full overflow-hidden bg-black flex items-center justify-center">
+                      {isActive && isPlaying ? (
+                        <iframe
+                          src={getInstagramEmbedUrl(reel.video_url)}
+                          title={reel.title || 'Instagram Reel'}
+                          className="h-full w-full border-0 select-none"
+                          allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share"
+                          allowFullScreen
+                          scrolling="no"
+                        />
+                      ) : (
+                        <div
+                          onClick={handleVideoTap}
+                          className="group relative h-full w-full cursor-pointer bg-slate-950 flex items-center justify-center"
+                        >
+                          <img
+                            src={safeImageSrc(coverSrc)}
+                            alt={reel.title}
+                            onError={handleImageError}
+                            className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
+                          />
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/30" />
+                          <div className="absolute top-4 left-4 z-10 flex items-center gap-1.5 rounded-full bg-gradient-to-r from-purple-600/80 via-pink-600/80 to-amber-600/80 px-2.5 py-1 text-[11px] font-semibold text-white shadow-lg backdrop-blur-md">
+                            <Instagram className="h-3.5 w-3.5" />
+                            <span>Instagram Reel</span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    /* HTML5 Vertical Video */
+                    <video
+                      ref={(el) => {
+                        if (el) videoRefs.current[reel.id] = el;
+                      }}
+                      src={reel.video_url}
+                      poster={safeImageSrc(coverSrc) || undefined}
+                      loop
+                      playsInline
+                      webkit-playsinline="true"
+                      muted={isMuted}
+                      onTimeUpdate={isActive ? handleTimeUpdate : undefined}
+                      onClick={handleVideoTap}
+                      className="h-full w-full object-cover cursor-pointer"
+                    />
+                  )}
 
                   {/* Google Ad Manager (GAM) Overlay Container */}
                   {isActive && currentAd && currentAd.reelId === reel.id && (
@@ -679,6 +816,19 @@ const Reels = () => {
                       <span className="font-bold text-sm tracking-wide text-white">
                         {reel.author_name || 'Pranvith DOP'}
                       </span>
+                      {isIg && (
+                        <a
+                          href={reel.video_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 rounded-full bg-pink-500/20 border border-pink-500/40 px-2 py-0.5 text-[10px] font-semibold text-pink-300 backdrop-blur-sm transition hover:text-white hover:border-pink-400"
+                          title="Open in Instagram"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <Instagram className="h-3 w-3" />
+                          <span>Instagram</span>
+                        </a>
+                      )}
                       <span className="h-1.5 w-1.5 rounded-full bg-blue-400" />
                       <a
                         href="/about"

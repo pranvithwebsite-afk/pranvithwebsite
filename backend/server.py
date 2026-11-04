@@ -72,6 +72,14 @@ except ImportError:
         DEFAULT_REELS,
     )
 
+try:
+    from .camera_ai import answer_camera_query
+except ImportError:
+    try:
+        from camera_ai import answer_camera_query
+    except ImportError:
+        from backend.camera_ai import answer_camera_query
+
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
@@ -1143,6 +1151,11 @@ class SettingsPayload(BaseModel):
     works_page: Optional[Dict[str, Any]] = None
     footer: Optional[Dict[str, Any]] = None
     header: Optional[Dict[str, Any]] = None
+    camera_ai_enabled: Optional[bool] = None
+    camera_ai_welcome_message: Optional[str] = None
+    camera_ai_system_instructions: Optional[str] = None
+    camera_ai_suggested_questions: Optional[List[str]] = None
+    camera_ai_knowledge_notes: Optional[str] = None
 
     @field_validator("logo_url")
     @classmethod
@@ -1498,230 +1511,33 @@ async def camera_ai_assistant(payload: CameraAiRequest):
         raise HTTPException(status_code=400, detail="Message cannot be empty")
 
     gemini_key = os.environ.get("GEMINI_API_KEY", "").strip()
-    if gemini_key:
-        try:
-            import httpx
-            system_prompt = (
-                "You are Pranvith AI, the official intelligent assistant for PranvithDOP (https://pranvithdop.com), "
-                "a premier platform for professional video editing assets, master courses, and cinematography production.\n\n"
-                "OUR PRODUCTS & CATALOG:\n"
-                "1. Creative LUT Pack (₹49): 10+ 3D cinematic LUTs for Sony S-Log3, Canon C-Log3, V-Log & Rec.709. Drag-and-drop for Premiere Pro, Resolve, Final Cut, CapCut. Link: /assets/creative-lut-pack\n"
-                "2. Cinematic Sound FX Pack (₹149): 100+ 24-bit WAV impacts, risers, whooshes, atmospheres. Link: /assets/cinematic-sound-fx-pack\n"
-                "3. Premiere Pro Wedding Templates (₹299): 10+ 4K editable wedding titles, invitations, lower thirds. Link: /assets/premiere-pro-wedding-templates\n"
-                "4. Wedding Album PSD Pack (₹199): 100+ professional PSD photo grids. Link: /assets/wedding-album-psd-pack\n"
-                "5. Master Cinematography Course: Practical camera and color grading training. Link: /courses\n\n"
-                "RULES:\n"
-                "- If the user asks for LUTs, editing packs, presets, prices, or downloads, direct them to our products with exact prices and links.\n"
-                "- If the user asks for camera settings (Sony, Canon, FX3, A7IV, etc.), provide precise technical recipes (Dual Base ISOs, 180° shutter, ETTR +1.7 EV, S-Log3/C-Log3).\n"
-                "- Keep answers structured, friendly, concise, and beautifully formatted with bullet points."
-            )
-            async with httpx.AsyncClient(timeout=15.0) as client:
-                res = await client.post(
-                    f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={gemini_key}",
-                    json={
-                        "contents": [
-                            {"role": "user", "parts": [{"text": f"{system_prompt}\n\nQuestion: {query}"}]}
-                        ]
-                    }
-                )
-                if res.status_code == 200:
-                    data = res.json()
-                    candidates = data.get("candidates", [])
-                    if candidates:
-                        content = candidates[0].get("content", {}).get("parts", [{}])[0].get("text", "")
-                        if content:
-                            return {"response": content, "source": "gemini"}
-        except Exception as e:
-            logger.warning("Gemini API call failed, falling back to built-in intelligence engine: %s", e)
+    settings_doc = None
+    try:
+        settings_doc = await db.settings.find_one({}, {"_id": 0})
+    except Exception:
+        pass
 
-    q = query.lower().strip()
-
-    # 1. LUTs & Color Grading Packs
-    if any(k in q for k in ["lut", "luts", "color grade", "color grading pack", "grading pack", "preset", "presets"]):
-        resp = (
-            "🎨 **Pranvith Creative LUT Pack (₹49):**\n\n"
-            "• **Contents:** 10+ Cinematic 3D LUTs calibrated for Sony S-Log3, Canon C-Log3, Panasonic V-Log, and standard Rec.709 footage.\n"
-            "• **Price:** **₹49** (One-time purchase, lifetime access & free updates).\n"
-            "• **Software Compatibility:** Adobe Premiere Pro, DaVinci Resolve, Final Cut Pro, CapCut, and After Effects.\n"
-            "• **Delivery:** Instant download link after payment + token sent to your email.\n\n"
-            "👉 [View Creative LUT Pack (₹49)](/assets/creative-lut-pack)\n"
-            "👉 [Browse All Assets](/assets)"
+    try:
+        return await answer_camera_query(
+            message=query,
+            history=payload.history,
+            admin_settings=settings_doc,
+            gemini_api_key=gemini_key
         )
-        return {"response": resp, "source": "pranvith_ai"}
-
-    # 2. Sound FX / SFX Packs
-    if any(k in q for k in ["sound", "sfx", "sound fx", "audio pack", "whoosh", "riser", "impact"]):
-        resp = (
-            "🔊 **Cinematic Sound FX Pack (₹149):**\n\n"
-            "• **Contents:** 100+ High-impact cinematic sound effects (whooshes, risers, deep hits, sub-booms, and atmospheric drones).\n"
-            "• **Quality:** Studio-grade 24-bit 48kHz WAV files.\n"
-            "• **License:** 100% Royalty-Free for commercial client videos, YouTube, and reels.\n"
-            "• **Price:** **₹149** (One-time lifetime access).\n\n"
-            "👉 [Get Sound FX Pack (₹149)](/assets/cinematic-sound-fx-pack)"
-        )
-        return {"response": resp, "source": "pranvith_ai"}
-
-    # 3. Wedding Templates / Premiere Pro
-    if any(k in q for k in ["template", "templates", "wedding template", "lower third", "invitation", "prproj"]):
-        resp = (
-            "💍 **Premiere Pro Wedding Templates (₹299):**\n\n"
-            "• **Contents:** 10+ Ready-to-use 4K cinematic wedding templates (animated invitations, title sequences, lower thirds, and save-the-date openers).\n"
-            "• **Compatibility:** Adobe Premiere Pro CC 2020 and newer (No third-party plugins required).\n"
-            "• **Price:** **₹299** (Instant digital download).\n\n"
-            "👉 [Get Wedding Templates (₹299)](/assets/premiere-pro-wedding-templates)"
-        )
-        return {"response": resp, "source": "pranvith_ai"}
-
-    # 4. Album PSD Pack
-    if any(k in q for k in ["album", "psd", "photoshop", "photo grid", "album pack"]):
-        resp = (
-            "📖 **Wedding Album PSD Pack (₹199):**\n\n"
-            "• **Contents:** 100+ High-resolution PSD wedding photo album design grids & layouts.\n"
-            "• **Format:** Fully layered, editable Photoshop (.PSD) files with smart objects.\n"
-            "• **Price:** **₹199**.\n\n"
-            "👉 [Get Wedding Album PSD Pack (₹199)](/assets/wedding-album-psd-pack)"
-        )
-        return {"response": resp, "source": "pranvith_ai"}
-
-    # 5. General Products / Catalog / Pricing / Buying / Shop
-    if any(k in q for k in ["product", "products", "pack", "packs", "asset", "assets", "buy", "price", "cost", "shop", "catalog", "store"]):
-        resp = (
-            "🛍️ **PranvithDOP Digital Assets & Pricing:**\n\n"
-            "1. **Creative LUT Pack:** ₹49 ➔ [View LUTs](/assets/creative-lut-pack)\n"
-            "2. **Cinematic Sound FX Pack:** ₹149 ➔ [View Sound FX](/assets/cinematic-sound-fx-pack)\n"
-            "3. **Premiere Pro Wedding Templates:** ₹299 ➔ [View Templates](/assets/premiere-pro-wedding-templates)\n"
-            "4. **Wedding Album PSD Pack:** ₹199 ➔ [View PSD Pack](/assets/wedding-album-psd-pack)\n\n"
-            "• **Instant Delivery:** Automatic download link upon checkout.\n"
-            "• **Payment:** UPI (GPay/PhonePe), Cards, Net Banking via Razorpay.\n\n"
-            "👉 [Browse All Creative Assets](/assets)"
-        )
-        return {"response": resp, "source": "pranvith_ai"}
-
-    # 6. Download & Order Help
-    if any(k in q for k in ["download", "token", "expired", "lost email", "where is my file", "order status", "not received"]):
-        resp = (
-            "📥 **Download & Order Recovery:**\n\n"
-            "1. **Instant Download:** A download link is shown immediately on the order confirmation screen.\n"
-            "2. **Email Receipt:** An automated email containing your secure download token is sent to your billing address.\n"
-            "3. **Expired or Lost Link?** Send your Order ID / Payment screenshot to **info@pranvithdop.com** or WhatsApp **+91 9059867883** for instant link renewal!"
-        )
-        return {"response": resp, "source": "pranvith_ai"}
-
-    # 7. Payments & Checkout
-    if any(k in q for k in ["payment", "pay", "upi", "gpay", "phonepe", "razorpay", "card", "failed"]):
-        resp = (
-            "💳 **Payment Methods & Security:**\n\n"
-            "• We accept **UPI (Google Pay, PhonePe, Paytm, BHIM)**, **Credit/Debit Cards (Visa, Mastercard, RuPay)**, and **Net Banking**.\n"
-            "• Processed via 100% secure Razorpay encrypted checkout.\n"
-            "• Digital files are unlocked and downloadable instantly upon successful payment."
-        )
-        return {"response": resp, "source": "pranvith_ai"}
-
-    # 8. Courses & Cinematography Training
-    if any(k in q for k in ["course", "courses", "learn", "class", "training", "roadmap", "masterclass"]):
-        resp = (
-            "🎓 **PranvithDOP Master Cinematography Course:**\n\n"
-            "• **Curriculum:** Camera operation, S-Log3/C-Log3 exposure mastery, on-set lighting, gimbal movements, color grading in DaVinci Resolve & Premiere Pro.\n"
-            "• **Format:** Self-paced step-by-step video modules with real-world practice footage and community support.\n\n"
-            "👉 [Explore Courses & Roadmap](/courses)"
-        )
-        return {"response": resp, "source": "pranvith_ai"}
-
-    # 9. Services & Hiring
-    if any(k in q for k in ["hire", "service", "services", "quote", "booking", "brand film", "drone shoot"]):
-        resp = (
-            "🎬 **Hire PranvithDOP Production Services:**\n\n"
-            "• **Commercial Video Production:** Brand films, ad films, and promotional reels.\n"
-            "• **Cinematic Wedding Films:** High-end multi-cam wedding coverage with 4K color-graded films.\n"
-            "• **Aerial Drone Cinematography:** Licensed high-resolution aerial visuals.\n\n"
-            "👉 [Send Project Enquiry](/hire)"
-        )
-        return {"response": resp, "source": "pranvith_ai"}
-
-    # 10. Sony A7 IV / A7M4 / A74
-    if any(k in q for k in ["a7iv", "a7m4", "a74", "a7 iv", "a7 4", "m4", "sony iv"]):
-        resp = (
-            "🎥 **Sony A7 IV (A7M4) Cinematic Video Setup:**\n\n"
-            "• **Picture Profile:** PP8 / PP11 (S-Log3 / S-Gamut3.Cine).\n"
-            "• **Dual Native Base ISO:** **ISO 800 (Base 1)** & **ISO 3,200 (Base 2)**.\n"
-            "• **Exposure Strategy:** Expose to the right (**+1.7 to +2.0 EV** MM) for zero shadow noise.\n"
-            "• **Shutter Speed:** 1/50s for 24/25fps | 1/100s for 50fps (180° Rule).\n"
-            "• **Codec:** XAVC S-I 4K (All-Intra) 10-Bit 4:2:2 for maximum color grading flexibility.\n"
-            "• **Zebras:** Set lower limit at 52-55% for skin tones, 94%+ for highlight clipping.\n"
-            "• **Note on 60fps:** A7 IV applies a 1.5x Super35 crop at 4K 60p."
-        )
-        return {"response": resp, "source": "pranvith_camera_ai"}
-
-    # 11. Sony FX3 / A7S III / FX6
-    if any(k in q for k in ["fx3", "a7s", "a7siii", "a7s3", "fx6", "zve1", "a6700", "sony"]):
-        if any(k in q for k in ["low light", "night", "dark"]):
-            resp = (
-                "🎥 **Sony S-Log3 Low-Light Recipe (FX3 / A7S III):**\n\n"
-                "• **Base ISO:** Jump directly to **ISO 12,800 (Base 2)** for clean, grain-free shadows.\n"
-                "• **Exposure:** Expose at **+1.7 to +2.0 EV** on Metered Manual (ETTR).\n"
-                "• **Shutter Speed:** 1/50s (24/25fps) or 180° Shutter Angle.\n"
-                "• **Gamut:** S-Gamut3.Cine.\n"
-                "• **Pro Tip:** Never shoot between ISO 1,250 and 10,000 in low light—jump directly to ISO 12,800!"
-            )
-        else:
-            resp = (
-                "🎬 **Sony S-Log3 General Mastering Guide (FX3 / FX6 / A7S III):**\n\n"
-                "• **Picture Profile:** S-Log3 / S-Gamut3.Cine (10-Bit 4:2:2).\n"
-                "• **Dual Native Base ISOs:** **ISO 800 & ISO 12,800**.\n"
-                "• **Exposure Strategy:** Expose to the right (ETTR) by **+1.7 EV**.\n"
-                "• **Skin Tone Zebras:** 52-55%.\n"
-                "• **LUT Workflow:** Convert with Pranvith Creative LUT Pack before secondary grading."
-            )
-        return {"response": resp, "source": "pranvith_camera_ai"}
-
-    # 12. Canon C-Log3 / R5 / R6
-    if any(k in q for k in ["canon", "c-log", "clog", "r6", "r5", "c70", "r8"]):
-        resp = (
-            "🎥 **Canon C-Log3 Cinematography Recipe (R5 / R6 II / C70):**\n\n"
-            "• **Picture Profile:** C-Log3 / Cinema Gamut.\n"
-            "• **Base ISO:** **ISO 800** (Native).\n"
-            "• **Exposure Strategy:** Expose **+1.0 to +1.3 EV** over standard meter.\n"
-            "• **Waveform Target:** Middle grey at 35%, skin tones at 50-55%.\n"
-            "• **Color Transform:** Canon Cinema Gamut to Rec.709 via CST node in DaVinci Resolve."
-        )
-        return {"response": resp, "source": "pranvith_camera_ai"}
-
-    # 13. Slow Motion & Frame Rates
-    if any(k in q for k in ["slow motion", "slowmo", "60fps", "120fps", "50fps", "100fps", "240fps", "fps"]):
-        resp = (
-            "⚡ **Cinematic Slow-Motion Recipe:**\n\n"
-            "• **180° Shutter Rule:**\n"
-            "  - 60fps ➔ **1/120s**\n"
-            "  - 120fps ➔ **1/240s**\n"
-            "• **Light Compensation:** Higher frame rates lose ~1.5 to 2 stops of light. Open your aperture (f/1.4-f/2.0) or switch to your camera's second Base ISO.\n"
-            "• **Playback:** Conform 60fps/120fps to a 24fps timeline for smooth 2.5x to 5x slow motion."
-        )
-        return {"response": resp, "source": "pranvith_camera_ai"}
-
-    # 14. Light Flicker & LED Banding
-    if any(k in q for k in ["flicker", "flickering", "hz", "banding", "lines", "led"]):
-        resp = (
-            "💡 **Light Flicker & LED Banding Fix:**\n\n"
-            "• **50Hz Regions (India, UK, Europe, Australia):**\n"
-            "  - Use **25fps @ 1/50s** or **50fps @ 1/100s**.\n"
-            "  - For 60fps in 50Hz countries, dial shutter to **1/100s**.\n"
-            "• **60Hz Regions (USA, Canada, Japan):**\n"
-            "  - Use **24fps @ 1/48s (or 1/50s)** | **60fps @ 1/120s**.\n"
-            "• **Anti-Flicker Mode:** Turn on *ECS / Variable Shutter* (Sony) or *Synchro Scan* (Canon/Panasonic)."
-        )
-        return {"response": resp, "source": "pranvith_camera_ai"}
-
-    # 15. Default Friendly Fallback
-    resp = (
-        f"🎬 **Pranvith AI Assistant for: \"{query}\"**\n\n"
-        "• **Looking for Editing Packs?** Check out our [Creative LUT Pack (₹49)](/assets/creative-lut-pack) and [Cinematic Sound FX Pack (₹149)](/assets/cinematic-sound-fx-pack).\n"
-        "• **Camera Settings?** Ask for exact settings on Sony (A7 IV, FX3, A7S III), Canon (R5, R6), slow-motion 60fps/120fps, or low-light wedding workflows.\n"
-        "• **Support / Orders:** Instant download access after checkout; support via **info@pranvithdop.com**."
-    )
-    return {"response": resp, "source": "pranvith_ai"}
+    except Exception as e:
+        logger.exception("Camera AI processing failed: %s", e)
+        return {
+            "response": "I encountered an issue processing your camera query. Please check your settings or try again.",
+            "source": "error_fallback"
+        }
 
 
 PUBLIC_SETTINGS_FIELDS = {
+    "camera_ai_enabled",
+    "camera_ai_welcome_message",
+    "camera_ai_system_instructions",
+    "camera_ai_suggested_questions",
+    "camera_ai_knowledge_notes",
     "site_name",
     "theme",
     "notifications_enabled",
@@ -2977,6 +2793,69 @@ def _public_service(service: dict) -> dict:
     return _normalize_service_doc(safe_service)
 
 
+def _extract_instagram_shortcode(url: Optional[str]) -> Optional[str]:
+    if not url:
+        return None
+    raw = str(url).strip()
+    match = re.search(r'(?:instagram\.com|instagr\.am)/(?:reel|reels|p)/([A-Za-z0-9_-]+)', raw, re.IGNORECASE)
+    return match.group(1) if match else None
+
+
+def _fetch_instagram_thumbnail(url_or_shortcode: Optional[str]) -> Optional[str]:
+    shortcode = _extract_instagram_shortcode(url_or_shortcode) or (str(url_or_shortcode).strip() if url_or_shortcode else "")
+    if not shortcode or not re.match(r'^[A-Za-z0-9_-]+$', shortcode):
+        return None
+
+    import urllib.request
+
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.5",
+    }
+
+    endpoints = [
+        f"https://www.instagram.com/p/{shortcode}/embed/",
+        f"https://www.instagram.com/p/{shortcode}/embed/captioned/",
+        f"https://www.instagram.com/reel/{shortcode}/embed/",
+    ]
+
+    for embed_url in endpoints:
+        try:
+            req = urllib.request.Request(embed_url, headers=headers)
+            with urllib.request.urlopen(req, timeout=4) as resp:
+                content = resp.read().decode("utf-8", errors="ignore")
+
+                # Match 1: EmbeddedMediaImage
+                m = re.search(r'<img[^>]+class=[\"\'][^\"\']*EmbeddedMediaImage[^\"\']*[\"\'][^>]+src=[\"\']([^\"\']+)[\"\']', content, re.IGNORECASE)
+                if not m:
+                    m = re.search(r'<img[^>]+src=[\"\']([^\"\']+)[\"\'][^>]+class=[\"\'][^\"\']*EmbeddedMediaImage', content, re.IGNORECASE)
+                if m:
+                    raw_src = html.unescape(m.group(1)).replace(r"\/", "/")
+                    safe = _reject_unsafe_url(raw_src)
+                    if safe:
+                        return safe
+
+                # Match 2: display_url in JSON
+                m2 = re.search(r'[\"\']display_url[\"\']\s*:\s*[\"\']([^\"\']+)[\"\']', content)
+                if m2:
+                    raw_src = m2.group(1).replace(r"\/", "/").replace(r"\u0026", "&")
+                    safe = _reject_unsafe_url(raw_src)
+                    if safe:
+                        return safe
+
+                # Match 3: og:image
+                m3 = re.search(r'<meta[^>]+property=[\"\']og:image[\"\'][^>]+content=[\"\']([^\"\']+)[\"\']', content, re.IGNORECASE)
+                if m3:
+                    safe = _reject_unsafe_url(html.unescape(m3.group(1)))
+                    if safe:
+                        return safe
+        except Exception:
+            continue
+
+    return f"https://www.instagram.com/p/{shortcode}/media/?size=l"
+
+
 def _normalize_reel_doc(doc: dict, existing: Optional[dict] = None) -> dict:
     now = datetime.now(timezone.utc).isoformat()
     safe = dict(doc or {})
@@ -2989,6 +2868,13 @@ def _normalize_reel_doc(doc: dict, existing: Optional[dict] = None) -> dict:
 
     video_url = _reject_unsafe_url(video_url)
     thumbnail_url = _reject_unsafe_url(safe.get("thumbnail_url") or "") or ""
+
+    # Auto-resolve Instagram Reel cover thumbnail if not explicitly given
+    ig_shortcode = _extract_instagram_shortcode(video_url)
+    if ig_shortcode and not thumbnail_url:
+        auto_thumb = _fetch_instagram_thumbnail(ig_shortcode)
+        if auto_thumb:
+            thumbnail_url = auto_thumb
 
     ad_settings_raw = safe.get("ad_settings") or (existing.get("ad_settings") if existing else {}) or {}
     if hasattr(ad_settings_raw, "model_dump"):
@@ -3328,6 +3214,23 @@ async def public_toggle_reel_like(reel_id: str):
         return {"success": True, "likes_count": (res or {}).get("likes_count", 0)}
     except Exception:
         return {"success": True}
+
+
+@api_router.get("/reels/instagram-thumbnail")
+async def public_get_instagram_thumbnail(url: str):
+    shortcode = _extract_instagram_shortcode(url)
+    if not shortcode:
+        raise HTTPException(status_code=400, detail="Invalid Instagram Reel URL")
+
+    loop = asyncio.get_running_loop()
+    thumbnail_url = await loop.run_in_executor(None, _fetch_instagram_thumbnail, shortcode)
+
+    return {
+        "success": True,
+        "shortcode": shortcode,
+        "thumbnail_url": thumbnail_url or f"https://www.instagram.com/p/{shortcode}/media/?size=l",
+        "embed_url": f"https://www.instagram.com/reel/{shortcode}/embed/",
+    }
 
 
 @api_router.post("/hire")

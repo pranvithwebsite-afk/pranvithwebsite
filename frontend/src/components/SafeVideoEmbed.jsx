@@ -3,6 +3,7 @@ import { Play } from 'lucide-react';
 
 const YOUTUBE_HOSTS = new Set(['youtube.com', 'www.youtube.com', 'm.youtube.com', 'music.youtube.com', 'youtu.be', 'www.youtu.be', 'youtube-nocookie.com', 'www.youtube-nocookie.com']);
 const VIMEO_HOSTS = new Set(['vimeo.com', 'www.vimeo.com', 'player.vimeo.com']);
+export const INSTAGRAM_HOSTS = new Set(['instagram.com', 'www.instagram.com', 'instagr.am', 'm.instagram.com']);
 const DIRECT_VIDEO_EXT = /\.(mp4|webm|mov)(\?.*)?$/i;
 const IMAGE_EXT = /\.(jpe?g|png|webp|gif)(\?.*)?$/i;
 
@@ -60,6 +61,21 @@ export const getVimeoId = (url) => {
 export const isYouTubeUrl = (url) => !!getYouTubeId(url);
 export const isVimeoUrl = (url) => !!getVimeoId(url);
 
+export const getInstagramShortcode = (url) => {
+  const raw = String(url || '').trim();
+  if (!raw) return '';
+  const match = raw.match(/(?:instagram\.com|instagr\.am)\/(?:reel|reels|p)\/([A-Za-z0-9_-]+)/i);
+  return match ? match[1] : '';
+};
+
+export const isInstagramUrl = (url) => !!getInstagramShortcode(url);
+
+export const getInstagramEmbedUrl = (url) => {
+  const shortcode = getInstagramShortcode(url);
+  if (!shortcode) return '';
+  return `https://www.instagram.com/reel/${shortcode}/embed/?utm_source=ig_embed&utm_campaign=loading`;
+};
+
 export const isDirectVideoUrl = (url) => {
   const parsed = parseSafeUrl(url);
   return !!parsed && DIRECT_VIDEO_EXT.test(String(url || '').trim());
@@ -77,6 +93,7 @@ export const detectMediaType = (url) => {
   if (isDirectVideoUrl(raw)) return 'video_file';
   if (getYouTubeId(raw)) return 'youtube';
   if (getVimeoId(raw)) return 'vimeo';
+  if (getInstagramShortcode(raw)) return 'instagram';
   return '';
 };
 
@@ -88,6 +105,9 @@ export const getSafeVideoEmbedUrl = (videoType, videoUrl) => {
 
   const vimeoId = (type === 'vimeo' || type === 'video_url' || type === 'auto' || !type) ? getVimeoId(url) : '';
   if (vimeoId) return `https://player.vimeo.com/video/${vimeoId}?playsinline=1`;
+
+  const instagramCode = (type === 'instagram' || type === 'video_url' || type === 'auto' || !type) ? getInstagramShortcode(url) : '';
+  if (instagramCode) return `https://www.instagram.com/reel/${instagramCode}/embed/?utm_source=ig_embed&utm_campaign=loading`;
 
   return '';
 };
@@ -112,6 +132,7 @@ const withAutoplay = (url, { loop = false, youtubeId = '' } = {}) => {
 
 const externalVideoLabel = (videoType, videoUrl) => {
   if (getYouTubeId(videoUrl) || String(videoType || '').toLowerCase() === 'youtube') return 'Watch on YouTube';
+  if (getInstagramShortcode(videoUrl) || String(videoType || '').toLowerCase() === 'instagram') return 'Watch on Instagram';
   return 'Open video';
 };
 

@@ -16,6 +16,18 @@ const defaultSettings = {
   meta_pixel_id: '',
   ga4_id: '',
   gtm_id: '',
+  camera_ai_enabled: true,
+  camera_ai_welcome_message: '',
+  camera_ai_system_instructions: '',
+  camera_ai_suggested_questions: [
+    'Best settings for Nikon Z6III?',
+    'How to shoot 4K 120fps?',
+    'Sony FX3 vs Nikon Z6III for filmmaking?',
+    'Explain aperture in Telugu',
+    'Best camera settings for indoor wedding?',
+    'Which lens is best for low-light video?'
+  ],
+  camera_ai_knowledge_notes: '',
   header: {
     logo_url: '',
     logo_badge_text: 'PD',
@@ -404,6 +416,76 @@ const Settings = () => {
               />
               <p className="mt-2 text-xs text-slate-500">One link per line as Label|/path.</p>
             </Field>
+          </div>
+
+          {/* Camera AI PRO Assistant Settings */}
+          <div className="rounded-3xl border border-[#ff5a1f]/30 bg-slate-900/80 p-6 shadow-xl shadow-orange-950/20">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <div className="flex items-center gap-2">
+                  <h2 className="text-xl font-semibold text-white">Camera AI PRO Assistant</h2>
+                  <span className="rounded-md bg-[#ff5a1f]/20 border border-[#ff5a1f]/40 px-2 py-0.5 text-xs font-bold uppercase tracking-wider text-[#ff8a5c]">
+                    PRO
+                  </span>
+                </div>
+                <p className="mt-1 text-sm text-slate-400">
+                  Manage the AI Camera Expert assistant configuration, welcome text, suggestions, and custom instructions.
+                </p>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={settings.camera_ai_enabled !== false}
+                  onChange={(e) => update('camera_ai_enabled', e.target.checked)}
+                  className="sr-only peer"
+                />
+                <div className="w-11 h-6 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#ff5a1f]"></div>
+                <span className="ml-3 text-xs font-semibold text-white">
+                  {settings.camera_ai_enabled !== false ? 'Enabled' : 'Disabled'}
+                </span>
+              </label>
+            </div>
+
+            <div className="mt-6 space-y-5">
+              <Field label="Custom Welcome Message (Shown when user opens chat)">
+                <input
+                  value={settings.camera_ai_welcome_message || ''}
+                  onChange={(e) => update('camera_ai_welcome_message', e.target.value)}
+                  className={fieldClass}
+                  placeholder="Hi 👋 Welcome to PranvithDOP! Ask me about cameras, lenses, cinematic settings..."
+                />
+              </Field>
+
+              <Field label="Custom AI Instructions (Tone, guidelines, specific studio policies)">
+                <textarea
+                  value={settings.camera_ai_system_instructions || ''}
+                  onChange={(e) => update('camera_ai_system_instructions', e.target.value)}
+                  rows={3}
+                  className={`${fieldClass} resize-none`}
+                  placeholder="e.g. Always emphasize shooting in N-Log for Nikon and S-Log3 for Sony. Mention our Hyderabad rental gear packages if asked."
+                />
+              </Field>
+
+              <Field label="Suggested Questions (One per line)">
+                <textarea
+                  value={Array.isArray(settings.camera_ai_suggested_questions) ? settings.camera_ai_suggested_questions.join('\n') : (settings.camera_ai_suggested_questions || '')}
+                  onChange={(e) => update('camera_ai_suggested_questions', e.target.value.split('\n').filter(Boolean))}
+                  rows={4}
+                  className={`${fieldClass} resize-none`}
+                  placeholder="Best settings for Nikon Z6III?&#10;How to shoot 4K 120fps?&#10;Sony FX3 vs Nikon Z6III?&#10;Explain aperture in Telugu"
+                />
+              </Field>
+
+              <Field label="Custom Knowledge Base Notes (Rental gear, offline course dates, studio address)">
+                <textarea
+                  value={settings.camera_ai_knowledge_notes || ''}
+                  onChange={(e) => update('camera_ai_knowledge_notes', e.target.value)}
+                  rows={3}
+                  className={`${fieldClass} resize-none`}
+                  placeholder="Additional facts or FAQs the AI can reference when responding to queries."
+                />
+              </Field>
+            </div>
           </div>
 
           <div className="flex justify-end">

@@ -150,3 +150,29 @@ def test_admin_reels_crud_and_reorder(monkeypatch):
     delete_res = asyncio.run(server.admin_delete_reel(reel_id, admin))
     assert delete_res["success"] is True
 
+
+def test_instagram_reel_thumbnail_helpers(monkeypatch):
+    # Shortcode extraction
+    assert server._extract_instagram_shortcode("https://www.instagram.com/reel/C7mZ123xyz/") == "C7mZ123xyz"
+    assert server._extract_instagram_shortcode("https://instagram.com/reels/D8kL987abc/?utm_source=ig_web_copy_link") == "D8kL987abc"
+    assert server._extract_instagram_shortcode("https://instagr.am/p/B5xP456def/") == "B5xP456def"
+    assert server._extract_instagram_shortcode("https://example.com/not-instagram.mp4") is None
+
+    # Endpoint response
+    res = asyncio.run(server.public_get_instagram_thumbnail("https://www.instagram.com/reel/C7mZ123xyz/"))
+    assert res["success"] is True
+    assert res["shortcode"] == "C7mZ123xyz"
+    assert "thumbnail_url" in res
+    assert "embed_url" in res
+
+    # Auto-resolve thumbnail in Reel doc normalization
+    doc = {
+        "title": "IG Reel",
+        "video_url": "https://www.instagram.com/reel/C7mZ123xyz/",
+        "thumbnail_url": "",
+    }
+    normalized = server._normalize_reel_doc(doc)
+    assert normalized["thumbnail_url"] != ""
+    assert "C7mZ123xyz" in normalized["thumbnail_url"]
+
+

@@ -249,6 +249,18 @@ export const askCameraAi = async (message, history = []) => {
     if (q.includes('product') || q.includes('pack') || q.includes('price') || q.includes('buy')) {
       return "🛍️ **PranvithDOP Digital Assets & Pricing:**\n\n1. **Creative LUT Pack:** ₹49 ➔ [View LUTs](/assets/creative-lut-pack)\n2. **Cinematic Sound FX Pack:** ₹149 ➔ [View Sound FX](/assets/cinematic-sound-fx-pack)\n3. **Premiere Pro Wedding Templates:** ₹299 ➔ [View Templates](/assets/premiere-pro-wedding-templates)\n4. **Wedding Album PSD Pack:** ₹199 ➔ [View PSD Pack](/assets/wedding-album-psd-pack)\n\n👉 [Browse All Creative Assets](/assets)";
     }
+    if (q.includes('z6') || q.includes('z6iii') || q.includes('nikon')) {
+      if (q.includes('120') || q.includes('slow')) {
+        return "🎥 **Nikon Z6III 4K 120fps Guide:**\n\n• **Sensor Crop:** 1.5x DX (Super35) crop.\n• **Shutter Speed:** 1/240s (180° rule).\n• **Base ISO:** N-Log High Base ISO 6,400 to compensate for light loss.\n• **Codecs:** N-RAW 12-bit or ProRes 422 HQ.\n• **Media:** High-speed CFexpress Type B card required.";
+      }
+      return "🎥 **Nikon Z6III Cinematography Recipe:**\n\n• **Sensor:** 24.5MP Partially-Stacked Full-Frame.\n• **Video:** Internal 6K 60p N-RAW & 4K 60p oversampled from 6K.\n• **Slow-Mo:** 4K 120p (1.5x DX crop) & 1080p up to 240p.\n• **Dual Base ISO (N-Log):** ISO 800 & ISO 6,400.\n• **Stabilization:** 8.0 stops IBIS with Focus Point VR.";
+    }
+    if (q.includes('180') && (q.includes('shutter') || q.includes('rule') || q.includes('degree'))) {
+      return "📐 **The 180-Degree Shutter Rule:**\n\n• **Formula:** Shutter Speed = 1 / (2 × Frame Rate)\n• **24fps / 25fps:** 1/50s\n• **50fps:** 1/100s\n• **60fps:** 1/120s\n• **120fps:** 1/240s\n• **Pro Tip:** Never use shutter speed to darken daylight exposure—use a Variable ND Filter!";
+    }
+    if (q.includes('aperture')) {
+      return "📸 **Aperture & Depth of Field:**\n\n• **Wide Aperture (f/1.4 - f/2.8):** Lets in maximum light, creamy background blur (bokeh), great for portraits.\n• **Narrow Aperture (f/8 - f/16):** Keeps foreground to background sharp, ideal for landscapes and group stage photos.";
+    }
     if (q.includes('a7iv') || q.includes('a7m4') || q.includes('m4') || q.includes('a7 4')) {
       return "🎥 **Sony A7 IV (A7M4) Cinematic Video Setup:**\n\n• **Picture Profile:** PP8 / PP11 (S-Log3 / S-Gamut3.Cine).\n• **Dual Native Base ISO:** **ISO 800 (Base 1)** & **ISO 3,200 (Base 2)**.\n• **Exposure:** Expose to the right (**+1.7 to +2.0 EV** MM) for zero shadow noise.\n• **Shutter:** 1/50s for 24/25fps | 1/100s for 50fps.\n• **Codec:** XAVC S-I 4K 10-Bit 4:2:2.";
     }
@@ -531,6 +543,18 @@ export const reorderAdminServices = async (serviceIds) => {
 export const fetchPublicReels = async () => {
   const { data } = await api.get('/reels');
   return data;
+};
+
+export const fetchInstagramThumbnail = async (url) => {
+  try {
+    const { data } = await api.get('/reels/instagram-thumbnail', {
+      params: { url },
+      timeout: 6000,
+    });
+    return data?.thumbnail_url || '';
+  } catch (err) {
+    return '';
+  }
 };
 
 export const recordReelView = async (reelId) => {

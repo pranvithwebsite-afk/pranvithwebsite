@@ -19,11 +19,18 @@ import {
 import { askCameraAi } from '../lib/api';
 import { Link } from 'react-router-dom';
 
-const SHORTCUTS = [
+const CAMERA_SUGGESTIONS = [
+  'Best settings for Nikon Z6III?',
+  'How to shoot 4K 120fps?',
+  'Sony FX3 vs Nikon Z6III for filmmaking?',
+  'Explain aperture in Telugu',
+  'Best camera settings for indoor wedding?',
+  'Which lens is best for low-light video?',
+  'How to shoot professional slow motion?',
+];
+
+const STORE_SHORTCUTS = [
   { id: 'find_product', label: 'Find a Product', icon: ShoppingBag, prompt: 'What editing packs, LUTs, and presets are available?' },
-  { id: 'product_rec', label: 'Product Recommendation', icon: Star, prompt: 'Which LUT pack or preset is best for Sony and Canon wedding videos?' },
-  { id: 'download_help', label: 'Download Help', icon: Download, prompt: 'How do I download my purchased assets and what if my link expired?' },
-  { id: 'payment_help', label: 'Payment Help', icon: CreditCard, prompt: 'What payment methods do you support and how does Razorpay checkout work?' },
   { id: 'order_help', label: 'Order Help', icon: Package, prompt: 'How do I check my order status or re-access my download token?' },
   { id: 'faq', label: 'FAQ', icon: HelpCircle, prompt: 'What is your commercial license policy and software compatibility?' },
   { id: 'support', label: 'Talk to Support', icon: Headphones, prompt: 'How can I contact PranvithDOP support directly?' },
@@ -96,21 +103,116 @@ const parseInlineContent = (str, keyPrefix = '', onLinkClick) => {
   return elements;
 };
 
-const FormattedAiMessage = ({ text, onLinkClick }) => {
-  const lines = String(text || '').split('\n');
+const renderTableBlock = (tableLines, tableIndex, onLinkClick) => {
+  if (tableLines.length < 2) return null;
+  const parseRow = (line) =>
+    line
+      .split('|')
+      .map((c) => c.trim())
+      .filter((c, idx, arr) => idx > 0 && idx < arr.length - 1);
+
+  const headers = parseRow(tableLines[0]);
+  const dataRows = tableLines.slice(1).filter((l) => !l.includes('---')).map(parseRow);
+
   return (
-    <div className="space-y-1.5 text-xs md:text-sm leading-relaxed">
-      {lines.map((line, idx) => {
-        if (!line.trim()) return <div key={idx} className="h-1.5" />;
-        const isBullet = line.startsWith('•');
-        return (
-          <div key={idx} className={isBullet ? 'pl-2 text-white/95' : 'text-white/90'}>
-            {parseInlineContent(line, `l-${idx}`, onLinkClick)}
-          </div>
-        );
-      })}
+    <div key={`tbl-${tableIndex}`} className="my-2.5 overflow-x-auto rounded-xl border border-white/10 bg-white/[0.03]">
+      <table className="w-full text-left text-[11px] md:text-xs">
+        <thead className="border-b border-white/10 bg-[#ff5a1f]/15 text-[#ff8a5c] font-bold">
+          <tr>
+            {headers.map((h, hIdx) => (
+              <th key={`th-${tableIndex}-${hIdx}`} className="px-2.5 py-1.5 whitespace-nowrap font-semibold">
+                {parseInlineContent(h, `th-${tableIndex}-${hIdx}`, onLinkClick)}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-white/5 text-white/90">
+          {dataRows.map((row, rIdx) => (
+            <tr key={`tr-${tableIndex}-${rIdx}`} className="hover:bg-white/[0.02]">
+              {row.map((cell, cIdx) => (
+                <td key={`td-${tableIndex}-${rIdx}-${cIdx}`} className="px-2.5 py-1.5 align-top">
+                  {parseInlineContent(cell, `td-${tableIndex}-${rIdx}-${cIdx}`, onLinkClick)}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
+};
+
+const FormattedAiMessage = ({ text, onLinkClick }) => {
+  const lines = String(text || '').split('\n');
+  const elements = [];
+  let tableBuffer = [];
+  let tableIndex = 0;
+
+  const flushTable = () => {
+    if (tableBuffer.length > 0) {
+      elements.push(renderTableBlock(tableBuffer, tableIndex++, onLinkClick));
+      tableBuffer = [];
+    }
+  };
+
+  lines.forEach((line, idx) => {
+    const trimmed = line.trim();
+
+    if (trimmed.startsWith('|') && trimmed.endsWith('|')) {
+      tableBuffer.push(trimmed);
+      return;
+    }
+
+    flushTable();
+
+    if (!trimmed) {
+      elements.push(<div key={`sp-${idx}`} className="h-1.5" />);
+      return;
+    }
+
+    if (trimmed.startsWith('### ')) {
+      elements.push(
+        <h4 key={`h3-${idx}`} className="text-xs md:text-sm font-bold text-[#ff8a5c] mt-2 mb-1 flex items-center gap-1.5">
+          <span className="h-1.5 w-1.5 rounded-full bg-[#ff5a1f]" />
+          {parseInlineContent(trimmed.replace(/^###\s*/, ''), `h3-${idx}`, onLinkClick)}
+        </h4>
+      );
+      return;
+    }
+
+    if (trimmed.startsWith('## ')) {
+      elements.push(
+        <h3 key={`h2-${idx}`} className="text-sm md:text-base font-bold text-white mt-2.5 mb-1.5 flex items-center gap-2">
+          <span className="h-2 w-2 rounded-full bg-[#ff5a1f]" />
+          {parseInlineContent(trimmed.replace(/^##\s*/, ''), `h2-${idx}`, onLinkClick)}
+        </h3>
+      );
+      return;
+    }
+
+    if (trimmed.includes('$$')) {
+      const cleanFormula = trimmed.replace(/\$\$/g, '').replace(/\\text\{([^}]+)\}/g, '$1').replace(/\\frac\{([^}]+)\}\{([^}]+)\}/g, '$1 / ($2)').replace(/\\times/g, '×');
+      elements.push(
+        <div key={`math-${idx}`} className="my-2 p-2 rounded-xl bg-white/[0.05] border border-white/10 font-mono text-center text-xs text-[#ff8a5c]">
+          {cleanFormula}
+        </div>
+      );
+      return;
+    }
+
+    const isBullet = trimmed.startsWith('•') || trimmed.startsWith('- ');
+    const cleanLine = isBullet ? trimmed.replace(/^[•\-]\s*/, '• ') : trimmed;
+
+    elements.push(
+      <div key={`l-${idx}`} className={isBullet ? 'pl-2 text-white/95' : 'text-white/90'}>
+        {parseInlineContent(cleanLine, `l-${idx}`, onLinkClick)}
+      </div>
+    );
+  });
+
+  flushTable();
+
+  return <div className="space-y-1.5 text-xs md:text-sm leading-relaxed">{elements}</div>;
 };
 
 const FloatingAiAssistant = () => {
@@ -164,17 +266,9 @@ const FloatingAiAssistant = () => {
       }));
 
       let response = '';
-      const q = userMsg.toLowerCase();
+      const q = userMsg.toLowerCase().trim();
 
-      if (q.includes('find a product') || q.includes('available') || q.includes('packs')) {
-        response = `🛍️ **PranvithDOP Editing Packs & Assets:**\n\n• **Wedding LUTs Master Pack:** 15+ high-grade cinematic LUTs calibrated for Sony S-Log3, Canon C-Log3, and Rec.709.\n• **Cinematic Sound FX Bundle:** 200+ whooshes, risers, impacts, and ambient soundscapes.\n• **Motion Transitions & Overlay Presets:** Seamless zooms, light leaks, and glitch transitions.\n• **Album PSD Templates:** Professional photo editing grids.\n\n👉 [Explore All Assets](/assets)`;
-      } else if (q.includes('download help') || q.includes('download') || q.includes('expired')) {
-        response = `📥 **Download Instructions:**\n\n1. Instant access is provided immediately after payment on the confirmation page.\n2. A download token link is also automatically sent to your billing email.\n3. If your token expired or you lost the email, send your Order ID to **info@pranvithdop.com** for instant renewal!`;
-      } else if (q.includes('payment') || q.includes('methods') || q.includes('razorpay')) {
-        response = `💳 **Payment & Checkout:**\n\n• We accept **UPI (GPay, PhonePe, Paytm)**, **Credit/Debit Cards**, **Net Banking**, and **International Cards** via Razorpay.\n• 100% encrypted and instant automatic delivery!`;
-      } else if (q.includes('order help') || q.includes('status')) {
-        response = `📦 **Order Status & Downloads:**\n\n• All digital assets are delivered instantly upon successful payment.\n• Please check your email inbox and spam folder for the download receipt.\n• Need instant re-send? Contact our support team below!`;
-      } else if (q.includes('support') || q.includes('contact') || q.includes('talk to support')) {
+      if (q === 'how can i contact pranvithdop support directly?' || q === 'talk to support') {
         response = `💬 **Contact PranvithDOP Support:**\n\n• **Email:** info@pranvithdop.com\n• **WhatsApp / Phone:** +91 9059867883\n• **Location:** Hyderabad, India\n• **Hours:** 24/7 Response time for digital downloads & enquiries.`;
       } else {
         response = await askCameraAi(userMsg, history);
@@ -267,22 +361,43 @@ const FloatingAiAssistant = () => {
                 I can help you explore editing packs, find presets, verify order downloads, and answer camera & technical questions.
               </p>
 
-              {/* Quick Shortcuts Grid */}
+              {/* Camera Expert Suggestions */}
               <div className="mt-4 pt-3 border-t border-white/10 text-left">
-                <p className="text-[10px] font-bold uppercase tracking-wider text-[#ff8a5c] mb-2.5">
-                  QUICK SHORTCUTS:
+                <p className="text-[10px] font-bold uppercase tracking-wider text-[#ff8a5c] mb-2 flex items-center gap-1.5">
+                  <Sparkles size={11} className="text-[#ff5a1f]" />
+                  <span>CAMERA AI SUGGESTIONS:</span>
                 </p>
                 <div className="flex flex-wrap gap-1.5">
-                  {SHORTCUTS.map((item) => {
+                  {CAMERA_SUGGESTIONS.map((suggestion, sIdx) => (
+                    <button
+                      key={`cam-sugg-${sIdx}`}
+                      type="button"
+                      onClick={() => handleSend(suggestion)}
+                      className="inline-flex items-center gap-1.5 rounded-full border border-[#ff5a1f]/30 bg-white/[0.04] hover:bg-[#ff5a1f]/20 hover:border-[#ff5a1f]/60 px-2.5 py-1 text-[11px] font-medium text-white/90 hover:text-white transition duration-200"
+                    >
+                      <Camera size={11} className="text-[#ff8a5c]" />
+                      <span>{suggestion}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Order & Store Shortcuts */}
+              <div className="mt-3 pt-2.5 border-t border-white/5 text-left">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-white/40 mb-2">
+                  STORE & ORDER HELP:
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {STORE_SHORTCUTS.map((item) => {
                     const Icon = item.icon;
                     return (
                       <button
                         key={item.id}
                         type="button"
                         onClick={() => handleSend(item.prompt)}
-                        className="inline-flex items-center gap-1.5 rounded-full border border-white/12 bg-white/[0.04] hover:bg-[#ff5a1f]/20 hover:border-[#ff5a1f]/50 px-3 py-1.5 text-[11px] font-medium text-white/90 hover:text-white transition duration-200"
+                        className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.03] hover:bg-white/[0.08] hover:border-white/20 px-2.5 py-1 text-[11px] font-medium text-white/70 hover:text-white transition duration-200"
                       >
-                        <Icon size={12} className="text-[#ff8a5c]" />
+                        <Icon size={11} className="text-[#ff8a5c]" />
                         <span>{item.label}</span>
                       </button>
                     );

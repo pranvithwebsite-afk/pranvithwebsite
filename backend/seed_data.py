@@ -1521,6 +1521,30 @@ DEFAULT_REELS = [
         "created_at": "2026-10-15T09:45:00Z",
         "updated_at": None,
     },
+    {
+        "id": "reel-5-cinematic-reel-ig",
+        "title": "Low Light Street Cine Grade",
+        "description": "Sony FX3 Dual Native ISO 12800 nighttime street grade. Graded with Pranvith Creative LUTs. #fx3 #cinematography #streetcine #slog3",
+        "video_url": "https://www.instagram.com/reel/C8qL8G2v_kF/",
+        "thumbnail_url": "",
+        "aspect_ratio": "9:16",
+        "sound_title": "Night Lights - Original Audio",
+        "author_name": "Pranvith DOP",
+        "duration": 15.0,
+        "sort_order": 4,
+        "is_active": True,
+        "likes_count": 1240,
+        "views_count": 15300,
+        "ad_settings": {
+            "pre_roll_enabled": True,
+            "mid_roll_enabled": True,
+            "mid_roll_cue_seconds": 6.0,
+            "ad_tag_url": "",
+            "gam_ad_unit_path": "/21775744923/pranvith_reels_video",
+        },
+        "created_at": "2026-10-20T10:00:00Z",
+        "updated_at": None,
+    },
 ]
 
 

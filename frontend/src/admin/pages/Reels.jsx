@@ -9,6 +9,7 @@ import {
   EyeOff,
   Film,
   Heart,
+  Instagram,
   Play,
   Plus,
   RefreshCw,
@@ -27,10 +28,17 @@ import {
   createAdminReel,
   deleteAdminReel,
   fetchAdminReels,
+  fetchInstagramThumbnail,
   reorderAdminReels,
   toggleAdminReelStatus,
   updateAdminReel,
 } from '../../lib/api';
+import {
+  getInstagramEmbedUrl,
+  getInstagramShortcode,
+  isInstagramUrl,
+} from '../../components/SafeVideoEmbed';
+import { FALLBACK_IMAGE, handleImageError, safeImageSrc } from '../../lib/utils';
 import { useAdminConfirm } from '../components/AdminConfirmProvider';
 
 const defaultAdSettings = {
@@ -64,7 +72,73 @@ const Reels = () => {
   const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState(defaultForm);
   const [saving, setSaving] = useState(false);
+  const [fetchingThumb, setFetchingThumb] = useState(false);
   const confirm = useAdminConfirm();
+
+  const getAdminReelCover = (reel) => {
+    if (!reel) return FALLBACK_IMAGE;
+    if (reel.thumbnail_url) return reel.thumbnail_url;
+    const sc = getInstagramShortcode(reel.video_url);
+    if (sc) {
+      return `https://www.instagram.com/p/${sc}/media/?size=l`;
+    }
+    return FALLBACK_IMAGE;
+  };
+
+  const handleVideoUrlChange = async (val) => {
+    setForm((prev) => ({ ...prev, video_url: val }));
+    if (isInstagramUrl(val)) {
+      try {
+        setFetchingThumb(true);
+        const res = await fetchInstagramThumbnail(val);
+        if (res?.thumbnail_url) {
+          setForm((prev) => ({
+            ...prev,
+            thumbnail_url: prev.thumbnail_url || res.thumbnail_url,
+          }));
+          toast.success('Instagram Reel detected: cover thumbnail auto-resolved!');
+        }
+      } catch (err) {
+        const sc = getInstagramShortcode(val);
+        if (sc) {
+          setForm((prev) => ({
+            ...prev,
+            thumbnail_url: prev.thumbnail_url || `https://www.instagram.com/p/${sc}/media/?size=l`,
+          }));
+        }
+      } finally {
+        setFetchingThumb(false);
+      }
+    }
+  };
+
+  const handleAutoFetchInstagramThumb = async () => {
+    if (!isInstagramUrl(form.video_url)) {
+      toast.error('Enter a valid Instagram Reel URL in the video field first');
+      return;
+    }
+    try {
+      setFetchingThumb(true);
+      const res = await fetchInstagramThumbnail(form.video_url);
+      if (res?.thumbnail_url) {
+        setForm((prev) => ({ ...prev, thumbnail_url: res.thumbnail_url }));
+        toast.success('Instagram cover thumbnail fetched successfully!');
+      } else {
+        const sc = getInstagramShortcode(form.video_url);
+        if (sc) {
+          setForm((prev) => ({
+            ...prev,
+            thumbnail_url: `https://www.instagram.com/p/${sc}/media/?size=l`,
+          }));
+          toast.success('Using official Instagram cover fallback');
+        }
+      }
+    } catch (err) {
+      toast.error('Could not fetch Instagram thumbnail');
+    } finally {
+      setFetchingThumb(false);
+    }
+  };
 
   const sortedReels = useMemo(
     () => [...reels].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0)),
@@ -341,10 +415,17 @@ const Reels = () => {
                       }}
                       className="group relative h-28 w-16 flex-shrink-0 cursor-pointer overflow-hidden rounded-xl border border-slate-700 bg-slate-950"
                     >
-                      {reel.video_url ? (
+                      {isInstagramUrl(reel.video_url) ? (
+                        <img
+                          src={safeImageSrc(getAdminReelCover(reel))}
+                          alt={reel.title}
+                          onError={handleImageError}
+                          className="h-full w-full object-cover"
+                        />
+                      ) : reel.video_url ? (
                         <video
                           src={reel.video_url}
-                          poster={reel.thumbnail_url || undefined}
+                          poster={safeImageSrc(reel.thumbnail_url) || undefined}
                           className="h-full w-full object-cover"
                           muted
                           playsInline
@@ -357,6 +438,11 @@ const Reels = () => {
                       <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 transition group-hover:opacity-100">
                         <Play className="h-6 w-6 fill-white text-white" />
                       </div>
+                      {isInstagramUrl(reel.video_url) && (
+                        <span className="absolute top-1 left-1 rounded bg-gradient-to-r from-purple-600 to-pink-600 p-0.5 text-white shadow">
+                          <Instagram className="h-3 w-3" />
+                        </span>
+                      )}
                       <span className="absolute bottom-1 right-1 rounded bg-black/80 px-1 py-0.5 text-[10px] font-mono text-white">
                         9:16
                       </span>
@@ -365,6 +451,12 @@ const Reels = () => {
                     <div className="space-y-1.5">
                       <div className="flex flex-wrap items-center gap-2">
                         <h3 className="text-base font-semibold text-white">{reel.title}</h3>
+                        {isInstagramUrl(reel.video_url) && (
+                          <span className="inline-flex items-center gap-1 rounded bg-pink-500/20 px-2 py-0.5 text-[11px] font-medium text-pink-300">
+                            <Instagram className="h-3 w-3" />
+                            Instagram Reel
+                          </span>
+                        )}
                         {!reel.is_active && (
                           <span className="rounded bg-rose-500/20 px-2 py-0.5 text-[11px] font-medium text-rose-400">
                             Hidden / Draft
@@ -503,13 +595,13 @@ const Reels = () => {
               {/* Video Upload / URL */}
               <div className="rounded-2xl border border-slate-800 bg-slate-950/60 p-4 space-y-4">
                 <MediaUrlInput
-                  label="Reel Video (9:16 Vertical MP4 / WebM)"
+                  label="Reel Video (9:16 Vertical MP4 / WebM or Instagram Reel)"
                   fieldName="video_url"
                   value={form.video_url}
-                  onChange={(val) => setForm((prev) => ({ ...prev, video_url: val }))}
+                  onChange={handleVideoUrlChange}
                   accept="video/mp4,video/webm,video/quicktime"
-                  placeholder="Upload 9:16 video to Cloudflare R2 or paste direct video URL"
-                  helperText="Upload vertical 9:16 MP4/WebM video or paste direct video / YouTube Shorts / Vimeo link."
+                  placeholder="Upload 9:16 video or paste Instagram Reel link (https://www.instagram.com/reel/...)"
+                  helperText="Upload vertical 9:16 MP4/WebM video or paste direct link / Instagram Reel. Instagram covers are auto-fetched automatically."
                   videoUploadPurpose="reel-video"
                   showPreview={false}
                 />
@@ -518,20 +610,44 @@ const Reels = () => {
                 {form.video_url && (
                   <div className="mt-3 flex items-center gap-4 rounded-xl border border-slate-800 bg-slate-900 p-3">
                     <div className="h-24 w-14 flex-shrink-0 overflow-hidden rounded-lg bg-black">
-                      <video
-                        src={form.video_url}
-                        className="h-full w-full object-cover"
-                        controls={false}
-                        autoPlay
-                        loop
-                        muted
-                        playsInline
-                      />
+                      {isInstagramUrl(form.video_url) ? (
+                        <img
+                          src={safeImageSrc(getAdminReelCover(form))}
+                          alt="Instagram Reel Cover"
+                          onError={handleImageError}
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        <video
+                          src={form.video_url}
+                          className="h-full w-full object-cover"
+                          controls={false}
+                          autoPlay
+                          loop
+                          muted
+                          playsInline
+                        />
+                      )}
                     </div>
                     <div className="space-y-1 text-xs">
-                      <p className="font-semibold text-emerald-400">✓ Video Source Connected</p>
-                      <p className="line-clamp-1 text-slate-400 font-mono text-[11px]">{form.video_url}</p>
-                      <p className="text-slate-500">9:16 vertical fullscreen ratio</p>
+                      {isInstagramUrl(form.video_url) ? (
+                        <>
+                          <p className="font-semibold text-pink-400 flex items-center gap-1.5">
+                            <Instagram className="h-3.5 w-3.5" />
+                            Instagram Reel Detected
+                          </p>
+                          <p className="line-clamp-1 text-slate-400 font-mono text-[11px]">{form.video_url}</p>
+                          <p className="text-slate-400 text-[11px]">
+                            Official embed ready &bull; Cover auto-resolved
+                          </p>
+                        </>
+                      ) : (
+                        <>
+                          <p className="font-semibold text-emerald-400">✓ Video Source Connected</p>
+                          <p className="line-clamp-1 text-slate-400 font-mono text-[11px]">{form.video_url}</p>
+                          <p className="text-slate-500">9:16 vertical fullscreen ratio</p>
+                        </>
+                      )}
                     </div>
                   </div>
                 )}
@@ -568,15 +684,33 @@ const Reels = () => {
               </div>
 
               {/* Poster / Thumbnail image */}
-              <MediaUrlInput
-                label="Poster / Thumbnail Image (Optional)"
-                fieldName="thumbnail_url"
-                value={form.thumbnail_url}
-                onChange={(val) => setForm((prev) => ({ ...prev, thumbnail_url: val }))}
-                accept="image/*"
-                placeholder="Upload or paste image thumbnail URL"
-                helperText="Poster image displayed while video is loading."
-              />
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-semibold text-slate-300">
+                    Poster / Thumbnail Image (Optional)
+                  </label>
+                  {isInstagramUrl(form.video_url) && (
+                    <button
+                      type="button"
+                      disabled={fetchingThumb}
+                      onClick={handleAutoFetchInstagramThumb}
+                      className="inline-flex items-center gap-1 rounded-lg border border-pink-500/30 bg-pink-500/10 px-2 py-0.5 text-[11px] font-semibold text-pink-300 hover:bg-pink-500/20 disabled:opacity-50"
+                    >
+                      <Instagram className="h-3 w-3" />
+                      {fetchingThumb ? 'Fetching Cover...' : 'Re-fetch Instagram Cover'}
+                    </button>
+                  )}
+                </div>
+                <MediaUrlInput
+                  label=""
+                  fieldName="thumbnail_url"
+                  value={form.thumbnail_url}
+                  onChange={(val) => setForm((prev) => ({ ...prev, thumbnail_url: val }))}
+                  accept="image/*"
+                  placeholder="Upload or paste image thumbnail URL"
+                  helperText="Poster image displayed while video is loading or paused. For Instagram Reels, this is auto-resolved from the official embed."
+                />
+              </div>
 
               {/* Audio & Metadata */}
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
@@ -830,13 +964,24 @@ const Reels = () => {
               <X className="h-5 w-5" />
             </button>
             <div className="relative aspect-[9/16] h-[75vh] max-h-[800px] overflow-hidden rounded-3xl border border-slate-700 bg-black shadow-2xl">
-              <video
-                src={previewReel.video_url}
-                controls
-                autoPlay
-                playsInline
-                className="h-full w-full object-cover"
-              />
+              {isInstagramUrl(previewReel.video_url) ? (
+                <iframe
+                  src={getInstagramEmbedUrl(previewReel.video_url)}
+                  title={previewReel.title}
+                  className="h-full w-full border-0 select-none"
+                  allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share"
+                  allowFullScreen
+                  scrolling="no"
+                />
+              ) : (
+                <video
+                  src={previewReel.video_url}
+                  controls
+                  autoPlay
+                  playsInline
+                  className="h-full w-full object-cover"
+                />
+              )}
               <div className="pointer-events-none absolute bottom-4 left-4 right-4 bg-gradient-to-t from-black/80 to-transparent p-4 text-white">
                 <p className="font-bold text-sm">{previewReel.title}</p>
                 <p className="text-xs text-white/70 line-clamp-2 mt-1">{previewReel.description}</p>
