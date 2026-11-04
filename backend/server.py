@@ -6267,11 +6267,12 @@ async def synchronize_default_admin():
             "role": "super_admin",
             "permissions": ["super_admin", "admin", "editor"],
             "is_active": True,
-            "updated_at": now,
-            "hashed_password": get_password_hash(default_password),
         }
+        if os.environ.get("FORCE_RESET_ADMIN_PASSWORD", "").lower() == "true" or not existing.get("hashed_password"):
+            updates["hashed_password"] = get_password_hash(default_password)
+            updates["updated_at"] = now
         await db.admins.update_one({"email": default_email}, {"$set": updates})
-        logger.info("Default admin synchronized")
+        logger.info("Default admin synchronized (password preserved)")
         return {"action": "synchronized", "email": default_email}
 
     admin_doc = {
