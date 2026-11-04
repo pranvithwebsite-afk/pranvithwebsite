@@ -86,24 +86,37 @@ const Reels = () => {
   };
 
   const handleVideoUrlChange = async (val) => {
-    setForm((prev) => ({ ...prev, video_url: val }));
-    if (isInstagramUrl(val)) {
+    const rawVal = String(val || '').trim();
+    const isIg = isInstagramUrl(rawVal);
+    const shortcode = getInstagramShortcode(rawVal);
+
+    setForm((prev) => ({
+      ...prev,
+      video_url: rawVal,
+      title: prev.title || (isIg && shortcode ? `Instagram Reel · ${shortcode}` : prev.title),
+      sound_title:
+        isIg && (!prev.sound_title || prev.sound_title === 'Original Audio - Pranvith DOP')
+          ? 'Instagram Audio'
+          : prev.sound_title,
+    }));
+
+    if (isIg) {
       try {
         setFetchingThumb(true);
-        const res = await fetchInstagramThumbnail(val);
+        const res = await fetchInstagramThumbnail(rawVal);
         if (res?.thumbnail_url) {
           setForm((prev) => ({
             ...prev,
             thumbnail_url: prev.thumbnail_url || res.thumbnail_url,
+            title: prev.title || res.title || (shortcode ? `Instagram Reel · ${shortcode}` : 'Instagram Reel'),
           }));
-          toast.success('Instagram Reel detected: cover thumbnail auto-resolved!');
+          toast.success('Instagram Reel detected: cover thumbnail & embed ready!');
         }
       } catch (err) {
-        const sc = getInstagramShortcode(val);
-        if (sc) {
+        if (shortcode) {
           setForm((prev) => ({
             ...prev,
-            thumbnail_url: prev.thumbnail_url || `https://www.instagram.com/p/${sc}/media/?size=l`,
+            thumbnail_url: prev.thumbnail_url || `https://www.instagram.com/p/${shortcode}/media/?size=l`,
           }));
         }
       } finally {
@@ -203,26 +216,32 @@ const Reels = () => {
 
   const handleSave = async (e) => {
     e.preventDefault();
-    if (!form.title.trim()) {
-      toast.error('Reel title is required');
+    const rawVideoUrl = form.video_url.trim();
+    if (!rawVideoUrl) {
+      toast.error('Reel video URL or Instagram Reel link is required');
       return;
     }
-    if (!form.video_url.trim()) {
-      toast.error('Reel video URL or upload is required');
+
+    const isIg = isInstagramUrl(rawVideoUrl);
+    const resolvedTitle =
+      form.title.trim() || (isIg ? `Instagram Reel · ${getInstagramShortcode(rawVideoUrl) || ''}` : '');
+    if (!resolvedTitle) {
+      toast.error('Reel title is required');
       return;
     }
 
     try {
       setSaving(true);
       const payload = {
-        title: form.title.trim(),
+        title: resolvedTitle,
         description: form.description.trim(),
-        video_url: form.video_url.trim(),
+        video_url: rawVideoUrl,
         thumbnail_url: form.thumbnail_url.trim(),
         aspect_ratio: form.aspect_ratio || '9:16',
-        sound_title: form.sound_title?.trim() || 'Original Audio - Pranvith DOP',
+        sound_title:
+          form.sound_title?.trim() || (isIg ? 'Instagram Audio' : 'Original Audio - Pranvith DOP'),
         author_name: form.author_name?.trim() || 'Pranvith DOP',
-        duration: form.duration ? Number(form.duration) : null,
+        duration: form.duration ? Number(form.duration) : 15.0,
         sort_order: Number(form.sort_order || 0),
         is_active: Boolean(form.is_active),
         ad_settings: {
@@ -239,10 +258,16 @@ const Reels = () => {
         toast.success('Reel updated successfully');
       } else {
         await createAdminReel(payload);
-        toast.success('Reel uploaded and created successfully');
+        toast.success('Reel added and published successfully');
       }
       closeModal();
       loadReels({ showToast: false });
+    } catch (error) {
+      toast.error(error?.response?.data?.detail || 'Failed to save reel');
+    } finally {
+      setSaving(false);
+    }
+  };
     } catch (error) {
       toast.error(error?.response?.data?.detail || 'Failed to save reel');
     } finally {

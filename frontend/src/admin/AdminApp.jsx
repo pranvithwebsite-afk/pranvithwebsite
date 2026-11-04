@@ -33,21 +33,21 @@ const AdminApp = () => {
   useEffect(() => {
     // Dynamically set Admin Web App Manifest and Apple Home Screen meta tags
     const manifestEl = document.querySelector('link[rel="manifest"]');
-    const prevManifest = manifestEl ? manifestEl.getAttribute('href') : '/manifest.json?v=4';
+    const prevManifest = manifestEl ? manifestEl.getAttribute('href') : '/manifest.json';
     if (manifestEl) {
-      manifestEl.setAttribute('href', '/admin-manifest.json?v=1');
+      manifestEl.setAttribute('href', '/admin-manifest.json');
     }
 
     const appleIconEl = document.querySelector('link[rel="apple-touch-icon"]');
-    const prevAppleIcon = appleIconEl ? appleIconEl.getAttribute('href') : '/apple-touch-icon.png?v=4';
+    const prevAppleIcon = appleIconEl ? appleIconEl.getAttribute('href') : '/apple-touch-icon.png';
     if (appleIconEl) {
-      appleIconEl.setAttribute('href', '/admin-apple-touch-icon.png?v=1');
+      appleIconEl.setAttribute('href', '/admin-apple-touch-icon.png');
     }
 
     const appleTitleEl = document.getElementById('apple-app-title');
     const prevAppleTitle = appleTitleEl ? appleTitleEl.getAttribute('content') : 'PranvithDOP';
     if (appleTitleEl) {
-      appleTitleEl.setAttribute('content', 'Pranvith Admin');
+      appleTitleEl.setAttribute('content', 'Pranvith DOP Admin');
     }
 
     const themeEl = document.querySelector('meta[name="theme-color"]');
@@ -58,7 +58,7 @@ const AdminApp = () => {
 
     const prevTitle = document.title;
     if (!prevTitle || prevTitle.includes('PranvithDOP — Video Editing')) {
-      document.title = 'Pranvith Admin';
+      document.title = 'Pranvith DOP Admin';
     }
 
     document.body.classList.add('admin-pwa-mode');

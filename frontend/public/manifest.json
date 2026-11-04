@@ -1,4 +1,5 @@
 {
+  "id": "/",
   "short_name": "PranvithDOP",
   "name": "PranvithDOP - Video Editing Courses & Assets",
   "icons": [
@@ -20,6 +21,7 @@
     }
   ],
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
   "theme_color": "#070314",
   "background_color": "#070314"

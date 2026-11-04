@@ -59,24 +59,41 @@
       "dest": "/frontend/logo-512.png"
     },
     {
-      "src": "/manifest.json",
-      "dest": "/frontend/manifest.json"
+      "src": "/manifest\\.json.*",
+      "dest": "/frontend/manifest.json",
+      "headers": {
+        "Content-Type": "application/manifest+json; charset=utf-8",
+        "Cache-Control": "no-cache"
+      }
     },
     {
-      "src": "/admin-manifest.json",
-      "dest": "/frontend/admin-manifest.json"
+      "src": "/admin-manifest\\.json.*",
+      "dest": "/frontend/admin-manifest.json",
+      "headers": {
+        "Content-Type": "application/manifest+json; charset=utf-8",
+        "Cache-Control": "no-cache"
+      }
     },
     {
-      "src": "/admin-apple-touch-icon.png",
-      "dest": "/frontend/admin-apple-touch-icon.png"
+      "src": "/admin-apple-touch-icon\\.png.*",
+      "dest": "/frontend/admin-apple-touch-icon.png",
+      "headers": {
+        "Cache-Control": "public, max-age=86400"
+      }
     },
     {
-      "src": "/admin-icon-192.png",
-      "dest": "/frontend/admin-icon-192.png"
+      "src": "/admin-icon-192\\.png.*",
+      "dest": "/frontend/admin-icon-192.png",
+      "headers": {
+        "Cache-Control": "public, max-age=86400"
+      }
     },
     {
-      "src": "/admin-icon-512.png",
-      "dest": "/frontend/admin-icon-512.png"
+      "src": "/admin-icon-512\\.png.*",
+      "dest": "/frontend/admin-icon-512.png",
+      "headers": {
+        "Cache-Control": "public, max-age=86400"
+      }
     },
     {
       "handle": "filesystem"

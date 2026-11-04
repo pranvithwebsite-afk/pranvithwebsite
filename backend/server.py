@@ -933,7 +933,7 @@ class ReelAdSettings(BaseModel):
 
 
 class ReelIn(BaseModel):
-    title: str
+    title: Optional[str] = ""
     description: Optional[str] = ""
     video_url: str
     thumbnail_url: Optional[str] = ""
@@ -2859,22 +2859,30 @@ def _fetch_instagram_thumbnail(url_or_shortcode: Optional[str]) -> Optional[str]
 def _normalize_reel_doc(doc: dict, existing: Optional[dict] = None) -> dict:
     now = datetime.now(timezone.utc).isoformat()
     safe = dict(doc or {})
-    title = str(safe.get("title") or "").strip()
-    if not title:
-        raise HTTPException(status_code=422, detail="Reel title is required")
+
     video_url = str(safe.get("video_url") or "").strip()
     if not video_url:
-        raise HTTPException(status_code=422, detail="Reel video URL is required")
+        raise HTTPException(status_code=422, detail="Reel video URL or Instagram link is required")
 
     video_url = _reject_unsafe_url(video_url)
+    ig_shortcode = _extract_instagram_shortcode(video_url)
+
+    title = str(safe.get("title") or "").strip()
+    if not title:
+        if ig_shortcode:
+            title = f"Instagram Reel · {ig_shortcode}"
+        else:
+            raise HTTPException(status_code=422, detail="Reel title is required")
+
     thumbnail_url = _reject_unsafe_url(safe.get("thumbnail_url") or "") or ""
 
     # Auto-resolve Instagram Reel cover thumbnail if not explicitly given
-    ig_shortcode = _extract_instagram_shortcode(video_url)
     if ig_shortcode and not thumbnail_url:
         auto_thumb = _fetch_instagram_thumbnail(ig_shortcode)
         if auto_thumb:
             thumbnail_url = auto_thumb
+        else:
+            thumbnail_url = f"https://www.instagram.com/p/{ig_shortcode}/media/?size=l"
 
     ad_settings_raw = safe.get("ad_settings") or (existing.get("ad_settings") if existing else {}) or {}
     if hasattr(ad_settings_raw, "model_dump"):
@@ -3228,8 +3236,9 @@ async def public_get_instagram_thumbnail(url: str):
     return {
         "success": True,
         "shortcode": shortcode,
+        "title": f"Instagram Reel · {shortcode}",
         "thumbnail_url": thumbnail_url or f"https://www.instagram.com/p/{shortcode}/media/?size=l",
-        "embed_url": f"https://www.instagram.com/reel/{shortcode}/embed/",
+        "embed_url": f"https://www.instagram.com/reel/{shortcode}/embed/?utm_source=ig_embed&utm_campaign=loading",
     }
 
 
