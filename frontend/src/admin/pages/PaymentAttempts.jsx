@@ -6,7 +6,6 @@ import {
   deleteAdminPaymentAttempt,
   fetchAdminPaymentAttempts,
   formatApiErrorDetail,
-  syncAdminPaymentAttempts,
 } from '../../lib/api';
 
 const statusOptions = [
@@ -63,27 +62,6 @@ const PaymentAttempts = () => {
   const [query, setQuery] = useState('');
   const [status, setStatus] = useState('all');
   const [archiving, setArchiving] = useState(false);
-  const [syncing, setSyncing] = useState(false);
-
-  const handleSyncRazorpay = async (attemptId = null) => {
-    setSyncing(true);
-    try {
-      const result = await syncAdminPaymentAttempts(attemptId);
-      const paid = result?.updated_paid ?? 0;
-      const failed = result?.updated_failed ?? 0;
-      if (paid > 0 || failed > 0) {
-        toast.success(`Razorpay sync complete: ${paid} marked as Paid (moved to Orders), ${failed} updated.`);
-      } else {
-        toast.info('Razorpay sync complete: all payment attempts are up to date.');
-      }
-      await loadAttempts();
-    } catch (err) {
-      const message = formatApiErrorDetail(err?.response?.data?.detail) || err?.message || 'Could not sync with Razorpay.';
-      toast.error(message);
-    } finally {
-      setSyncing(false);
-    }
-  };
 
   const loadAttempts = useCallback((isManual = false) => {
     if (isManual) setRefreshing(true);
@@ -189,15 +167,6 @@ const PaymentAttempts = () => {
           <div className="flex flex-wrap items-center gap-3">
             <button
               type="button"
-              onClick={() => handleSyncRazorpay()}
-              disabled={loading || syncing}
-              className="inline-flex h-11 items-center gap-2 rounded-2xl border border-blue-500/30 bg-blue-500/10 px-4 text-sm font-semibold text-blue-200 transition hover:bg-blue-500/20 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              <RotateCw size={15} className={syncing ? 'animate-spin' : ''} />
-              {syncing ? 'Syncing Razorpay...' : 'Sync with Razorpay'}
-            </button>
-            <button
-              type="button"
               onClick={() => loadAttempts(true)}
               disabled={loading || refreshing}
               className="inline-flex h-11 items-center gap-2 rounded-2xl border border-slate-700 bg-slate-800 px-4 text-sm font-semibold text-slate-100 transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-60"
@@ -278,7 +247,6 @@ const PaymentAttempts = () => {
               key={attempt.id || attempt.razorpay_order_id || attempt.razorpay_payment_id}
               attempt={attempt}
               onDelete={handleDeleteAttempt}
-              onSync={handleSyncRazorpay}
             />
           ))
         ) : (
@@ -310,7 +278,7 @@ const PaymentAttempts = () => {
   );
 };
 
-const AttemptCard = ({ attempt, onDelete, onSync }) => {
+const AttemptCard = ({ attempt, onDelete }) => {
   const status = normalizeStatus(attempt);
   const statusClass = status === 'pending'
     ? 'border-amber-500/20 bg-amber-500/10 text-amber-100'
@@ -338,16 +306,6 @@ const AttemptCard = ({ attempt, onDelete, onSync }) => {
           <h2 className="mt-1 break-all text-lg font-semibold text-white">{attempt.id || 'N/A'}</h2>
         </div>
         <div className="flex items-center gap-2">
-          {status === 'pending' && attempt.razorpay_order_id && (
-            <button
-              type="button"
-              onClick={() => onSync?.(attempt.id || attempt.razorpay_order_id)}
-              title="Sync status with Razorpay"
-              className="inline-flex items-center gap-1.5 rounded-xl border border-blue-500/40 bg-blue-500/15 px-3 py-1 text-xs font-semibold text-blue-200 hover:bg-blue-500/25 transition"
-            >
-              <RotateCw size={12} /> Sync Razorpay
-            </button>
-          )}
           <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${statusClass}`}>{status === 'pending' ? 'Pending' : status === 'failed' ? 'Failed' : status === 'cancelled' ? 'Cancelled' : status === 'expired' ? 'Expired' : status === 'abandoned' ? 'Abandoned' : status}</span>
           <button
             type="button"
