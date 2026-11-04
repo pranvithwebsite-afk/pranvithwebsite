@@ -152,10 +152,17 @@ def test_admin_reels_crud_and_reorder(monkeypatch):
 
 
 def test_instagram_reel_thumbnail_helpers(monkeypatch):
-    # Shortcode extraction
-    assert server._extract_instagram_shortcode("https://www.instagram.com/reel/C7mZ123xyz/") == "C7mZ123xyz"
-    assert server._extract_instagram_shortcode("https://instagram.com/reels/D8kL987abc/?utm_source=ig_web_copy_link") == "D8kL987abc"
-    assert server._extract_instagram_shortcode("https://instagr.am/p/B5xP456def/") == "B5xP456def"
+    # Shortcode extraction across multiple Instagram formats
+    sample_urls = [
+        ("https://www.instagram.com/reel/C7mZ123xyz/", "C7mZ123xyz"),
+        ("https://instagram.com/reels/D8kL987abc/?utm_source=ig_web_copy_link", "D8kL987abc"),
+        ("https://instagr.am/p/B5xP456def/", "B5xP456def"),
+        ("https://www.instagram.com/reel/C8qL8G2v_kF/", "C8qL8G2v_kF"),
+        ("https://www.instagram.com/p/C6O1sL8xY7Z/?igsh=MW...", "C6O1sL8xY7Z"),
+    ]
+    for url, expected_sc in sample_urls:
+        assert server._extract_instagram_shortcode(url) == expected_sc
+
     assert server._extract_instagram_shortcode("https://example.com/not-instagram.mp4") is None
 
     # Endpoint response
@@ -164,15 +171,48 @@ def test_instagram_reel_thumbnail_helpers(monkeypatch):
     assert res["shortcode"] == "C7mZ123xyz"
     assert "thumbnail_url" in res
     assert "embed_url" in res
+    assert "title" in res
 
-    # Auto-resolve thumbnail in Reel doc normalization
-    doc = {
-        "title": "IG Reel",
+    # Auto-resolve thumbnail and auto-generate title when title/thumbnail are omitted
+    doc_no_title = {
         "video_url": "https://www.instagram.com/reel/C7mZ123xyz/",
-        "thumbnail_url": "",
     }
-    normalized = server._normalize_reel_doc(doc)
+    normalized = server._normalize_reel_doc(doc_no_title)
+    assert normalized["title"] == "Instagram Reel · C7mZ123xyz"
     assert normalized["thumbnail_url"] != ""
     assert "C7mZ123xyz" in normalized["thumbnail_url"]
+
+
+def test_admin_create_instagram_reel_without_manual_title_or_thumbnail(monkeypatch):
+    fake_db = FakeDb()
+    monkeypatch.setattr(server, "db", fake_db)
+    admin = SimpleNamespace(role="admin")
+
+    # Admin pastes multiple Instagram Reel URLs without manual title, thumbnail, or MP4
+    test_ig_urls = [
+        "https://www.instagram.com/reel/C8qL8G2v_kF/",
+        "https://www.instagram.com/p/C6O1sL8xY7Z/",
+        "https://instagram.com/reel/D8kL987abc/?utm_source=ig_web_copy_link",
+    ]
+
+    for idx, ig_url in enumerate(test_ig_urls):
+        payload = server.ReelIn(
+            video_url=ig_url,
+            # Notice: title and thumbnail_url are completely omitted / empty
+        )
+        created = asyncio.run(server.admin_create_reel(payload, admin))
+        assert created["success"] is True
+        reel = created["reel"]
+        assert "Instagram Reel ·" in reel["title"]
+        assert reel["video_url"] == ig_url.strip()
+        assert reel["thumbnail_url"] != ""
+        assert reel["is_active"] is True
+
+    # Check public feed returns them
+    reels = asyncio.run(server.public_reels())
+    assert len(reels) >= len(test_ig_urls)
+    ig_reels = [r for r in reels if "instagram.com" in r["video_url"]]
+    assert len(ig_reels) >= len(test_ig_urls)
+
 
 

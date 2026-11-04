@@ -268,12 +268,6 @@ const Reels = () => {
       setSaving(false);
     }
   };
-    } catch (error) {
-      toast.error(error?.response?.data?.detail || 'Failed to save reel');
-    } finally {
-      setSaving(false);
-    }
-  };
 
   const handleToggleStatus = async (reel) => {
     try {

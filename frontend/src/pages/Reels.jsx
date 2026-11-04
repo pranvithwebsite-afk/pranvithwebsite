@@ -844,7 +844,7 @@ const Reels = () => {
                     </h2>
 
                     {/* Description / Caption */}
-                    {reel.description && (
+                    {reel.description ? (
                       <div className="mt-1">
                         <p
                           className={`text-xs text-white/80 leading-relaxed ${
@@ -862,13 +862,17 @@ const Reels = () => {
                           </button>
                         )}
                       </div>
-                    )}
+                    ) : isIg ? (
+                      <p className="mt-1 text-xs text-white/70 italic">
+                        Official Instagram Reel &bull; Audio and caption playing via embed
+                      </p>
+                    ) : null}
 
                     {/* Audio track ticker */}
                     <div className="mt-2 flex items-center gap-2 text-xs text-white/70">
                       <Music className="h-3.5 w-3.5 flex-shrink-0 text-violet-400 animate-pulse" />
                       <span className="truncate text-[11px] font-medium">
-                        {reel.sound_title || 'Original Audio - Pranvith DOP'}
+                        {reel.sound_title || (isIg ? 'Instagram Audio' : 'Original Audio - Pranvith DOP')}
                       </span>
                     </div>
                   </div>

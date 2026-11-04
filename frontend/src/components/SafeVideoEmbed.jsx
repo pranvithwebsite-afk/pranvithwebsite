@@ -70,10 +70,11 @@ export const getInstagramShortcode = (url) => {
 
 export const isInstagramUrl = (url) => !!getInstagramShortcode(url);
 
-export const getInstagramEmbedUrl = (url) => {
+export const getInstagramEmbedUrl = (url, { captioned = false } = {}) => {
   const shortcode = getInstagramShortcode(url);
   if (!shortcode) return '';
-  return `https://www.instagram.com/reel/${shortcode}/embed/?utm_source=ig_embed&utm_campaign=loading`;
+  const captionPart = captioned ? 'captioned/' : '';
+  return `https://www.instagram.com/reel/${shortcode}/embed/${captionPart}?utm_source=ig_embed&utm_campaign=loading`;
 };
 
 export const isDirectVideoUrl = (url) => {
