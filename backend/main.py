@@ -1,4 +1,4 @@
-from fastapi import FastAPI, APIRouter, HTTPException, Depends, status, UploadFile, File, Form, Request
+from fastapi import FastAPI, APIRouter, HTTPException, Depends, status, UploadFile, File, Form, Request, Query
 from fastapi.exceptions import RequestValidationError
 from fastapi.security import OAuth2PasswordBearer
 from dotenv import load_dotenv
@@ -6303,7 +6303,9 @@ class YouTubeCallbackIn(BaseModel):
 class YouTubeSettingsIn(BaseModel):
     auto_reply_enabled: Optional[bool] = None
     safe_testing_mode: Optional[bool] = None
+    emergency_kill_switch: Optional[bool] = None
     sync_interval_minutes: Optional[int] = None
+    ai_provider: Optional[str] = None
     reply_tone: Optional[str] = None
 
 class YouTubeSyncIn(BaseModel):
@@ -6312,6 +6314,28 @@ class YouTubeSyncIn(BaseModel):
     safe_testing_mode: Optional[bool] = None
 
 class YouTubePreviewIn(BaseModel):
+    comment_text: str
+    author_name: str = "creator"
+
+class FacebookSettingsIn(BaseModel):
+    auto_reply_enabled: Optional[bool] = None
+    safe_testing_mode: Optional[bool] = None
+    emergency_kill_switch: Optional[bool] = None
+    sync_interval_minutes: Optional[int] = None
+    ai_provider: Optional[str] = None
+    reply_tone: Optional[str] = None
+
+class FacebookConnectIn(BaseModel):
+    page_id: str
+    page_access_token: str
+    page_name: Optional[str] = None
+
+class FacebookSyncIn(BaseModel):
+    max_results: int = 25
+    auto_reply_enabled: Optional[bool] = None
+    safe_testing_mode: Optional[bool] = None
+
+class FacebookPreviewIn(BaseModel):
     comment_text: str
     author_name: str = "creator"
 
@@ -6324,9 +6348,11 @@ async def admin_get_social_accounts(current_admin: AdminBase = Depends(get_curre
 
     ig_summary = await get_social_account_summary(db, "instagram")
     yt_summary = await get_social_account_summary(db, "youtube")
+    fb_summary = await get_social_account_summary(db, "facebook")
     return {
         "instagram": ig_summary,
         "youtube": yt_summary,
+        "facebook": fb_summary,
     }
 
 @admin_router.post("/social/connect/instagram")
@@ -6449,6 +6475,28 @@ async def admin_test_social_connection(platform: str, current_admin: AdminBase =
             "platform": "youtube",
             "is_live_api": False,
             "status_message": "YouTube account not connected yet. Click 'Connect YouTube Channel' to authorize.",
+            "profile": None
+        }
+    elif platform.lower() == "facebook":
+        try:
+            from .social_automation import get_facebook_client
+        except ImportError:
+            from social_automation import get_facebook_client
+        client = await get_facebook_client(db)
+        ok, profile_data, err = await client.verify_page_access()
+        if ok:
+            return {
+                "success": True,
+                "platform": "facebook",
+                "is_live_api": True,
+                "status_message": f"Connected to Facebook Page: {profile_data.get('name', 'Page')} (ID: {profile_data.get('id')})",
+                "profile": profile_data
+            }
+        return {
+            "success": False,
+            "platform": "facebook",
+            "is_live_api": False,
+            "status_message": err or "Facebook Page access token is not configured or invalid.",
             "profile": None
         }
     return {
@@ -6639,6 +6687,30 @@ async def admin_approve_social_comment(
             "replied_at": now,
             "safe_mode": safe_mode
         }
+    elif platform.lower() == "facebook":
+        try:
+            from .social_automation import get_facebook_client, get_facebook_automation_settings
+        except ImportError:
+            from social_automation import get_facebook_client, get_facebook_automation_settings
+        settings = await get_facebook_automation_settings(db)
+        safe_mode = settings.get("safe_testing_mode", True)
+        fb_client = await get_facebook_client(db)
+        ok, reply_ref, err = await fb_client.approve_and_publish(
+            comment_id=comment_id,
+            reply_text=payload.reply_text,
+            admin_email=current_admin.email,
+            safe_testing_mode=safe_mode
+        )
+        if not ok and not safe_mode:
+            raise HTTPException(status_code=400, detail=err or "Failed to post Facebook reply")
+        msg = "Reply approved in Safe Testing Mode (preview recorded, not published to live Facebook Page)." if safe_mode else "Reply approved and published to Facebook Page."
+        return {
+            "success": True,
+            "message": msg,
+            "reply_id": reply_ref,
+            "replied_at": now,
+            "safe_mode": safe_mode
+        }
     else:
         client = await get_instagram_client(db)
         ok, reply_ref = await client.post_reply(comment_id, payload.reply_text)
@@ -6694,6 +6766,30 @@ async def admin_manual_reply_social_comment(
         if not ok and not safe_mode:
             raise HTTPException(status_code=400, detail=err or "Failed to post manual YouTube reply")
         msg = "Manual reply saved in Safe Testing Mode (preview recorded, not published to live YouTube)." if safe_mode else "Manual reply published to YouTube."
+        return {
+            "success": True,
+            "message": msg,
+            "reply_id": reply_ref,
+            "replied_at": now,
+            "safe_mode": safe_mode
+        }
+    elif platform.lower() == "facebook":
+        try:
+            from .social_automation import get_facebook_client, get_facebook_automation_settings
+        except ImportError:
+            from social_automation import get_facebook_client, get_facebook_automation_settings
+        settings = await get_facebook_automation_settings(db)
+        safe_mode = settings.get("safe_testing_mode", True)
+        fb_client = await get_facebook_client(db)
+        ok, reply_ref, err = await fb_client.manual_reply(
+            comment_id=comment_id,
+            reply_text=payload.reply_text,
+            admin_email=current_admin.email,
+            safe_testing_mode=safe_mode
+        )
+        if not ok and not safe_mode:
+            raise HTTPException(status_code=400, detail=err or "Failed to post manual Facebook reply")
+        msg = "Manual reply saved in Safe Testing Mode (preview recorded, not published to live Facebook Page)." if safe_mode else "Manual reply published to Facebook Page."
         return {
             "success": True,
             "message": msg,
@@ -6811,6 +6907,133 @@ async def admin_preview_youtube_reply(
     evaluation = await generate_youtube_ai_reply(
         comment_text=payload.comment_text,
         author_name=payload.author_name
+    )
+    return {
+        "success": True,
+        "evaluation": evaluation
+    }
+
+# ==================== FACEBOOK SPECIFIC SOCIAL ROUTES ====================
+
+@admin_router.get("/social/facebook/settings")
+async def admin_get_facebook_settings(current_admin: AdminBase = Depends(get_current_active_admin)):
+    try:
+        from .social_automation import get_facebook_automation_settings
+    except ImportError:
+        from social_automation import get_facebook_automation_settings
+    return await get_facebook_automation_settings(db)
+
+@admin_router.post("/social/facebook/settings")
+async def admin_update_facebook_settings(
+    payload: FacebookSettingsIn,
+    current_admin: AdminBase = Depends(get_current_active_admin)
+):
+    try:
+        from .social_automation import update_facebook_automation_settings
+    except ImportError:
+        from social_automation import update_facebook_automation_settings
+    updates = payload.model_dump(exclude_unset=True)
+    return await update_facebook_automation_settings(db, updates)
+
+@admin_router.post("/social/facebook/connect")
+async def admin_connect_facebook(
+    payload: FacebookConnectIn,
+    current_admin: AdminBase = Depends(get_current_active_admin)
+):
+    try:
+        from .social_automation import FacebookAutomationClient, get_social_account_summary
+    except ImportError:
+        from social_automation import FacebookAutomationClient, get_social_account_summary
+
+    page_id = payload.page_id.strip()
+    page_token = payload.page_access_token.strip()
+    if not page_id or not page_token:
+        raise HTTPException(status_code=400, detail="Facebook Page ID and Page Access Token are required.")
+
+    client = FacebookAutomationClient(db, page_id=page_id, page_access_token=page_token)
+    ok, profile, err = await client.verify_page_access()
+    if not ok:
+        raise HTTPException(status_code=400, detail=f"Failed to verify Facebook Page: {err}")
+
+    now = datetime.now(timezone.utc).isoformat()
+    doc = {
+        "platform": "facebook",
+        "is_connected": True,
+        "account_id": page_id,
+        "page_id": page_id,
+        "page_name": profile.get("name") or payload.page_name or "Pranvith DOP Facebook Page",
+        "username": profile.get("username") or profile.get("name") or "Pranvith DOP",
+        "name": profile.get("name") or "Pranvith DOP",
+        "access_token": page_token,
+        "page_access_token": page_token,
+        "connected_at": now,
+        "last_synced_at": now,
+        "updated_at": now,
+        "scopes": ["pages_show_list", "pages_read_engagement", "pages_manage_posts", "pages_manage_engagement"]
+    }
+    if db is not None:
+        await db.social_accounts.update_one({"platform": "facebook"}, {"$set": doc}, upsert=True)
+
+    summary = await get_social_account_summary(db, "facebook")
+    return {
+        "success": True,
+        "message": f"Successfully connected Facebook Page '{doc['page_name']}'.",
+        "summary": summary
+    }
+
+@admin_router.post("/social/facebook/sync")
+async def admin_sync_facebook_comments(
+    payload: FacebookSyncIn = FacebookSyncIn(),
+    current_admin: AdminBase = Depends(get_current_active_admin)
+):
+    try:
+        from .social_automation import get_facebook_client, get_facebook_automation_settings
+    except ImportError:
+        from social_automation import get_facebook_client, get_facebook_automation_settings
+
+    settings = await get_facebook_automation_settings(db)
+    auto_reply = payload.auto_reply_enabled if payload.auto_reply_enabled is not None else settings.get("auto_reply_enabled", False)
+    safe_mode = payload.safe_testing_mode if payload.safe_testing_mode is not None else settings.get("safe_testing_mode", True)
+
+    client = await get_facebook_client(db)
+    res = await client.sync_and_process_comments(
+        auto_reply_enabled=auto_reply,
+        safe_testing_mode=safe_mode,
+        max_results=payload.max_results
+    )
+    return res
+
+@admin_router.get("/social/facebook/comments")
+async def admin_get_facebook_comments(
+    status: Optional[str] = None,
+    current_admin: AdminBase = Depends(get_current_active_admin)
+):
+    query = {"platform": "facebook"}
+    if status and status.lower() != "all":
+        query["status"] = status.lower()
+
+    comments = []
+    if db is not None:
+        try:
+            comments = await db.social_comments.find(query, {"_id": 0}).sort("published_at", -1).to_list(100)
+        except Exception:
+            pass
+    return comments
+
+@admin_router.post("/social/facebook/preview-reply")
+async def admin_preview_facebook_reply(
+    payload: FacebookPreviewIn,
+    current_admin: AdminBase = Depends(get_current_active_admin)
+):
+    try:
+        from .social_automation import generate_social_ai_reply
+    except ImportError:
+        from social_automation import generate_social_ai_reply
+
+    evaluation = await generate_social_ai_reply(
+        comment_text=payload.comment_text,
+        author_name=payload.author_name,
+        platform="facebook"
     )
     return {
         "success": True,
@@ -8497,6 +8720,42 @@ async def checkout_verify_payment(payload: PaymentVerifyIn):
         "email_delivery_error": fulfillment["email_delivery_error"],
         "customer_access_token": _customer_token(buyer_email),
     }
+
+
+# ==================== META / FACEBOOK WEBHOOK HANDLERS ====================
+
+@api_router.get("/webhooks/facebook")
+async def meta_facebook_webhook_verification(
+    hub_mode: Optional[str] = Query(None, alias="hub.mode"),
+    hub_verify_token: Optional[str] = Query(None, alias="hub.verify_token"),
+    hub_challenge: Optional[str] = Query(None, alias="hub.challenge"),
+):
+    try:
+        from .social_automation import verify_facebook_webhook
+    except ImportError:
+        from social_automation import verify_facebook_webhook
+
+    ok, challenge = verify_facebook_webhook(hub_mode, hub_verify_token, hub_challenge)
+    if ok:
+        return PlainTextResponse(content=challenge, status_code=200)
+    raise HTTPException(status_code=403, detail="Webhook verification token mismatch")
+
+
+@api_router.post("/webhooks/facebook")
+async def meta_facebook_webhook_event(request: Request):
+    try:
+        from .social_automation import process_facebook_webhook_event
+    except ImportError:
+        from social_automation import process_facebook_webhook_event
+
+    body = await request.body()
+    try:
+        payload = json.loads(body.decode("utf-8"))
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid JSON payload")
+
+    res = await process_facebook_webhook_event(db, payload)
+    return {"status": "ok", "result": res}
 
 
 @api_router.post("/webhooks/razorpay")

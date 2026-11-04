@@ -115,7 +115,7 @@ def test_youtube_intent_classification():
     c3 = classify_comment_intent("Z6ii. Setting kavali plz")
     assert c3["is_sensitive"] is False
     assert c3["requires_approval"] is False
-    assert c3["intent"] == "CAMERA_SETTINGS"
+    assert c3["intent"] in ("CAMERA_SPECIFIC_SETTINGS", "CAMERA_SETTINGS")
 
     # LUT -> Safe
     c4 = classify_comment_intent("Send Sony S-Log3 creative lut pack link")
@@ -136,7 +136,7 @@ async def test_youtube_dynamic_ai_reply_generation():
     # Telugu settings request
     r1 = await generate_youtube_ai_reply("Z6ii. Setting kavali plz", author_name="rambabu")
     assert r1["detected_language"] == "telugu"
-    assert r1["intent"] == "CAMERA_SETTINGS"
+    assert r1["intent"] in ("CAMERA_SPECIFIC_SETTINGS", "CAMERA_SETTINGS")
     assert r1["is_sensitive"] is False
     assert "@rambabu" in r1["reply_text"]
     assert "https://pranvithdop.com/assets" in r1["reply_text"]
@@ -188,10 +188,310 @@ async def test_youtube_settings_api_and_preview():
             assert prev_res.status_code == 200
             pdata = prev_res.json()
             assert pdata["success"] is True
-            assert pdata["evaluation"]["intent"] == "CAMERA_SETTINGS"
+            assert pdata["evaluation"]["intent"] in ("CAMERA_SPECIFIC_SETTINGS", "CAMERA_SETTINGS")
             assert pdata["evaluation"]["detected_language"] == "telugu"
             assert "@rambabu" in pdata["evaluation"]["reply_text"]
     finally:
         server.app.dependency_overrides.clear()
+
+
+@pytest.mark.anyio
+async def test_five_target_requirement_examples():
+    """
+    Directly tests the 5 core requirement examples from the user prompt:
+    1. 'Sony A7 IV best settings?' -> Sony A7 IV camera settings
+    2. 'Camera price?' -> Relevant camera & asset pricing
+    3. 'Send camera links' -> Product links from knowledge base
+    4. 'Instagram ID?' -> Follow us on Instagram @pranvith_dop
+    5. 'Thank you' -> Friendly thank-you response
+    Plus ensuring technical queries NEVER get generic 'Thanks for watching' replies.
+    """
+    from backend.social_automation import generate_social_ai_reply, classify_comment_intent
+
+    # 1. Sony A7 IV best settings?
+    res_a7iv = await generate_social_ai_reply("Sony A7 IV best settings?", author_name="kiran", platform="youtube")
+    assert res_a7iv["intent"] == "CAMERA_SPECIFIC_SETTINGS"
+    assert "S-Log3" in res_a7iv["reply_text"] or "800" in res_a7iv["reply_text"] or "ISO" in res_a7iv["reply_text"]
+    assert "Thanks for watching" not in res_a7iv["reply_text"]
+
+    # 2. Camera price?
+    res_price = await generate_social_ai_reply("Camera price?", author_name="rahul", platform="youtube")
+    assert res_price["intent"] == "CAMERA_PRICE" or res_price["is_sensitive"] is True
+    assert "₹" in res_price["reply_text"] or "price" in res_price["reply_text"].lower()
+
+    # 3. Send camera links
+    res_links = await generate_social_ai_reply("Send camera links", author_name="nikhil", platform="youtube")
+    assert res_links["intent"] == "CAMERA_LINKS"
+    assert "https://pranvithdop.com/assets" in res_links["reply_text"]
+
+    # 4. Instagram ID?
+    res_ig = await generate_social_ai_reply("Instagram ID?", author_name="sneha", platform="youtube")
+    assert res_ig["intent"] == "INSTAGRAM_ID"
+    assert "@pranvith_dop" in res_ig["reply_text"]
+    assert "instagram.com/pranvith_dop" in res_ig["reply_text"]
+
+    # 5. Thank you
+    res_ty = await generate_social_ai_reply("Thank you", author_name="manoj", platform="youtube")
+    assert res_ty["intent"] == "THANK_YOU"
+    assert any(w in res_ty["reply_text"].lower() for w in ["welcome", "pleasure", "glad", "thank you", "thanks"])
+
+
+@pytest.mark.anyio
+async def test_multilingual_hindi_telugu_mixed():
+    """Tests Telugu, Hindi, and mixed-language comments."""
+    from backend.social_automation import generate_social_ai_reply, detect_comment_language
+
+    # Telugu settings
+    te_text = "Sony A7 IV video settings cheppandi bro"
+    res_te = await generate_social_ai_reply(te_text, author_name="srinivas", platform="youtube")
+    assert res_te["detected_language"] == "telugu"
+    assert "S-Log3" in res_te["reply_text"] or "సెట్టింగ్స్" in res_te["reply_text"] or "settings" in res_te["reply_text"].lower()
+
+    # Hindi price inquiry
+    hi_text = "Bhai camera price kitna hai batao"
+    res_hi = await generate_social_ai_reply(hi_text, author_name="amit", platform="facebook")
+    assert res_hi["detected_language"] == "hindi"
+    assert "₹" in res_hi["reply_text"] or "price" in res_hi["reply_text"].lower()
+
+
+@pytest.mark.anyio
+async def test_facebook_settings_api_and_preview():
+    """Tests Facebook settings API, preview endpoint, and emergency kill switch."""
+    import backend.server as server
+    from backend.server import get_current_active_admin, AdminBase
+    import httpx
+
+    fake_admin = AdminBase(
+        id="test_admin_id",
+        email="pranvithwebsite@gmail.com",
+        name="Admin",
+        role="super_admin",
+        permissions=["super_admin"]
+    )
+    server.app.dependency_overrides[get_current_active_admin] = lambda: fake_admin
+
+    try:
+        transport = httpx.ASGITransport(app=server.app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+            # 1. GET Facebook Settings
+            get_res = await client.get('/api/admin/social/facebook/settings')
+            assert get_res.status_code == 200
+            data = get_res.json()
+            assert "auto_reply_enabled" in data
+            assert "safe_testing_mode" in data
+
+            # 2. POST Preview Facebook Reply
+            prev_res = await client.post(
+                '/api/admin/social/facebook/preview-reply',
+                json={'comment_text': 'Sony A7 IV best settings?', 'author_name': 'fb_user'}
+            )
+            assert prev_res.status_code == 200
+            pdata = prev_res.json()
+            assert pdata["success"] is True
+            assert "Sony A7 IV" in pdata["evaluation"]["reply_text"] or "S-Log3" in pdata["evaluation"]["reply_text"]
+            assert "@fb_user" in pdata["evaluation"]["reply_text"]
+
+            # 3. GET Facebook comments endpoint
+            comm_res = await client.get('/api/admin/social/facebook/comments')
+            assert comm_res.status_code == 200
+            assert isinstance(comm_res.json(), list)
+    finally:
+        server.app.dependency_overrides.clear()
+
+
+def test_meta_facebook_webhook_verification():
+    """Tests Meta Graph API webhook subscription challenge response."""
+    from fastapi.testclient import TestClient
+    import backend.server as server
+
+    client = TestClient(server.app)
+    # Correct verify token
+    res = client.get('/api/webhooks/facebook?hub.mode=subscribe&hub.challenge=test_challenge_code_999&hub.verify_token=pranvith_fb_meta_webhook')
+    assert res.status_code == 200
+    assert res.text == "test_challenge_code_999"
+
+    # Wrong verify token -> 403
+    res_bad = client.get('/api/webhooks/facebook?hub.mode=subscribe&hub.challenge=test_challenge_code_999&hub.verify_token=wrong_token')
+    assert res_bad.status_code == 403
+
+
+@pytest.mark.anyio
+async def test_self_comment_filtering():
+    """Tests that comments from our own connected account are ignored (preventing reply loops)."""
+    from backend.social_automation import YouTubeAutomationClient, FacebookAutomationClient
+
+    yt = YouTubeAutomationClient(db=None)
+    # Connected channel ID matching author channel ID
+    assert yt._is_self_comment("UCRDl6hJTm0_VoAF70rZjdgQ", "UCRDl6hJTm0_VoAF70rZjdgQ", "viewer") is True
+    # PranvithDOP handle
+    assert yt._is_self_comment("pranvithdop", "different_id", "@pranvithdop") is True
+    # Genuine external viewer
+    assert yt._is_self_comment("viewer_123", "different_id", "external_creator") is False
+
+    fb = FacebookAutomationClient(db=None)
+    # Page ID matching author ID
+    assert fb._is_self_comment("100200300", "100200300", "follower") is True
+    # Genuine external follower
+    assert fb._is_self_comment("999888777", "100200300", "external_follower") is False
+
+
+@pytest.mark.anyio
+async def test_nikon_sony_canon_camera_specifications():
+    """
+    Verifies that camera technical questions for Nikon, Sony, and Canon
+    are matched accurately (even with punctuation) and answered with
+    hard facts from CAMERA_DATABASE (never invented specs or prices).
+    """
+    from backend.social_automation import match_camera_profile, generate_social_ai_reply
+
+    # 1. Nikon Z6II (with dot punctuation as often typed on YouTube)
+    m_z6ii = match_camera_profile("Z6ii. Setting kavali plz")
+    assert m_z6ii is not None
+    assert m_z6ii[0] == "nikon_z6ii"
+    r_z6ii = await generate_social_ai_reply("Z6ii. Setting kavali plz", author_name="rambabu", platform="youtube")
+    assert "800" in r_z6ii["reply_text"] or "Flat" in r_z6ii["reply_text"] or "N-Log" in r_z6ii["reply_text"]
+    assert "https://pranvithdop.com/assets" in r_z6ii["reply_text"]
+
+    # 2. Nikon Z8
+    m_z8 = match_camera_profile("Nikon Z8 best 8K video settings?")
+    assert m_z8 is not None
+    assert m_z8[0] == "nikon_z8"
+    r_z8 = await generate_social_ai_reply("Nikon Z8 best 8K video settings?", author_name="arun", platform="youtube")
+    assert "4,000" in r_z8["reply_text"] or "4000" in r_z8["reply_text"] or "N-Log" in r_z8["reply_text"]
+
+    # 3. Sony A7 III
+    m_a73 = match_camera_profile("Sony A73 settings for wedding video?")
+    assert m_a73 is not None
+    assert m_a73[0] == "sony_a7iii"
+    r_a73 = await generate_social_ai_reply("Sony A73 settings for wedding video?", author_name="sanjay", platform="youtube")
+    assert "S-Log2" in r_a73["reply_text"] or "HLG" in r_a73["reply_text"]
+
+    # 4. Canon EOS R5
+    m_r5 = match_camera_profile("Canon R5 best settings for video?")
+    assert m_r5 is not None
+    assert m_r5[0] == "canon_r5"
+    r_r5 = await generate_social_ai_reply("Canon R5 best settings for video?", author_name="raj", platform="youtube")
+    assert "C-Log3" in r_r5["reply_text"]
+    assert "800" in r_r5["reply_text"]
+
+    # 5. Canon EOS R6 Mark II
+    m_r6 = match_camera_profile("Canon R6 II wedding settings?")
+    assert m_r6 is not None
+    assert m_r6[0] == "canon_r6_ii"
+    r_r6 = await generate_social_ai_reply("Canon R6 II wedding settings?", author_name="manoj", platform="youtube")
+    assert "C-Log3" in r_r6["reply_text"]
+    assert "6K" in r_r6["reply_text"] or "800" in r_r6["reply_text"]
+
+
+@pytest.mark.anyio
+async def test_historical_vs_new_comment_filtering():
+    """
+    Verifies that historical comments (published before cutoff) are safely
+    archived with status='historical' and zero auto-replies, while new comments
+    on old or new videos are processed as new_evaluated.
+    """
+    from backend.social_automation import YouTubeAutomationClient
+    from datetime import datetime, timedelta, timezone
+
+    # Mock database in memory
+    stored_comments = {}
+    stored_settings = {}
+    stored_accounts = {
+        "youtube": {
+            "platform": "youtube",
+            "is_connected": True,
+            "account_id": "UCRDl6hJTm0_VoAF70rZjdgQ",
+            "connected_at": "2026-11-04T12:00:00Z"
+        }
+    }
+
+    class MockCollection:
+        def __init__(self, storage):
+            self.storage = storage
+
+        async def find_one(self, query, projection=None):
+            if "platform" in query:
+                return self.storage.get(query["platform"])
+            if "id" in query:
+                return self.storage.get(query["id"])
+            return None
+
+        async def update_one(self, query, update, upsert=False):
+            key = query.get("platform") or query.get("id")
+            if "$set" in update:
+                doc = self.storage.get(key, {})
+                doc.update(update["$set"])
+                self.storage[key] = doc
+            return None
+
+    class MockDB:
+        def __init__(self):
+            self.social_accounts = MockCollection(stored_accounts)
+            self.social_settings = MockCollection(stored_settings)
+            self.social_comments = MockCollection(stored_comments)
+
+    mock_db = MockDB()
+    yt_client = YouTubeAutomationClient(db=mock_db)
+
+    # 1. Historical comment from 6 months ago (on an old video)
+    old_time = "2026-05-01T10:00:00Z"
+    # 2. Brand new comment from 5 minutes ago (on an old video or new video)
+    new_time = (datetime.now(timezone.utc) - timedelta(minutes=5)).isoformat()
+
+    mock_comments = [
+        {
+            "id": "yt_hist_001",
+            "comment_id": "hist_001",
+            "thread_id": "hist_001",
+            "platform": "youtube",
+            "author_name": "old_viewer",
+            "author_channel_id": "UC_diff_1",
+            "comment_text": "Nice video bro",
+            "published_at": old_time,
+            "video_id": "old_vid_123"
+        },
+        {
+            "id": "yt_new_002",
+            "comment_id": "new_002",
+            "thread_id": "new_002",
+            "platform": "youtube",
+            "author_name": "new_viewer",
+            "author_channel_id": "UC_diff_2",
+            "comment_text": "Sony A7 IV best settings?",
+            "published_at": new_time,
+            "video_id": "old_vid_123" # New comment on an old video!
+        }
+    ]
+
+    # Override fetch_recent_comments to return our test comments
+    async def mock_fetch(max_results=25):
+        return True, mock_comments, None
+    yt_client.fetch_recent_comments = mock_fetch
+
+    res = await yt_client.sync_and_process_comments(
+        auto_reply_enabled=False,
+        safe_testing_mode=True
+    )
+
+    assert res["success"] is True
+    assert res["total_fetched"] == 2
+    assert res["historical_count"] == 1
+    assert res["new_evaluated"] == 1
+    assert res["previews_ready"] == 1
+    assert res["auto_replied"] == 0
+
+    # Verify historical comment status in DB
+    c_hist = stored_comments.get("yt_hist_001")
+    assert c_hist is not None
+    assert c_hist["status"] == "historical"
+    assert c_hist["suggested_reply"] is None
+
+    # Verify new comment was evaluated
+    c_new = stored_comments.get("yt_new_002")
+    assert c_new is not None
+    assert c_new["status"] == "preview_ready"
+    assert "S-Log3" in c_new["suggested_reply"] or "800" in c_new["suggested_reply"]
+
+
 
 

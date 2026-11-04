@@ -3,6 +3,7 @@ import {
   Share2,
   Instagram,
   Youtube,
+  Facebook,
   CheckCircle2,
   AlertCircle,
   Clock,
@@ -26,7 +27,8 @@ import {
   Database,
   CheckCheck,
   Eye,
-  Power
+  Power,
+  AlertTriangle
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -47,6 +49,12 @@ import {
   syncAdminYouTubeComments,
   fetchAdminYouTubeComments,
   previewAdminYouTubeReply,
+  fetchAdminFacebookSettings,
+  saveAdminFacebookSettings,
+  connectAdminFacebook,
+  syncAdminFacebookComments,
+  fetchAdminFacebookComments,
+  previewAdminFacebookReply,
   formatApiErrorDetail
 } from '../../lib/api';
 
@@ -56,8 +64,9 @@ const TABS = [
   { id: 'scheduled_posts', label: 'Scheduled Posts', icon: Clock, badge: 'Upcoming' },
   { id: 'instagram_comments', label: 'Instagram Comments', icon: Instagram, badge: 'Phase 3' },
   { id: 'youtube_comments', label: 'YouTube Comments', icon: Youtube, badge: 'Active AI' },
+  { id: 'facebook_comments', label: 'Facebook Comments', icon: Facebook, badge: 'Active AI' },
   { id: 'keyword_automation', label: 'Keyword Automation', icon: Sliders, badge: 'Phase 6' },
-  { id: 'ai_reply_manager', label: 'AI Reply Manager', icon: Sparkles, badge: 'Phase 4' },
+  { id: 'ai_reply_manager', label: 'AI Reply Manager', icon: Sparkles, badge: 'Interactive AI' },
   { id: 'digital_resources', label: 'Digital Resources', icon: FileText, badge: 'Assets' },
   { id: 'pending_approvals', label: 'Pending Approvals', icon: AlertCircle, badge: 'Security' },
   { id: 'activity_logs', label: 'Activity Logs', icon: ListOrdered, badge: 'Audit' },
@@ -66,7 +75,7 @@ const TABS = [
 export default function SocialMediaManager() {
   const [activeTab, setActiveTab] = useState('connected_accounts');
   const [loading, setLoading] = useState(true);
-  const [accounts, setAccounts] = useState({ instagram: null, youtube: null });
+  const [accounts, setAccounts] = useState({ instagram: null, youtube: null, facebook: null });
   const [comments, setComments] = useState([]);
   const [rules, setRules] = useState(null);
 
@@ -74,6 +83,7 @@ export default function SocialMediaManager() {
   const [ytSettings, setYtSettings] = useState({
     auto_reply_enabled: false,
     safe_testing_mode: true,
+    emergency_kill_switch: false,
     sync_interval_minutes: 15
   });
   const [ytComments, setYtComments] = useState([]);
@@ -82,8 +92,31 @@ export default function SocialMediaManager() {
   const [savingSettings, setSavingSettings] = useState(false);
   const [editingReplyId, setEditingReplyId] = useState(null);
   const [editedReplyText, setEditedReplyText] = useState({});
-  const [ytPlaygroundText, setYtPlaygroundText] = useState('Z6ii. Setting kavali plz');
-  const [ytPlaygroundAuthor, setYtPlaygroundAuthor] = useState('rambabududdu1714');
+
+  // Facebook Auto-Reply & Comments state
+  const [fbSettings, setFbSettings] = useState({
+    auto_reply_enabled: false,
+    safe_testing_mode: true,
+    emergency_kill_switch: false,
+    sync_interval_minutes: 15
+  });
+  const [fbComments, setFbComments] = useState([]);
+  const [fbFilter, setFbFilter] = useState('all');
+  const [syncingFb, setSyncingFb] = useState(false);
+  const [savingFbSettings, setSavingFbSettings] = useState(false);
+  const [showFbModal, setShowFbModal] = useState(false);
+  const [fbPageId, setFbPageId] = useState('');
+  const [fbPageToken, setFbPageToken] = useState('');
+  const [fbPageName, setFbPageName] = useState('');
+  const [savingFb, setSavingFb] = useState(false);
+
+  // Master Emergency Kill Switch loading
+  const [togglingKillSwitch, setTogglingKillSwitch] = useState(false);
+
+  // Playground state
+  const [playgroundPlatform, setPlaygroundPlatform] = useState('youtube');
+  const [ytPlaygroundText, setYtPlaygroundText] = useState('Sony A7 IV best settings?');
+  const [ytPlaygroundAuthor, setYtPlaygroundAuthor] = useState('creator_arjun');
   const [ytPlaygroundResult, setYtPlaygroundResult] = useState(null);
   const [testingPlayground, setTestingPlayground] = useState(false);
   const [actionLoadingId, setActionLoadingId] = useState(null);
@@ -109,18 +142,22 @@ export default function SocialMediaManager() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [accData, commData, ruleData, ytSetData, ytCommData] = await Promise.all([
-        fetchAdminSocialAccounts().catch(() => ({ instagram: null, youtube: null })),
+      const [accData, commData, ruleData, ytSetData, ytCommData, fbSetData, fbCommData] = await Promise.all([
+        fetchAdminSocialAccounts().catch(() => ({ instagram: null, youtube: null, facebook: null })),
         fetchAdminSocialComments().catch(() => []),
         fetchAdminSocialRules().catch(() => null),
         fetchAdminYouTubeSettings().catch(() => ({ auto_reply_enabled: false, safe_testing_mode: true })),
-        fetchAdminYouTubeComments('all').catch(() => [])
+        fetchAdminYouTubeComments('all').catch(() => []),
+        fetchAdminFacebookSettings().catch(() => ({ auto_reply_enabled: false, safe_testing_mode: true })),
+        fetchAdminFacebookComments('all').catch(() => [])
       ]);
       setAccounts(accData || {});
       setComments(commData || []);
       setRules(ruleData || null);
       if (ytSetData) setYtSettings(ytSetData);
       if (ytCommData) setYtComments(ytCommData);
+      if (fbSetData) setFbSettings(fbSetData);
+      if (fbCommData) setFbComments(fbCommData);
     } catch (err) {
       toast.error('Failed to load social automation data: ' + formatApiErrorDetail(err));
     } finally {
@@ -345,18 +382,172 @@ export default function SocialMediaManager() {
     }
   };
 
+  // Facebook specific actions
+  const handleToggleFbAutoReply = async () => {
+    const nextVal = !fbSettings.auto_reply_enabled;
+    setSavingFbSettings(true);
+    try {
+      const res = await saveAdminFacebookSettings({ auto_reply_enabled: nextVal });
+      setFbSettings(res);
+      if (nextVal) {
+        toast.success('Facebook Auto-Reply ENABLED. (Safe Testing Mode determines if replies preview or publish)');
+      } else {
+        toast.info('Facebook Auto-Reply DISABLED. Incoming comments will wait for approval.');
+      }
+    } catch (err) {
+      toast.error('Failed to toggle Facebook Auto-Reply: ' + formatApiErrorDetail(err));
+    } finally {
+      setSavingFbSettings(false);
+    }
+  };
+
+  const handleToggleFbSafeMode = async () => {
+    const nextVal = !fbSettings.safe_testing_mode;
+    setSavingFbSettings(true);
+    try {
+      const res = await saveAdminFacebookSettings({ safe_testing_mode: nextVal });
+      setFbSettings(res);
+      if (nextVal) {
+        toast.success('Safe Testing Mode ACTIVATED for Facebook! Live publishing is disabled for safety.');
+      } else {
+        toast.warning('Safe Testing Mode turned OFF for Facebook. Approved and auto-replied comments will publish live to Facebook Page!');
+      }
+    } catch (err) {
+      toast.error('Failed to update Facebook Safe Mode: ' + formatApiErrorDetail(err));
+    } finally {
+      setSavingFbSettings(false);
+    }
+  };
+
+  const handleSyncFacebook = async () => {
+    setSyncingFb(true);
+    const toastId = toast.loading('Syncing latest comments from connected Facebook Page...');
+    try {
+      const res = await syncAdminFacebookComments({ max_results: 25 });
+      if (res?.success) {
+        toast.success(`Synced ${res.total_fetched} Facebook comments (${res.new_evaluated} analyzed with AI)`, { id: toastId });
+        const fresh = await fetchAdminFacebookComments('all');
+        setFbComments(fresh || []);
+      } else {
+        toast.error(`Facebook sync failed: ${res?.error || 'Unknown error'}`, { id: toastId });
+      }
+    } catch (err) {
+      toast.error('Failed to sync Facebook comments: ' + formatApiErrorDetail(err), { id: toastId });
+    } finally {
+      setSyncingFb(false);
+    }
+  };
+
+  const handleApproveFacebookComment = async (commentId, defaultReply) => {
+    const text = editedReplyText[commentId] !== undefined ? editedReplyText[commentId] : defaultReply;
+    if (!text || !text.trim()) {
+      toast.error('Reply text cannot be empty');
+      return;
+    }
+    setActionLoadingId(commentId);
+    try {
+      const res = await approveAdminSocialComment(commentId, text.trim());
+      toast.success(res?.message || 'Facebook reply approved successfully!');
+      const fresh = await fetchAdminFacebookComments('all');
+      setFbComments(fresh || []);
+      setEditingReplyId(null);
+    } catch (err) {
+      toast.error('Facebook approval failed: ' + formatApiErrorDetail(err));
+    } finally {
+      setActionLoadingId(null);
+    }
+  };
+
+  const handleDismissFacebookComment = async (commentId) => {
+    setActionLoadingId(commentId);
+    try {
+      await dismissAdminSocialComment(commentId);
+      toast.success('Facebook comment dismissed.');
+      const fresh = await fetchAdminFacebookComments('all');
+      setFbComments(fresh || []);
+    } catch (err) {
+      toast.error('Failed to dismiss Facebook comment: ' + formatApiErrorDetail(err));
+    } finally {
+      setActionLoadingId(null);
+    }
+  };
+
+  const handleSaveFacebook = async (e) => {
+    e.preventDefault();
+    if (!fbPageId.trim() || !fbPageToken.trim()) {
+      toast.error('Page ID and Page Access Token are required.');
+      return;
+    }
+    setSavingFb(true);
+    try {
+      const res = await connectAdminFacebook({
+        page_id: fbPageId.trim(),
+        access_token: fbPageToken.trim(),
+        page_name: fbPageName.trim() || undefined
+      });
+      toast.success(res.message || 'Facebook Page connected successfully!');
+      setShowFbModal(false);
+      setFbPageId('');
+      setFbPageToken('');
+      setFbPageName('');
+      loadData();
+    } catch (err) {
+      toast.error(`Facebook connection error: ${formatApiErrorDetail(err)}`);
+    } finally {
+      setSavingFb(false);
+    }
+  };
+
+  // Master Emergency Kill Switch
+  const isEmergencyKilled = Boolean(ytSettings.emergency_kill_switch || fbSettings.emergency_kill_switch);
+
+  const handleToggleEmergencyKillSwitch = async () => {
+    const nextVal = !isEmergencyKilled;
+    const confirmMsg = nextVal
+      ? "EMERGENCY ACTION: Immediately halt ALL automatic replies across YouTube and Facebook?"
+      : "Deactivate Emergency Kill Switch and restore normal automation settings?";
+    if (!window.confirm(confirmMsg)) return;
+
+    setTogglingKillSwitch(true);
+    try {
+      const [resYt, resFb] = await Promise.all([
+        saveAdminYouTubeSettings({ emergency_kill_switch: nextVal }).catch(() => ytSettings),
+        saveAdminFacebookSettings({ emergency_kill_switch: nextVal }).catch(() => fbSettings)
+      ]);
+      setYtSettings(resYt);
+      setFbSettings(resFb);
+      if (nextVal) {
+        toast.error("EMERGENCY KILL SWITCH ACTIVATED: All automated replies stopped across all platforms!");
+      } else {
+        toast.success("Emergency Kill Switch deactivated. Normal settings restored.");
+      }
+    } catch (err) {
+      toast.error("Failed to toggle Emergency Kill Switch: " + formatApiErrorDetail(err));
+    } finally {
+      setTogglingKillSwitch(false);
+    }
+  };
+
   const handleTestPlayground = async (e) => {
     if (e) e.preventDefault();
     if (!ytPlaygroundText.trim()) return;
     setTestingPlayground(true);
     setYtPlaygroundResult(null);
     try {
-      const res = await previewAdminYouTubeReply({
-        comment_text: ytPlaygroundText.trim(),
-        author_name: ytPlaygroundAuthor.trim() || 'creator'
-      });
+      let res;
+      if (playgroundPlatform === 'facebook') {
+        res = await previewAdminFacebookReply({
+          comment_text: ytPlaygroundText.trim(),
+          author_name: ytPlaygroundAuthor.trim() || 'follower'
+        });
+      } else {
+        res = await previewAdminYouTubeReply({
+          comment_text: ytPlaygroundText.trim(),
+          author_name: ytPlaygroundAuthor.trim() || 'creator'
+        });
+      }
       setYtPlaygroundResult(res?.evaluation || null);
-      toast.success('AI reply generated and evaluated!');
+      toast.success(`${playgroundPlatform === 'facebook' ? 'Facebook' : 'YouTube'} AI reply generated and evaluated!`);
     } catch (err) {
       toast.error('AI Preview error: ' + formatApiErrorDetail(err));
     } finally {
@@ -366,6 +557,7 @@ export default function SocialMediaManager() {
 
   const ig = accounts.instagram || {};
   const yt = accounts.youtube || {};
+  const fb = accounts.facebook || {};
 
   return (
     <div className="space-y-8 pb-16">
@@ -390,7 +582,22 @@ export default function SocialMediaManager() {
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Emergency Kill Switch Button */}
+          <button
+            onClick={handleToggleEmergencyKillSwitch}
+            disabled={togglingKillSwitch}
+            className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-md ${
+              isEmergencyKilled
+                ? 'bg-rose-600 hover:bg-rose-500 text-white animate-pulse shadow-rose-600/30'
+                : 'bg-white/5 hover:bg-rose-500/10 text-neutral-300 hover:text-rose-400 border border-white/10 hover:border-rose-500/30'
+            }`}
+            title="Emergency Kill Switch forcefully halts all automated responses across all connected channels"
+          >
+            <Power className={`w-3.5 h-3.5 ${isEmergencyKilled ? 'text-white' : 'text-rose-400'}`} />
+            {isEmergencyKilled ? 'EMERGENCY KILL SWITCH ACTIVE (OFF)' : 'Emergency Kill Switch'}
+          </button>
+
           <button
             onClick={loadData}
             disabled={loading}
@@ -400,6 +607,37 @@ export default function SocialMediaManager() {
             Refresh Status
           </button>
         </div>
+      </div>
+
+      {/* Global Status Bar */}
+      <div className="flex flex-wrap items-center gap-2.5 p-3 rounded-2xl bg-neutral-900/60 border border-white/5 text-xs">
+        <span className="text-neutral-500 font-semibold px-1">Engine Status:</span>
+        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border ${
+          ytSettings.auto_reply_enabled
+            ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+            : 'bg-neutral-800 text-neutral-400 border-white/5'
+        }`}>
+          <Youtube className="w-3.5 h-3.5" />
+          YouTube: {ytSettings.auto_reply_enabled ? 'Auto-Reply ON' : 'OFF'}
+          <span className="text-[10px] opacity-75">({ytSettings.safe_testing_mode ? 'Safe Mode' : 'Live'})</span>
+        </span>
+
+        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border ${
+          fbSettings.auto_reply_enabled
+            ? 'bg-blue-500/10 text-blue-400 border-blue-500/20'
+            : 'bg-neutral-800 text-neutral-400 border-white/5'
+        }`}>
+          <Facebook className="w-3.5 h-3.5" />
+          Facebook: {fbSettings.auto_reply_enabled ? 'Auto-Reply ON' : 'OFF'}
+          <span className="text-[10px] opacity-75">({fbSettings.safe_testing_mode ? 'Safe Mode' : 'Live'})</span>
+        </span>
+
+        {isEmergencyKilled && (
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-rose-500/20 text-rose-300 border border-rose-500/30 font-bold animate-pulse">
+            <AlertTriangle className="w-3.5 h-3.5 text-rose-400" />
+            Master Kill Switch Engaged
+          </span>
+        )}
       </div>
 
       {/* Navigation Tabs */}
@@ -464,7 +702,7 @@ export default function SocialMediaManager() {
           </div>
 
           {/* Accounts Grid */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* INSTAGRAM BUSINESS CARD */}
             <div className="rounded-2xl border border-white/10 bg-neutral-900/80 p-6 flex flex-col justify-between shadow-xl relative overflow-hidden group">
               <div className="absolute top-0 right-0 w-48 h-48 bg-gradient-to-bl from-pink-500/10 via-purple-500/5 to-transparent rounded-full blur-2xl pointer-events-none" />
@@ -772,6 +1010,153 @@ export default function SocialMediaManager() {
                 )}
               </div>
             </div>
+
+            {/* FACEBOOK PAGES CARD */}
+            <div className="rounded-2xl border border-white/10 bg-neutral-900/80 p-6 flex flex-col justify-between shadow-xl relative overflow-hidden group">
+              <div className="absolute top-0 right-0 w-48 h-48 bg-gradient-to-bl from-blue-500/10 via-indigo-500/5 to-transparent rounded-full blur-2xl pointer-events-none" />
+
+              <div>
+                {/* Header */}
+                <div className="flex items-center justify-between border-b border-white/10 pb-4 mb-5">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-blue-600/20 border border-blue-500/30 flex items-center justify-center text-blue-400 shadow-md shadow-blue-500/10">
+                      <Facebook className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                        Facebook Pages
+                        <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                          Meta Graph API v21.0
+                        </span>
+                      </h3>
+                      <p className="text-xs text-neutral-400">Creator Page & Feed Comments Automation</p>
+                    </div>
+                  </div>
+
+                  {/* Status Badge */}
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold ${
+                        fb.is_connected
+                          ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
+                          : 'bg-neutral-800 text-neutral-400 border border-white/10'
+                      }`}
+                    >
+                      <span
+                        className={`w-2 h-2 rounded-full ${
+                          fb.is_connected ? 'bg-emerald-400 animate-pulse' : 'bg-neutral-500'
+                        }`}
+                      />
+                      {fb.is_connected ? 'Connected' : 'Ready to Connect'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Profile & Metadata */}
+                <div className="space-y-4">
+                  <div className="flex items-center gap-3.5 p-3.5 rounded-xl bg-white/[0.03] border border-white/5">
+                    <img
+                      src={fb.profile_picture_url || '/apple-touch-icon.png'}
+                      alt="Facebook Page Profile"
+                      className="w-12 h-12 rounded-xl object-cover border border-white/10 bg-neutral-800"
+                      onError={(e) => {
+                        e.target.src = '/apple-touch-icon.png';
+                      }}
+                    />
+                    <div className="flex-1 min-w-0">
+                      <h4 className="text-sm font-semibold text-white truncate">
+                        {fb.name || 'Pranvith DOP Page'}
+                      </h4>
+                      <p className="text-xs text-blue-400 font-mono truncate">
+                        @{fb.username || 'pranvithdop'}
+                      </p>
+                      <p className="text-[11px] text-neutral-500 font-mono mt-0.5 truncate">
+                        Page ID: {fb.account_id || 'Not configured'}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Token Status */}
+                  <div className="p-3.5 rounded-xl bg-white/[0.02] border border-white/5 space-y-1.5">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-neutral-400 flex items-center gap-1.5">
+                        <Key className="w-3.5 h-3.5 text-neutral-500" />
+                        Token Status:
+                      </span>
+                      <span
+                        className={`font-semibold ${
+                          fb.token_status?.severity === 'success'
+                            ? 'text-emerald-400'
+                            : fb.token_status?.severity === 'warning'
+                            ? 'text-amber-400'
+                            : fb.token_status?.severity === 'danger'
+                            ? 'text-rose-400'
+                            : 'text-neutral-400'
+                        }`}
+                      >
+                        {fb.token_status?.status_text || (fb.is_connected ? 'Connected' : 'Ready for Page Token')}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between text-xs text-neutral-500 font-mono">
+                      <span>Masked Token:</span>
+                      <span>{fb.token_masked || 'None'}</span>
+                    </div>
+                  </div>
+
+                  {/* Granted Permissions */}
+                  <div className="space-y-2">
+                    <span className="text-xs font-medium text-neutral-400">Required Page Permissions:</span>
+                    <div className="flex flex-wrap gap-1.5">
+                      {['pages_show_list', 'pages_read_engagement', 'pages_manage_posts', 'pages_manage_engagement'].map((scope) => (
+                        <span
+                          key={scope}
+                          className="text-[11px] px-2 py-0.5 rounded-md bg-white/5 border border-white/10 text-neutral-300 font-mono"
+                        >
+                          {scope}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+
+                  <p className="text-[11px] text-neutral-500 leading-relaxed bg-white/[0.01] p-2.5 rounded-lg border border-white/5">
+                    <span className="text-neutral-400 font-semibold">Note:</span> Supports Facebook Pages only (not personal profiles). In Meta Development Mode, app admins/testers connect without review. Production use requires Meta App Review.
+                  </p>
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div className="pt-6 mt-6 border-t border-white/10 flex flex-wrap items-center gap-2">
+                <button
+                  onClick={() => setShowFbModal(true)}
+                  className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-blue-600/20 hover:bg-blue-600/30 border border-blue-500/30 text-blue-400 text-xs font-semibold transition-all"
+                >
+                  <Facebook className="w-3.5 h-3.5" />
+                  {fb.is_connected ? 'Update Page Token' : 'Connect Facebook Page'}
+                </button>
+
+                <button
+                  onClick={() => handleTestConnection('facebook')}
+                  disabled={testingPlatform === 'facebook'}
+                  className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-medium text-neutral-300 transition-colors"
+                >
+                  <RefreshCw
+                    className={`w-3.5 h-3.5 ${testingPlatform === 'facebook' ? 'animate-spin text-blue-400' : ''}`}
+                  />
+                  Test API
+                </button>
+
+                {fb.is_connected && (
+                  <button
+                    onClick={() => handleDisconnect('facebook')}
+                    className="inline-flex items-center justify-center px-3 py-2.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 text-rose-400 text-xs font-medium transition-colors"
+                    title="Disconnect Facebook Page"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+            </div>
           </div>
 
           {/* Quick Comment Simulator / Phase Verification Tool */}
@@ -1050,9 +1435,9 @@ export default function SocialMediaManager() {
             </div>
 
             {/* Metrics ribbon */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2">
+            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3 pt-2">
               <div className="p-3.5 rounded-xl bg-white/[0.02] border border-white/5">
-                <span className="text-[11px] text-neutral-400 block font-medium">Channel Comments</span>
+                <span className="text-[11px] text-neutral-400 block font-medium">Comments Detected</span>
                 <span className="text-xl font-bold text-white mt-1 block">
                   {ytComments.length}
                 </span>
@@ -1066,16 +1451,37 @@ export default function SocialMediaManager() {
               </div>
 
               <div className="p-3.5 rounded-xl bg-white/[0.02] border border-white/5">
-                <span className="text-[11px] text-blue-400/90 block font-medium">Safe Previews Ready</span>
+                <span className="text-[11px] text-blue-400/90 block font-medium">Safe Previews</span>
                 <span className="text-xl font-bold text-blue-400 mt-1 block">
                   {ytComments.filter((c) => c.status === 'preview_ready').length}
                 </span>
               </div>
 
               <div className="p-3.5 rounded-xl bg-white/[0.02] border border-white/5">
-                <span className="text-[11px] text-emerald-400/90 block font-medium">Approved / Published</span>
+                <span className="text-[11px] text-emerald-400/90 block font-medium">AI Replies Sent</span>
                 <span className="text-xl font-bold text-emerald-400 mt-1 block">
                   {ytComments.filter((c) => c.status === 'approved' || c.status === 'auto_replied' || c.status === 'manual_replied').length}
+                </span>
+              </div>
+
+              <div className="p-3.5 rounded-xl bg-white/[0.02] border border-white/5">
+                <span className="text-[11px] text-neutral-400 block font-medium">Historical</span>
+                <span className="text-xl font-bold text-neutral-400 mt-1 block">
+                  {ytComments.filter((c) => c.status === 'historical').length}
+                </span>
+              </div>
+
+              <div className="p-3.5 rounded-xl bg-white/[0.02] border border-white/5">
+                <span className="text-[11px] text-rose-400/90 block font-medium">Failed Replies</span>
+                <span className="text-xl font-bold text-rose-400 mt-1 block">
+                  {ytSettings.failed_replies || 0}
+                </span>
+              </div>
+
+              <div className="p-3.5 rounded-xl bg-white/[0.02] border border-white/5">
+                <span className="text-[11px] text-neutral-400 block font-medium">Last Reply</span>
+                <span className="text-xs font-semibold text-neutral-300 mt-2 block truncate" title={ytSettings.last_reply_at ? new Date(ytSettings.last_reply_at).toLocaleString() : 'None yet'}>
+                  {ytSettings.last_reply_at ? new Date(ytSettings.last_reply_at).toLocaleTimeString() : 'None'}
                 </span>
               </div>
             </div>
@@ -1136,13 +1542,21 @@ export default function SocialMediaManager() {
 
             {/* Quick Test Samples */}
             <div className="flex flex-wrap items-center gap-2 text-xs">
-              <span className="text-neutral-500">Live Samples:</span>
+              <span className="text-neutral-500 font-medium">Quick Test Presets:</span>
               {[
-                { label: 'Z6II Settings (Teluglish)', text: 'Z6ii. Setting kavali plz', author: 'rambabududdu1714' },
-                { label: 'Short film + Price (Telugu script)', text: 'Short films theeyocha బ్రో దీనితో ప్రైస్ ఎంత ఉంటుంది', author: 'agentx0073' },
-                { label: 'Nikon ZR details (English)', text: 'The Nikon ZR shows good details.', author: 'shakeel_raj_photography' },
-                { label: 'LUT Pack Inquiry', text: 'Bro send Sony S-Log3 Creative LUT pack link please', author: 'kiran_creative' },
-                { label: 'Wedding Shoot Booking', text: 'Bro wedding film shoot booking available next month in Hyderabad?', author: 'suresh_films' }
+                { label: 'Sony A7 IV Settings', text: 'Sony A7 IV best settings?', author: 'creator_arjun' },
+                { label: 'Sony A73 Settings', text: 'Sony A73 settings', author: 'sanjay_visuals' },
+                { label: 'Nikon Z6III Settings', text: 'Nikon Z6III best settings?', author: 'arun_cinematics' },
+                { label: 'Nikon Z6II Settings (Teluglish)', text: 'Z6ii. Setting kavali plz', author: 'rambabududdu1714' },
+                { label: 'Canon R5 / R5 II Settings', text: 'Canon R5 best settings for video?', author: 'raj_lens' },
+                { label: 'Canon R6 II Settings', text: 'Canon R6 II wedding settings?', author: 'manoj_canon' },
+                { label: 'Camera Price', text: 'Camera price?', author: 'rahul_photo' },
+                { label: 'Camera Links', text: 'Send camera links', author: 'nikhil_films' },
+                { label: 'Instagram ID', text: 'Instagram ID?', author: 'sneha_visuals' },
+                { label: 'Thank You', text: 'Thank you', author: 'manoj_dop' },
+                { label: 'Telugu Settings', text: 'Sony A7 IV video settings cheppandi bro', author: 'kiran_visuals' },
+                { label: 'Hindi Price', text: 'Bhai camera price kitna hai batao', author: 'amit_cinematics' },
+                { label: 'Mixed Telugu Script', text: 'Short films theeyocha బ్రో దీనితో ప్రైస్ ఎంత ఉంటుంది', author: 'agentx0073' }
               ].map((sample) => (
                 <button
                   key={sample.label}
@@ -1224,6 +1638,7 @@ export default function SocialMediaManager() {
                   { id: 'pending_approval', label: 'Pending Approval', count: ytComments.filter((c) => c.status === 'pending_approval').length },
                   { id: 'preview_ready', label: 'Previews Ready', count: ytComments.filter((c) => c.status === 'preview_ready').length },
                   { id: 'approved', label: 'Approved / Replied', count: ytComments.filter((c) => c.status === 'approved' || c.status === 'auto_replied' || c.status === 'manual_replied').length },
+                  { id: 'historical', label: 'Historical (Archived)', count: ytComments.filter((c) => c.status === 'historical').length },
                   { id: 'dismissed', label: 'Dismissed', count: ytComments.filter((c) => c.status === 'dismissed').length }
                 ].map((f) => (
                   <button
@@ -1272,6 +1687,7 @@ export default function SocialMediaManager() {
                     const isPending = c.status === 'pending_approval';
                     const isPreview = c.status === 'preview_ready';
                     const isDone = c.status === 'approved' || c.status === 'auto_replied' || c.status === 'manual_replied';
+                    const isHistorical = c.status === 'historical';
                     const isEditing = editingReplyId === c.id;
                     const replyVal = editedReplyText[c.id] !== undefined ? editedReplyText[c.id] : (c.reply_text || c.suggested_reply || '');
 
@@ -1283,6 +1699,8 @@ export default function SocialMediaManager() {
                             ? 'bg-amber-500/[0.03] border-amber-500/30'
                             : isDone
                             ? 'bg-emerald-500/[0.02] border-emerald-500/20'
+                            : isHistorical
+                            ? 'bg-neutral-900/40 border-white/5 opacity-80'
                             : 'bg-white/[0.02] border-white/10'
                         } space-y-4`}
                       >
@@ -1302,6 +1720,430 @@ export default function SocialMediaManager() {
                                 {c.video_id && (
                                   <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-white/5 text-neutral-400">
                                     Video: {c.video_id}
+                                  </span>
+                                )}
+                              </div>
+                              <span className="text-[11px] text-neutral-500">
+                                {c.published_at ? new Date(c.published_at).toLocaleString() : 'Recent'}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Status and language badges */}
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            {c.detected_language && (
+                              <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-blue-500/20 text-blue-400 uppercase">
+                                {c.detected_language}
+                              </span>
+                            )}
+
+                            {c.intent && (
+                              <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-purple-500/20 text-purple-400 uppercase">
+                                {c.intent.replace('SENSITIVE_', '')}
+                              </span>
+                            )}
+
+                            {isHistorical && (
+                              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-neutral-800 text-neutral-400 border border-white/10">
+                                Historical Archive
+                              </span>
+                            )}
+
+                            {isPending && (
+                              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/30">
+                                Pending Approval
+                              </span>
+                            )}
+
+                            {isPreview && (
+                              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-400 border border-blue-500/30">
+                                Preview Ready (Safe Mode)
+                              </span>
+                            )}
+
+                            {isDone && (
+                              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
+                                <Check className="w-3 h-3" />
+                                {c.status === 'auto_replied' ? 'Auto-Replied' : 'Approved'}
+                              </span>
+                            )}
+
+                            {c.status === 'dismissed' && (
+                              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-neutral-800 text-neutral-400">
+                                Dismissed
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Comment text */}
+                        <div className="p-3.5 rounded-xl bg-neutral-950/80 border border-white/5">
+                          <p className="text-sm text-neutral-200 leading-relaxed font-sans">
+                            {c.comment_text}
+                          </p>
+                        </div>
+
+                        {/* AI Suggested Response Box */}
+                        <div className="p-3.5 rounded-xl bg-white/[0.02] border border-white/5 space-y-2">
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="font-semibold text-neutral-400 flex items-center gap-1.5">
+                              <Sparkles className="w-3.5 h-3.5 text-red-400" />
+                              {isHistorical ? 'Historical Archive Notice:' : isDone ? 'Published Response:' : 'AI Suggested Response:'}
+                            </span>
+                            {!isDone && !isHistorical && (
+                              <button
+                                type="button"
+                                onClick={() => setEditingReplyId(isEditing ? null : c.id)}
+                                className="text-[11px] text-neutral-400 hover:text-white underline"
+                              >
+                                {isEditing ? 'Cancel Edit' : 'Edit Response'}
+                              </button>
+                            )}
+                          </div>
+
+                          {isHistorical ? (
+                            <p className="text-xs text-neutral-400 italic font-sans leading-relaxed">
+                              Historical comment detected prior to active automation window. Preserved safely in history with zero auto-reply.
+                            </p>
+                          ) : isEditing ? (
+                            <textarea
+                              rows={3}
+                              value={replyVal}
+                              onChange={(e) =>
+                                setEditedReplyText({ ...editedReplyText, [c.id]: e.target.value })
+                              }
+                              className="w-full px-3 py-2 rounded-xl bg-neutral-950 border border-red-500/40 text-xs text-white focus:outline-none"
+                            />
+                          ) : (
+                            <p className="text-xs text-neutral-300 leading-relaxed font-sans">
+                              {replyVal || 'No response draft generated.'}
+                            </p>
+                          )}
+                        </div>
+
+                        {/* Actions row */}
+                        {!isDone && !isHistorical && c.status !== 'dismissed' && (
+                          <div className="flex flex-wrap items-center justify-end gap-2.5 pt-1">
+                            <button
+                              type="button"
+                              onClick={() => handleDismissYouTubeComment(c.id)}
+                              disabled={actionLoadingId === c.id}
+                              className="px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-xs text-neutral-400 transition-colors"
+                            >
+                              Dismiss
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => handleApproveYouTubeComment(c.id, c.suggested_reply)}
+                              disabled={actionLoadingId === c.id}
+                              className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold shadow-md shadow-emerald-600/20 transition-all disabled:opacity-50"
+                            >
+                              <Check className="w-3.5 h-3.5" />
+                              {ytSettings.safe_testing_mode
+                                ? 'Approve (Safe Preview Mode)'
+                                : 'Approve & Publish to YouTube'}
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================== */}
+      {/* FACEBOOK COMMENTS AI AUTO-REPLY AUTOMATION                     */}
+      {/* ============================================================== */}
+      {activeTab === 'facebook_comments' && (
+        <div className="space-y-6">
+          {/* Header Controls Bar */}
+          <div className="rounded-2xl border border-white/10 bg-neutral-900/60 p-6 space-y-6">
+            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6 border-b border-white/10 pb-6">
+              <div className="flex items-center gap-4">
+                <div className="relative">
+                  <img
+                    src={fb.profile_picture_url || '/apple-touch-icon.png'}
+                    alt="Facebook Page"
+                    className="w-14 h-14 rounded-2xl object-cover border-2 border-blue-500/30 shadow-lg shadow-blue-500/10"
+                    onError={(e) => {
+                      e.target.src = '/apple-touch-icon.png';
+                    }}
+                  />
+                  <div className="absolute -bottom-1 -right-1 p-1 rounded-lg bg-blue-600 text-white shadow">
+                    <Facebook className="w-3.5 h-3.5" />
+                  </div>
+                </div>
+
+                <div>
+                  <div className="flex items-center gap-2.5">
+                    <h2 className="text-lg font-bold text-white">{fb.name || 'Pranvith DOP Page'}</h2>
+                    <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                      @{fb.username || 'pranvithdop'}
+                    </span>
+                    {fb.is_connected && (
+                      <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center gap-1">
+                        <Check className="w-3 h-3" /> Page Token Active
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-neutral-400 mt-1">
+                    Meta Graph API v21.0 Page Feed & Post Comments Monitor with Multilingual AI Auto-Reply
+                  </p>
+                </div>
+              </div>
+
+              {/* Sync Action */}
+              <div className="flex flex-wrap items-center gap-3">
+                <button
+                  onClick={handleSyncFacebook}
+                  disabled={syncingFb}
+                  className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow-lg shadow-blue-600/20 transition-all disabled:opacity-50"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${syncingFb ? 'animate-spin' : ''}`} />
+                  {syncingFb ? 'Syncing...' : 'Fetch Page Comments'}
+                </button>
+
+                <button
+                  onClick={() => setShowFbModal(true)}
+                  className="px-3.5 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-neutral-300 text-xs font-semibold transition-colors flex items-center gap-1.5"
+                >
+                  <Key className="w-3.5 h-3.5 text-blue-400" />
+                  Configure Page
+                </button>
+              </div>
+            </div>
+
+            {/* Automation Mode Toggles */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Toggle 1: Auto-Reply Switch */}
+              <div className="p-4 rounded-xl border border-white/10 bg-white/[0.02] flex items-center justify-between">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold uppercase tracking-wider text-neutral-400">
+                      Auto-Reply Engine:
+                    </span>
+                    <span
+                      className={`text-xs font-bold px-2 py-0.5 rounded ${
+                        fbSettings.auto_reply_enabled
+                          ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                          : 'bg-neutral-800 text-neutral-400 border border-neutral-700'
+                      }`}
+                    >
+                      {fbSettings.auto_reply_enabled ? 'ENABLED (ON)' : 'PAUSED (OFF)'}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-neutral-400">
+                    Automatically processes new Page comments. Sensitive inquiries (pricing/booking) always pause for approval.
+                  </p>
+                </div>
+
+                <button
+                  onClick={handleToggleFbAutoReply}
+                  disabled={savingFbSettings}
+                  className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                    fbSettings.auto_reply_enabled ? 'bg-emerald-600' : 'bg-neutral-800'
+                  }`}
+                  role="switch"
+                  aria-checked={fbSettings.auto_reply_enabled}
+                >
+                  <span
+                    aria-hidden="true"
+                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                      fbSettings.auto_reply_enabled ? 'translate-x-5' : 'translate-x-0'
+                    }`}
+                  />
+                </button>
+              </div>
+
+              {/* Toggle 2: Safe Testing Mode */}
+              <div className="p-4 rounded-xl border border-white/10 bg-white/[0.02] flex items-center justify-between">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold uppercase tracking-wider text-neutral-400">
+                      Safe Testing Mode:
+                    </span>
+                    <span
+                      className={`text-xs font-bold px-2 py-0.5 rounded ${
+                        fbSettings.safe_testing_mode
+                          ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
+                          : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                      }`}
+                    >
+                      {fbSettings.safe_testing_mode ? 'ACTIVE (Previews Only)' : 'LIVE PUBLISHING ACTIVE'}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-neutral-400">
+                    {fbSettings.safe_testing_mode
+                      ? 'AI generates replies safely in preview mode. Zero live responses posted to your Facebook Page.'
+                      : 'Live Mode: Approved replies will be published publicly to your Facebook Page comment threads.'}
+                  </p>
+                </div>
+
+                <button
+                  onClick={handleToggleFbSafeMode}
+                  disabled={savingFbSettings}
+                  className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                    fbSettings.safe_testing_mode ? 'bg-blue-600' : 'bg-neutral-800'
+                  }`}
+                  role="switch"
+                  aria-checked={fbSettings.safe_testing_mode}
+                >
+                  <span
+                    aria-hidden="true"
+                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                      fbSettings.safe_testing_mode ? 'translate-x-5' : 'translate-x-0'
+                    }`}
+                  />
+                </button>
+              </div>
+            </div>
+
+            {/* Metrics ribbon */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 pt-2">
+              <div className="p-3.5 rounded-xl bg-white/[0.02] border border-white/5">
+                <span className="text-[11px] text-neutral-400 block font-medium">Comments Detected</span>
+                <span className="text-xl font-bold text-white mt-1 block">
+                  {fbComments.length}
+                </span>
+              </div>
+
+              <div className="p-3.5 rounded-xl bg-white/[0.02] border border-white/5">
+                <span className="text-[11px] text-amber-400/90 block font-medium">Pending Approval</span>
+                <span className="text-xl font-bold text-amber-400 mt-1 block">
+                  {fbComments.filter((c) => c.status === 'pending_approval').length}
+                </span>
+              </div>
+
+              <div className="p-3.5 rounded-xl bg-white/[0.02] border border-white/5">
+                <span className="text-[11px] text-blue-400/90 block font-medium">Safe Previews</span>
+                <span className="text-xl font-bold text-blue-400 mt-1 block">
+                  {fbComments.filter((c) => c.status === 'preview_ready').length}
+                </span>
+              </div>
+
+              <div className="p-3.5 rounded-xl bg-white/[0.02] border border-white/5">
+                <span className="text-[11px] text-emerald-400/90 block font-medium">AI Replies Sent</span>
+                <span className="text-xl font-bold text-emerald-400 mt-1 block">
+                  {fbComments.filter((c) => c.status === 'approved' || c.status === 'auto_replied' || c.status === 'manual_replied').length}
+                </span>
+              </div>
+
+              <div className="p-3.5 rounded-xl bg-white/[0.02] border border-white/5">
+                <span className="text-[11px] text-rose-400/90 block font-medium">Failed Replies</span>
+                <span className="text-xl font-bold text-rose-400 mt-1 block">
+                  {fbSettings.failed_replies || 0}
+                </span>
+              </div>
+
+              <div className="p-3.5 rounded-xl bg-white/[0.02] border border-white/5">
+                <span className="text-[11px] text-neutral-400 block font-medium">Last Reply</span>
+                <span className="text-xs font-semibold text-neutral-300 mt-2 block truncate" title={fbSettings.last_reply_at ? new Date(fbSettings.last_reply_at).toLocaleString() : 'None yet'}>
+                  {fbSettings.last_reply_at ? new Date(fbSettings.last_reply_at).toLocaleTimeString() : 'None'}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Facebook Comments Feed & Management Table */}
+          <div className="rounded-2xl border border-white/10 bg-neutral-900/60 p-6 space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-white/10 pb-4">
+              <div>
+                <h3 className="text-base font-bold text-white flex items-center gap-2">
+                  <MessageSquare className="w-4 h-4 text-blue-400" />
+                  Page Comments & AI Suggestions
+                </h3>
+                <p className="text-xs text-neutral-400">
+                  Review comments from your connected Facebook Page, edit suggested responses, or approve replies.
+                </p>
+              </div>
+
+              {/* Filter Tabs */}
+              <div className="flex flex-wrap items-center gap-1 bg-white/5 p-1 rounded-xl border border-white/10 text-xs">
+                {[
+                  { id: 'all', label: 'All', count: fbComments.length },
+                  { id: 'pending_approval', label: 'Pending Approval', count: fbComments.filter((c) => c.status === 'pending_approval').length },
+                  { id: 'preview_ready', label: 'Previews Ready', count: fbComments.filter((c) => c.status === 'preview_ready').length },
+                  { id: 'approved', label: 'Approved / Replied', count: fbComments.filter((c) => c.status === 'approved' || c.status === 'auto_replied' || c.status === 'manual_replied').length },
+                  { id: 'dismissed', label: 'Dismissed', count: fbComments.filter((c) => c.status === 'dismissed').length }
+                ].map((f) => (
+                  <button
+                    key={f.id}
+                    onClick={() => setFbFilter(f.id)}
+                    className={`px-3 py-1.5 rounded-lg font-medium transition-colors ${
+                      fbFilter === f.id
+                        ? 'bg-blue-600 text-white font-semibold'
+                        : 'text-neutral-400 hover:text-white'
+                    }`}
+                  >
+                    {f.label} ({f.count})
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Comments List */}
+            {fbComments.length === 0 ? (
+              <div className="p-12 text-center space-y-3">
+                <Facebook className="w-10 h-10 text-neutral-600 mx-auto" />
+                <h4 className="text-sm font-semibold text-neutral-300">No Facebook Comments Loaded</h4>
+                <p className="text-xs text-neutral-500 max-w-sm mx-auto">
+                  Click the "Fetch Page Comments" button above or connect your Facebook Page to import recent post and video comments.
+                </p>
+                <button
+                  onClick={handleSyncFacebook}
+                  disabled={syncingFb}
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow-md transition-all"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${syncingFb ? 'animate-spin' : ''}`} />
+                  Sync Page Comments
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {fbComments
+                  .filter((c) => {
+                    if (fbFilter === 'all') return true;
+                    if (fbFilter === 'approved') {
+                      return c.status === 'approved' || c.status === 'auto_replied' || c.status === 'manual_replied';
+                    }
+                    return c.status === fbFilter;
+                  })
+                  .map((c) => {
+                    const isPending = c.status === 'pending_approval';
+                    const isPreview = c.status === 'preview_ready';
+                    const isDone = c.status === 'approved' || c.status === 'auto_replied' || c.status === 'manual_replied';
+                    const isEditing = editingReplyId === c.id;
+                    const replyVal = editedReplyText[c.id] !== undefined ? editedReplyText[c.id] : (c.reply_text || c.suggested_reply || '');
+
+                    return (
+                      <div
+                        key={c.id}
+                        className={`p-5 rounded-2xl border transition-all ${
+                          isPending
+                            ? 'bg-amber-500/[0.03] border-amber-500/30'
+                            : isDone
+                            ? 'bg-emerald-500/[0.02] border-emerald-500/20'
+                            : 'bg-white/[0.02] border-white/10'
+                        } space-y-4`}
+                      >
+                        {/* Top row: Author & Metadata */}
+                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5">
+                          <div className="flex items-center gap-3">
+                            <div className="w-9 h-9 rounded-full bg-blue-600/20 border border-blue-500/30 flex items-center justify-center text-blue-400 font-bold text-xs">
+                              {(c.author_name || 'U').charAt(0).toUpperCase()}
+                            </div>
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs font-bold text-white">
+                                  {c.author_name || 'Facebook User'}
+                                </span>
+                                {c.post_id && (
+                                  <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-white/5 text-neutral-400">
+                                    Post: {c.post_id.slice(-8)}
                                   </span>
                                 )}
                               </div>
@@ -1363,7 +2205,7 @@ export default function SocialMediaManager() {
                         <div className="p-3.5 rounded-xl bg-white/[0.02] border border-white/5 space-y-2">
                           <div className="flex items-center justify-between text-xs">
                             <span className="font-semibold text-neutral-400 flex items-center gap-1.5">
-                              <Sparkles className="w-3.5 h-3.5 text-red-400" />
+                              <Sparkles className="w-3.5 h-3.5 text-blue-400" />
                               {isDone ? 'Published Response:' : 'AI Suggested Response:'}
                             </span>
                             {!isDone && (
@@ -1384,7 +2226,7 @@ export default function SocialMediaManager() {
                               onChange={(e) =>
                                 setEditedReplyText({ ...editedReplyText, [c.id]: e.target.value })
                               }
-                              className="w-full px-3 py-2 rounded-xl bg-neutral-950 border border-red-500/40 text-xs text-white focus:outline-none"
+                              className="w-full px-3 py-2 rounded-xl bg-neutral-950 border border-blue-500/40 text-xs text-white focus:outline-none"
                             />
                           ) : (
                             <p className="text-xs text-neutral-300 leading-relaxed font-sans">
@@ -1398,7 +2240,7 @@ export default function SocialMediaManager() {
                           <div className="flex flex-wrap items-center justify-end gap-2.5 pt-1">
                             <button
                               type="button"
-                              onClick={() => handleDismissYouTubeComment(c.id)}
+                              onClick={() => handleDismissFacebookComment(c.id)}
                               disabled={actionLoadingId === c.id}
                               className="px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-xs text-neutral-400 transition-colors"
                             >
@@ -1407,14 +2249,14 @@ export default function SocialMediaManager() {
 
                             <button
                               type="button"
-                              onClick={() => handleApproveYouTubeComment(c.id, c.suggested_reply)}
+                              onClick={() => handleApproveFacebookComment(c.id, c.suggested_reply)}
                               disabled={actionLoadingId === c.id}
                               className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold shadow-md shadow-emerald-600/20 transition-all disabled:opacity-50"
                             >
                               <Check className="w-3.5 h-3.5" />
-                              {ytSettings.safe_testing_mode
+                              {fbSettings.safe_testing_mode
                                 ? 'Approve (Safe Preview Mode)'
-                                : 'Approve & Publish to YouTube'}
+                                : 'Approve & Publish to Facebook'}
                             </button>
                           </div>
                         )}
@@ -1430,7 +2272,7 @@ export default function SocialMediaManager() {
       {/* ============================================================== */}
       {/* OTHER TABS: ROADMAP / COMING PHASES                           */}
       {/* ============================================================== */}
-      {activeTab !== 'connected_accounts' && activeTab !== 'youtube_comments' && (
+      {activeTab !== 'connected_accounts' && activeTab !== 'youtube_comments' && activeTab !== 'facebook_comments' && (
         <div className="rounded-2xl border border-white/10 bg-neutral-900/60 p-8 text-center space-y-4">
           <div className="w-12 h-12 rounded-2xl bg-orange-500/10 border border-orange-500/20 text-orange-400 flex items-center justify-center mx-auto">
             {React.createElement(TABS.find((t) => t.id === activeTab)?.icon || Share2, { className: 'w-6 h-6' })}
@@ -1578,6 +2420,107 @@ export default function SocialMediaManager() {
                 >
                   {savingIg && <RefreshCw className="w-3.5 h-3.5 animate-spin" />}
                   Verify & Connect
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================== */}
+      {/* FACEBOOK PAGE CONNECT MODAL (META GRAPH API)                 */}
+      {/* ============================================================== */}
+      {showFbModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+          <div className="w-full max-w-xl rounded-2xl border border-white/10 bg-neutral-900 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="flex items-center justify-between border-b border-white/10 p-5 bg-neutral-950/50">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-xl bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                  <Facebook className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white">Connect Facebook Page</h3>
+                  <p className="text-xs text-neutral-400">Meta Graph API (v21.0) Integration for Pages</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowFbModal(false)}
+                className="p-1.5 rounded-lg text-neutral-400 hover:text-white hover:bg-white/10 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveFacebook} className="p-6 space-y-4 overflow-y-auto flex-1">
+              <div className="p-4 rounded-xl bg-white/[0.02] border border-white/5 space-y-2 text-xs text-neutral-300">
+                <p className="font-semibold text-white flex items-center gap-1.5">
+                  <Info className="w-4 h-4 text-blue-400" />
+                  How to obtain your Facebook Page Access Token:
+                </p>
+                <ol className="list-decimal list-inside space-y-1 text-neutral-400 pl-1">
+                  <li>Go to <strong className="text-white">developers.facebook.com/tools/explorer</strong>.</li>
+                  <li>Select your Meta App and choose your Facebook Page in the "User or Page" dropdown.</li>
+                  <li>Ensure permissions are selected: <code className="text-blue-400">pages_show_list, pages_read_engagement, pages_manage_posts, pages_manage_engagement</code>.</li>
+                  <li>Click <strong className="text-white">Generate Access Token</strong> and copy the Page ID and Page Access Token below.</li>
+                </ol>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-neutral-300 mb-1.5">
+                  Facebook Page ID <span className="text-red-400">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={fbPageId}
+                  onChange={(e) => setFbPageId(e.target.value)}
+                  placeholder="e.g. 109283746501928"
+                  required
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-white/5 border border-white/10 text-xs font-mono text-white focus:outline-none focus:border-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-neutral-300 mb-1.5">
+                  Page Access Token <span className="text-red-400">*</span>
+                </label>
+                <textarea
+                  rows={3}
+                  value={fbPageToken}
+                  onChange={(e) => setFbPageToken(e.target.value)}
+                  placeholder="Paste your EAAG... Page Access Token"
+                  required
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-white/5 border border-white/10 text-xs font-mono text-white focus:outline-none focus:border-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-neutral-300 mb-1.5">
+                  Page Name (Optional)
+                </label>
+                <input
+                  type="text"
+                  value={fbPageName}
+                  onChange={(e) => setFbPageName(e.target.value)}
+                  placeholder="e.g. Pranvith DOP"
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-white/5 border border-white/10 text-xs font-sans text-white focus:outline-none focus:border-blue-500"
+                />
+              </div>
+
+              <div className="pt-4 border-t border-white/10 flex items-center justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setShowFbModal(false)}
+                  className="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-xs font-medium text-neutral-300 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingFb}
+                  className="inline-flex items-center gap-2 px-5 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs font-semibold shadow-lg shadow-blue-500/20 transition-all disabled:opacity-50"
+                >
+                  {savingFb && <RefreshCw className="w-3.5 h-3.5 animate-spin" />}
+                  Verify & Connect Page
                 </button>
               </div>
             </form>

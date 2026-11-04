@@ -1212,4 +1212,38 @@ export const previewAdminYouTubeReply = async (payload) => {
   return data;
 };
 
+// ==================== FACEBOOK SOCIAL AUTOMATION ====================
+
+export const fetchAdminFacebookSettings = async () => {
+  const { data } = await adminApi.get('/admin/social/facebook/settings');
+  return data;
+};
+
+export const saveAdminFacebookSettings = async (payload) => {
+  const { data } = await adminApi.post('/admin/social/facebook/settings', payload);
+  return data;
+};
+
+export const connectAdminFacebook = async (payload) => {
+  const { data } = await adminApi.post('/admin/social/facebook/connect', payload);
+  return data;
+};
+
+export const syncAdminFacebookComments = async (payload = {}) => {
+  const { data } = await adminApi.post('/admin/social/facebook/sync', payload);
+  return data;
+};
+
+export const fetchAdminFacebookComments = async (status = 'all') => {
+  const params = status && status !== 'all' ? `?status=${encodeURIComponent(status)}` : '';
+  const { data } = await adminApi.get(`/admin/social/facebook/comments${params}`);
+  return data;
+};
+
+export const previewAdminFacebookReply = async (payload) => {
+  const { data } = await adminApi.post('/admin/social/facebook/preview-reply', payload);
+  return data;
+};
+
+
 

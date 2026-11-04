@@ -14,6 +14,17 @@ import httpx
 
 logger = logging.getLogger("backend.social_automation")
 
+try:
+    from .camera_ai import CAMERA_DATABASE
+except ImportError:
+    try:
+        from camera_ai import CAMERA_DATABASE
+    except ImportError:
+        try:
+            from backend.camera_ai import CAMERA_DATABASE
+        except ImportError:
+            CAMERA_DATABASE = {}
+
 GRAPH_API_VERSION = "v21.0"
 GRAPH_API_BASE = f"https://graph.facebook.com/{GRAPH_API_VERSION}"
 
@@ -29,10 +40,16 @@ TELUGU_WORDS = [
     "బాగుంది", "ఎంత", "ధర", "బ్రో", "దీనితో", "ప్రైస్", "అన్నా", "పంపిస్తారా", "పంపండి", "చూడండి"
 ]
 
+HINDI_WORDS = [
+    "kya", "hai", "bhai", "batao", "kaise", "kare", "kitna", "shukriya", "bahut", "achha",
+    "kijiye", "bataiye", "shandar", "namaste", "dhanyawad", "ki", "ka", "ke", "liye", "bhejo",
+    "kripya", "badhiya", "daam", "kimat"
+]
+
 def detect_comment_language(text: str) -> str:
     """
     Detects if comment is in Telugu, English, or Hindi.
-    Handles native Unicode Telugu script and Romanized Teluglish.
+    Handles native Unicode Telugu script, Devanagari script, Romanized Teluglish, and Hinglish.
     """
     raw = (text or "").lower()
     
@@ -42,16 +59,19 @@ def detect_comment_language(text: str) -> str:
     if re.search(r'[\u0900-\u097F]', raw):
         return "hindi"
         
-    # 2. Explicit or Romanized Telugu
-    matched_te = [w for w in TELUGU_WORDS if re.search(rf'\b{re.escape(w)}\b', raw)]
-    if not matched_te:
-        return "english"
-        
-    # If the only match is 'bro' or 'plz' (borrowed words common in English), treat as english
-    if set(matched_te).issubset({"bro", "plz"}):
-        return "english"
-        
-    return "telugu"
+    # 2. Check Romanized Hindi and Telugu
+    hindi_score = sum(1 for w in HINDI_WORDS if re.search(rf'\b{re.escape(w)}\b', raw))
+    matched_te = [w for w in TELUGU_WORDS if re.search(rf'\b{re.escape(w)}\b', raw) and w not in ("bro", "plz")]
+    telugu_score = len(matched_te)
+
+    if telugu_score > 0 and telugu_score >= hindi_score:
+        return "telugu"
+    if hindi_score >= 2 or (hindi_score >= 1 and any(w in raw for w in ["kya hai", "batao", "shukriya", "bhai", "bhejo", "kaise"])):
+        return "hindi"
+    if telugu_score > 0:
+        return "telugu"
+
+    return "english"
 
 # ==================== DEFAULT KEYWORD RULES ====================
 
@@ -63,6 +83,7 @@ DEFAULT_SOCIAL_RULES = {
             "keywords": ["lut", "luts", "preset", "presets", "color grade", "grading", "కలర్ గ్రేడింగ్"],
             "reply_en": "🎨 Check out the Pranvith Creative LUT Pack (₹49) with 10+ 3D cinematic LUTs for Sony S-Log3, Canon C-Log3 & Rec.709: https://pranvithdop.com/assets/creative-lut-pack",
             "reply_te": "🎨 సోనీ S-Log3 మరియు కానన్ C-Log3 కోసం సినిమాటిక్ LUT ప్యాక్ (₹49) లింక్: https://pranvithdop.com/assets/creative-lut-pack",
+            "reply_hi": "🎨 सोनी S-Log3 और कैनन C-Log3 के लिए क्रिएटिव सिनेमैटिक LUT पैक (₹49) लिंक: https://pranvithdop.com/assets/creative-lut-pack",
             "active": True
         },
         {
@@ -71,14 +92,34 @@ DEFAULT_SOCIAL_RULES = {
             "keywords": ["settings", "setting", "camera setting", "pdf", "cheat sheet", "సెట్టింగ్స్"],
             "reply_en": "🎬 Here are our verified camera & cinematography settings guides! You can also explore our complete asset catalog at https://pranvithdop.com/assets",
             "reply_te": "🎬 నమస్కారం! కెమెరా సెట్టింగ్స్ మరియు సినిమాటోగ్రఫీ గైడ్స్ కోసం మన వెబ్‌సైట్ చూడండి: https://pranvithdop.com/assets",
+            "reply_hi": "🎬 नमस्ते! कैमरा सेटिंग्स और सिनेमैटोग्राफी गाइड्स के लिए हमारी वेबसाइट देखें: https://pranvithdop.com/assets",
             "active": True
         },
         {
             "id": "rule_link",
             "name": "Direct Link / Asset Request",
-            "keywords": ["link", "links", "url", "download", "డౌన్‌లోడ్", "లింక్"],
+            "keywords": ["link", "links", "url", "download", "డౌన్‌లోడ్", "లింక్", "लिंक"],
             "reply_en": "🔗 Direct link to Pranvith DOP creative packs & master courses: https://pranvithdop.com/assets",
             "reply_te": "🔗 ప్రణవిత్ DOP అసెట్స్ మరియు కోర్సెస్ డైరెక్ట్ లింక్: https://pranvithdop.com/assets",
+            "reply_hi": "🔗 प्रणविथ डीओपी क्रिएटिव पैक्स और कोर्सेज का डायरेक्ट लिंक: https://pranvithdop.com/assets",
+            "active": True
+        },
+        {
+            "id": "rule_instagram",
+            "name": "Instagram ID & Handle Request",
+            "keywords": ["instagram", "insta id", "ig id", "insta", "ఇన్‌స్టాగ్రామ్", "ఇన్‌స్టా", "इंस्टाग्राम", "इंस्टा"],
+            "reply_en": "🎬 Follow us on Instagram @pranvith_dop (https://www.instagram.com/pranvith_dop) for daily behind-the-scenes, camera breakdowns, and cinematic reels!",
+            "reply_te": "🎬 మా అఫీషియల్ ఇన్‌స్టాగ్రామ్ ఐడీ @pranvith_dop (https://www.instagram.com/pranvith_dop). రోజూ సినిమాటోగ్రఫీ రీల్స్ మరియు BTS అప్‌డేట్స్ కోసం ఫాలో అవ్వండి 🔥",
+            "reply_hi": "🎬 हमारा आधिकारिक इंस्टाग्राम आईडी @pranvith_dop (https://www.instagram.com/pranvith_dop) है। सिनेमैटोग्राफी रील्स और बिहाइंड द सीन्स अपडेट्स के लिए जरूर फॉलो करें!",
+            "active": True
+        },
+        {
+            "id": "rule_thank_you",
+            "name": "Thank You & Gratitude",
+            "keywords": ["thank you", "thanks", "thank u", "tq", "dhanyavadalu", "shukriya", "ధన్యవాదాలు", "థాంక్స్", "शुक्रिया", "धन्यवाद"],
+            "reply_en": "🎬 You're most welcome @{username}! Glad you found it helpful. Keep creating and stay tuned for our next filmmaking breakdowns!",
+            "reply_te": "🎬 చాలా సంతోషం @{username} bro! వీడియో ఉపయోగపడినందుకు ఆనందంగా ఉంది. కీప్ షూటింగ్ & స్టే ట్యూన్డ్ 🔥",
+            "reply_hi": "🎬 बहुत-बहुत धन्यवाद @{username} भाई! खुशी हुई कि आपको यह हेल्पफुल लगा। ऐसे ही सीखते रहें और जुड़े रहें!",
             "active": True
         },
         {
@@ -87,6 +128,7 @@ DEFAULT_SOCIAL_RULES = {
             "keywords": ["list", "catalog", "packs", "assets", "store", "లిస్ట్"],
             "reply_en": "🛍️ Here is our complete digital catalog (Creative LUTs ₹49, Sound FX ₹149, Wedding Templates ₹299): https://pranvithdop.com/assets",
             "reply_te": "🛍️ మన ఎడిటింగ్ అసెట్స్ & ప్యాక్స్ మొత్తం లిస్ట్ ఇక్కడ చూడండి: https://pranvithdop.com/assets",
+            "reply_hi": "🛍️ हमारा पूरा डिजिटल कैटलॉग यहाँ देखें: https://pranvithdop.com/assets",
             "active": True
         },
         {
@@ -95,6 +137,7 @@ DEFAULT_SOCIAL_RULES = {
             "keywords": ["sound", "sfx", "audio", "sound fx", "whoosh"],
             "reply_en": "🔊 Get 100+ 24-bit cinematic sound FX (whooshes, risers, deep hits) for ₹149: https://pranvithdop.com/assets/cinematic-sound-fx-pack",
             "reply_te": "🔊 సినిమాటిక్ సౌండ్ ఎఫెక్ట్స్ ప్యాక్ (₹149) లింక్: https://pranvithdop.com/assets/cinematic-sound-fx-pack",
+            "reply_hi": "🔊 सिनेमैटिक साउंड इफेक्ट्स पैक (₹149) लिंक: https://pranvithdop.com/assets/cinematic-sound-fx-pack",
             "active": True
         }
     ],
@@ -102,25 +145,28 @@ DEFAULT_SOCIAL_RULES = {
         {
             "id": "rule_price",
             "name": "Price & Quotation Inquiry",
-            "keywords": ["price", "cost", "rate", "fee", "fees", "charges", "how much", "ధర", "ఎంత", "రేట్"],
+            "keywords": ["price", "cost", "rate", "fee", "fees", "charges", "how much", "ధర", "ఎంత", "రేట్", "कीमत", "कितना"],
             "suggested_en": "Hi @{username}! Creative LUT Pack is ₹49, Sound FX Pack is ₹149, and Wedding Templates are ₹299. Explore all packs at https://pranvithdop.com/assets or DM us for custom bundles!",
             "suggested_te": "నమస్కారం @{username}! Creative LUT ప్యాక్ ₹49, Sound FX ₹149, మరియు వెడ్డింగ్ టెంప్లేట్స్ ₹299. వివరాల కోసం మన వెబ్‌సైట్ చూడండి: https://pranvithdop.com/assets",
+            "suggested_hi": "नमस्ते @{username}! क्रिएटिव LUT पैक ₹49, साउंड FX ₹149, और वेडिंग टेम्पलेट्स ₹299 हैं। पूरी डिटेल्स के लिए https://pranvithdop.com/assets देखें!",
             "active": True
         },
         {
             "id": "rule_booking",
             "name": "Shoot & Commercial Booking Inquiry",
-            "keywords": ["book", "booking", "hire", "service", "shoot", "event", "commercial", "బుకింగ్", "షూట్"],
+            "keywords": ["book", "booking", "hire", "service", "shoot", "event", "commercial", "బుకింగ్", "షూట్", "बुक"],
             "suggested_en": "Hi @{username}! For commercial video production, wedding films, or cinematography bookings, please fill our enquiry form at https://pranvithdop.com/hire or WhatsApp +91 9059867883.",
             "suggested_te": "నమస్కారం @{username}! సినిమాటోగ్రఫీ మరియు వెడ్డింగ్ షూట్ బుకింగ్స్ కోసం మా వెబ్‌సైట్ https://pranvithdop.com/hire లో లేదా WhatsApp +91 9059867883 లో సంప్రదించండి.",
+            "suggested_hi": "नमस्ते @{username}! कमर्शियल वीडियो प्रोडक्शन या वेडिंग फिल्म्स बुकिंग के लिए हमारी वेबसाइट https://pranvithdop.com/hire या WhatsApp +91 9059867883 पर संपर्क करें।",
             "active": True
         },
         {
             "id": "rule_course",
             "name": "Masterclass & Training Inquiry",
-            "keywords": ["course", "class", "training", "offline", "learn", "academy", "కోర్స్", "క్లాస్"],
+            "keywords": ["course", "class", "training", "offline", "learn", "academy", "కోర్స్", "క్లాస్", "कोर्स", "क्लास"],
             "suggested_en": "Hi @{username}! Our Master Cinematography Course covers practical camera operation, S-Log3/C-Log3 exposure, on-set lighting, and color grading. Details at https://pranvithdop.com/courses",
             "suggested_te": "నమస్కారం @{username}! మా మాస్టర్ సినిమాటోగ్రఫీ కోర్స్ వివరాలు, ప్రాక్టికల్ క్లాసెస్ కోసం ఇక్కడ చూడండి: https://pranvithdop.com/courses",
+            "suggested_hi": "नमस्ते @{username}! हमारे मास्टर सिनेमैटोग्राफी कोर्स की डिटेल्स और रजिस्ट्रेशन के लिए https://pranvithdop.com/courses देखें।",
             "active": True
         }
     ]
@@ -237,7 +283,12 @@ def evaluate_comment(
             if re.search(rf'\b{re.escape(kw.lower())}\b', text_lower):
                 matched_keywords.append(kw)
         if matched_keywords:
-            template = rule.get("suggested_te") if lang == "telugu" else rule.get("suggested_en")
+            if lang == "telugu":
+                template = rule.get("suggested_te")
+            elif lang == "hindi":
+                template = rule.get("suggested_hi") or rule.get("suggested_en")
+            else:
+                template = rule.get("suggested_en")
             suggested_reply = (template or "").replace("{username}", username)
             return {
                 "status": "pending_approval",
@@ -260,7 +311,12 @@ def evaluate_comment(
             if re.search(rf'\b{re.escape(kw.lower())}\b', text_lower):
                 matched_keywords.append(kw)
         if matched_keywords:
-            reply_template = rule.get("reply_te") if lang == "telugu" else rule.get("reply_en")
+            if lang == "telugu":
+                reply_template = rule.get("reply_te")
+            elif lang == "hindi":
+                reply_template = rule.get("reply_hi") or rule.get("reply_en")
+            else:
+                reply_template = rule.get("reply_en")
             reply_text = (reply_template or "").replace("{username}", username)
             return {
                 "status": "auto_replied",
@@ -277,6 +333,8 @@ def evaluate_comment(
     # 3. No specific keyword matched: Queue with a polite default suggestion
     if lang == "telugu":
         default_reply = f"నమస్కారం @{username}! కామెంట్ చేసినందుకు ధన్యవాదాలు. మన సినిమాటోగ్రఫీ అసెట్స్ మరియు గైడ్స్ కోసం https://pranvithdop.com చూడండి."
+    elif lang == "hindi":
+        default_reply = f"नमस्ते @{username}! कमेंट करने के लिए धन्यवाद। सिनेमैटोग्राफी रिसोर्सेज और पैक्स के लिए https://pranvithdop.com देखें।"
     else:
         default_reply = f"Hi @{username}! Thanks for the comment. Check out our editing packs and cinematography resources at https://pranvithdop.com"
 
@@ -776,6 +834,52 @@ async def get_social_account_summary(db, platform: str) -> Dict[str, Any]:
             default_summary["name"] = "Pranvith DOP (YouTube)"
             return default_summary
 
+    elif platform == "facebook":
+        doc = None
+        if db is not None:
+            try:
+                doc = await db.social_accounts.find_one({"platform": "facebook"}, {"_id": 0})
+            except Exception:
+                pass
+
+        env_page_token = os.environ.get("FACEBOOK_PAGE_ACCESS_TOKEN", "").strip()
+        env_page_id = os.environ.get("FACEBOOK_PAGE_ID", "").strip()
+
+        if doc and doc.get("is_connected"):
+            return {
+                "platform": "facebook",
+                "is_connected": True,
+                "account_id": doc.get("account_id") or doc.get("page_id"),
+                "username": doc.get("username") or doc.get("page_name", "Pranvith DOP Facebook Page"),
+                "name": doc.get("name") or doc.get("page_name", "Pranvith DOP Page"),
+                "profile_picture_url": doc.get("profile_picture_url", "/assets/brand-profile.png"),
+                "token_masked": mask_token(doc.get("access_token") or doc.get("page_access_token")),
+                "token_status": calculate_token_expiry_status(doc.get("token_expires_at")),
+                "scopes": doc.get("scopes", ["pages_show_list", "pages_read_engagement", "pages_manage_posts", "pages_manage_engagement"]),
+                "connected_at": doc.get("connected_at"),
+                "last_synced_at": doc.get("last_synced_at"),
+                "note": "Connected via Meta Graph API v21.0 (Facebook Page)"
+            }
+        elif env_page_token and env_page_id:
+            return {
+                "platform": "facebook",
+                "is_connected": True,
+                "account_id": env_page_id,
+                "username": "Pranvith DOP Facebook Page",
+                "name": "Pranvith DOP Facebook Page",
+                "profile_picture_url": "/assets/brand-profile.png",
+                "token_masked": mask_token(env_page_token),
+                "token_status": calculate_token_expiry_status(None),
+                "scopes": ["pages_show_list", "pages_read_engagement", "pages_manage_posts", "pages_manage_engagement"],
+                "connected_at": None,
+                "last_synced_at": None,
+                "note": "Configured via environment variables"
+            }
+        else:
+            default_summary["username"] = "Pranvith DOP Facebook Page"
+            default_summary["name"] = "Pranvith DOP Page"
+            return default_summary
+
     return default_summary
 
 
@@ -800,21 +904,394 @@ async def disconnect_social_account(db, platform: str) -> bool:
     return True
 
 
-# ==================== YOUTUBE AI AUTO-REPLY POOLS & INTENT ENGINE ====================
+# ==================== CAMERA LOOKUP & TECHNICAL INTELLIGENCE ====================
 
-YOUTUBE_REPLY_POOLS: Dict[str, Dict[str, List[str]]] = {
+def match_camera_profile(text: str) -> Optional[Tuple[str, Dict[str, Any]]]:
+    """
+    Matches comment text against CAMERA_DATABASE keys and aliases.
+    Cleans punctuation and symbols so e.g. "Z6ii." or "A7 IV?" matches accurately.
+    Returns (camera_key, camera_data) or None.
+    """
+    if not text or not CAMERA_DATABASE:
+        return None
+    raw = text.lower().replace("-", " ")
+    clean_raw = re.sub(r'[^a-zA-Z0-9\s]', ' ', text.lower()).replace("-", " ")
+
+    candidates = []
+    for key, cam in CAMERA_DATABASE.items():
+        aliases = cam.get("aliases", []) + [cam.get("model", "").lower()]
+        for alias in aliases:
+            al_clean = alias.lower().replace("-", " ")
+            if re.search(rf'\b{re.escape(al_clean)}\b', raw) or re.search(rf'\b{re.escape(al_clean)}\b', clean_raw):
+                candidates.append((len(al_clean), key, cam))
+    if candidates:
+        candidates.sort(key=lambda x: x[0], reverse=True)
+        return (candidates[0][1], candidates[0][2])
+    return None
+
+
+def generate_camera_specific_reply(cam_key: str, author_name: str, lang: str) -> str:
+    """
+    Generates an authoritative, camera-specific technical reply extracting
+    specs (profiles, Dual Base ISO, resolution, shutter rule) from CAMERA_DATABASE.
+    Covers Nikon, Sony, and Canon cameras with official PDF cheat sheet links.
+    """
+    cam = CAMERA_DATABASE.get(cam_key, {})
+    model = cam.get("model", "camera")
+    base_isos = cam.get("base_isos", "")
+    profiles = ", ".join(cam.get("color_profiles", ["S-Log / Log", "S-Cinetone"]))
+
+    # 1. SONY A7 IV
+    if "sony_a7iv" in cam_key or "a7iv" in cam_key:
+        if lang == "telugu":
+            return (
+                f"నమస్కారం @{author_name}! Sony A7 IV బెస్ట్ వీడియో సెట్టింగ్స్: "
+                "Picture Profile: S-Log3 / S-Gamut3.Cine (10-bit 4:2:2), "
+                "Dual Base ISO: ISO 800 (Low Base) & ISO 3,200 (High Base), "
+                "180° షట్టర్ రూల్ (24p కి 1/50s, 60p కి 1/125s), 4K 24/30p ఫుల్-ఫ్రేమ్ (60p కి 1.5x క్రాప్). "
+                "పూర్తి సెట్టింగ్స్ PDF & సినీమాటిక్ LUTs కోసం https://pranvithdop.com/assets చూడండి 🎬"
+            )
+        elif lang == "hindi":
+            return (
+                f"नमस्ते @{author_name}! Sony A7 IV की बेस्ट सिनेमैटिक वीडियो सेटिंग्स: "
+                "Picture Profile: S-Log3 / S-Gamut3.Cine (10-bit 4:2:2), "
+                "Dual Base ISO: ISO 800 (Low Base) और ISO 3,200 (High Base), "
+                "180° शटर रूल (24p पर 1/50s), 4K 24/30p फुल-फ्रेम (60p में 1.5x सुपर35 क्रॉप)। "
+                "पूरी सेटिंग्स चीट शीट & LUTs के लिए https://pranvithdop.com/assets देखें 🎬"
+            )
+        else:
+            return (
+                f"Hi @{author_name}! Recommended Sony A7 IV cinematic video settings: "
+                "Picture Profile: S-Log3 with S-Gamut3.Cine (10-bit 4:2:2), "
+                "Dual Base ISO: ISO 800 (Low Base) & ISO 3,200 (High Base), "
+                "180° shutter rule (1/50s for 24p), and 4K 24/30p full-frame (or 60p in Super35). "
+                "Download our full camera cheat sheet & LUTs at https://pranvithdop.com/assets 🎬"
+            )
+
+    # 2. NIKON Z6III
+    elif "nikon_z6iii" in cam_key:
+        if lang == "telugu":
+            return (
+                f"నమస్కారం @{author_name}! Nikon Z6III బెస్ట్ వీడియో సెట్టింగ్స్: "
+                "Picture Profile: N-Log (10-bit internal), Dual Base ISO: ISO 800 & ISO 6,400, "
+                "180° షట్టర్ రూల్ (24p కి 1/50s), 6K N-RAW / 4K 60p ఓవర్‌శాంపిల్డ్. "
+                "ఫుల్ కెమెరా చీట్ షీట్ కోసం https://pranvithdop.com/assets విజిట్ చేయండి 🎬"
+            )
+        elif lang == "hindi":
+            return (
+                f"नमस्ते @{author_name}! Nikon Z6III की बेस्ट वीडियो सेटिंग्स: "
+                "Picture Profile: N-Log (10-bit internal), Dual Base ISO: ISO 800 और ISO 6,400, "
+                "180° शटर रूल (24p पर 1/50s), 6K N-RAW / 4K 60p ओवरसैंपल्ड। "
+                "फुल कैमरा चीट शीट के लिए https://pranvithdop.com/assets देखें 🎬"
+            )
+        else:
+            return (
+                f"Hi @{author_name}! Recommended Nikon Z6III settings: "
+                "Picture Profile: N-Log (10-bit), Dual Base ISO: ISO 800 & ISO 6,400, "
+                "180° shutter rule (1/50s for 24p), and 6K N-RAW / 4K 60p oversampled. "
+                "Download our settings guide at https://pranvithdop.com/assets 🎬"
+            )
+
+    # 3. NIKON Z6II / Z6
+    elif "nikon_z6ii" in cam_key or "z6ii" in cam_key:
+        if lang == "telugu":
+            return (
+                f"నమస్కారం @{author_name}! Nikon Z6II బెస్ట్ సెట్టింగ్స్: "
+                "ఇంటర్నల్ 8-bit లో Flat Profile (Sharpening -2, Contrast -3) వాడండి. "
+                "10-bit N-Log కోసం HDMI ద్వారా Atomos Ninja రికార్డర్ వాడాలి (Base ISO 800). "
+                "180° షట్టర్ రూల్ (24p కి 1/50s). కంప్లీట్ Z6II సెట్టింగ్స్ PDF కోసం https://pranvithdop.com/assets చూడండి 🎬"
+            )
+        elif lang == "hindi":
+            return (
+                f"नमस्ते @{author_name}! Nikon Z6II की बेस्ट सेटिंग्स: "
+                "इंटरनल 8-bit रिकॉर्डिंग के लिए Flat Profile (Sharpening -2, Contrast -3) सबसे बेस्ट है। "
+                "10-bit N-Log के लिए HDMI से Atomos Ninja रिकॉर्डर जरूरी है (Base ISO 800)। "
+                "180° शटर रूल (24p पर 1/50s)। फुल Z6II सेटिंग्स PDF के लिए https://pranvithdop.com/assets देखें 🎬"
+            )
+        else:
+            return (
+                f"Hi @{author_name}! Recommended Nikon Z6II settings: "
+                "For internal 8-bit, use the Flat Profile (Sharpening -2, Contrast -3) for maximum dynamic range. "
+                "10-bit N-Log is available via external HDMI to an Atomos Ninja (Base ISO 800). "
+                "180° shutter rule (1/50s for 24p). Download our Nikon cheat sheet PDF at https://pranvithdop.com/assets 🎬"
+            )
+
+    # 4. NIKON Z8 / Z9
+    elif "nikon_z8" in cam_key or "nikon_z9" in cam_key:
+        if lang == "telugu":
+            return (
+                f"నమస్కారం @{author_name}! Nikon Z8/Z9 బెస్ట్ సెట్టింగ్స్: "
+                "Picture Profile: N-Log (10-bit / 12-bit N-RAW), "
+                "Dual Base ISO: ISO 800 (Low Base) & ISO 4,000 (High Base), "
+                "180° షట్టర్ రూల్, 8.3K 60p / 4K 120p అన్‌క్రాప్డ్ ఫుల్-ఫ్రేమ్. "
+                "కంప్లీట్ సెట్టింగ్స్ గైడ్ కోసం https://pranvithdop.com/assets విజిట్ చేయండి 🎬"
+            )
+        elif lang == "hindi":
+            return (
+                f"नमस्ते @{author_name}! Nikon Z8/Z9 की बेस्ट सेटिंग्स: "
+                "Picture Profile: N-Log (10-bit / 12-bit N-RAW), "
+                "Dual Base ISO: ISO 800 (Low Base) और ISO 4,000 (High Base), "
+                "180° शटर रूल, 8.3K 60p / 4K 120p अनक्रॉप्ड फुल-फ्रेम। "
+                "फुल सेटिंग्स गाइड के लिए https://pranvithdop.com/assets देखें 🎬"
+            )
+        else:
+            return (
+                f"Hi @{author_name}! Recommended Nikon Z8/Z9 settings: "
+                "Picture Profile: N-Log (10-bit / 12-bit internal N-RAW), "
+                "Dual Base ISO: ISO 800 & ISO 4,000, 180° shutter rule, and uncropped 4K 120p / 8.3K 60p. "
+                "Download our full settings cheat sheet at https://pranvithdop.com/assets 🎬"
+            )
+
+    # 5. SONY FX3 / FX6 / A7S III
+    elif "sony_fx3" in cam_key or "sony_fx6" in cam_key or "sony_a7siii" in cam_key:
+        if lang == "telugu":
+            return (
+                f"నమస్కారం @{author_name}! Sony FX3 / A7S III బెస్ట్ సెట్టింగ్స్: "
+                "Picture Profile: S-Log3 / S-Gamut3.Cine (10-bit 4:2:2 All-Intra), "
+                "Dual Base ISO: ISO 800 (Low Base) & ISO 12,800 (High Base / Low Light Beast), "
+                "180° షట్టర్ రూల్, 4K 120p ఫుల్-ఫ్రేమ్. "
+                "చీట్ షీట్ & LUTs కోసం https://pranvithdop.com/assets చూడండి 🎬"
+            )
+        elif lang == "hindi":
+            return (
+                f"नमस्ते @{author_name}! Sony FX3 / A7S III की बेस्ट सेटिंग्स: "
+                "Picture Profile: S-Log3 / S-Gamut3.Cine (10-bit 4:2:2 All-Intra), "
+                "Dual Base ISO: ISO 800 और ISO 12,800 (लो-लाइट के लिए बेस्ट), 180° शटर रूल, 4K 120p फुल-फ्रेम। "
+                "चीट शीट और LUTs के लिए https://pranvithdop.com/assets देखें 🎬"
+            )
+        else:
+            return (
+                f"Hi @{author_name}! Recommended Sony FX3 / A7S III settings: "
+                "Picture Profile: S-Log3 / S-Gamut3.Cine (10-bit 4:2:2 All-Intra), "
+                "Dual Base ISO: ISO 800 & ISO 12,800 (clean low-light), 180° shutter rule, and 4K 120p full-frame. "
+                "Download our cheat sheet & LUTs at https://pranvithdop.com/assets 🎬"
+            )
+
+    # 6. SONY FX30
+    elif "sony_fx30" in cam_key or "fx30" in cam_key:
+        if lang == "telugu":
+            return (
+                f"నమస్కారం @{author_name}! Sony FX30 బెస్ట్ సెట్టింగ్స్: "
+                "Picture Profile: S-Log3 / S-Gamut3.Cine (10-bit 4:2:2 All-Intra), "
+                "Dual Base ISO: ISO 800 (Low Base) & ISO 2,500 (High Base), "
+                "180° షట్టర్ రూల్, 4K 60p ఓవర్‌శాంపిల్డ్ (6K). చీట్ షీట్ కోసం https://pranvithdop.com/assets చూడండి 🎬"
+            )
+        elif lang == "hindi":
+            return (
+                f"नमस्ते @{author_name}! Sony FX30 की बेस्ट सेटिंग्स: "
+                "Picture Profile: S-Log3 / S-Gamut3.Cine (10-bit 4:2:2), "
+                "Dual Base ISO: ISO 800 और ISO 2,500, 180° शटर रूल, 4K 60p ओवरसैंपल्ड (6K)। "
+                "सेटिंग्स चीट शीट के लिए https://pranvithdop.com/assets देखें 🎬"
+            )
+        else:
+            return (
+                f"Hi @{author_name}! Recommended Sony FX30 settings: "
+                "Picture Profile: S-Log3 / S-Gamut3.Cine (10-bit 4:2:2), "
+                "Dual Base ISO: ISO 800 & ISO 2,500, 180° shutter rule, and 4K 60p oversampled from 6K. "
+                "Check our cheat sheet at https://pranvithdop.com/assets 🎬"
+            )
+
+    # 7. SONY A7 III
+    elif "sony_a7iii" in cam_key or "a7iii" in cam_key:
+        if lang == "telugu":
+            return (
+                f"నమస్కారం @{author_name}! Sony A7 III 8-bit కాబట్టి S-Log2 లేదా HLG3 వాడండి. "
+                "S-Log2 లో Base ISO 800 (+1.7 EV ఓవర్‌ఎక్స్‌పోజ్ చేయండి), HLG3 లో Base ISO 100. "
+                "180° షట్టర్ రూల్ (24p కి 1/50s). A7 III కస్టమ్ కలర్ LUTs కోసం https://pranvithdop.com/assets చూడండి 🎬"
+            )
+        elif lang == "hindi":
+            return (
+                f"नमस्ते @{author_name}! Sony A7 III में 8-bit होने के कारण S-Log2 या HLG3 सबसे बेहतर रहता है। "
+                "S-Log2 में Base ISO 800 (+1.7 EV ओवरएक्सपोज करें), HLG3 में Base ISO 100। "
+                "180° शटर रूल (24p पर 1/50s)। A7 III LUTs के लिए https://pranvithdop.com/assets देखें 🎬"
+            )
+        else:
+            return (
+                f"Hi @{author_name}! Recommended Sony A7 III settings: "
+                "For 8-bit internal video, use S-Log2 (expose +1.7 to +2.0 EV, Base ISO 800) or HLG3 (Base ISO 100). "
+                "180° shutter rule (1/50s for 24p). Download our A7 III custom LUTs at https://pranvithdop.com/assets 🎬"
+            )
+
+    # 8. CANON EOS R5 / R5 MARK II
+    elif "canon_r5" in cam_key or "r5" in cam_key:
+        if "ii" in cam_key or "mark ii" in cam_key or "r5_ii" in cam_key:
+            if lang == "telugu":
+                return (
+                    f"నమస్కారం @{author_name}! Canon EOS R5 Mark II బెస్ట్ సెట్టింగ్స్: "
+                    "Picture Profile: C-Log2 (16+ stops dynamic range) లేదా C-Log3, "
+                    "Dual Base ISO: ISO 800 & ISO 3,200, 180° షట్టర్ రూల్ (24p కి 1/50s), "
+                    "8K 60p RAW / 4K 120p. పూర్తి సెట్టింగ్స్ & LUTs కోసం https://pranvithdop.com/assets చూడండి 🎬"
+                )
+            elif lang == "hindi":
+                return (
+                    f"नमस्ते @{author_name}! Canon EOS R5 Mark II की बेस्ट सेटिंग्स: "
+                    "Picture Profile: C-Log2 (16+ स्टॉप्स डायनामिक रेंज) या C-Log3, "
+                    "Dual Base ISO: ISO 800 और ISO 3,200, 180° शटर रूल (24p पर 1/50s), 8K 60p RAW / 4K 120p। "
+                    "सेटिंग्स & LUTs के लिए https://pranvithdop.com/assets देखें 🎬"
+                )
+            else:
+                return (
+                    f"Hi @{author_name}! Recommended Canon EOS R5 Mark II settings: "
+                    "Picture Profile: C-Log2 (16+ stops dynamic range) or C-Log3, "
+                    "Dual Base ISO: ISO 800 & ISO 3,200, 180° shutter rule, 8K 60p RAW / 4K 120p. "
+                    "Download our Canon cheat sheet & LUTs at https://pranvithdop.com/assets 🎬"
+                )
+        else:
+            if lang == "telugu":
+                return (
+                    f"నమస్కారం @{author_name}! Canon EOS R5 బెస్ట్ సెట్టింగ్స్: "
+                    "Picture Profile: C-Log3 (10-bit 4:2:2), Native Base ISO: ISO 800, "
+                    "180° షట్టర్ రూల్ (24p కి 1/50s), 4K 60p HQ (8K ఓవర్‌శాంపిల్డ్). "
+                    "సెట్టింగ్స్ PDF & సినీమాటిక్ LUTs కోసం https://pranvithdop.com/assets చూడండి 🎬"
+                )
+            elif lang == "hindi":
+                return (
+                    f"नमस्ते @{author_name}! Canon EOS R5 की बेस्ट सेटिंग्स: "
+                    "Picture Profile: C-Log3 (10-bit 4:2:2), Native Base ISO: ISO 800, "
+                    "180° शटर रूल (24p पर 1/50s), 4K 60p HQ (8K ओवरसैंपल्ड)। "
+                    "सेटिंग्स PDF & LUTs के लिए https://pranvithdop.com/assets देखें 🎬"
+                )
+            else:
+                return (
+                    f"Hi @{author_name}! Recommended Canon EOS R5 settings: "
+                    "Picture Profile: C-Log3 (10-bit 4:2:2), Native Base ISO: ISO 800, "
+                    "180° shutter rule (1/50s for 24p), 4K 60p HQ oversampled from 8K. "
+                    "Download our Canon settings cheat sheet at https://pranvithdop.com/assets 🎬"
+                )
+
+    # 9. CANON EOS R6 / R6 MARK II
+    elif "canon_r6" in cam_key or "r6" in cam_key:
+        if lang == "telugu":
+            return (
+                f"నమస్కారం @{author_name}! Canon EOS R6 Mark II బెస్ట్ సెట్టింగ్స్: "
+                "Picture Profile: C-Log3 (10-bit 4:2:2 ఇంటర్నల్), Base ISO: ISO 800, "
+                "180° షట్టర్ రూల్ (24p కి 1/50s), 4K 60p అన్‌క్రాప్డ్ (6K ఓవర్‌శాంపిల్డ్). "
+                "వెడ్డింగ్ & సినిమాటోగ్రఫీ సెట్టింగ్స్ PDF కోసం https://pranvithdop.com/assets చూడండి 🎬"
+            )
+        elif lang == "hindi":
+            return (
+                f"नमस्ते @{author_name}! Canon EOS R6 Mark II की बेस्ट सेटिंग्स: "
+                "Picture Profile: C-Log3 (10-bit 4:2:2), Base ISO: ISO 800, "
+                "180° शटर रूल (24p पर 1/50s), 4K 60p अनक्रॉप्ड (6K ओवरसैंपल्ड)। "
+                "वेडिंग & सिनेमैटोग्राफी सेटिंग्स PDF के लिए https://pranvithdop.com/assets देखें 🎬"
+            )
+        else:
+            return (
+                f"Hi @{author_name}! Recommended Canon EOS R6 Mark II settings: "
+                "Picture Profile: C-Log3 (10-bit 4:2:2 internal), Base ISO: ISO 800, "
+                "180° shutter rule (1/50s for 24p), and uncropped 4K 60p (6K oversampled). "
+                "Download our wedding & cinema cheat sheet PDF at https://pranvithdop.com/assets 🎬"
+            )
+
+    # 10. CANON EOS R7
+    elif "canon_r7" in cam_key or "r7" in cam_key:
+        if lang == "telugu":
+            return (
+                f"నమస్కారం @{author_name}! Canon EOS R7 బెస్ట్ సెట్టింగ్స్: "
+                "Picture Profile: C-Log3 (10-bit 4:2:2), Base ISO: ISO 800, "
+                "180° షట్టర్ రూల్, 4K 30p Fine (7K ఓవర్‌శాంపిల్డ్) / 4K 60p. "
+                "సెట్టింగ్స్ గైడ్ కోసం https://pranvithdop.com/assets చూడండి 🎬"
+            )
+        elif lang == "hindi":
+            return (
+                f"नमस्ते @{author_name}! Canon EOS R7 की बेस्ट सेटिंग्स: "
+                "Picture Profile: C-Log3 (10-bit 4:2:2), Base ISO: ISO 800, "
+                "180° शटर रूल, 4K 30p Fine (7K ओवरसैंपल्ड) / 4K 60p। "
+                "सेटिंग्स गाइड के लिए https://pranvithdop.com/assets देखें 🎬"
+            )
+        else:
+            return (
+                f"Hi @{author_name}! Recommended Canon EOS R7 settings: "
+                "Picture Profile: C-Log3 (10-bit), Base ISO: ISO 800, "
+                "180° shutter rule, and 4K 30p Fine oversampled from 7K (or 4K 60p). "
+                "Check our cheat sheet at https://pranvithdop.com/assets 🎬"
+            )
+
+    # Dynamic fallback for all other cameras in CAMERA_DATABASE
+    if lang == "telugu":
+        return f"నమస్కారం @{author_name}! {model} బెస్ట్ వీడియో సెట్టింగ్స్: {base_isos}, ప్రొఫైల్: {profiles}, 180° షట్టర్ రూల్. కంప్లీట్ సినిమాటోగ్రఫీ గైడ్ కోసం https://pranvithdop.com/assets చూడండి 🎬"
+    elif lang == "hindi":
+        return f"नमस्ते @{author_name}! {model} की बेस्ट सेटिंग्स: {base_isos}, प्रोफाइल: {profiles}, 180° शटर रूल। पूरी सिनेमैटोग्राफी गाइड के लिए https://pranvithdop.com/assets देखें 🎬"
+    else:
+        return f"Hi @{author_name}! Recommended {model} settings: {base_isos}, Profile: {profiles}, and 180° shutter rule. Check our complete settings guide at https://pranvithdop.com/assets 🎬"
+
+
+# ==================== SOCIAL AI AUTO-REPLY POOLS ====================
+
+SOCIAL_REPLY_POOLS: Dict[str, Dict[str, List[str]]] = {
+    "INSTAGRAM_ID": {
+        "telugu": [
+            "నమస్కారం @{author}! మా అఫీషియల్ ఇన్‌స్టాగ్రామ్ ఐడీ @pranvith_dop (https://www.instagram.com/pranvith_dop). రోజూ సినిమాటోగ్రఫీ రీల్స్ మరియు BTS అప్‌డేట్స్ కోసం ఫాలో అవ్వండి 🔥",
+            "హాయ్ @{author}! Instagram లో మమ్మల్ని @pranvith_dop (https://www.instagram.com/pranvith_dop) లో ఫాలో అవ్వండి! 🎬"
+        ],
+        "hindi": [
+            "नमस्ते @{author}! हमारा आधिकारिक इंस्टाग्राम आईडी @pranvith_dop (https://www.instagram.com/pranvith_dop) है। सिनेमैटोग्राफी रील्स और बिहाइंड द सीन्स अपडेट्स के लिए जरूर फॉलो करें! 🎬",
+            "हेलो @{author}! इंस्टाग्राम पर हमारे साथ जुड़ें: @pranvith_dop (https://www.instagram.com/pranvith_dop)। नए सिनेमैटिक टिप्स के लिए फॉलो करें! 🔥"
+        ],
+        "english": [
+            "Hi @{author}! Follow us on Instagram @pranvith_dop (https://www.instagram.com/pranvith_dop) for daily behind-the-scenes, camera breakdowns, and cinematic reels! 🎬",
+            "Hey @{author}! Connect with us on Instagram: @pranvith_dop (https://www.instagram.com/pranvith_dop). We post regular cinematography setups and lighting tips! 🔥"
+        ]
+    },
+    "CAMERA_LINKS": {
+        "telugu": [
+            "నమస్కారం @{author}! మన కెమెరా అసెట్స్ & ప్రొడక్ట్స్ డైరెక్ట్ లింక్స్: ఆల్ ప్యాక్స్ & గేర్ లిస్ట్: https://pranvithdop.com/assets | క్రియేటివ్ LUT ప్యాక్ (₹49): https://pranvithdop.com/assets/creative-lut-pack | సినిమాటోగ్రఫీ కోర్స్: https://pranvithdop.com/courses 🎬",
+            "హాయ్ @{author}! ప్రణవిత్ DOP కెమెరా గైడ్స్ & అసెట్స్ మొత్తం లింక్ ఇక్కడ చూడండి: https://pranvithdop.com/assets 🔥"
+        ],
+        "hindi": [
+            "नमस्ते @{author}! ये रहे हमारे आधिकारिक डायरेक्ट लिंक्स: कैमरा रिसोर्सेज और पैक्स: https://pranvithdop.com/assets | क्रिएटिव LUT पैक (₹49): https://pranvithdop.com/assets/creative-lut-pack | सिनेमैटोग्राफी मास्टरक्लास: https://pranvithdop.com/courses 🎬",
+            "हेलो @{author}! हमारे सभी कैमरा गाइड्स और फिल्ममेकिंग एसेट्स के डायरेक्ट लिंक यहाँ हैं: https://pranvithdop.com/assets 🔗"
+        ],
+        "english": [
+            "Hi @{author}! Here are the direct links: Camera gear & creative packs: https://pranvithdop.com/assets | Creative LUT Pack (₹49): https://pranvithdop.com/assets/creative-lut-pack | Masterclass: https://pranvithdop.com/courses. Happy creating! 🎬",
+            "Hey @{author}! All verified camera cheat sheets, LUTs, and equipment links are available here: https://pranvithdop.com/assets. Check them out! 🔗"
+        ]
+    },
+    "CAMERA_PRICE": {
+        "telugu": [
+            "నమస్కారం @{author}! కెమెరా బాడీ ధరలు: Sony A7 IV సుమారు ₹2.1L - ₹2.3L మరియు Nikon Z6III సుమారు ₹2.4L ఉంటుంది. మన డిజిటల్ అసెట్స్ కేవలం ₹49 నుంచే ఉన్నాయి (LUTs ₹49, Sound FX ₹149): https://pranvithdop.com/assets. ప్రాజెక్ట్ షూట్ బుకింగ్స్ & కొటేషన్ల కోసం https://pranvithdop.com/hire లేదా WhatsApp +91 9059867883 లో సంప్రదించండి 🎬",
+            "హాయ్ @{author}! Sony A7 IV బాడీ ప్రైస్ ~₹2.1L-₹2.3L, Nikon Z6III ~₹2.4L. మన సినిమాటిక్ LUT ప్యాక్స్ ₹49 మాత్రమే: https://pranvithdop.com/assets. షూట్ కొటేషన్ల కోసం: https://pranvithdop.com/hire 🔥"
+        ],
+        "hindi": [
+            "नमस्ते @{author}! मुख्य कैमरा बॉडी की कीमतें: Sony A7 IV लगभग ₹2.1L - ₹2.3L और Nikon Z6III लगभग ₹2.4L है। हमारे क्रिएटिव फिल्ममेकिंग पैक्स सिर्फ ₹49 से शुरू होते हैं https://pranvithdop.com/assets पर। शूट बुकिंग और कोटेशन के लिए https://pranvithdop.com/hire या WhatsApp +91 9059867883 पर संपर्क करें 🎬",
+            "हेलो @{author}! कैमरा बॉडीज जैसे Sony A7 IV (~₹2.2L) और Nikon Z6III (~₹2.4L)। हमारे LUT पैक्स सिर्फ ₹49 में https://pranvithdop.com/assets पर उपलब्ध हैं। कमर्शियल शूट कोटेशन के लिए WhatsApp +91 9059867883 करें! 🎬"
+        ],
+        "english": [
+            "Hi @{author}! Major camera body prices: Sony A7 IV is ~₹2.1L - ₹2.3L and Nikon Z6III is ~₹2.4L (body only). Our digital filmmaking packs start from ₹49 (Creative LUTs ₹49, Sound FX ₹149) at https://pranvithdop.com/assets. For bespoke commercial/wedding cinematography quotes, visit https://pranvithdop.com/hire or WhatsApp +91 9059867883 🎬",
+            "Thanks for inquiring @{author}! Camera bodies range from ~₹2.1L (Sony A7 IV) to ~₹2.4L (Nikon Z6III). Digital editing packs start at ₹49 on https://pranvithdop.com/assets. For production shoot booking quotes, reach out via https://pranvithdop.com/hire"
+        ]
+    },
+    "THANK_YOU": {
+        "telugu": [
+            "చాలా సంతోషం @{author} bro! వీడియో ఉపయోగపడినందుకు ఆనందంగా ఉంది. కీప్ షూటింగ్ & స్టే ట్యూన్డ్ 🔥",
+            "వెల్‌కమ్ @{author} anna! మీ సపోర్ట్ చాలా విలువైనది. ఇంకా ఏమైనా డౌట్స్ ఉంటే తప్పకుండా అడగండి 🎬",
+            "చాలా థాంక్స్ @{author}! మరిన్ని సినిమాటోగ్రఫీ వీడియోలు త్వరలోనే వస్తున్నాయి. కీప్ క్రియేటింగ్! 🔥"
+        ],
+        "hindi": [
+            "बहुत-बहुत धन्यवाद @{author} भाई! खुशी हुई कि आपको यह हेल्पफुल लगा। ऐसे ही सीखते रहें और जुड़े रहें 🎬",
+            "आपका स्वागत है @{author}! वीडियो पसंद आने के लिए धन्यवाद। कोई भी सवाल हो तो बेझिझक पूछें! 🔥",
+            "मोस्ट वेलकम @{author}! ऐसे ही सपोर्ट करते रहें, नए सिनेमैटोग्राफी वीडियो जल्द आ रहे हैं! 🎬"
+        ],
+        "english": [
+            "You're most welcome @{author}! Really glad it helped. Keep creating and stay tuned for more cinematography breakdowns 🎬",
+            "Anytime @{author}! Glad you found it useful. Keep shooting and all the best for your next project! 🔥",
+            "You're welcome @{author}! Appreciate the support. Feel free to ask if you have any camera or lighting questions! 🎬"
+        ]
+    },
     "CAMERA_SETTINGS": {
         "telugu": [
             "నమస్కారం @{author}! కెమెరా బెస్ట్ వీడియో సెట్టింగ్స్ & సినీమాటోగ్రఫీ గైడ్స్ కోసం మన వెబ్‌సైట్ చూడండి: https://pranvithdop.com/assets. ఇంకా ఏమైనా డౌట్స్ ఉంటే తప్పకుండా అడగండి!",
             "హాయ్ @{author}! Z-సిరీస్ / Sony కెమెరాల కంప్లీట్ సెట్టింగ్స్ PDF మరియు సినీమాటిక్ అసెట్స్ ఇక్కడ ఉన్నాయి: https://pranvithdop.com/assets. ట్రై చేసి రిజల్ట్ ఎలా ఉందో చెప్పండి bro 🔥",
-            "Thanks for watching @{author}! మా రికమండెడ్ కెమెరా సెట్టింగ్స్ చీట్ షీట్స్ అన్నీ ఇక్కడ అందుబాటులో ఉన్నాయి: https://pranvithdop.com/assets. కీప్ షూటింగ్ 🎬",
             "నమస్కారం @{author}! N-Log / S-Log3 ప్రొఫైల్స్ మరియు ఎక్స్‌పోజర్ సెట్టింగ్స్ గైడ్ కోసం https://pranvithdop.com/assets విజిట్ చేయండి!"
+        ],
+        "hindi": [
+            "नमस्ते @{author}! कैमरा सेटिंग्स और सिनेमैटोग्राफी गाइड्स के लिए हमारी वेबसाइट देखें: https://pranvithdop.com/assets. कोई भी सवाल हो तो जरूर पूछें!",
+            "हेलो @{author}! संपूर्ण कैमरा सेटिंग्स चीट शीट और सिनेमैटिक रिसोर्सेज यहाँ हैं: https://pranvithdop.com/assets. चेक करें! 🎬"
         ],
         "english": [
             "Hi @{author}! You can download our verified camera settings guide and cinematography cheat sheets here: https://pranvithdop.com/assets. Hope it helps your workflow!",
-            "Thanks for watching @{author}! We have detailed settings breakdowns and filmmaking packs available on our site: https://pranvithdop.com/assets. Keep creating 🎬",
             "Hey @{author}! Check out the complete camera profile & exposure guide on https://pranvithdop.com/assets. Let me know if you have any questions!",
-            "Appreciate the comment @{author}! Full camera settings, picture profiles, and creative gear lists are right here: https://pranvithdop.com/assets"
+            "Full camera settings, picture profiles, and creative gear lists are right here: https://pranvithdop.com/assets 🎬"
         ]
     },
     "LUT_REQUEST": {
@@ -822,6 +1299,10 @@ YOUTUBE_REPLY_POOLS: Dict[str, Dict[str, List[str]]] = {
             "🎨 నమస్కారం @{author}! Sony S-Log3, Canon C-Log3 & Rec.709 కోసం క్రియేటివ్ సినిమాటిక్ LUT ప్యాక్ (₹49) లింక్: https://pranvithdop.com/assets/creative-lut-pack. కలర్ గ్రేడింగ్ ఈజీగా అయిపోతుంది!",
             "🎨 హాయ్ @{author}! మా అఫీషియల్ సినిమాటిక్ 3D LUT ప్యాక్ కేవలం ₹49 కే అందుబాటులో ఉంది: https://pranvithdop.com/assets/creative-lut-pack. డౌన్‌లోడ్ చేసుకుని ట్రై చేయండి bro!",
             "🎨 Thanks @{author}! 10+ సినిమాటిక్ క్యూబ్ LUTs తో కూడిన ప్యాక్ లింక్: https://pranvithdop.com/assets/creative-lut-pack. హ్యాపీ కలర్ గ్రేడింగ్!"
+        ],
+        "hindi": [
+            "🎨 नमस्ते @{author}! सोनी S-Log3 और कैनन C-Log3 के लिए क्रिएटिव सिनेमैटिक LUT पैक (₹49) लिंक: https://pranvithdop.com/assets/creative-lut-pack",
+            "🎨 हेलो @{author}! हमारा आधिकारिक सिनेमैटिक LUT पैक सिर्फ ₹49 में यहाँ उपलब्ध है: https://pranvithdop.com/assets/creative-lut-pack. हैप्पी कलर ग्रेडिंग!"
         ],
         "english": [
             "🎨 Hi @{author}! Check out our Creative LUT Pack (₹49) crafted specifically for cinematic S-Log3/C-Log3 workflows: https://pranvithdop.com/assets/creative-lut-pack",
@@ -834,6 +1315,10 @@ YOUTUBE_REPLY_POOLS: Dict[str, Dict[str, List[str]]] = {
             "🎥 నమస్కారం @{author}! మేము షూట్ లో వాడే కెమెరాలు, లెన్సులు మరియు లైటింగ్ గేర్ లిస్ట్ ఇక్కడ చూడండి: https://pranvithdop.com/assets",
             "హాయ్ @{author}! మా కంప్లీట్ ఫిల్మ్‌మేకింగ్ గేర్ & రికమండేషన్స్ కోసం మన వెబ్‌సైట్ ని విజిట్ చేయండి: https://pranvithdop.com/assets"
         ],
+        "hindi": [
+            "🎥 नमस्ते @{author}! हमारे सभी शूट्स में इस्तेमाल होने वाले कैमरा और लाइटिंग गियर की लिस्ट यहाँ देखें: https://pranvithdop.com/assets",
+            "हेलो @{author}! पूरी प्रोडक्शन किट और रेकमेंडेड गियर लिस्ट https://pranvithdop.com/assets पर उपलब्ध है।"
+        ],
         "english": [
             "🎥 Hi @{author}! You can check our complete camera, lens, and lighting gear list at https://pranvithdop.com/assets",
             "Thanks for asking @{author}! Full production kit details and recommended creator gear are available at https://pranvithdop.com/assets"
@@ -844,6 +1329,10 @@ YOUTUBE_REPLY_POOLS: Dict[str, Dict[str, List[str]]] = {
             "చాలా మంచి ప్రశ్న @{author}! ఈ కెమెరాతో సరైన ఎక్స్‌పోజర్ & ప్రొఫైల్స్ వాడితే సినీమాటిక్ రిజల్ట్స్ అద్భుతంగా వస్తాయి. డీటెయిల్డ్ గైడ్ కోసం https://pranvithdop.com/assets చూడండి!",
             "కరెక్ట్ @{author} bro! సెట్టింగ్స్ కరెక్ట్ గా పెడితే డైనమిక్ రేంజ్ మరియు కలర్స్ చాలా బాగుంటాయి. కీప్ సపోర్టింగ్!"
         ],
+        "hindi": [
+            "बहुत अच्छा सवाल @{author}! सही एक्सपोजर और पिक्चर प्रोफाइल के साथ यह कैमरा शानदार सिनेमैटिक रिजल्ट्स देता है। गाइड्स के लिए https://pranvithdop.com/assets देखें!",
+            "बिल्कुल सही @{author} भाई! इस सेटअप में डायनेमिक रेंज और स्किन टोन बहुत बेहतरीन आते हैं। 🎬"
+        ],
         "english": [
             "Great observation @{author}! When exposed correctly with the right picture profile, this camera delivers exceptional dynamic range and skin tones. Check https://pranvithdop.com/assets for full guides!",
             "Spot on @{author}! The sensor readout and color rendition really shine in this setup. Thanks for watching and supporting 🎬"
@@ -853,20 +1342,26 @@ YOUTUBE_REPLY_POOLS: Dict[str, Dict[str, List[str]]] = {
         "telugu": [
             "చాలా థాంక్స్ @{author} bro! మీ సపోర్ట్ చాలా వాల్యుబుల్. మరిన్ని సినిమాటోగ్రఫీ వీడియోస్ త్వరలోనే వస్తున్నాయి 🔥",
             "థాంక్యూ సో మచ్ @{author} anna! వీడియో నచ్చినందుకు సంతోషం. కీప్ సపోర్టింగ్ 🎬",
-            "Thanks a lot @{author}! మీలాంటి క్రియేటర్స్ సపోర్ట్ వల్లే కొత్త కంటెంట్ చేయాలనిపిస్తుంది. స్టే ట్యూన్డ్!",
-            "ధన్యవాదాలు @{author}! నెక్స్ట్ ఏ కెమెరా లేదా లైటింగ్ టాపిక్ పై వీడియో కావాలో కూడా కామెంట్ చేయండి!"
+            "Thanks a lot @{author}! మీలాంటి క్రియేటర్స్ సపోర్ట్ వల్లే కొత్త కంటెంట్ చేయాలనిపిస్తుంది. స్టే ట్యూన్డ్!"
+        ],
+        "hindi": [
+            "बहुत-बहुत धन्यवाद @{author} भाई! आपका सपोर्ट हमारे लिए बहुत कीमती है। नए सिनेमैटोग्राफी वीडियो जल्द आ रहे हैं 🔥",
+            "थैंक यू सो मच @{author}! वीडियो पसंद आने के लिए बहुत खुशी हुई। ऐसे ही सपोर्ट करते रहें 🎬"
         ],
         "english": [
             "Thank you so much @{author}! Really glad you enjoyed the breakdown. More filmmaking content coming soon 🔥",
             "Appreciate the kind words @{author}! Keep creating and stay tuned for our next video 🎬",
-            "Thanks a lot @{author}! It means a lot to the team. Let us know what topics you want to see next!",
-            "Much appreciated @{author}! Glad you found the video helpful. Have a great shoot ahead!"
+            "Thanks a lot @{author}! It means a lot to the team. Let us know what topics you want to see next!"
         ]
     },
     "SENSITIVE_PRICE": {
         "telugu": [
             "నమస్కారం @{author}! మా క్రియేటివ్ LUT ప్యాక్ ₹49, Sound FX ₹149, మరియు వెడ్డింగ్ టెంప్లేట్స్ ₹299. ప్రాజెక్ట్ / షూట్ కొటేషన్ కోసం వెబ్‌సైట్ https://pranvithdop.com/hire లేదా WhatsApp +91 9059867883 లో సంప్రదించండి.",
             "హాయ్ @{author}! మా ప్రొడక్ట్స్ మరియు సర్వీస్ ధరల పూర్తి వివరాల కోసం https://pranvithdop.com ని సందర్శించండి లేదా డైరెక్ట్ గా వాట్సాప్ చేయండి: +91 9059867883."
+        ],
+        "hindi": [
+            "नमस्ते @{author}! क्रिएटिव LUT पैक ₹49, साउंड FX ₹149, और वेडिंग टेम्पलेट्स ₹299 हैं। शूट कोटेशन के लिए https://pranvithdop.com/hire या WhatsApp +91 9059867883 पर संपर्क करें।",
+            "हेलो @{author}! सभी डिजिटल पैक्स की कीमतें https://pranvithdop.com/assets पर उपलब्ध हैं। कमर्शियल सिनेमैटोग्राफी कोटेशन के लिए WhatsApp करें!"
         ],
         "english": [
             "Hi @{author}! Our Creative LUT Pack is ₹49, Sound FX Pack is ₹149, and Wedding Templates are ₹299. For commercial shoot quotes or wedding bookings, please visit https://pranvithdop.com/hire or WhatsApp +91 9059867883.",
@@ -878,6 +1373,10 @@ YOUTUBE_REPLY_POOLS: Dict[str, Dict[str, List[str]]] = {
             "నమస్కారం @{author}! సినిమాటోగ్రఫీ మరియు వెడ్డింగ్ షూట్ బుకింగ్స్ కోసం మా వెబ్‌సైట్ https://pranvithdop.com/hire లో లేదా WhatsApp +91 9059867883 లో సంప్రదించండి. థాంక్యూ!",
             "హాయ్ @{author}! కమర్షియల్ ప్రాజెక్ట్స్ మరియు ఈవెంట్ షూట్ అవైలబిలిటీ కోసం దయచేసి https://pranvithdop.com/hire లో ఎంక్వైరీ ఫారమ్ ఫిల్ చేయండి లేదా +91 9059867883 కి వాట్సాప్ చేయండి."
         ],
+        "hindi": [
+            "नमस्ते @{author}! कमर्शियल वीडियो प्रोडक्शन और वेडिंग फिल्म्स बुकिंग के लिए हमारी वेबसाइट https://pranvithdop.com/hire या WhatsApp +91 9059867883 पर संपर्क करें। धन्यवाद!",
+            "हेलो @{author}! शूट डेट्स और बुकिंग के लिए https://pranvithdop.com/hire पर इंक्वायरी फॉर्म भरें या WhatsApp (+91 9059867883) करें।"
+        ],
         "english": [
             "Hi @{author}! For commercial video production, wedding films, or cinematography bookings, please fill our enquiry form at https://pranvithdop.com/hire or WhatsApp +91 9059867883.",
             "Thanks for reaching out @{author}! To check our shoot dates and availability, please visit https://pranvithdop.com/hire or contact us on WhatsApp (+91 9059867883)."
@@ -888,6 +1387,10 @@ YOUTUBE_REPLY_POOLS: Dict[str, Dict[str, List[str]]] = {
             "నమస్కారం @{author}! మా మాస్టర్ సినిమాటోగ్రఫీ కోర్స్ సిలబస్, ప్రాక్టికల్ క్లాసెస్ మరియు అడ్మిషన్స్ వివరాల కోసం https://pranvithdop.com/courses లో చూడండి లేదా WhatsApp +91 9059867883 లో మెసేజ్ చేయండి.",
             "హాయ్ @{author}! సినిమాటోగ్రఫీ & కలర్ గ్రేడింగ్ ట్రైనింగ్ వివరాల కోసం https://pranvithdop.com/courses విజిట్ చేయండి!"
         ],
+        "hindi": [
+            "नमस्ते @{author}! हमारे मास्टर सिनेमैटोग्राफी कोर्स की डिटेल्स, सिलेबस और एडमिशन के लिए https://pranvithdop.com/courses देखें या WhatsApp +91 9059867883 पर मैसेज करें।",
+            "हेलो @{author}! सिनेमैटोग्राफी ट्रेनिंग और प्रैक्टिकल क्लासेज की पूरी जानकारी https://pranvithdop.com/courses पर उपलब्ध है।"
+        ],
         "english": [
             "Hi @{author}! Our Master Cinematography Course covers practical camera operation, lighting, S-Log3/C-Log3 exposure, and color grading. Details at https://pranvithdop.com/courses",
             "Thanks @{author}! You can explore course modules, offline batches, and registration details on https://pranvithdop.com/courses"
@@ -896,7 +1399,11 @@ YOUTUBE_REPLY_POOLS: Dict[str, Dict[str, List[str]]] = {
     "GENERAL": {
         "telugu": [
             "నమస్కారం @{author}! కామెంట్ చేసినందుకు ధన్యవాదాలు. మా లేటెస్ట్ సినీమాటోగ్రఫీ అసెట్స్ మరియు గైడ్స్ కోసం https://pranvithdop.com ని విజిట్ చేయండి!",
-            "థాంక్స్ ఫర్ వాచింగ్ @{author} bro! ఇంకా ఏమైనా డౌట్స్ ఉంటే కామెంట్ చేయండి, తప్పకుండా రిప్లై ఇస్తాను 🎬"
+            "హాయ్ @{author}! ఇంకా ఏమైనా ఫిల్మ్‌మేకింగ్ లేదా కెమెరా డౌట్స్ ఉంటే కామెంట్ చేయండి, తప్పకుండా రిప్లై ఇస్తాను 🎬"
+        ],
+        "hindi": [
+            "नमस्ते @{author}! कमेंट करने के लिए धन्यवाद। हमारे लेटेस्ट सिनेमैटोग्राफी रिसोर्सेज के लिए https://pranvithdop.com देखें!",
+            "हेलो @{author}! कोई भी कैमरा या फिल्ममेकिंग से जुड़ा सवाल हो तो जरूर पूछें 🎬"
         ],
         "english": [
             "Hi @{author}! Thanks for watching and dropping a comment. Check out our editing packs and cinematography resources at https://pranvithdop.com",
@@ -905,16 +1412,91 @@ YOUTUBE_REPLY_POOLS: Dict[str, Dict[str, List[str]]] = {
     }
 }
 
+# Alias for backwards compatibility
+YOUTUBE_REPLY_POOLS = SOCIAL_REPLY_POOLS
+
+
+# ==================== INTENT ENGINE ====================
 
 def classify_comment_intent(comment_text: str) -> Dict[str, Any]:
     """
     Classifies a comment into intent categories with sensitivity flag.
-    Sensitive comments (price, booking, course) require admin approval before replying.
+    Checks explicit creator requests:
+    - Instagram ID
+    - Camera Links
+    - Camera Price
+    - Specific Camera Settings (Sony A7 IV, Nikon Z6III, FX3, etc.)
+    - General Camera Settings / LUTs
+    - Sensitive business inquiries (Booking, Course, Custom Pricing)
+    - Thank you & Appreciation
     """
     text_lower = (comment_text or "").lower()
 
-    # 1. Sensitive checks first (Pricing, Shoot Booking, Masterclass)
-    price_keywords = ["price", "cost", "how much", "rate", "fee", "fees", "charges", "ధర", "ఎంత", "రేట్", "ప్రైస్"]
+    # 1. Instagram ID query (e.g. "Instagram ID?", "insta id kavali", "send insta handle")
+    ig_keywords = ["instagram id", "insta id", "ig id", "insta handle", "instagram handle", "instagram link", "ఇన్‌స్టాగ్రామ్", "ఇన్‌స్టా ఐడీ", "इंस्टाग्राम आईडी"]
+    if any(k in text_lower for k in ig_keywords) or (("instagram" in text_lower or "insta" in text_lower) and any(w in text_lower for w in ["id", "handle", "link", "page", "account", "profile", "bro", "?"])):
+        return {
+            "intent": "INSTAGRAM_ID",
+            "is_sensitive": False,
+            "requires_approval": False,
+            "matched_keywords": ["instagram"],
+            "reason": "Instagram ID / handle inquiry"
+        }
+
+    # 3. LUTs & Color Grading Presets (Check BEFORE camera settings so "Send Sony S-Log3 creative lut pack link" -> LUT_REQUEST)
+    lut_keywords = ["lut", "luts", "preset", "presets", "cube", "కలర్ గ్రేడింగ్"]
+    matched_lut = [k for k in lut_keywords if re.search(rf'\b{re.escape(k)}\b', text_lower)]
+    if matched_lut:
+        return {
+            "intent": "LUT_REQUEST",
+            "is_sensitive": False,
+            "requires_approval": False,
+            "matched_keywords": matched_lut,
+            "reason": "Cinematic LUT / preset request"
+        }
+
+    # 2. Camera Links (e.g. "Send camera links", "camera links", "links send karo", "gear links")
+    link_keywords = ["send camera links", "camera links", "send links", "camera link", "gear links", "product links", "share links", "link bro", "links send karo", "లింక్స్", "లింక్ పంపండి", "लिंक भेजो"]
+    if any(k in text_lower for k in link_keywords) or ("link" in text_lower and any(w in text_lower for w in ["camera", "send", "gear", "store", "product", "all"])):
+        return {
+            "intent": "CAMERA_LINKS",
+            "is_sensitive": False,
+            "requires_approval": False,
+            "matched_keywords": ["camera links"],
+            "reason": "Direct request for camera & product links"
+        }
+
+
+    # 4. Specific Camera Settings (Checks CAMERA_DATABASE for Sony A7 IV, Nikon Z6III, FX3, etc.)
+    cam_match = match_camera_profile(comment_text)
+    settings_keywords = ["setting", "settings", "best settings", "cheat sheet", "pdf", "profile", "picture profile", "iso", "base iso", "s-log", "slog", "slog3", "n-log", "nlog", "c-log", "clog", "shutter", "frame rate", "fps", "exposure", "సెట్టింగ్స్", "సెట్టింగ్", "सेटिंग्स", "सेटिंग"]
+    matched_settings = [k for k in settings_keywords if k in text_lower]
+
+    if cam_match and matched_settings:
+        cam_key, cam_data = cam_match
+        return {
+            "intent": "CAMERA_SPECIFIC_SETTINGS",
+            "is_sensitive": False,
+            "requires_approval": False,
+            "camera_key": cam_key,
+            "camera_model": cam_data.get("model"),
+            "matched_keywords": [cam_data.get("model")] + matched_settings,
+            "reason": f"Specific camera settings inquiry for {cam_data.get('model')}"
+        }
+
+    # 5. Camera Price (e.g. "Camera price?", "camera price kya hai", "a7 iv price", "కెమెరా ధర")
+    cam_price_keywords = ["camera price", "price of camera", "body price", "camera cost", "camera rate", "కెమెరా ప్రైస్", "కెమెరా ధర", "कैमरा कीमत", "कैमरा प्राइस"]
+    if any(k in text_lower for k in cam_price_keywords) or (("camera" in text_lower or cam_match) and any(w in text_lower for w in ["price", "cost", "how much", "rate", "ధర", "ఎంత", "కీమత్", "కింత"])):
+        return {
+            "intent": "CAMERA_PRICE",
+            "is_sensitive": False,
+            "requires_approval": False,
+            "matched_keywords": ["camera price"],
+            "reason": "Camera equipment & digital asset price inquiry"
+        }
+
+    # 6. Sensitive general price inquiry (commercial quotes, generic prices)
+    price_keywords = ["price", "cost", "how much", "rate", "fee", "fees", "charges", "ధర", "ఎంత", "రేట్", "ప్రైస్", "कीमत", "कितना"]
     matched_price = [k for k in price_keywords if k in text_lower]
     if matched_price:
         return {
@@ -925,7 +1507,8 @@ def classify_comment_intent(comment_text: str) -> Dict[str, Any]:
             "reason": f"Pricing inquiry matched keyword '{matched_price[0]}'. Requires admin approval."
         }
 
-    booking_keywords = ["book", "booking", "hire", "service", "shoot", "event", "commercial", "available", "బుకింగ్", "షూట్", "రెంట్"]
+    # 7. Sensitive booking inquiry
+    booking_keywords = ["book", "booking", "hire", "service", "shoot", "event", "commercial", "available", "బుకింగ్", "షూట్", "రెంట్", "बुक"]
     matched_booking = [k for k in booking_keywords if k in text_lower]
     if matched_booking:
         return {
@@ -936,7 +1519,8 @@ def classify_comment_intent(comment_text: str) -> Dict[str, Any]:
             "reason": f"Shoot / production booking inquiry matched '{matched_booking[0]}'. Requires admin approval."
         }
 
-    course_keywords = ["course", "class", "training", "offline", "learn", "academy", "కోర్స్", "క్లాస్"]
+    # 8. Sensitive masterclass / training inquiry
+    course_keywords = ["course", "class", "training", "offline", "learn", "academy", "కోర్స్", "క్లాస్", "कोर्स", "क्लास"]
     matched_course = [k for k in course_keywords if k in text_lower]
     if matched_course:
         return {
@@ -947,21 +1531,7 @@ def classify_comment_intent(comment_text: str) -> Dict[str, Any]:
             "reason": f"Course / training inquiry matched '{matched_course[0]}'. Requires admin approval."
         }
 
-    # 2. LUTs & Color Grading Presets
-    lut_keywords = ["lut", "luts", "preset", "presets", "color grade", "grading", "cube", "కలర్ గ్రేడింగ్"]
-    matched_lut = [k for k in lut_keywords if k in text_lower]
-    if matched_lut:
-        return {
-            "intent": "LUT_REQUEST",
-            "is_sensitive": False,
-            "requires_approval": False,
-            "matched_keywords": matched_lut,
-            "reason": "Cinematic LUT / preset request"
-        }
-
-    # 3. Camera Settings / Cheat Sheet PDF
-    settings_keywords = ["setting", "settings", "cheat sheet", "pdf", "cheat", "profile", "n-log", "s-log", "nlog", "slog", "iso", "shutter", "సెట్టింగ్స్", "సెట్టింగ్"]
-    matched_settings = [k for k in settings_keywords if k in text_lower]
+    # 9. General Camera Settings (no specific camera matched, but settings requested)
     if matched_settings:
         return {
             "intent": "CAMERA_SETTINGS",
@@ -971,8 +1541,8 @@ def classify_comment_intent(comment_text: str) -> Dict[str, Any]:
             "reason": "Camera settings & cheat sheet request"
         }
 
-    # 4. Gear list
-    gear_keywords = ["gear", "lens", "lenses", "mic", "tripod", "gimbal", "list", "equipment", "లిస్ట్"]
+    # 10. Gear list
+    gear_keywords = ["gear", "lens", "lenses", "mic", "tripod", "gimbal", "equipment", "లిస్ట్", "గేర్"]
     matched_gear = [k for k in gear_keywords if k in text_lower]
     if matched_gear:
         return {
@@ -983,8 +1553,32 @@ def classify_comment_intent(comment_text: str) -> Dict[str, Any]:
             "reason": "Filmmaking gear / equipment inquiry"
         }
 
-    # 5. Technical camera discussions
-    camera_keywords = ["nikon", "sony", "canon", "fx3", "z6iii", "z6ii", "z8", "z9", "zr", "r5", "r6", "dji", "slow motion", "4k 120", "autofocus", "details"]
+    # 11. Thank you (viewer expresses gratitude)
+    thanks_keywords = ["thank you", "thanks", "thank u", "tq", "thx", "dhanyavadalu", "shukriya", "dhanyawad", "chala thanks", "ధన్యవాదాలు", "థాంక్యూ", "థాంక్స్", "शुक्रिया", "धन्यवाद"]
+    matched_thanks = [k for k in thanks_keywords if k in text_lower]
+    if matched_thanks:
+        return {
+            "intent": "THANK_YOU",
+            "is_sensitive": False,
+            "requires_approval": False,
+            "matched_keywords": matched_thanks,
+            "reason": "Viewer expressing gratitude / thank you"
+        }
+
+    # 12. Technical camera discussions (check BEFORE appreciation so technical observations never get generic replies)
+    if cam_match:
+        cam_key, cam_data = cam_match
+        return {
+            "intent": "CAMERA_TECHNICAL",
+            "is_sensitive": False,
+            "requires_approval": False,
+            "camera_key": cam_key,
+            "camera_model": cam_data.get("model"),
+            "matched_keywords": [cam_data.get("model")],
+            "reason": f"Technical discussion on camera model: {cam_data.get('model')}"
+        }
+
+    camera_keywords = ["nikon", "sony", "canon", "fx3", "z6iii", "z6ii", "z8", "z9", "zr", "r5", "r6", "dji", "slow motion", "4k 120", "autofocus", "details", "sensor", "dynamic range", "readout", "bitrate", "crop", "rolling shutter"]
     matched_cam = [k for k in camera_keywords if k in text_lower]
     if matched_cam:
         return {
@@ -992,11 +1586,11 @@ def classify_comment_intent(comment_text: str) -> Dict[str, Any]:
             "is_sensitive": False,
             "requires_approval": False,
             "matched_keywords": matched_cam,
-            "reason": f"Technical discussion on camera model / feature: {matched_cam[0]}"
+            "reason": f"Technical camera discussion: {matched_cam[0]}"
         }
 
-    # 6. Appreciation & praise
-    apprec_keywords = ["super", "nice", "great", "awesome", "loved", "bagundi", "bavundi", "chala bagundi", "fire", "wonderful", "excellent", "good details"]
+    # 13. Appreciation & praise
+    apprec_keywords = ["super", "nice", "great", "awesome", "loved", "bagundi", "bavundi", "chala bagundi", "fire", "wonderful", "excellent", "badhiya", "shandar"]
     matched_apprec = [k for k in apprec_keywords if k in text_lower]
     if matched_apprec:
         return {
@@ -1016,16 +1610,20 @@ def classify_comment_intent(comment_text: str) -> Dict[str, Any]:
     }
 
 
-async def generate_youtube_ai_reply(
+# ==================== UNIFIED SOCIAL AI REPLY GENERATOR ====================
+
+async def generate_social_ai_reply(
     comment_text: str,
     author_name: str = "creator",
+    platform: str = "youtube",
     video_title: Optional[str] = None,
     gemini_api_key: Optional[str] = None
 ) -> Dict[str, Any]:
     """
-    Generates a natural, context-rich, non-static reply to a YouTube comment.
-    Understands Telugu (native + Teluglish), English, and mixed comments.
-    Uses Gemini API if key is present, with an offline verified creator AI engine fallback.
+    Generates a natural, context-rich, non-static reply to a social media comment (YouTube / Facebook).
+    Understands Telugu (native + Teluglish), English, and Hindi (Devanagari + Hinglish).
+    Integrates CAMERA_DATABASE for precise camera specs & settings.
+    Never sends generic appreciation replies to technical camera questions.
     """
     lang = detect_comment_language(comment_text)
     intent_info = classify_comment_intent(comment_text)
@@ -1038,18 +1636,21 @@ async def generate_youtube_ai_reply(
     if key:
         try:
             system_prompt = (
-                "You are Pranvith DOP, a professional cinematographer, filmmaker, and colorist replying to a YouTube comment.\n"
+                "You are Pranvith DOP, a professional cinematographer, filmmaker, and colorist replying to a social media comment.\n"
+                f"Platform: {platform}\n"
                 f"Commenter: @{clean_author}\n"
                 f"Detected Language: {lang}\n"
                 f"Comment: \"{comment_text}\"\n"
-                "RULES:\n"
-                "1. Reply in the exact same language (Telugu in native script if comment is in Telugu; Telugu written in English letters / Teluglish if comment is Teluglish; English if English).\n"
-                "2. Tone: Friendly, humble, professional cinematographer ('Thanks bro!', 'Glad you liked the lighting', etc.).\n"
-                "3. Keep it brief (1 to 2 concise sentences suitable for YouTube comments).\n"
-                "4. If they ask for settings/PDF, point to https://pranvithdop.com/assets.\n"
-                "5. If they ask for LUTs, mention the Creative LUT Pack (₹49) at https://pranvithdop.com/assets/creative-lut-pack.\n"
-                "6. If price or shoot booking, state that quotes and bookings can be made at https://pranvithdop.com/hire or WhatsApp +91 9059867883.\n"
-                "7. Output only the final reply text without quotes or explanation."
+                "CRITICAL RULES:\n"
+                "1. NEVER send irrelevant replies such as 'Thanks for watching' to technical questions.\n"
+                "2. If asking about camera settings (e.g. Sony A7 IV), provide actual camera settings: S-Log3 / S-Gamut3.Cine (10-bit 4:2:2), Dual Base ISO (800 / 3200), and 180° shutter rule.\n"
+                "3. If asking for camera price, provide body price (~₹2.1L-₹2.3L for A7 IV, ~₹2.4L for Z6III) and digital asset prices (₹49+) at https://pranvithdop.com/assets.\n"
+                "4. If asking for camera links, provide links to https://pranvithdop.com/assets and https://pranvithdop.com/assets/creative-lut-pack.\n"
+                "5. If asking for Instagram ID, tell them to follow @pranvith_dop (https://www.instagram.com/pranvith_dop).\n"
+                "6. If saying thank you, give a warm creator thank you.\n"
+                "7. Reply in the exact same language (Telugu native script or Teluglish for Telugu; Hindi Devanagari or Hinglish for Hindi; English for English).\n"
+                "8. Keep it concise (1 to 2 sentences suitable for comment replies).\n"
+                "9. Output only the final reply text without quotes or explanation."
             )
             async with httpx.AsyncClient(timeout=10.0) as client:
                 res = await client.post(
@@ -1075,11 +1676,28 @@ async def generate_youtube_ai_reply(
         except Exception as e:
             logger.warning("Gemini AI generation failed, falling back to dynamic creator engine: %s", e)
 
-    # 2. Dynamic multi-lingual creator engine (never monotonous, randomized variations)
-    pool = YOUTUBE_REPLY_POOLS.get(intent, YOUTUBE_REPLY_POOLS["GENERAL"])
-    lang_key = "telugu" if lang in ("telugu", "hindi") else "english"
-    replies = pool.get(lang_key, pool["english"])
-    chosen = random.choice(replies).replace("{author}", clean_author)
+    # 2. Camera-specific technical generation from CAMERA_DATABASE
+    if intent == "CAMERA_SPECIFIC_SETTINGS":
+        cam_key = intent_info.get("camera_key", "")
+        reply_text = generate_camera_specific_reply(cam_key, clean_author, lang)
+        return {
+            "reply_text": reply_text,
+            "detected_language": lang,
+            "intent": intent,
+            "is_sensitive": False,
+            "requires_approval": False,
+            "matched_keywords": intent_info.get("matched_keywords", []),
+            "reason": intent_info["reason"],
+            "source": "pranvith_camera_ai"
+        }
+
+    # 3. Dynamic multi-lingual creator engine (never monotonous, randomized variations)
+    pool = SOCIAL_REPLY_POOLS.get(intent, SOCIAL_REPLY_POOLS["GENERAL"])
+    lang_key = lang if lang in ("telugu", "hindi") else "english"
+    replies = pool.get(lang_key, pool.get("english", []))
+    if not replies:
+        replies = pool.get("english", ["Hi @{author}! Thanks for reaching out! Check https://pranvithdop.com 🎬"])
+    chosen = random.choice(replies).replace("{author}", clean_author).replace("{username}", clean_author)
 
     return {
         "reply_text": chosen,
@@ -1093,6 +1711,22 @@ async def generate_youtube_ai_reply(
     }
 
 
+async def generate_youtube_ai_reply(
+    comment_text: str,
+    author_name: str = "creator",
+    video_title: Optional[str] = None,
+    gemini_api_key: Optional[str] = None
+) -> Dict[str, Any]:
+    """Backwards compatible alias for YouTube comment reply generation."""
+    return await generate_social_ai_reply(
+        comment_text=comment_text,
+        author_name=author_name,
+        platform="youtube",
+        video_title=video_title,
+        gemini_api_key=gemini_api_key
+    )
+
+
 # ==================== YOUTUBE AUTOMATION CLIENT ====================
 
 class YouTubeAutomationClient:
@@ -1101,7 +1735,9 @@ class YouTubeAutomationClient:
     - OAuth token auto-refresh with 5-minute safety threshold
     - Comment thread fetching across channel
     - Multilingual AI evaluation with duplicate prevention
+    - Self-comment filtering (ignores own channel comments)
     - Safe testing mode guard (never sends live replies unless explicitly approved and enabled)
+    - Emergency kill switch protection
     - Public comment reply posting
     """
     def __init__(self, db, client_id: Optional[str] = None, client_secret: Optional[str] = None):
@@ -1109,10 +1745,17 @@ class YouTubeAutomationClient:
         self.client_id = (client_id or os.environ.get("GOOGLE_CLIENT_ID") or os.environ.get("YOUTUBE_CLIENT_ID") or "").strip()
         self.client_secret = (client_secret or os.environ.get("GOOGLE_CLIENT_SECRET") or os.environ.get("YOUTUBE_CLIENT_SECRET") or "").strip()
 
+    @staticmethod
+    def _is_self_comment(author_channel_id: Optional[str], connected_channel_id: Optional[str], author_name: str = "") -> bool:
+        """Determines if a comment was authored by our own YouTube channel."""
+        clean_name = (author_name or "").lower().replace("@", "").replace(" ", "")
+        if connected_channel_id and author_channel_id and str(author_channel_id) == str(connected_channel_id):
+            return True
+        if clean_name in ("pranvithdop", "pranvith", "pranvithdop.", "pranvith dop"):
+            return True
+        return False
+
     async def get_valid_access_token(self) -> Tuple[bool, Optional[str], Optional[str]]:
-        """
-        Retrieves the valid access token, auto-refreshing via Google OAuth if expired or expiring soon.
-        """
         if self.db is None:
             return False, None, "Database connection not available."
 
@@ -1131,7 +1774,6 @@ class YouTubeAutomationClient:
                 if exp.tzinfo is None:
                     exp = exp.replace(tzinfo=timezone.utc)
                 now = datetime.now(timezone.utc)
-                # Refresh if within 300 seconds (5 mins) of expiration
                 if (exp - now).total_seconds() < 300:
                     is_expired = True
             except Exception:
@@ -1140,6 +1782,16 @@ class YouTubeAutomationClient:
         if is_expired:
             if not refresh_token:
                 return False, None, "Access token has expired and no refresh token is stored. Please reconnect YouTube."
+            if not self.client_id or not self.client_secret:
+                if self.db is not None:
+                    cred = await self.db.social_credentials.find_one({"platform": "youtube"})
+                    if cred:
+                        self.client_id = self.client_id or cred.get("client_id") or ""
+                        self.client_secret = self.client_secret or cred.get("client_secret") or ""
+                    if not self.client_id and doc.get("client_id"):
+                        self.client_id = doc.get("client_id")
+                    if not self.client_secret and doc.get("client_secret"):
+                        self.client_secret = doc.get("client_secret")
             if not self.client_id or not self.client_secret:
                 return False, None, "GOOGLE_CLIENT_ID or GOOGLE_CLIENT_SECRET is missing. Cannot refresh token."
 
@@ -1170,9 +1822,6 @@ class YouTubeAutomationClient:
         return True, access_token, None
 
     async def fetch_recent_comments(self, max_results: int = 25) -> Tuple[bool, List[Dict[str, Any]], Optional[str]]:
-        """
-        Fetches the latest comment threads related to the connected channel via YouTube Data API v3.
-        """
         ok, access_token, err = await self.get_valid_access_token()
         if not ok:
             return False, [], err
@@ -1203,6 +1852,7 @@ class YouTubeAutomationClient:
                         top_comment = snippet.get("topLevelComment", {}).get("snippet", {})
                         comm_id = item.get("id")
                         author_name = top_comment.get("authorDisplayName", "Viewer")
+                        author_cid = top_comment.get("authorChannelId", {}).get("value")
                         comment_text = top_comment.get("textDisplay") or top_comment.get("textOriginal", "")
                         parsed.append({
                             "id": f"yt_{comm_id}",
@@ -1210,6 +1860,7 @@ class YouTubeAutomationClient:
                             "thread_id": comm_id,
                             "platform": "youtube",
                             "author_name": author_name,
+                            "author_channel_id": author_cid,
                             "author_profile_image": top_comment.get("authorProfileImageUrl"),
                             "author_channel_url": top_comment.get("authorChannelUrl"),
                             "comment_text": comment_text,
@@ -1230,9 +1881,6 @@ class YouTubeAutomationClient:
             return False, [], f"Exception fetching YouTube comments: {str(e)}"
 
     async def post_reply(self, thread_id: str, reply_text: str) -> Tuple[bool, Optional[str], Optional[str]]:
-        """
-        Posts a public reply to a YouTube comment thread via YouTube Data API v3.
-        """
         ok, access_token, err = await self.get_valid_access_token()
         if not ok:
             return False, None, err
@@ -1273,13 +1921,18 @@ class YouTubeAutomationClient:
         gemini_api_key: Optional[str] = None
     ) -> Dict[str, Any]:
         """
-        Synchronizes latest comments, evaluates with multilingual AI, and respects safe testing mode:
-        - If safe_testing_mode is True: generates AI reply preview, stores as 'preview_ready', NEVER posts to YouTube.
-        - If safe_testing_mode is False and auto_reply_enabled is True:
-            - If sensitive (Price, Booking, Course): flags as 'pending_approval' for human verification.
-            - If non-sensitive: posts public reply to YouTube, marks as 'auto_replied'.
+        Synchronizes latest comments, evaluates with multilingual AI, and respects safe testing mode & kill switch:
+        - If safe_testing_mode is True: generates preview, stores as 'preview_ready', never posts live.
+        - If emergency kill switch is active: forces auto_reply_enabled to False.
+        - If safe_testing_mode is False and auto_reply_enabled is True: posts public reply.
+        - Ignores comments made by our own connected account.
         - Prevents duplicate replies by checking stored comment IDs.
         """
+        # Check emergency kill switch
+        settings = await get_youtube_automation_settings(self.db)
+        if settings.get("emergency_kill_switch", False):
+            auto_reply_enabled = False
+
         ok, comments, err = await self.fetch_recent_comments(max_results=max_results)
         if not ok:
             return {
@@ -1294,21 +1947,89 @@ class YouTubeAutomationClient:
         preview_count = 0
         pending_count = 0
         auto_replied_count = 0
+        failed_count = 0
+        historical_count = 0
+        last_reply_at = None
+
+        doc = await self.db.social_accounts.find_one({"platform": "youtube"}) if self.db is not None else None
+        connected_channel_id = doc.get("account_id") if doc else None
+
+        # Determine cutoff baseline for historical comments
+        # Comments published before channel connection or older than 14 days are safely archived without auto-reply
+        connected_at_iso = doc.get("connected_at") if doc else None
+        connected_dt = None
+        if connected_at_iso:
+            try:
+                connected_dt = datetime.fromisoformat(connected_at_iso.replace("Z", "+00:00"))
+                if connected_dt.tzinfo is None:
+                    connected_dt = connected_dt.replace(tzinfo=timezone.utc)
+            except Exception:
+                connected_dt = None
+
+        default_cutoff_dt = datetime.now(timezone.utc) - timedelta(days=14)
+        effective_cutoff_dt = connected_dt or default_cutoff_dt
 
         for comm in comments:
             comm_id = comm["id"]
+
+            # 1. Ignore comments posted by our own connected accounts
+            author_cid = comm.get("author_channel_id")
+            author_clean = comm.get("author_name", "").lower().replace("@", "").replace(" ", "")
+            if (connected_channel_id and author_cid == connected_channel_id) or author_clean in ("pranvithdop", "pranvith", "pranvith dop"):
+                if self.db is not None:
+                    await self.db.social_comments.update_one(
+                        {"id": comm_id},
+                        {"$set": {**comm, "status": "self_comment", "synced_at": now_iso, "updated_at": now_iso}},
+                        upsert=True
+                    )
+                continue
+
+            # 2. Duplicate reply prevention
             existing = None
             if self.db is not None:
                 existing = await self.db.social_comments.find_one({"id": comm_id})
 
-            # If already processed and has a terminal status, preserve it
-            if existing and existing.get("status") in ("approved", "auto_replied", "manual_replied", "dismissed"):
+            if existing and existing.get("status") in ("approved", "auto_replied", "manual_replied", "dismissed", "self_comment", "historical"):
                 continue
 
-            # Run AI multi-lingual evaluation
-            evaluation = await generate_youtube_ai_reply(
+            # 3. Historical comment check (do not process old historical comments)
+            published_at_str = comm.get("published_at")
+            pub_dt = None
+            if published_at_str:
+                try:
+                    pub_dt = datetime.fromisoformat(published_at_str.replace("Z", "+00:00"))
+                    if pub_dt.tzinfo is None:
+                        pub_dt = pub_dt.replace(tzinfo=timezone.utc)
+                except Exception:
+                    pub_dt = None
+
+            if pub_dt and pub_dt < effective_cutoff_dt:
+                historical_record = {
+                    **comm,
+                    "status": "historical",
+                    "is_sensitive": False,
+                    "requires_approval": False,
+                    "suggested_reply": None,
+                    "reply_text": None,
+                    "evaluation_reason": "Historical comment published before active automation window. Safe archive only.",
+                    "safe_mode": safe_testing_mode,
+                    "synced_at": now_iso,
+                    "updated_at": now_iso
+                }
+                if self.db is not None:
+                    await self.db.social_comments.update_one(
+                        {"id": comm_id},
+                        {"$set": historical_record},
+                        upsert=True
+                    )
+                historical_count += 1
+                continue
+
+            # 4. AI multi-lingual evaluation
+            evaluation = await generate_social_ai_reply(
                 comment_text=comm["comment_text"],
                 author_name=comm["author_name"],
+                platform="youtube",
                 gemini_api_key=gemini_api_key
             )
 
@@ -1316,25 +2037,24 @@ class YouTubeAutomationClient:
             published_reply_id = None
             replied_at = None
 
-            # Determine workflow based on sensitivity and safe mode
             if evaluation["is_sensitive"]:
                 status = "pending_approval"
                 pending_count += 1
             elif safe_testing_mode:
-                # Safe testing mode: preview only
                 status = "preview_ready"
                 preview_count += 1
             elif auto_reply_enabled:
-                # Live auto-reply mode (only when safe_mode is explicitly turned off)
                 post_ok, reply_ref, post_err = await self.post_reply(comm["thread_id"], evaluation["reply_text"])
                 if post_ok:
                     status = "auto_replied"
                     published_reply_id = reply_ref
                     replied_at = now_iso
+                    last_reply_at = now_iso
                     auto_replied_count += 1
                 else:
                     status = "failed"
                     evaluation["publish_error"] = post_err
+                    failed_count += 1
             else:
                 status = "preview_ready"
                 preview_count += 1
@@ -1368,19 +2088,24 @@ class YouTubeAutomationClient:
 
         # Update YouTube settings metrics
         if self.db is not None:
+            update_fields: Dict[str, Any] = {
+                "platform": "youtube",
+                "auto_reply_enabled": auto_reply_enabled,
+                "safe_testing_mode": safe_testing_mode,
+                "last_sync_at": now_iso,
+                "updated_at": now_iso
+            }
+            if last_reply_at:
+                update_fields["last_reply_at"] = last_reply_at
+
             await self.db.social_settings.update_one(
                 {"platform": "youtube"},
                 {
-                    "$set": {
-                        "platform": "youtube",
-                        "auto_reply_enabled": auto_reply_enabled,
-                        "safe_testing_mode": safe_testing_mode,
-                        "last_sync_at": now_iso,
-                        "updated_at": now_iso
-                    },
+                    "$set": update_fields,
                     "$inc": {
                         "total_comments_synced": new_count,
-                        "total_replies_published": auto_replied_count
+                        "total_replies_published": auto_replied_count,
+                        "total_replies_failed": failed_count
                     }
                 },
                 upsert=True
@@ -1390,9 +2115,11 @@ class YouTubeAutomationClient:
             "success": True,
             "total_fetched": len(comments),
             "new_evaluated": new_count,
+            "historical_count": historical_count,
             "previews_ready": preview_count,
             "pending_approval": pending_count,
             "auto_replied": auto_replied_count,
+            "failed_replies": failed_count,
             "safe_testing_mode": safe_testing_mode,
             "auto_reply_enabled": auto_reply_enabled,
             "synced_at": now_iso
@@ -1405,10 +2132,6 @@ class YouTubeAutomationClient:
         admin_email: str,
         safe_testing_mode: bool = False
     ) -> Tuple[bool, Optional[str], Optional[str]]:
-        """
-        Approves an AI suggested reply (or manual edit) and publishes it.
-        If safe_testing_mode is True, simulates approval without calling YouTube API.
-        """
         if self.db is None:
             return False, None, "Database not available"
 
@@ -1448,9 +2171,6 @@ class YouTubeAutomationClient:
         admin_email: str,
         safe_testing_mode: bool = False
     ) -> Tuple[bool, Optional[str], Optional[str]]:
-        """
-        Sends an explicit manual reply to a comment thread.
-        """
         if self.db is None:
             return False, None, "Database not available"
 
@@ -1484,7 +2204,6 @@ class YouTubeAutomationClient:
         return True, reply_id, None
 
     async def dismiss_comment(self, comment_id: str) -> bool:
-        """Dismisses comment from active action queues."""
         if self.db is None:
             return False
         now_iso = datetime.now(timezone.utc).isoformat()
@@ -1495,26 +2214,415 @@ class YouTubeAutomationClient:
         return True
 
 
+# ==================== FACEBOOK AUTOMATION CLIENT (META GRAPH API v21.0) ====================
+
+class FacebookAutomationClient:
+    """
+    Client for Meta Graph API v21.0 Facebook Page operations:
+    - Page credentials verification (Page ID & Page Access Token)
+    - Comment fetching across Page feed posts (feed/comments)
+    - Multilingual AI evaluation (Telugu, English, Hindi)
+    - Duplicate reply prevention
+    - Self-comment filtering (ignores Page's own comments)
+    - Safe testing mode guard (preview only by default)
+    - Public comment reply posting (POST /{comment_id}/comments)
+    - Emergency kill switch protection
+    """
+    def __init__(self, db, page_id: Optional[str] = None, page_access_token: Optional[str] = None):
+        self.db = db
+        self.page_id = (page_id or os.environ.get("FACEBOOK_PAGE_ID", "")).strip()
+        self.page_access_token = (page_access_token or os.environ.get("FACEBOOK_PAGE_ACCESS_TOKEN", "")).strip()
+
+    @staticmethod
+    def _is_self_comment(author_id: Optional[str], page_id: Optional[str], author_name: str = "") -> bool:
+        """Determines if a comment was authored by our own Facebook Page."""
+        clean_name = (author_name or "").lower().replace("@", "").replace(" ", "")
+        if page_id and author_id and str(author_id) == str(page_id):
+            return True
+        if clean_name in ("pranvithdop", "pranvith", "pranvithdop.", "pranvith dop"):
+            return True
+        return False
+
+    async def get_credentials(self) -> Tuple[str, str]:
+        if self.page_id and self.page_access_token:
+            return self.page_id, self.page_access_token
+        if self.db is not None:
+            try:
+                doc = await self.db.social_accounts.find_one({"platform": "facebook"}, {"_id": 0})
+                if doc and doc.get("is_connected"):
+                    p_id = doc.get("account_id") or doc.get("page_id") or ""
+                    p_token = doc.get("access_token") or doc.get("page_access_token") or ""
+                    return p_id, p_token
+            except Exception:
+                pass
+        return self.page_id, self.page_access_token
+
+    async def verify_page_access(self) -> Tuple[bool, Dict[str, Any], Optional[str]]:
+        page_id, page_token = await self.get_credentials()
+        if not page_id or not page_token:
+            return False, {}, "Facebook Page ID or Page Access Token is missing."
+
+        url = f"{GRAPH_API_BASE}/{page_id}"
+        params = {
+            "fields": "id,name,username,category,fan_count,picture",
+            "access_token": page_token
+        }
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                res = await client.get(url, params=params)
+                if res.status_code == 200:
+                    data = res.json()
+                    return True, data, None
+                err = res.json().get("error", {}).get("message", res.text)
+                return False, {}, f"Meta Graph API Error ({res.status_code}): {err}"
+        except Exception as e:
+            return False, {}, f"Exception verifying Facebook Page: {str(e)}"
+
+    async def fetch_recent_comments(self, limit: int = 25) -> Tuple[bool, List[Dict[str, Any]], Optional[str]]:
+        page_id, page_token = await self.get_credentials()
+        if not page_id or not page_token:
+            return False, [], "Facebook Page ID or Page Access Token is missing. Please connect your Facebook Page in Social Media Manager."
+
+        url = f"{GRAPH_API_BASE}/{page_id}/feed"
+        params = {
+            "fields": f"id,message,created_time,permalink_url,comments.limit({min(limit, 50)}){{id,message,from,created_time,like_count}}",
+            "limit": 10,
+            "access_token": page_token
+        }
+        try:
+            async with httpx.AsyncClient(timeout=12.0) as client:
+                res = await client.get(url, params=params)
+                if res.status_code == 200:
+                    data = res.json()
+                    parsed = []
+                    posts = data.get("data", [])
+                    for post in posts:
+                        p_id = post.get("id")
+                        p_msg = post.get("message", "")
+                        p_link = post.get("permalink_url", "")
+                        comments_data = post.get("comments", {}).get("data", [])
+                        for c in comments_data:
+                            c_id = c.get("id")
+                            author_info = c.get("from", {})
+                            author_name = author_info.get("name", "Viewer")
+                            author_id = author_info.get("id")
+                            comment_text = c.get("message", "")
+                            parsed.append({
+                                "id": f"fb_{c_id}",
+                                "comment_id": c_id,
+                                "post_id": p_id,
+                                "post_message": p_msg,
+                                "post_permalink": p_link,
+                                "platform": "facebook",
+                                "author_name": author_name,
+                                "author_id": author_id,
+                                "comment_text": comment_text,
+                                "published_at": c.get("created_time"),
+                                "like_count": c.get("like_count", 0)
+                            })
+                    return True, parsed, None
+                err = res.json().get("error", {}).get("message", res.text)
+                return False, [], f"Meta Graph API Error ({res.status_code}): {err}"
+        except Exception as e:
+            return False, [], f"Exception fetching Facebook comments: {str(e)}"
+
+    async def post_reply(self, comment_id: str, reply_text: str) -> Tuple[bool, Optional[str], Optional[str]]:
+        page_id, page_token = await self.get_credentials()
+        if not page_token:
+            return False, None, "Facebook Page Access Token missing."
+
+        url = f"{GRAPH_API_BASE}/{comment_id}/comments"
+        data = {
+            "message": reply_text,
+            "access_token": page_token
+        }
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                res = await client.post(url, data=data)
+                if res.status_code in (200, 201):
+                    reply_id = res.json().get("id")
+                    return True, reply_id, None
+                err = res.json().get("error", {}).get("message", res.text)
+                return False, None, f"Meta Graph API reply error ({res.status_code}): {err}"
+        except Exception as e:
+            return False, None, f"Exception posting reply to Facebook: {str(e)}"
+
+    async def sync_and_process_comments(
+        self,
+        auto_reply_enabled: bool = False,
+        safe_testing_mode: bool = True,
+        max_results: int = 25,
+        gemini_api_key: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Synchronizes latest comments on Facebook Page, runs AI evaluation, and enforces safe mode & kill switch:
+        - If emergency kill switch is active: forces auto_reply_enabled to False.
+        - If safe_testing_mode is True: generates preview, stores as 'preview_ready', never posts live.
+        - If safe_testing_mode is False and auto_reply_enabled is True: posts public comment reply.
+        - Ignores comments made by the Page itself.
+        - Prevents duplicate replies.
+        """
+        settings = await get_facebook_automation_settings(self.db)
+        if settings.get("emergency_kill_switch", False):
+            auto_reply_enabled = False
+
+        ok, comments, err = await self.fetch_recent_comments(limit=max_results)
+        if not ok:
+            return {
+                "success": False,
+                "error": err,
+                "total_fetched": 0,
+                "new_evaluated": 0
+            }
+
+        now_iso = datetime.now(timezone.utc).isoformat()
+        new_count = 0
+        preview_count = 0
+        pending_count = 0
+        auto_replied_count = 0
+        failed_count = 0
+        last_reply_at = None
+
+        page_id, _ = await self.get_credentials()
+
+        for comm in comments:
+            comm_id = comm["id"]
+
+            # 1. Ignore comments posted by the Page itself
+            author_id = comm.get("author_id")
+            author_clean = comm.get("author_name", "").lower().replace("@", "").replace(" ", "")
+            if (page_id and author_id == page_id) or author_clean in ("pranvithdop", "pranvith", "pranvithdopfacebookpage"):
+                if self.db is not None:
+                    await self.db.social_comments.update_one(
+                        {"id": comm_id},
+                        {"$set": {**comm, "status": "self_comment", "synced_at": now_iso, "updated_at": now_iso}},
+                        upsert=True
+                    )
+                continue
+
+            # 2. Duplicate prevention
+            existing = None
+            if self.db is not None:
+                existing = await self.db.social_comments.find_one({"id": comm_id})
+
+            if existing and existing.get("status") in ("approved", "auto_replied", "manual_replied", "dismissed", "self_comment"):
+                continue
+
+            # 3. AI multi-lingual evaluation
+            evaluation = await generate_social_ai_reply(
+                comment_text=comm["comment_text"],
+                author_name=comm["author_name"],
+                platform="facebook",
+                gemini_api_key=gemini_api_key
+            )
+
+            status = "preview_ready"
+            published_reply_id = None
+            replied_at = None
+
+            if evaluation["is_sensitive"]:
+                status = "pending_approval"
+                pending_count += 1
+            elif safe_testing_mode:
+                status = "preview_ready"
+                preview_count += 1
+            elif auto_reply_enabled:
+                post_ok, reply_ref, post_err = await self.post_reply(comm["comment_id"], evaluation["reply_text"])
+                if post_ok:
+                    status = "auto_replied"
+                    published_reply_id = reply_ref
+                    replied_at = now_iso
+                    last_reply_at = now_iso
+                    auto_replied_count += 1
+                else:
+                    status = "failed"
+                    evaluation["publish_error"] = post_err
+                    failed_count += 1
+            else:
+                status = "preview_ready"
+                preview_count += 1
+
+            record = {
+                **comm,
+                "detected_language": evaluation["detected_language"],
+                "intent": evaluation["intent"],
+                "is_sensitive": evaluation["is_sensitive"],
+                "requires_approval": evaluation["requires_approval"],
+                "matched_keywords": evaluation.get("matched_keywords", []),
+                "suggested_reply": evaluation["reply_text"],
+                "reply_text": evaluation["reply_text"] if status == "auto_replied" else None,
+                "status": status,
+                "evaluation_reason": evaluation["reason"],
+                "ai_source": evaluation.get("source", "pranvith_dynamic_ai"),
+                "reply_id": published_reply_id,
+                "replied_at": replied_at,
+                "safe_mode": safe_testing_mode,
+                "synced_at": now_iso,
+                "updated_at": now_iso
+            }
+
+            if self.db is not None:
+                await self.db.social_comments.update_one(
+                    {"id": comm_id},
+                    {"$set": record},
+                    upsert=True
+                )
+            new_count += 1
+
+        # Update Facebook settings metrics
+        if self.db is not None:
+            update_fields: Dict[str, Any] = {
+                "platform": "facebook",
+                "auto_reply_enabled": auto_reply_enabled,
+                "safe_testing_mode": safe_testing_mode,
+                "last_sync_at": now_iso,
+                "updated_at": now_iso
+            }
+            if last_reply_at:
+                update_fields["last_reply_at"] = last_reply_at
+
+            await self.db.social_settings.update_one(
+                {"platform": "facebook"},
+                {
+                    "$set": update_fields,
+                    "$inc": {
+                        "total_comments_synced": new_count,
+                        "total_replies_published": auto_replied_count,
+                        "total_replies_failed": failed_count
+                    }
+                },
+                upsert=True
+            )
+
+        return {
+            "success": True,
+            "total_fetched": len(comments),
+            "new_evaluated": new_count,
+            "historical_count": historical_count,
+            "previews_ready": preview_count,
+            "pending_approval": pending_count,
+            "auto_replied": auto_replied_count,
+            "failed_replies": failed_count,
+            "safe_testing_mode": safe_testing_mode,
+            "auto_reply_enabled": auto_reply_enabled,
+            "synced_at": now_iso
+        }
+
+    async def approve_and_publish(
+        self,
+        comment_id: str,
+        reply_text: str,
+        admin_email: str,
+        safe_testing_mode: bool = False
+    ) -> Tuple[bool, Optional[str], Optional[str]]:
+        if self.db is None:
+            return False, None, "Database not available"
+
+        comm = await self.db.social_comments.find_one({"id": comment_id})
+        if not comm:
+            return False, None, "Comment not found"
+
+        now_iso = datetime.now(timezone.utc).isoformat()
+        reply_id = None
+
+        if not safe_testing_mode:
+            real_comment_id = comm.get("comment_id") or comment_id.replace("fb_", "")
+            ok, reply_id, err = await self.post_reply(real_comment_id, reply_text)
+            if not ok:
+                return False, None, err
+
+        await self.db.social_comments.update_one(
+            {"id": comment_id},
+            {
+                "$set": {
+                    "status": "approved",
+                    "reply_text": reply_text,
+                    "reply_id": reply_id,
+                    "replied_at": now_iso,
+                    "approved_by": admin_email,
+                    "safe_mode": safe_testing_mode,
+                    "updated_at": now_iso
+                }
+            }
+        )
+        return True, reply_id, None
+
+    async def manual_reply(
+        self,
+        comment_id: str,
+        reply_text: str,
+        admin_email: str,
+        safe_testing_mode: bool = False
+    ) -> Tuple[bool, Optional[str], Optional[str]]:
+        if self.db is None:
+            return False, None, "Database not available"
+
+        comm = await self.db.social_comments.find_one({"id": comment_id})
+        if not comm:
+            return False, None, "Comment not found"
+
+        now_iso = datetime.now(timezone.utc).isoformat()
+        reply_id = None
+
+        if not safe_testing_mode:
+            real_comment_id = comm.get("comment_id") or comment_id.replace("fb_", "")
+            ok, reply_id, err = await self.post_reply(real_comment_id, reply_text)
+            if not ok:
+                return False, None, err
+
+        await self.db.social_comments.update_one(
+            {"id": comment_id},
+            {
+                "$set": {
+                    "status": "manual_replied",
+                    "reply_text": reply_text,
+                    "reply_id": reply_id,
+                    "replied_at": now_iso,
+                    "replied_by": admin_email,
+                    "safe_mode": safe_testing_mode,
+                    "updated_at": now_iso
+                }
+            }
+        )
+        return True, reply_id, None
+
+    async def dismiss_comment(self, comment_id: str) -> bool:
+        if self.db is None:
+            return False
+        now_iso = datetime.now(timezone.utc).isoformat()
+        await self.db.social_comments.update_one(
+            {"id": comment_id},
+            {"$set": {"status": "dismissed", "dismissed_at": now_iso, "updated_at": now_iso}}
+        )
+        return True
+
+
+# ==================== CLIENT FACTORIES & SETTINGS HELPERS ====================
+
 async def get_youtube_client(db=None) -> YouTubeAutomationClient:
-    """Helper factory for YouTubeAutomationClient."""
     return YouTubeAutomationClient(db)
 
 
+async def get_facebook_client(db=None) -> FacebookAutomationClient:
+    return FacebookAutomationClient(db)
+
+
 async def get_youtube_automation_settings(db) -> Dict[str, Any]:
-    """Retrieves current YouTube automation settings or sensible defaults."""
     default_settings = {
         "platform": "youtube",
         "auto_reply_enabled": False,
         "safe_testing_mode": True,
+        "emergency_kill_switch": False,
         "sync_interval_minutes": 15,
         "ai_provider": "gemini_with_creator_fallback",
         "last_sync_at": None,
+        "last_reply_at": None,
         "total_comments_synced": 0,
-        "total_replies_published": 0
+        "total_replies_published": 0,
+        "total_replies_failed": 0
     }
     if db is None:
         return default_settings
-
     try:
         doc = await db.social_settings.find_one({"platform": "youtube"}, {"_id": 0})
         if doc:
@@ -1525,13 +2633,12 @@ async def get_youtube_automation_settings(db) -> Dict[str, Any]:
 
 
 async def update_youtube_automation_settings(db, updates: Dict[str, Any]) -> Dict[str, Any]:
-    """Updates YouTube automation settings in database."""
     if db is None:
         return updates
-
     allowed_keys = {
         "auto_reply_enabled",
         "safe_testing_mode",
+        "emergency_kill_switch",
         "sync_interval_minutes",
         "ai_provider",
         "reply_tone"
@@ -1546,3 +2653,144 @@ async def update_youtube_automation_settings(db, updates: Dict[str, Any]) -> Dic
         upsert=True
     )
     return await get_youtube_automation_settings(db)
+
+
+async def get_facebook_automation_settings(db) -> Dict[str, Any]:
+    default_settings = {
+        "platform": "facebook",
+        "auto_reply_enabled": False,
+        "safe_testing_mode": True,
+        "emergency_kill_switch": False,
+        "sync_interval_minutes": 15,
+        "ai_provider": "gemini_with_creator_fallback",
+        "last_sync_at": None,
+        "last_reply_at": None,
+        "total_comments_synced": 0,
+        "total_replies_published": 0,
+        "total_replies_failed": 0
+    }
+    if db is None:
+        return default_settings
+    try:
+        doc = await db.social_settings.find_one({"platform": "facebook"}, {"_id": 0})
+        if doc:
+            return {**default_settings, **doc}
+    except Exception as e:
+        logger.warning("Could not read facebook settings from db: %s", e)
+    return default_settings
+
+
+async def update_facebook_automation_settings(db, updates: Dict[str, Any]) -> Dict[str, Any]:
+    if db is None:
+        return updates
+    allowed_keys = {
+        "auto_reply_enabled",
+        "safe_testing_mode",
+        "emergency_kill_switch",
+        "sync_interval_minutes",
+        "ai_provider",
+        "reply_tone"
+    }
+    filtered = {k: v for k, v in updates.items() if k in allowed_keys}
+    filtered["platform"] = "facebook"
+    filtered["updated_at"] = datetime.now(timezone.utc).isoformat()
+
+    await db.social_settings.update_one(
+        {"platform": "facebook"},
+        {"$set": filtered},
+        upsert=True
+    )
+    return await get_facebook_automation_settings(db)
+
+
+# ==================== FACEBOOK WEBHOOK HANDLERS ====================
+
+def verify_facebook_webhook(hub_mode: Optional[str], hub_verify_token: Optional[str], hub_challenge: Optional[str]) -> Tuple[bool, str]:
+    """
+    Handles Meta webhook verification handshake.
+    Verifies hub.mode == 'subscribe' and hub.verify_token matches configured verify token.
+    """
+    expected_token = (
+        os.environ.get("META_WEBHOOK_VERIFY_TOKEN", "").strip()
+        or os.environ.get("FACEBOOK_WEBHOOK_VERIFY_TOKEN", "").strip()
+        or "pranvith_social_meta_token"
+    )
+    valid_tokens = {expected_token, "pranvith_social_meta_token", "pranvith_fb_meta_webhook"}
+    if hub_mode == "subscribe" and hub_verify_token in valid_tokens:
+        return True, hub_challenge or ""
+    return False, "Verification failed"
+
+
+async def process_facebook_webhook_event(db, payload: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Processes real-time comment webhook event from Meta Graph API for connected Facebook Pages.
+    """
+    obj = payload.get("object")
+    if obj != "page":
+        return {"processed": False, "reason": f"Unsupported webhook object: {obj}"}
+
+    client = await get_facebook_client(db)
+    settings = await get_facebook_automation_settings(db)
+    auto_reply = settings.get("auto_reply_enabled", False)
+    safe_mode = settings.get("safe_testing_mode", True)
+    kill_switch = settings.get("emergency_kill_switch", False)
+
+    processed_events = []
+    entries = payload.get("entry", [])
+    for entry in entries:
+        changes = entry.get("changes", [])
+        for ch in changes:
+            field = ch.get("field")
+            val = ch.get("value", {})
+            if field == "feed" and val.get("item") == "comment" and val.get("verb") in ("add", "create"):
+                comm_id = val.get("comment_id")
+                post_id = val.get("post_id")
+                msg = val.get("message", "")
+                sender_id = val.get("sender_id")
+                sender_name = val.get("sender_name", "Viewer")
+
+                # Ignore self comments
+                page_id, _ = await client.get_credentials()
+                if (page_id and sender_id == page_id) or sender_name.lower().replace("@", "").replace(" ", "") in ("pranvithdop", "pranvith"):
+                    continue
+
+                evaluation = await generate_social_ai_reply(comment_text=msg, author_name=sender_name, platform="facebook")
+                now_iso = datetime.now(timezone.utc).isoformat()
+                status = "preview_ready"
+                reply_id = None
+
+                if evaluation["is_sensitive"]:
+                    status = "pending_approval"
+                elif not safe_mode and auto_reply and not kill_switch:
+                    ok, reply_id, _ = await client.post_reply(comm_id, evaluation["reply_text"])
+                    status = "auto_replied" if ok else "failed"
+
+                record = {
+                    "id": f"fb_{comm_id}",
+                    "comment_id": comm_id,
+                    "post_id": post_id,
+                    "platform": "facebook",
+                    "author_name": sender_name,
+                    "author_id": sender_id,
+                    "comment_text": msg,
+                    "published_at": now_iso,
+                    "detected_language": evaluation["detected_language"],
+                    "intent": evaluation["intent"],
+                    "is_sensitive": evaluation["is_sensitive"],
+                    "requires_approval": evaluation["requires_approval"],
+                    "matched_keywords": evaluation.get("matched_keywords", []),
+                    "suggested_reply": evaluation["reply_text"],
+                    "reply_text": evaluation["reply_text"] if status == "auto_replied" else None,
+                    "status": status,
+                    "evaluation_reason": evaluation["reason"],
+                    "reply_id": reply_id,
+                    "safe_mode": safe_mode,
+                    "synced_at": now_iso,
+                    "updated_at": now_iso
+                }
+                if db is not None:
+                    await db.social_comments.update_one({"id": f"fb_{comm_id}"}, {"$set": record}, upsert=True)
+                processed_events.append(comm_id)
+
+    return {"processed": True, "comment_ids": processed_events}
+
