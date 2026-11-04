@@ -63,6 +63,22 @@
       "dest": "/frontend/manifest.json"
     },
     {
+      "src": "/admin-manifest.json",
+      "dest": "/frontend/admin-manifest.json"
+    },
+    {
+      "src": "/admin-apple-touch-icon.png",
+      "dest": "/frontend/admin-apple-touch-icon.png"
+    },
+    {
+      "src": "/admin-icon-192.png",
+      "dest": "/frontend/admin-icon-192.png"
+    },
+    {
+      "src": "/admin-icon-512.png",
+      "dest": "/frontend/admin-icon-512.png"
+    },
+    {
       "handle": "filesystem"
     },
     {

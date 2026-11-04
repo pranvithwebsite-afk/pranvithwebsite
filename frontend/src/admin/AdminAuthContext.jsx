@@ -22,11 +22,13 @@ export const AdminAuthProvider = ({ children }) => {
     setToken(authToken);
     setAdmin(adminProfile);
     setAdminAuthToken(authToken);
-    sessionStorage.setItem('cms_admin', JSON.stringify({ token: authToken, admin: adminProfile }));
+    const serialized = JSON.stringify({ token: authToken, admin: adminProfile });
+    sessionStorage.setItem('cms_admin', serialized);
+    localStorage.setItem('cms_admin', serialized);
   }, []);
 
   useEffect(() => {
-    const stored = sessionStorage.getItem('cms_admin');
+    const stored = sessionStorage.getItem('cms_admin') || localStorage.getItem('cms_admin');
     if (!stored) {
       setLoading(false);
       return;

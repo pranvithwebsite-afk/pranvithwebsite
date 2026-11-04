@@ -1,0 +1,30 @@
+{
+  "short_name": "Pranvith Admin",
+  "name": "Pranvith DOP Admin Dashboard",
+  "description": "Pranvith DOP Admin Dashboard & CMS",
+  "icons": [
+    {
+      "src": "/admin-apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png"
+    },
+    {
+      "src": "/admin-icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/admin-icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "start_url": "/admin/login?source=pwa",
+  "scope": "/admin",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "theme_color": "#020617",
+  "background_color": "#020617"
+}
+

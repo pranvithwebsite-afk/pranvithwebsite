@@ -2,6 +2,7 @@ import {
   LayoutDashboard,
   Globe,
   BriefcaseBusiness,
+  Clapperboard,
   Box,
   Ticket,
   ShoppingBag,
@@ -17,6 +18,7 @@ import {
 const navItems = [
   { label: 'Dashboard', to: '/admin/dashboard', icon: LayoutDashboard },
   { label: 'Website (CMS)', to: '/admin/website', icon: Globe },
+  { label: 'Reels (9:16)', to: '/admin/reels', icon: Clapperboard },
   { label: 'Services', to: '/admin/services', icon: BriefcaseBusiness },
   { label: 'Products & Assets', to: '/admin/products', icon: Box },
   { label: 'Coupons & Offers', to: '/admin/coupons', icon: Ticket },

@@ -528,6 +528,55 @@ export const reorderAdminServices = async (serviceIds) => {
   return data;
 };
 
+export const fetchPublicReels = async () => {
+  const { data } = await api.get('/reels');
+  return data;
+};
+
+export const recordReelView = async (reelId) => {
+  try {
+    const { data } = await api.post(`/reels/${encodeURIComponent(reelId)}/view`);
+    return data;
+  } catch (e) {
+    return { success: true };
+  }
+};
+
+export const toggleReelLike = async (reelId) => {
+  const { data } = await api.post(`/reels/${encodeURIComponent(reelId)}/like`);
+  return data;
+};
+
+export const fetchAdminReels = async () => {
+  const { data } = await adminApi.get('/admin/reels');
+  return data;
+};
+
+export const createAdminReel = async (payload) => {
+  const { data } = await adminApi.post('/admin/reels', payload);
+  return data;
+};
+
+export const updateAdminReel = async (reelId, payload) => {
+  const { data } = await adminApi.put(`/admin/reels/${encodeURIComponent(reelId)}`, payload);
+  return data;
+};
+
+export const toggleAdminReelStatus = async (reelId) => {
+  const { data } = await adminApi.patch(`/admin/reels/${encodeURIComponent(reelId)}/status`);
+  return data;
+};
+
+export const deleteAdminReel = async (reelId) => {
+  const { data } = await adminApi.delete(`/admin/reels/${encodeURIComponent(reelId)}`);
+  return data;
+};
+
+export const reorderAdminReels = async (reelIds) => {
+  const { data } = await adminApi.post('/admin/reels/reorder', { reel_ids: reelIds });
+  return data;
+};
+
 export const fetchAdminOrders = async () => {
   const { data } = await adminApi.get('/admin/orders');
   return data;

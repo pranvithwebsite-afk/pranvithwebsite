@@ -1,4 +1,4 @@
-import React, { Suspense, lazy } from 'react';
+import React, { Suspense, lazy, useEffect } from 'react';
 import { Routes, Route } from 'react-router-dom';
 import { AdminAuthProvider } from './AdminAuthContext';
 import AdminRoute from './AdminRoute';
@@ -7,6 +7,7 @@ import AdminLayout from './AdminLayout';
 const AdminLogin = lazy(() => import('./pages/Login'));
 const AdminDashboard = lazy(() => import('./pages/Dashboard'));
 const Website = lazy(() => import('./pages/Website'));
+const Reels = lazy(() => import('./pages/Reels'));
 const Products = lazy(() => import('./pages/Products'));
 const Coupons = lazy(() => import('./pages/Coupons'));
 const AdminServices = lazy(() => import('./pages/Services'));
@@ -28,32 +29,78 @@ const RouteFallback = () => (
   </main>
 );
 
-const AdminApp = () => (
-  <AdminAuthProvider>
-    <Suspense fallback={<RouteFallback />}>
-      <Routes>
-        <Route path="/admin/login" element={<AdminLogin />} />
-        <Route element={<AdminRoute />}>
-          <Route path="/admin" element={<AdminLayout />}>
-            <Route index element={<AdminDashboard />} />
-            <Route path="dashboard" element={<AdminDashboard />} />
-            <Route path="website" element={<Website />} />
-            <Route path="services" element={<AdminServices />} />
-            <Route path="products" element={<Products />} />
-            <Route path="coupons" element={<Coupons />} />
-            <Route path="orders" element={<Orders />} />
-            <Route path="payments/payment-attempts" element={<PaymentAttempts />} />
-            <Route path="customers" element={<Customers />} />
-            <Route path="reports" element={<Reports />} />
-            <Route path="enquiries" element={<Enquiries />} />
-            <Route path="media" element={<Media />} />
-            <Route path="admin-users" element={<AdminUsers />} />
-            <Route path="settings" element={<Settings />} />
+const AdminApp = () => {
+  useEffect(() => {
+    // Dynamically set Admin Web App Manifest and Apple Home Screen meta tags
+    const manifestEl = document.querySelector('link[rel="manifest"]');
+    const prevManifest = manifestEl ? manifestEl.getAttribute('href') : '/manifest.json?v=4';
+    if (manifestEl) {
+      manifestEl.setAttribute('href', '/admin-manifest.json?v=1');
+    }
+
+    const appleIconEl = document.querySelector('link[rel="apple-touch-icon"]');
+    const prevAppleIcon = appleIconEl ? appleIconEl.getAttribute('href') : '/apple-touch-icon.png?v=4';
+    if (appleIconEl) {
+      appleIconEl.setAttribute('href', '/admin-apple-touch-icon.png?v=1');
+    }
+
+    const appleTitleEl = document.getElementById('apple-app-title');
+    const prevAppleTitle = appleTitleEl ? appleTitleEl.getAttribute('content') : 'PranvithDOP';
+    if (appleTitleEl) {
+      appleTitleEl.setAttribute('content', 'Pranvith Admin');
+    }
+
+    const themeEl = document.querySelector('meta[name="theme-color"]');
+    const prevTheme = themeEl ? themeEl.getAttribute('content') : '#05070b';
+    if (themeEl) {
+      themeEl.setAttribute('content', '#020617');
+    }
+
+    const prevTitle = document.title;
+    if (!prevTitle || prevTitle.includes('PranvithDOP — Video Editing')) {
+      document.title = 'Pranvith Admin';
+    }
+
+    document.body.classList.add('admin-pwa-mode');
+
+    return () => {
+      document.body.classList.remove('admin-pwa-mode');
+      if (manifestEl && prevManifest) manifestEl.setAttribute('href', prevManifest);
+      if (appleIconEl && prevAppleIcon) appleIconEl.setAttribute('href', prevAppleIcon);
+      if (appleTitleEl && prevAppleTitle) appleTitleEl.setAttribute('content', prevAppleTitle);
+      if (themeEl && prevTheme) themeEl.setAttribute('content', prevTheme);
+      if (prevTitle) document.title = prevTitle;
+    };
+  }, []);
+
+  return (
+    <AdminAuthProvider>
+      <Suspense fallback={<RouteFallback />}>
+        <Routes>
+          <Route path="/admin/login" element={<AdminLogin />} />
+          <Route element={<AdminRoute />}>
+            <Route path="/admin" element={<AdminLayout />}>
+              <Route index element={<AdminDashboard />} />
+              <Route path="dashboard" element={<AdminDashboard />} />
+              <Route path="website" element={<Website />} />
+              <Route path="reels" element={<Reels />} />
+              <Route path="services" element={<AdminServices />} />
+              <Route path="products" element={<Products />} />
+              <Route path="coupons" element={<Coupons />} />
+              <Route path="orders" element={<Orders />} />
+              <Route path="payments/payment-attempts" element={<PaymentAttempts />} />
+              <Route path="customers" element={<Customers />} />
+              <Route path="reports" element={<Reports />} />
+              <Route path="enquiries" element={<Enquiries />} />
+              <Route path="media" element={<Media />} />
+              <Route path="admin-users" element={<AdminUsers />} />
+              <Route path="settings" element={<Settings />} />
+            </Route>
           </Route>
-        </Route>
-      </Routes>
-    </Suspense>
-  </AdminAuthProvider>
-);
+        </Routes>
+      </Suspense>
+    </AdminAuthProvider>
+  );
+};
 
 export default AdminApp;

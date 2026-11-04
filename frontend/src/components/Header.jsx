@@ -7,6 +7,7 @@ import { FALLBACK_IMAGE, handleImageError, safeImageSrc, safePublicHref } from '
 
 const customNavLinks = [
   { name: 'Home', path: '/' },
+  { name: 'Reels', path: '/reels' },
   { name: 'Courses', path: '/courses' },
   { name: 'About', path: '/about' },
   { name: 'Services', path: '/services' },

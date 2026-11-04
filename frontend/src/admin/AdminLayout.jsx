@@ -76,13 +76,14 @@ const AdminLayout = () => {
         <div className="flex min-h-screen">
           <aside
             id="admin-navigation"
-            className={`fixed inset-y-0 left-0 z-40 flex h-dvh w-72 max-w-[85vw] shrink-0 flex-col border-r border-slate-800 bg-slate-950 p-4 shadow-2xl shadow-black/40 transition-transform duration-200 ease-out sm:w-80 lg:sticky lg:top-0 lg:h-screen lg:max-w-none lg:translate-x-0 lg:shadow-none ${
+            className={`fixed inset-y-0 left-0 z-40 flex h-dvh w-72 max-w-[85vw] shrink-0 flex-col border-r border-slate-800 bg-slate-950 p-4 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))] shadow-2xl shadow-black/40 transition-transform duration-200 ease-out sm:w-80 lg:sticky lg:top-0 lg:h-screen lg:max-w-none lg:translate-x-0 lg:shadow-none ${
               open ? 'translate-x-0' : '-translate-x-full'
             }`}
           >
             <div className="flex items-center justify-between">
-              <Link to="/admin/dashboard" className="text-xl font-semibold tracking-tight text-white">
-                PranvithDOP CMS
+              <Link to="/admin/dashboard" className="flex items-center gap-2.5 text-lg font-bold tracking-tight text-white">
+                <img src="/admin-icon-192.png" alt="Admin Icon" className="h-7 w-7 rounded-lg border border-violet-500/30 object-cover shadow-sm" />
+                <span>Pranvith Admin</span>
               </Link>
               <button
                 type="button"
@@ -118,8 +119,8 @@ const AdminLayout = () => {
             </nav>
           </aside>
 
-          <div className="min-w-0 flex-1 pb-16">
-            <header className="sticky top-0 z-10 border-b border-slate-800 bg-slate-950/95 px-4 py-4 backdrop-blur-xl lg:px-8">
+          <div className="min-w-0 flex-1 pb-[max(4rem,env(safe-area-inset-bottom))]">
+            <header className="sticky top-0 z-10 border-b border-slate-800 bg-slate-950/95 px-4 py-4 pt-[max(1rem,env(safe-area-inset-top))] backdrop-blur-xl lg:px-8">
               <div className="flex items-center justify-between gap-4">
                 <div className="flex min-w-0 items-center gap-3">
                   <button

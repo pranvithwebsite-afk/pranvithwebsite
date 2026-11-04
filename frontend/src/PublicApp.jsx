@@ -9,6 +9,7 @@ const Assets = lazy(() => import('./pages/Assets'));
 const AssetLanding = lazy(() => import('./pages/AssetLanding'));
 const Hire = lazy(() => import('./pages/Hire'));
 const Works = lazy(() => import('./pages/Works'));
+const Reels = lazy(() => import('./pages/Reels'));
 const Privacy = lazy(() => import('./pages/Privacy'));
 const ServicePage = lazy(() => import('./pages/ServicePage'));
 const Services = lazy(() => import('./pages/Services'));
@@ -41,6 +42,7 @@ const PublicApp = () => (
         <Route path="/payment-failed" element={<PaymentFailed />} />
         <Route path="/works" element={<Works />} />
         <Route path="/portfolio" element={<Works />} />
+        <Route path="/reels" element={<Reels />} />
         <Route path="/hire" element={<Hire />} />
         <Route path="/contact" element={<Hire />} />
         <Route path="/privacy" element={<Privacy />} />

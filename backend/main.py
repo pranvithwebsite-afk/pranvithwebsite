@@ -52,6 +52,7 @@ try:
         BLOG_POSTS,
         SETTINGS,
         DEFAULT_SERVICES,
+        DEFAULT_REELS,
     )
 except ImportError:
     from excel_export import create_excel_report
@@ -67,6 +68,7 @@ except ImportError:
         BLOG_POSTS,
         SETTINGS,
         DEFAULT_SERVICES,
+        DEFAULT_REELS,
     )
 
 ROOT_DIR = Path(__file__).parent
@@ -902,6 +904,56 @@ class ServicePublishIn(BaseModel):
 
 class ServiceReorderIn(BaseModel):
     service_ids: List[str]
+
+
+class ReelAdSettings(BaseModel):
+    pre_roll_enabled: bool = True
+    mid_roll_enabled: bool = True
+    mid_roll_cue_seconds: float = 12.0
+    ad_tag_url: Optional[str] = ""
+    gam_ad_unit_path: Optional[str] = "/21775744923/pranvith_reels_video"
+
+
+class ReelIn(BaseModel):
+    title: str
+    description: Optional[str] = ""
+    video_url: str
+    thumbnail_url: Optional[str] = ""
+    aspect_ratio: Optional[str] = "9:16"
+    sound_title: Optional[str] = "Original Audio - Pranvith DOP"
+    author_name: Optional[str] = "Pranvith DOP"
+    duration: Optional[float] = None
+    sort_order: Optional[int] = 0
+    is_active: Optional[bool] = True
+    ad_settings: Optional[ReelAdSettings] = Field(default_factory=ReelAdSettings)
+
+    @field_validator("video_url", "thumbnail_url")
+    @classmethod
+    def validate_urls(cls, value):
+        return _reject_unsafe_url(value)
+
+
+class ReelOut(BaseModel):
+    id: str
+    title: str
+    description: str = ""
+    video_url: str
+    thumbnail_url: str = ""
+    aspect_ratio: str = "9:16"
+    sound_title: str = "Original Audio - Pranvith DOP"
+    author_name: str = "Pranvith DOP"
+    duration: Optional[float] = None
+    sort_order: int = 0
+    is_active: bool = True
+    likes_count: int = 0
+    views_count: int = 0
+    ad_settings: ReelAdSettings = Field(default_factory=ReelAdSettings)
+    created_at: str
+    updated_at: Optional[str] = None
+
+
+class ReelReorderIn(BaseModel):
+    reel_ids: List[str]
 
 
 class MediaItem(BaseModel):
@@ -2821,6 +2873,85 @@ def _public_service(service: dict) -> dict:
     return _normalize_service_doc(safe_service)
 
 
+def _normalize_reel_doc(doc: dict, existing: Optional[dict] = None) -> dict:
+    now = datetime.now(timezone.utc).isoformat()
+    safe = dict(doc or {})
+    title = str(safe.get("title") or "").strip()
+    if not title:
+        raise HTTPException(status_code=422, detail="Reel title is required")
+    video_url = str(safe.get("video_url") or "").strip()
+    if not video_url:
+        raise HTTPException(status_code=422, detail="Reel video URL is required")
+
+    video_url = _reject_unsafe_url(video_url)
+    thumbnail_url = _reject_unsafe_url(safe.get("thumbnail_url") or "") or ""
+
+    ad_settings_raw = safe.get("ad_settings") or (existing.get("ad_settings") if existing else {}) or {}
+    if hasattr(ad_settings_raw, "model_dump"):
+        ad_settings_raw = ad_settings_raw.model_dump()
+    elif not isinstance(ad_settings_raw, dict):
+        ad_settings_raw = {}
+
+    try:
+        cue_sec = float(ad_settings_raw.get("mid_roll_cue_seconds", 12.0))
+    except (TypeError, ValueError):
+        cue_sec = 12.0
+
+    ad_settings = {
+        "pre_roll_enabled": bool(ad_settings_raw.get("pre_roll_enabled", True)),
+        "mid_roll_enabled": bool(ad_settings_raw.get("mid_roll_enabled", True)),
+        "mid_roll_cue_seconds": cue_sec,
+        "ad_tag_url": str(ad_settings_raw.get("ad_tag_url") or "").strip(),
+        "gam_ad_unit_path": str(ad_settings_raw.get("gam_ad_unit_path") or "/21775744923/pranvith_reels_video").strip(),
+    }
+
+    try:
+        sort_order = int(safe.get("sort_order") if safe.get("sort_order") is not None else (existing.get("sort_order", 0) if existing else 0))
+    except (TypeError, ValueError):
+        sort_order = 0
+
+    duration = safe.get("duration")
+    if duration is not None:
+        try:
+            duration = float(duration)
+        except (TypeError, ValueError):
+            duration = None
+    elif existing and existing.get("duration") is not None:
+        duration = existing.get("duration")
+
+    reel_id = (existing.get("id") if existing else None) or safe.get("id") or str(uuid.uuid4())
+    created_at = (existing.get("created_at") if existing else None) or safe.get("created_at") or now
+    likes_count = int(existing.get("likes_count", 0) if existing else safe.get("likes_count", 0))
+    views_count = int(existing.get("views_count", 0) if existing else safe.get("views_count", 0))
+
+    return {
+        "id": reel_id,
+        "title": title[:200],
+        "description": str(safe.get("description") if safe.get("description") is not None else (existing.get("description", "") if existing else "")).strip()[:2000],
+        "video_url": video_url,
+        "thumbnail_url": thumbnail_url,
+        "aspect_ratio": str(safe.get("aspect_ratio") or (existing.get("aspect_ratio") if existing else "9:16")).strip(),
+        "sound_title": str(safe.get("sound_title") or (existing.get("sound_title") if existing else "Original Audio - Pranvith DOP")).strip()[:150],
+        "author_name": str(safe.get("author_name") or (existing.get("author_name") if existing else "Pranvith DOP")).strip()[:100],
+        "duration": duration,
+        "sort_order": sort_order,
+        "is_active": bool(safe.get("is_active", True) if "is_active" in safe else (existing.get("is_active", True) if existing else True)),
+        "likes_count": likes_count,
+        "views_count": views_count,
+        "ad_settings": ad_settings,
+        "created_at": created_at,
+        "updated_at": now if existing else safe.get("updated_at"),
+    }
+
+
+def _public_reel(reel: dict) -> dict:
+    if not isinstance(reel, dict):
+        return {}
+    res = dict(reel)
+    res.pop("_id", None)
+    return res
+
+
 @api_router.get("/pages")
 async def public_pages():
     if db is None:
@@ -3035,6 +3166,57 @@ async def public_blog_categories():
     if db is None:
         return BLOG_CATEGORIES
     return await db.blog_categories.find({}, {"_id": 0}).to_list(100)
+
+
+@api_router.get("/reels")
+async def public_reels():
+    """Returns active 9:16 vertical reels for the /reels page."""
+    if db is None:
+        return [_public_reel(r) for r in DEFAULT_REELS if r.get("is_active", True)]
+    try:
+        count = await db.reels.count_documents({})
+        if count == 0:
+            seed_docs = [_normalize_reel_doc(r) for r in DEFAULT_REELS]
+            await db.reels.insert_many(seed_docs)
+        rows = await db.reels.find({"is_active": True}, {"_id": 0}).sort("sort_order", 1).to_list(100)
+        if not rows:
+            return [_public_reel(r) for r in DEFAULT_REELS if r.get("is_active", True)]
+        return [_public_reel(row) for row in rows]
+    except Exception:
+        logger.exception("Public reels fetch failed; returning fallback reels")
+        return [_public_reel(r) for r in DEFAULT_REELS if r.get("is_active", True)]
+
+
+@api_router.post("/reels/{reel_id}/view")
+async def public_record_reel_view(reel_id: str):
+    if db is None:
+        return {"success": True, "views_count": 1}
+    try:
+        res = await db.reels.find_one_and_update(
+            {"id": reel_id},
+            {"$inc": {"views_count": 1}},
+            return_document=True,
+            projection={"_id": 0, "views_count": 1},
+        )
+        return {"success": True, "views_count": (res or {}).get("views_count", 0)}
+    except Exception:
+        return {"success": True}
+
+
+@api_router.post("/reels/{reel_id}/like")
+async def public_toggle_reel_like(reel_id: str):
+    if db is None:
+        return {"success": True, "likes_count": 1}
+    try:
+        res = await db.reels.find_one_and_update(
+            {"id": reel_id},
+            {"$inc": {"likes_count": 1}},
+            return_document=True,
+            projection={"_id": 0, "likes_count": 1},
+        )
+        return {"success": True, "likes_count": (res or {}).get("likes_count", 0)}
+    except Exception:
+        return {"success": True}
 
 
 @api_router.post("/hire")
@@ -3761,6 +3943,84 @@ async def admin_reorder_services(payload: ServiceReorderIn, current_admin: Admin
         await db.services.update_one({"id": service_id}, {"$set": {"sort_order": index + 1, "updated_at": now}})
     rows = await db.services.find({}, {"_id": 0}).sort("sort_order", 1).to_list(300)
     return {"success": True, "services": [_public_service(row) for row in rows]}
+
+
+@admin_router.get("/reels")
+async def admin_get_reels(current_admin: AdminBase = Depends(get_current_active_admin)):
+    if db is None:
+        return [_public_reel(r) for r in DEFAULT_REELS]
+    try:
+        count = await db.reels.count_documents({})
+        if count == 0:
+            seed_docs = [_normalize_reel_doc(r) for r in DEFAULT_REELS]
+            await db.reels.insert_many(seed_docs)
+        rows = await db.reels.find({}, {"_id": 0}).sort("sort_order", 1).to_list(300)
+        if not rows:
+            return [_public_reel(r) for r in DEFAULT_REELS]
+        return [_public_reel(row) for row in rows]
+    except Exception:
+        logger.exception("Admin reels fetch failed")
+        return [_public_reel(r) for r in DEFAULT_REELS]
+
+
+@admin_router.post("/reels")
+async def admin_create_reel(payload: ReelIn, current_admin: AdminBase = Depends(get_current_active_admin)):
+    if db is None:
+        raise HTTPException(status_code=500, detail="Database is not configured")
+    doc = _normalize_reel_doc(payload.model_dump())
+    if not doc.get("sort_order"):
+        last = await db.reels.find_one({}, {"_id": 0, "sort_order": 1}, sort=[("sort_order", -1)])
+        doc["sort_order"] = int((last or {}).get("sort_order") or 0) + 1
+    await db.reels.insert_one(doc)
+    return {"success": True, "reel": _public_reel(doc)}
+
+
+@admin_router.put("/reels/{reel_id}")
+async def admin_update_reel(reel_id: str, payload: ReelIn, current_admin: AdminBase = Depends(get_current_active_admin)):
+    if db is None:
+        raise HTTPException(status_code=500, detail="Database is not configured")
+    existing = await db.reels.find_one({"id": reel_id}, {"_id": 0})
+    if not existing:
+        raise HTTPException(status_code=404, detail="Reel not found")
+    update_doc = _normalize_reel_doc(payload.model_dump(exclude_none=True), existing=existing)
+    await db.reels.update_one({"id": reel_id}, {"$set": update_doc})
+    return {"success": True, "reel": _public_reel(update_doc)}
+
+
+@admin_router.patch("/reels/{reel_id}/status")
+async def admin_toggle_reel_status(reel_id: str, current_admin: AdminBase = Depends(get_current_active_admin)):
+    if db is None:
+        raise HTTPException(status_code=500, detail="Database is not configured")
+    existing = await db.reels.find_one({"id": reel_id}, {"_id": 0})
+    if not existing:
+        raise HTTPException(status_code=404, detail="Reel not found")
+    new_status = not bool(existing.get("is_active", True))
+    await db.reels.update_one(
+        {"id": reel_id},
+        {"$set": {"is_active": new_status, "updated_at": datetime.now(timezone.utc).isoformat()}}
+    )
+    return {"success": True, "is_active": new_status}
+
+
+@admin_router.delete("/reels/{reel_id}")
+async def admin_delete_reel(reel_id: str, current_admin: AdminBase = Depends(get_current_active_admin)):
+    if db is None:
+        raise HTTPException(status_code=500, detail="Database is not configured")
+    res = await db.reels.delete_one({"id": reel_id})
+    if res.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Reel not found")
+    return {"success": True}
+
+
+@admin_router.post("/reels/reorder")
+async def admin_reorder_reels(payload: ReelReorderIn, current_admin: AdminBase = Depends(get_current_active_admin)):
+    if db is None:
+        raise HTTPException(status_code=500, detail="Database is not configured")
+    now = datetime.now(timezone.utc).isoformat()
+    for index, reel_id in enumerate(payload.reel_ids):
+        await db.reels.update_one({"id": reel_id}, {"$set": {"sort_order": index, "updated_at": now}})
+    rows = await db.reels.find({}, {"_id": 0}).sort("sort_order", 1).to_list(300)
+    return {"success": True, "reels": [_public_reel(r) for r in rows]}
 
 
 @admin_router.get("/products")
@@ -5184,7 +5444,7 @@ R2_PRIVATE_TYPES = {
 }
 R2_PUBLIC_PURPOSES = {"product-image", "product-video", "before-image", "after-image", "banner", "thumbnail"}
 R2_PRIVATE_PURPOSES = {"paid-download", "zip-file", "project-file", "lut-pack", "template-pack", "course-material"}
-R2_DIRECT_VIDEO_PURPOSES = {"product-video", "cms-video", "service-video", "media-library-video"}
+R2_DIRECT_VIDEO_PURPOSES = {"product-video", "cms-video", "service-video", "media-library-video", "reel-video"}
 R2_MAX_IMAGE_BYTES = 2 * 1024 * 1024
 R2_MAX_VIDEO_BYTES = 200 * 1024 * 1024
 R2_MAX_PRIVATE_BYTES = 500 * 1024 * 1024
@@ -5200,6 +5460,7 @@ R2_PUBLIC_PURPOSES = {
     "media-library-image",
     "media-library-file",
     "media-library-video",
+    "reel-video",
 }
 
 
@@ -5377,6 +5638,9 @@ def _r2_direct_video_object_key(purpose: str, file_ext: str, slug: Optional[str]
     if purpose == "media-library-video":
         today = datetime.now(timezone.utc).strftime("%Y/%m")
         return f"media-library/video/{today}/{object_id}{file_ext}"
+    if purpose == "reel-video":
+        today = datetime.now(timezone.utc).strftime("%Y/%m")
+        return f"reels/{today}/{object_id}{file_ext}"
     raise HTTPException(status_code=422, detail="Unsupported video upload purpose")
 
 
