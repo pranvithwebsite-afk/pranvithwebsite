@@ -57,9 +57,11 @@ import {
   previewAdminFacebookReply,
   formatApiErrorDetail
 } from '../../lib/api';
+import AutomationBuilder from '../components/AutomationBuilder';
 
 const TABS = [
   { id: 'connected_accounts', label: 'Connected Accounts', icon: Key, badge: 'Phase 1' },
+  { id: 'automation_builder', label: 'Automation Builder', icon: Layers, badge: 'Phase 4 Hybrid' },
   { id: 'video_publishing', label: 'Video Publishing', icon: Video, badge: 'Phase 2' },
   { id: 'scheduled_posts', label: 'Scheduled Posts', icon: Clock, badge: 'Upcoming' },
   { id: 'instagram_comments', label: 'Instagram Comments', icon: Instagram, badge: 'Phase 3' },
@@ -2270,9 +2272,19 @@ export default function SocialMediaManager() {
       )}
 
       {/* ============================================================== */}
+      {/* AUTOMATION BUILDER TAB (PHASE 4 HYBRID)                       */}
+      {/* ============================================================== */}
+      {activeTab === 'automation_builder' && (
+        <AutomationBuilder />
+      )}
+
+      {/* ============================================================== */}
       {/* OTHER TABS: ROADMAP / COMING PHASES                           */}
       {/* ============================================================== */}
-      {activeTab !== 'connected_accounts' && activeTab !== 'youtube_comments' && activeTab !== 'facebook_comments' && (
+      {activeTab !== 'connected_accounts' &&
+        activeTab !== 'automation_builder' &&
+        activeTab !== 'youtube_comments' &&
+        activeTab !== 'facebook_comments' && (
         <div className="rounded-2xl border border-white/10 bg-neutral-900/60 p-8 text-center space-y-4">
           <div className="w-12 h-12 rounded-2xl bg-orange-500/10 border border-orange-500/20 text-orange-400 flex items-center justify-center mx-auto">
             {React.createElement(TABS.find((t) => t.id === activeTab)?.icon || Share2, { className: 'w-6 h-6' })}

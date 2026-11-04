@@ -495,3 +495,240 @@ async def test_historical_vs_new_comment_filtering():
 
 
 
+
+
+# ==================== PHASE 4: HYBRID AUTOMATION BUILDER TESTS ====================
+
+@pytest.mark.anyio
+async def test_phase4_initial_seed_automation():
+    from backend.social_automation import INITIAL_SEED_AUTOMATION, get_social_automations
+
+    seed = INITIAL_SEED_AUTOMATION
+    assert seed["name"] == "Sony Camera Settings"
+    assert "youtube" in seed["platforms"]
+    assert "facebook" in seed["platforms"]
+    assert "instagram" in seed["platforms"]
+    assert seed["videoUrl"] == ""
+    assert seed["resourceUrl"] == ""
+    assert seed["triggerType"] == "keyword"
+    assert seed["keywords"] == ["SETTINGS", "LINK", "PRICE"]
+    assert "Camera settings మరియు links ఇక్కడ చూడండి 👇" in seed["replyMessage"]
+    assert seed["aiFallback"] is True
+    assert seed["enabled"] is False
+    assert seed["safeTestingMode"] is True
+    assert seed["status"] == "draft"
+
+    # Test get_social_automations seeds when db is empty
+    class EmptyMockDB:
+        def __init__(self):
+            self.docs = []
+            self.social_automations = self
+        def find(self, *args, **kwargs):
+            return self
+        def sort(self, *args, **kwargs):
+            return self
+        async def to_list(self, limit):
+            return list(self.docs)
+        async def insert_one(self, doc):
+            self.docs.append(doc)
+
+    mock_db = EmptyMockDB()
+    autos = await get_social_automations(mock_db)
+    assert len(autos) >= 1
+    assert autos[0]["name"] == "Sony Camera Settings"
+    assert autos[0]["videoUrl"] == ""
+    assert autos[0]["resourceUrl"] == ""
+
+
+def test_phase4_validation_rules():
+    from backend.social_automation import validate_automation_payload
+
+    # 1. Missing name
+    ok, err = validate_automation_payload({"name": ""})
+    assert ok is False
+    assert "Name is required" in err
+
+    # 2. Missing platforms
+    ok, err = validate_automation_payload({"name": "Test", "platforms": []})
+    assert ok is False
+    assert "At least one platform" in err
+
+    # 3. Invalid platform
+    ok, err = validate_automation_payload({"name": "Test", "platforms": ["tiktok"]})
+    assert ok is False
+    assert "Invalid platform" in err
+
+    # 4. Keyword trigger without keywords
+    ok, err = validate_automation_payload({
+        "name": "Test",
+        "platforms": ["youtube"],
+        "triggerType": "keyword",
+        "keywords": []
+    })
+    assert ok is False
+    assert "At least one keyword is required" in err
+
+    # 5. Invalid URL on activation
+    ok, err = validate_automation_payload({
+        "name": "Test",
+        "platforms": ["youtube"],
+        "triggerType": "keyword",
+        "keywords": ["LUT"],
+        "replyMessage": "Here is your link",
+        "enabled": True,
+        "videoUrl": "not_a_valid_url"
+    })
+    assert ok is False
+    assert "must be a valid HTTP or HTTPS URL" in err
+
+    # 6. Instagram activation without SuperProfile coordination confirmation
+    ok, err = validate_automation_payload({
+        "name": "Insta Auto",
+        "platforms": ["instagram"],
+        "triggerType": "keyword",
+        "keywords": ["LUT"],
+        "replyMessage": "Check DM",
+        "enabled": True,
+        "superprofile_coordinated": False
+    })
+    assert ok is False
+    assert "SuperProfile Safety Check" in err
+
+    # 7. Instagram activation WITH SuperProfile coordination confirmation
+    ok, err = validate_automation_payload({
+        "name": "Insta Auto",
+        "platforms": ["instagram"],
+        "triggerType": "keyword",
+        "keywords": ["LUT"],
+        "replyMessage": "Check DM",
+        "enabled": True,
+        "superprofile_coordinated": True
+    })
+    assert ok is True
+    assert err is None
+
+
+def test_phase4_keyword_matching_multilingual():
+    from backend.social_automation import match_keywords_in_text
+
+    kws = ["SETTINGS", "LINK", "PRICE", "ధర", "సెట్టింగ్స్"]
+
+    # English query
+    assert match_keywords_in_text(kws, "Sony A7 IV settings?") == ["SETTINGS"]
+    # Romanized Telugu (Tanglish) query
+    assert match_keywords_in_text(kws, "bro link pampandi") == ["LINK"]
+    # Telugu native script query
+    assert match_keywords_in_text(kws, "కెమెరా ధర ఎంత?") == ["ధర"]
+    # Punctuation isolation
+    assert match_keywords_in_text(kws, "Z6ii. Settings. Plz send") == ["SETTINGS"]
+    # Case insensitive
+    assert match_keywords_in_text(kws, "what is the price?") == ["PRICE"]
+
+
+@pytest.mark.anyio
+async def test_phase4_hybrid_reply_simulation():
+    from backend.social_automation import simulate_hybrid_reply
+
+    test_auto = {
+        "id": "auto_sony_test",
+        "name": "Sony Camera Settings",
+        "platforms": ["youtube", "facebook", "instagram"],
+        "videoUrl": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+        "triggerType": "keyword",
+        "keywords": ["SETTINGS", "LINK", "PRICE"],
+        "replyMessage": "Camera settings మరియు links ఇక్కడ చూడండి 👇",
+        "resourceUrl": "https://pranvithdop.com/assets",
+        "aiFallback": True,
+        "enabled": False,
+        "safeTestingMode": True,
+        "status": "draft"
+    }
+
+    # 1. Keyword match on YouTube (Specific Video Match)
+    res_yt = await simulate_hybrid_reply(
+        db=None,
+        platform="youtube",
+        comment_text="Camera settings kavali bro",
+        author_name="raj_creator",
+        video_url="https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+        automation_override=test_auto
+    )
+    assert res_yt["status"] == "preview_only"
+    assert res_yt["action"] == "keyword_automation"
+    assert res_yt["ai_fallback_used"] is False
+    assert "Camera settings మరియు links ఇక్కడ చూడండి 👇" in res_yt["public_reply"]
+    assert "https://pranvithdop.com/assets" in res_yt["public_reply"]
+    assert res_yt["dm_reply"] is None  # DMs not supported on YouTube
+
+    # 2. Keyword match on Instagram: Provides both Public Reply AND Private DM Preview
+    res_ig = await simulate_hybrid_reply(
+        db=None,
+        platform="instagram",
+        comment_text="send link plz",
+        author_name="ramesh_cine",
+        video_url="https://www.instagram.com/reel/DfTekPtNTe5/",
+        automation_override=test_auto
+    )
+    assert res_ig["status"] == "preview_only"
+    assert res_ig["public_reply"] is not None
+    assert res_ig["dm_reply"] is not None
+    assert "ramesh_cine" in res_ig["dm_reply"]
+    assert "https://pranvithdop.com/assets" in res_ig["dm_reply"]
+    assert "30 SuperProfile automations protected" in res_ig["superprofile_status"]
+
+    # 3. No keyword match with AI Fallback ON: generates contextual AI response
+    res_ai = await simulate_hybrid_reply(
+        db=None,
+        platform="youtube",
+        comment_text="Nikon Z6II base ISO entha?",
+        author_name="shakeel",
+        automation_override=test_auto
+    )
+    assert res_ai["ai_fallback_used"] is True
+    assert "800" in res_ai["public_reply"] or "N-Log" in res_ai["public_reply"]
+    assert res_ai["action"] == "ai_fallback"
+
+    # 4. No keyword match with AI Fallback OFF: takes no action
+    auto_no_ai = dict(test_auto)
+    auto_no_ai["aiFallback"] = False
+    res_no_ai = await simulate_hybrid_reply(
+        db=None,
+        platform="youtube",
+        comment_text="What do you think of this location?",
+        author_name="shakeel",
+        automation_override=auto_no_ai
+    )
+    assert res_no_ai["action"] == "none"
+    assert res_no_ai["public_reply"] is None
+    assert res_no_ai["ai_fallback_used"] is False
+
+
+@pytest.mark.anyio
+async def test_phase4_duplicate_detection_simulation():
+    from backend.social_automation import simulate_hybrid_reply
+
+    class MockDuplicateDB:
+        def __init__(self):
+            self.social_comments = self
+            self.social_automations = self
+        def find(self, *args, **kwargs):
+            return self
+        def sort(self, *args, **kwargs):
+            return self
+        async def to_list(self, limit):
+            return []
+        async def find_one(self, query, projection=None):
+            if query.get("comment_id") == "comm_duplicate_123":
+                return {"status": "auto_replied", "published_at": "2026-11-04T12:00:00Z"}
+            return None
+
+    mock_db = MockDuplicateDB()
+    res = await simulate_hybrid_reply(
+        db=mock_db,
+        platform="youtube",
+        comment_text="Sony settings plz",
+        author_name="test_user",
+        comment_id="comm_duplicate_123"
+    )
+    assert res["is_duplicate"] is True
+    assert "DUPLICATE_DETECTED" in res["duplicate_detection_result"]

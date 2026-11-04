@@ -1247,3 +1247,30 @@ export const previewAdminFacebookReply = async (payload) => {
 
 
 
+
+// ==================== PHASE 4: HYBRID SOCIAL AUTOMATION BUILDER ====================
+
+export const fetchAdminHybridAutomations = async () => {
+  const { data } = await adminApi.get('/admin/social/automations');
+  return data;
+};
+
+export const createAdminHybridAutomation = async (payload) => {
+  const { data } = await adminApi.post('/admin/social/automations', payload);
+  return data;
+};
+
+export const updateAdminHybridAutomation = async (automationId, payload) => {
+  const { data } = await adminApi.put(`/admin/social/automations/${encodeURIComponent(automationId)}`, payload);
+  return data;
+};
+
+export const deleteAdminHybridAutomation = async (automationId) => {
+  const { data } = await adminApi.delete(`/admin/social/automations/${encodeURIComponent(automationId)}`);
+  return data;
+};
+
+export const testAdminHybridAutomation = async (payload) => {
+  const { data } = await adminApi.post('/admin/social/automations/test', payload);
+  return data;
+};

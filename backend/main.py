@@ -6339,6 +6339,113 @@ class FacebookPreviewIn(BaseModel):
     comment_text: str
     author_name: str = "creator"
 
+class HybridAutomationIn(BaseModel):
+    id: Optional[str] = None
+    name: str
+    platforms: List[str] = ["youtube", "facebook", "instagram"]
+    videoUrl: Optional[str] = ""
+    video_url: Optional[str] = ""
+    triggerType: str = "keyword"
+    trigger_type: Optional[str] = None
+    keywords: List[str] = []
+    replyMessage: str = ""
+    reply_message: Optional[str] = None
+    resourceUrl: Optional[str] = ""
+    resource_url: Optional[str] = None
+    aiFallback: bool = True
+    ai_fallback: Optional[bool] = None
+    enabled: bool = False
+    safeTestingMode: bool = True
+    safe_testing_mode: Optional[bool] = None
+    status: str = "draft"
+    superprofile_coordinated: bool = False
+    run_count: Optional[int] = 0
+
+class HybridAutomationTestIn(BaseModel):
+    platform: str = "youtube"
+    video_url: Optional[str] = ""
+    comment_text: str
+    author_name: str = "creator"
+    comment_id: Optional[str] = None
+    automation_override: Optional[Dict[str, Any]] = None
+
+@admin_router.get("/social/automations")
+async def admin_get_hybrid_automations(current_admin: AdminBase = Depends(get_current_active_admin)):
+    try:
+        from .social_automation import get_social_automations
+    except ImportError:
+        from social_automation import get_social_automations
+    automations = await get_social_automations(db)
+    return automations
+
+@admin_router.post("/social/automations")
+async def admin_create_hybrid_automation(
+    payload: HybridAutomationIn,
+    current_admin: AdminBase = Depends(get_current_active_admin)
+):
+    try:
+        from .social_automation import save_social_automation
+    except ImportError:
+        from social_automation import save_social_automation
+
+    data = payload.dict()
+    ok, err, doc = await save_social_automation(db, data)
+    if not ok:
+        raise HTTPException(status_code=400, detail=err or "Invalid automation configuration")
+    return {"success": True, "message": f"Automation '{doc.get('name')}' saved successfully.", "automation": doc}
+
+@admin_router.put("/social/automations/{automation_id}")
+async def admin_update_hybrid_automation(
+    automation_id: str,
+    payload: Dict[str, Any],
+    current_admin: AdminBase = Depends(get_current_active_admin)
+):
+    try:
+        from .social_automation import update_social_automation
+    except ImportError:
+        from social_automation import update_social_automation
+
+    ok, err, doc = await update_social_automation(db, automation_id, payload)
+    if not ok:
+        raise HTTPException(status_code=400, detail=err or "Failed to update automation")
+    return {"success": True, "message": f"Automation '{doc.get('name')}' updated successfully.", "automation": doc}
+
+@admin_router.delete("/social/automations/{automation_id}")
+async def admin_delete_hybrid_automation(
+    automation_id: str,
+    current_admin: AdminBase = Depends(get_current_active_admin)
+):
+    try:
+        from .social_automation import delete_social_automation
+    except ImportError:
+        from social_automation import delete_social_automation
+
+    deleted = await delete_social_automation(db, automation_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Automation not found or could not be deleted")
+    return {"success": True, "message": f"Automation '{automation_id}' deleted."}
+
+@admin_router.post("/social/automations/test")
+async def admin_test_hybrid_automation(
+    payload: HybridAutomationTestIn,
+    current_admin: AdminBase = Depends(get_current_active_admin)
+):
+    try:
+        from .social_automation import simulate_hybrid_reply
+    except ImportError:
+        from social_automation import simulate_hybrid_reply
+
+    res = await simulate_hybrid_reply(
+        db=db,
+        platform=payload.platform,
+        comment_text=payload.comment_text,
+        author_name=payload.author_name,
+        video_url=payload.video_url,
+        comment_id=payload.comment_id,
+        automation_override=payload.automation_override
+    )
+    return {"success": True, "test_result": res}
+
 @admin_router.get("/social/accounts")
 async def admin_get_social_accounts(current_admin: AdminBase = Depends(get_current_active_admin)):
     try:

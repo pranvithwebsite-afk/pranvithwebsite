@@ -2794,3 +2794,411 @@ async def process_facebook_webhook_event(db, payload: Dict[str, Any]) -> Dict[st
 
     return {"processed": True, "comment_ids": processed_events}
 
+
+
+# ==================== PHASE 4: HYBRID SOCIAL MEDIA AUTOMATION BUILDER ====================
+
+INITIAL_SEED_AUTOMATION: Dict[str, Any] = {
+    "id": "auto_sony_camera_settings_seed",
+    "name": "Sony Camera Settings",
+    "platforms": ["youtube", "facebook", "instagram"],
+    "videoUrl": "",
+    "video_url": "",
+    "triggerType": "keyword",
+    "trigger_type": "keyword",
+    "keywords": ["SETTINGS", "LINK", "PRICE"],
+    "replyMessage": "Camera settings మరియు links ఇక్కడ చూడండి 👇",
+    "reply_message": "Camera settings మరియు links ఇక్కడ చూడండి 👇",
+    "resourceUrl": "",
+    "resource_url": "",
+    "aiFallback": True,
+    "ai_fallback": True,
+    "enabled": False,
+    "safeTestingMode": True,
+    "safe_testing_mode": True,
+    "status": "draft",
+    "superprofile_coordinated": False,
+    "run_count": 0,
+    "created_at": "2026-11-05T00:00:00Z",
+    "updated_at": "2026-11-05T00:00:00Z",
+    "history": []
+}
+
+
+def extract_media_identifier(url: str) -> str:
+    """Extracts platform-agnostic media shortcode or identifier from URL."""
+    if not url:
+        return ""
+    clean = url.strip()
+    # Instagram /reel/CODE or /p/CODE
+    m_ig = re.search(r'/(?:reel|p)/([A-Za-z0-9_-]+)', clean)
+    if m_ig:
+        return m_ig.group(1)
+    # YouTube watch?v=ID or youtu.be/ID or /shorts/ID
+    m_yt = re.search(r'(?:v=|youtu\.be/|shorts/)([A-Za-z0-9_-]{11})', clean)
+    if m_yt:
+        return m_yt.group(1)
+    # Facebook posts/ID or reel/ID or videos/ID
+    m_fb = re.search(r'/(?:posts|reel|videos)/([0-9]+)', clean)
+    if m_fb:
+        return m_fb.group(1)
+    return clean.rstrip("/").split("/")[-1]
+
+
+def match_keywords_in_text(keywords: List[str], text: str) -> List[str]:
+    """
+    Case-insensitive, punctuation-cleaned keyword matching.
+    Supports Telugu Unicode script, English, and Romanized Telugu (Tanglish).
+    """
+    if not keywords or not text:
+        return []
+    clean = " " + re.sub(r'[^\w\s]', ' ', text.lower()) + " "
+    matched = []
+    for kw in keywords:
+        kw_clean = kw.lower().strip()
+        if not kw_clean:
+            continue
+        pattern = rf'\b{re.escape(kw_clean)}\b'
+        if re.search(pattern, clean, re.UNICODE):
+            matched.append(kw)
+    return matched
+
+
+def validate_automation_payload(payload: Dict[str, Any]) -> Tuple[bool, Optional[str]]:
+    """
+    Validates automation builder payload.
+    Ensures required fields, platform URLs, SuperProfile protection, and safety constraints.
+    """
+    name = (payload.get("name") or "").strip()
+    if not name:
+        return False, "Automation Name is required."
+
+    platforms = payload.get("platforms") or []
+    if not isinstance(platforms, list) or not platforms:
+        return False, "At least one platform (YouTube, Facebook, Instagram) must be selected."
+
+    valid_platforms = {"youtube", "facebook", "instagram"}
+    for p in platforms:
+        if p.lower() not in valid_platforms:
+            return False, f"Invalid platform '{p}'. Allowed platforms: YouTube, Facebook, Instagram."
+
+    trigger_type = (payload.get("triggerType") or payload.get("trigger_type") or "keyword").lower()
+    if trigger_type not in ("keyword", "any_comment"):
+        return False, "Trigger Type must be either 'keyword' or 'any_comment'."
+
+    keywords = payload.get("keywords") or []
+    if trigger_type == "keyword":
+        clean_kws = [k.strip() for k in keywords if isinstance(k, str) and k.strip()]
+        if not clean_kws:
+            return False, "At least one keyword is required when Trigger Type is 'keyword'."
+
+    reply_msg = (payload.get("replyMessage") or payload.get("reply_message") or "").strip()
+    ai_fallback = payload.get("aiFallback") if payload.get("aiFallback") is not None else payload.get("ai_fallback", True)
+    if not reply_msg and not ai_fallback:
+        return False, "Public Reply Message is required unless AI Fallback is enabled."
+
+    video_url = (payload.get("videoUrl") or payload.get("video_url") or "").strip()
+    resource_url = (payload.get("resourceUrl") or payload.get("resource_url") or "").strip()
+
+    is_enabled = bool(payload.get("enabled", False))
+    if is_enabled:
+        if video_url and not (video_url.startswith("http://") or video_url.startswith("https://")):
+            return False, "Video/Post URL must be a valid HTTP or HTTPS URL."
+        if resource_url and not (resource_url.startswith("http://") or resource_url.startswith("https://")):
+            return False, "Resource/Product URL must be a valid HTTP or HTTPS URL."
+
+        # SuperProfile Instagram Protection Requirement
+        if "instagram" in [p.lower() for p in platforms]:
+            if not payload.get("superprofile_coordinated"):
+                return False, (
+                    "SuperProfile Safety Check: Explicit confirmation is required that overlapping "
+                    "SuperProfile automation has been disabled or coordinated before activating this automation on Instagram."
+                )
+
+    return True, None
+
+
+async def get_social_automations(db) -> List[Dict[str, Any]]:
+    """Retrieves all social automations. Seeds INITIAL_SEED_AUTOMATION if empty."""
+    if db is None:
+        return [dict(INITIAL_SEED_AUTOMATION)]
+    try:
+        docs = await db.social_automations.find({}, {"_id": 0}).sort("created_at", -1).to_list(100)
+        if not docs:
+            # Seed initial draft automation (Requirement 1)
+            seed_doc = dict(INITIAL_SEED_AUTOMATION)
+            seed_doc["created_at"] = datetime.now(timezone.utc).isoformat()
+            seed_doc["updated_at"] = datetime.now(timezone.utc).isoformat()
+            await db.social_automations.insert_one(dict(seed_doc))
+            # Return without _id
+            seed_doc.pop("_id", None)
+            return [seed_doc]
+        return docs
+    except Exception as e:
+        logger.warning("Failed to fetch social_automations: %s", e)
+        return [dict(INITIAL_SEED_AUTOMATION)]
+
+
+async def save_social_automation(db, payload: Dict[str, Any]) -> Tuple[bool, Optional[str], Optional[Dict[str, Any]]]:
+    """Saves or creates a new hybrid automation document in MongoDB."""
+    ok, err = validate_automation_payload(payload)
+    if not ok:
+        return False, err, None
+
+    now_iso = datetime.now(timezone.utc).isoformat()
+    auto_id = payload.get("id") or f"auto_{uuid.uuid4().hex[:12]}"
+    doc = {
+        "id": auto_id,
+        "name": payload.get("name", "").strip(),
+        "platforms": [p.lower() for p in (payload.get("platforms") or ["youtube"])],
+        "videoUrl": (payload.get("videoUrl") or payload.get("video_url") or "").strip(),
+        "video_url": (payload.get("videoUrl") or payload.get("video_url") or "").strip(),
+        "triggerType": (payload.get("triggerType") or payload.get("trigger_type") or "keyword").lower(),
+        "trigger_type": (payload.get("triggerType") or payload.get("trigger_type") or "keyword").lower(),
+        "keywords": [k.strip() for k in (payload.get("keywords") or []) if isinstance(k, str) and k.strip()],
+        "replyMessage": (payload.get("replyMessage") or payload.get("reply_message") or "").strip(),
+        "reply_message": (payload.get("replyMessage") or payload.get("reply_message") or "").strip(),
+        "resourceUrl": (payload.get("resourceUrl") or payload.get("resource_url") or "").strip(),
+        "resource_url": (payload.get("resourceUrl") or payload.get("resource_url") or "").strip(),
+        "aiFallback": bool(payload.get("aiFallback") if payload.get("aiFallback") is not None else payload.get("ai_fallback", True)),
+        "ai_fallback": bool(payload.get("aiFallback") if payload.get("aiFallback") is not None else payload.get("ai_fallback", True)),
+        "enabled": bool(payload.get("enabled", False)),
+        "safeTestingMode": bool(payload.get("safeTestingMode") if payload.get("safeTestingMode") is not None else payload.get("safe_testing_mode", True)),
+        "safe_testing_mode": bool(payload.get("safeTestingMode") if payload.get("safeTestingMode") is not None else payload.get("safe_testing_mode", True)),
+        "status": payload.get("status", "draft"),
+        "superprofile_coordinated": bool(payload.get("superprofile_coordinated", False)),
+        "run_count": int(payload.get("run_count", 0)),
+        "created_at": payload.get("created_at") or now_iso,
+        "updated_at": now_iso,
+        "history": payload.get("history") or []
+    }
+
+    if db is not None:
+        try:
+            await db.social_automations.update_one({"id": auto_id}, {"$set": doc}, upsert=True)
+        except Exception as e:
+            return False, f"Database error: {str(e)}", None
+
+    return True, None, doc
+
+
+async def update_social_automation(db, auto_id: str, updates: Dict[str, Any]) -> Tuple[bool, Optional[str], Optional[Dict[str, Any]]]:
+    """Updates an existing automation with validation."""
+    if db is None:
+        return False, "Database not available", None
+
+    existing = await db.social_automations.find_one({"id": auto_id}, {"_id": 0})
+    if not existing:
+        return False, f"Automation with ID '{auto_id}' not found.", None
+
+    merged = {**existing, **updates}
+    ok, err = validate_automation_payload(merged)
+    if not ok:
+        return False, err, None
+
+    merged["updated_at"] = datetime.now(timezone.utc).isoformat()
+    await db.social_automations.update_one({"id": auto_id}, {"$set": merged})
+    return True, None, merged
+
+
+async def delete_social_automation(db, auto_id: str) -> bool:
+    """Deletes an automation by ID."""
+    if db is None:
+        return False
+    res = await db.social_automations.delete_one({"id": auto_id})
+    return res.deleted_count > 0
+
+
+async def simulate_hybrid_reply(
+    db,
+    platform: str,
+    comment_text: str,
+    author_name: str = "creator",
+    video_url: Optional[str] = None,
+    comment_id: Optional[str] = None,
+    automation_override: Optional[Dict[str, Any]] = None,
+    gemini_api_key: Optional[str] = None
+) -> Dict[str, Any]:
+    """
+    Executes the 6-step Hybrid Reply Engine in Safe Preview Mode:
+    1. Identify platform, video, and comment.
+    2. Check duplicate reply history (idempotency).
+    3. Find automation mapped to specific video (or channel default).
+    4. Match keyword rules / any_comment trigger.
+    5. If no rule matches and AI fallback enabled, generate contextual AI reply.
+    6. Format platform-specific replies (YouTube public, Facebook page, Instagram public + DM).
+    Simulated 100% read-only.
+    """
+    platform_norm = (platform or "youtube").lower().strip()
+    clean_author = author_name.lstrip("@").strip() or "creator"
+    incoming_media_id = extract_media_identifier(video_url or "")
+    now_iso = datetime.now(timezone.utc).isoformat()
+
+    # Step 1: Duplicate Detection
+    is_duplicate = False
+    duplicate_result = "NO_DUPLICATE: Fresh comment"
+    if comment_id and db is not None:
+        try:
+            existing = await db.social_comments.find_one(
+                {"comment_id": comment_id, "platform": platform_norm},
+                {"_id": 0}
+            )
+            if existing and existing.get("status") in ("auto_replied", "replied", "published"):
+                is_duplicate = True
+                duplicate_result = f"DUPLICATE_DETECTED: Already replied on {existing.get('published_at', 'earlier')}"
+        except Exception:
+            pass
+
+    # Step 2: Language & Intent Detection
+    lang = detect_comment_language(comment_text)
+    intent_info = classify_comment_intent(comment_text)
+    intent = intent_info["intent"]
+    is_sensitive = intent_info.get("is_sensitive", False)
+    requires_approval = intent_info.get("requires_approval", False)
+
+    # Step 3: Fetch automations
+    automations = []
+    if automation_override:
+        automations = [automation_override]
+    else:
+        automations = await get_social_automations(db)
+
+    # Step 4: Candidate Matching
+    matched_auto = None
+    matched_kws: List[str] = []
+    target_match_type = "none"
+
+    # Filter by platform
+    platform_autos = [
+        a for a in automations
+        if platform_norm in [p.lower() for p in (a.get("platforms") or [])]
+    ]
+
+    # Prioritize: 1) Specific Video Match, 2) Channel/Platform-wide default (empty videoUrl)
+    specific_video_autos = []
+    generic_autos = []
+    for a in platform_autos:
+        a_url = (a.get("videoUrl") or a.get("video_url") or "").strip()
+        if a_url:
+            a_id = extract_media_identifier(a_url)
+            if incoming_media_id and (a_id == incoming_media_id or a_url == (video_url or "").strip()):
+                specific_video_autos.append(a)
+        else:
+            generic_autos.append(a)
+
+    candidates = specific_video_autos + generic_autos
+
+    for auto in candidates:
+        trigger_type = (auto.get("triggerType") or auto.get("trigger_type") or "keyword").lower()
+        if trigger_type == "any_comment":
+            matched_auto = auto
+            matched_kws = ["<ANY_COMMENT_TRIGGER>"]
+            target_match_type = "specific_video" if auto in specific_video_autos else "platform_default"
+            break
+        elif trigger_type == "keyword":
+            kws = auto.get("keywords") or []
+            found = match_keywords_in_text(kws, comment_text)
+            if found:
+                matched_auto = auto
+                matched_kws = found
+                target_match_type = "specific_video" if auto in specific_video_autos else "platform_default"
+                break
+
+    # Step 5: Resolve reply
+    action = "none"
+    selected_reply: Optional[str] = None
+    public_reply: Optional[str] = None
+    dm_reply: Optional[str] = None
+    ai_fallback_used = False
+    ai_fallback_reason: Optional[str] = None
+    resource_url: Optional[str] = None
+
+    if matched_auto:
+        action = "keyword_automation" if matched_kws != ["<ANY_COMMENT_TRIGGER>"] else "any_comment_automation"
+        base_reply = (matched_auto.get("replyMessage") or matched_auto.get("reply_message") or "").strip()
+        resource_url = (matched_auto.get("resourceUrl") or matched_auto.get("resource_url") or "").strip()
+
+        # Append resourceUrl if present and not already in reply
+        if resource_url and resource_url not in base_reply:
+            base_reply = f"{base_reply} {resource_url}".strip()
+
+        # Format public reply
+        public_reply = base_reply.replace("{username}", clean_author)
+
+        # Platform specific formatting
+        if platform_norm == "instagram":
+            # For Instagram, provide both Public Reply and Private DM Preview
+            dm_reply = (
+                f"Hi @{clean_author}! 🙌\n\n"
+                f"{matched_auto.get('replyMessage', '').strip()}"
+            )
+            if resource_url:
+                dm_reply += f"\n\n🔗 Access Link: {resource_url}"
+        selected_reply = public_reply
+
+    else:
+        # Check if an automation exists for this platform that has aiFallback enabled
+        allow_ai = any(
+            bool(a.get("aiFallback") if a.get("aiFallback") is not None else a.get("ai_fallback", True))
+            for a in (candidates or automations)
+        ) if (candidates or automations) else True
+
+        if allow_ai:
+            action = "ai_fallback"
+            ai_fallback_used = True
+            ai_eval = await generate_social_ai_reply(
+                comment_text=comment_text,
+                author_name=clean_author,
+                platform=platform_norm,
+                gemini_api_key=gemini_api_key
+            )
+            selected_reply = ai_eval["reply_text"]
+            public_reply = selected_reply
+            if platform_norm == "instagram":
+                dm_reply = f"Hi @{clean_author}!\n\n{selected_reply}"
+            ai_fallback_reason = (
+                f"No keyword matched in {len(candidates)} candidate automation(s). "
+                f"Contextual {ai_eval['source']} AI generated reply for intent '{intent}'."
+            )
+            is_sensitive = is_sensitive or ai_eval.get("is_sensitive", False)
+            requires_approval = requires_approval or ai_eval.get("requires_approval", False)
+        else:
+            action = "none"
+            ai_fallback_used = False
+            selected_reply = None
+            public_reply = None
+            dm_reply = None
+            ai_fallback_reason = "No keyword rule matched and AI Fallback is disabled."
+
+    return {
+        "status": "preview_only",
+        "preview_mode": True,
+        "is_simulated": True,
+        "platform": platform_norm,
+        "video_url": video_url or "",
+        "viewer_username": clean_author,
+        "sample_comment": comment_text,
+        "detected_language": lang,
+        "detected_intent": intent,
+        "matched_automation": {
+            "id": matched_auto.get("id"),
+            "name": matched_auto.get("name"),
+            "trigger_type": matched_auto.get("triggerType") or matched_auto.get("trigger_type"),
+            "match_scope": target_match_type
+        } if matched_auto else None,
+        "matched_keywords": matched_kws,
+        "selected_reply": selected_reply,
+        "public_reply": public_reply,
+        "dm_reply": dm_reply,
+        "resource_url": resource_url,
+        "ai_fallback_used": ai_fallback_used,
+        "ai_fallback_reason": ai_fallback_reason,
+        "action": action,
+        "is_duplicate": is_duplicate,
+        "duplicate_detection_result": duplicate_result,
+        "is_sensitive": is_sensitive,
+        "requires_approval": requires_approval,
+        "final_reply_preview": public_reply or "(No reply generated - action is none)",
+        "superprofile_status": "30 SuperProfile automations protected (Preview Only)" if platform_norm == "instagram" else "N/A",
+        "timestamp": now_iso
+    }
