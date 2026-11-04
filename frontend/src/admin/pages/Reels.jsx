@@ -611,37 +611,77 @@ const Reels = () => {
               <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-violet-600/20 text-violet-400">
                 <Film className="h-4 w-4" />
               </span>
-              <h2 className="text-xl font-bold text-white">
-                {editingId ? 'Edit Reel' : 'Upload New Vertical Reel (9:16)'}
-              </h2>
+              <div>
+                <h2 className="text-xl font-bold text-white">
+                  {editingId ? 'Edit Reel' : 'Add Reel'}
+                </h2>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Paste an Instagram Reel URL to auto-resolve embed & cover, or upload an MP4 as an optional fallback.
+                </p>
+              </div>
             </div>
 
             <form onSubmit={handleSave} className="space-y-6">
-              {/* Video Upload / URL */}
-              <div className="rounded-2xl border border-slate-800 bg-slate-950/60 p-4 space-y-4">
-                <MediaUrlInput
-                  label="Reel Video (9:16 Vertical MP4 / WebM or Instagram Reel)"
-                  fieldName="video_url"
-                  value={form.video_url}
-                  onChange={handleVideoUrlChange}
-                  accept="video/mp4,video/webm,video/quicktime"
-                  placeholder="Upload 9:16 video or paste Instagram Reel link (https://www.instagram.com/reel/...)"
-                  helperText="Upload vertical 9:16 MP4/WebM video or paste direct link / Instagram Reel. Instagram covers are auto-fetched automatically."
-                  videoUploadPurpose="reel-video"
-                  showPreview={false}
-                />
+              {/* Primary Video / Instagram Input */}
+              <div className="rounded-2xl border border-violet-500/30 bg-violet-950/20 p-5 space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-pink-500/20 text-pink-400">
+                      <Instagram className="h-4 w-4" />
+                    </span>
+                    <div>
+                      <h3 className="text-sm font-bold text-white">Instagram Reel URL</h3>
+                      <p className="text-[11px] text-slate-400">
+                        Paste link &bull; Official embed, cover and playback work automatically.
+                      </p>
+                    </div>
+                  </div>
+                  {isInstagramUrl(form.video_url) && (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-pink-500/20 px-2.5 py-0.5 text-[11px] font-semibold text-pink-300 border border-pink-500/30">
+                      <Instagram className="h-3 w-3" />
+                      Connected
+                    </span>
+                  )}
+                </div>
 
-                {/* Live Preview if video is set */}
+                <div className="relative">
+                  <input
+                    type="url"
+                    value={form.video_url}
+                    onChange={(e) => handleVideoUrlChange(e.target.value)}
+                    placeholder="https://www.instagram.com/reel/C8qL8G2v_kF/ (or /p/ shortcode)"
+                    className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3.5 py-2.5 text-sm text-white placeholder-slate-500 focus:border-violet-500 focus:outline-none pr-20"
+                  />
+                  {form.video_url && (
+                    <button
+                      type="button"
+                      onClick={() => setForm((prev) => ({ ...prev, video_url: '' }))}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 hover:text-white"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
+
+                {/* Live Preview if video / Instagram is set */}
                 {form.video_url && (
-                  <div className="mt-3 flex items-center gap-4 rounded-xl border border-slate-800 bg-slate-900 p-3">
-                    <div className="h-24 w-14 flex-shrink-0 overflow-hidden rounded-lg bg-black">
+                  <div className="rounded-xl border border-slate-800 bg-slate-900/90 p-3.5 flex flex-col sm:flex-row items-center gap-4 animate-in fade-in">
+                    <div className="relative h-36 w-20 flex-shrink-0 overflow-hidden rounded-xl border border-slate-700 bg-black shadow-md">
                       {isInstagramUrl(form.video_url) ? (
-                        <img
-                          src={safeImageSrc(getAdminReelCover(form))}
-                          alt="Instagram Reel Cover"
-                          onError={handleImageError}
-                          className="h-full w-full object-cover"
-                        />
+                        <>
+                          <img
+                            src={safeImageSrc(getAdminReelCover(form))}
+                            alt="Instagram Reel Cover"
+                            onError={handleImageError}
+                            className="h-full w-full object-cover"
+                          />
+                          <div className="absolute inset-0 flex items-center justify-center bg-black/20">
+                            <Play className="h-6 w-6 fill-white text-white opacity-90" />
+                          </div>
+                          <span className="absolute top-1 left-1 rounded bg-pink-600/90 p-0.5 text-white shadow">
+                            <Instagram className="h-2.5 w-2.5" />
+                          </span>
+                        </>
                       ) : (
                         <video
                           src={form.video_url}
@@ -653,22 +693,39 @@ const Reels = () => {
                           playsInline
                         />
                       )}
+                      <span className="absolute bottom-1 right-1 rounded bg-black/80 px-1 py-0.5 text-[9px] font-mono text-white">
+                        9:16
+                      </span>
                     </div>
-                    <div className="space-y-1 text-xs">
+
+                    <div className="space-y-1 text-xs w-full">
                       {isInstagramUrl(form.video_url) ? (
                         <>
-                          <p className="font-semibold text-pink-400 flex items-center gap-1.5">
+                          <p className="font-semibold text-pink-400 flex items-center gap-1.5 text-sm">
                             <Instagram className="h-3.5 w-3.5" />
-                            Instagram Reel Detected
+                            Official Instagram Reel Ready
                           </p>
-                          <p className="line-clamp-1 text-slate-400 font-mono text-[11px]">{form.video_url}</p>
+                          <p className="line-clamp-1 text-slate-300 font-mono text-[11px]">{form.video_url}</p>
                           <p className="text-slate-400 text-[11px]">
-                            Official embed ready &bull; Cover auto-resolved
+                            Plays seamlessly via official Instagram embed on public /reels feed.
                           </p>
+                          <div className="pt-1 flex items-center gap-3">
+                            <a
+                              href={getInstagramEmbedUrl(form.video_url)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 text-[11px] font-medium text-pink-400 hover:underline"
+                            >
+                              <span>Test official embed</span>
+                              <ExternalLink className="h-3 w-3" />
+                            </a>
+                          </div>
                         </>
                       ) : (
                         <>
-                          <p className="font-semibold text-emerald-400">✓ Video Source Connected</p>
+                          <p className="font-semibold text-emerald-400 flex items-center gap-1.5">
+                            ✓ Direct Video Source Connected
+                          </p>
                           <p className="line-clamp-1 text-slate-400 font-mono text-[11px]">{form.video_url}</p>
                           <p className="text-slate-500">9:16 vertical fullscreen ratio</p>
                         </>
@@ -678,31 +735,82 @@ const Reels = () => {
                 )}
               </div>
 
+              {/* Optional Fallback: Direct MP4 / WebM Upload */}
+              <details
+                className="group rounded-2xl border border-slate-800 bg-slate-950/40 p-4 transition"
+                open={!isInstagramUrl(form.video_url) && !!form.video_url}
+              >
+                <summary className="flex cursor-pointer items-center justify-between text-xs font-semibold text-slate-400 hover:text-white select-none">
+                  <div className="flex items-center gap-2">
+                    <Video className="h-4 w-4 text-slate-500" />
+                    <span>Optional Fallback: Direct MP4 / WebM File Upload</span>
+                  </div>
+                  <span className="text-[11px] text-slate-500 group-open:rotate-180 transition-transform">
+                    ▼
+                  </span>
+                </summary>
+                <div className="pt-4 space-y-3">
+                  <MediaUrlInput
+                    label="Direct Video URL or Upload to Cloudflare R2"
+                    fieldName="video_url"
+                    value={isInstagramUrl(form.video_url) ? '' : form.video_url}
+                    onChange={(val) => handleVideoUrlChange(val)}
+                    accept="video/mp4,video/webm,video/quicktime"
+                    placeholder="Upload MP4 or paste direct video URL"
+                    helperText="Use this only if you want to upload a raw MP4 file directly instead of pasting an Instagram link."
+                    videoUploadPurpose="reel-video"
+                    showPreview={false}
+                  />
+                </div>
+              </details>
+
               {/* Title & Description */}
               <div className="space-y-4">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-300">
-                    Reel Title <span className="text-rose-500">*</span>
-                  </label>
+                  <div className="flex items-center justify-between">
+                    <label className="block text-xs font-semibold text-slate-300">
+                      Reel Title {!isInstagramUrl(form.video_url) && <span className="text-rose-500">*</span>}
+                    </label>
+                    {isInstagramUrl(form.video_url) && (
+                      <span className="text-[11px] text-pink-400 font-medium">
+                        Optional &bull; Auto-generated from Instagram Reel
+                      </span>
+                    )}
+                  </div>
                   <input
                     type="text"
-                    required
+                    required={!isInstagramUrl(form.video_url)}
                     value={form.title}
                     onChange={(e) => setForm((prev) => ({ ...prev, title: e.target.value }))}
-                    placeholder="e.g. Cinematic Teal & Orange Color Grade"
+                    placeholder={
+                      isInstagramUrl(form.video_url)
+                        ? `Auto: Instagram Reel · ${getInstagramShortcode(form.video_url) || ''}`
+                        : 'e.g. Cinematic Teal & Orange Color Grade'
+                    }
                     className="mt-1.5 w-full rounded-xl border border-slate-700 bg-slate-950 px-3.5 py-2.5 text-sm text-white placeholder-slate-500 focus:border-violet-500 focus:outline-none"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-300">
-                    Caption / Description & Hashtags
-                  </label>
+                  <div className="flex items-center justify-between">
+                    <label className="block text-xs font-semibold text-slate-300">
+                      Caption / Description & Hashtags
+                    </label>
+                    {isInstagramUrl(form.video_url) && (
+                      <span className="text-[11px] text-slate-400">
+                        Optional &bull; Displayed automatically in official embed
+                      </span>
+                    )}
+                  </div>
                   <textarea
                     rows={3}
                     value={form.description}
                     onChange={(e) => setForm((prev) => ({ ...prev, description: e.target.value }))}
-                    placeholder="Shot on Sony FX3 in S-Log3. Graded using Pranvith LUTs. #cinematography #slog3 #reels"
+                    placeholder={
+                      isInstagramUrl(form.video_url)
+                        ? 'Optional custom caption. Leave blank to display official Instagram caption.'
+                        : 'Shot on Sony FX3 in S-Log3. Graded using Pranvith LUTs. #cinematography #slog3 #reels'
+                    }
                     className="mt-1.5 w-full rounded-xl border border-slate-700 bg-slate-950 px-3.5 py-2.5 text-sm text-white placeholder-slate-500 focus:border-violet-500 focus:outline-none"
                   />
                 </div>
@@ -712,7 +820,7 @@ const Reels = () => {
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
                   <label className="text-xs font-semibold text-slate-300">
-                    Poster / Thumbnail Image (Optional)
+                    Poster / Cover Image (Optional)
                   </label>
                   {isInstagramUrl(form.video_url) && (
                     <button
@@ -733,7 +841,7 @@ const Reels = () => {
                   onChange={(val) => setForm((prev) => ({ ...prev, thumbnail_url: val }))}
                   accept="image/*"
                   placeholder="Upload or paste image thumbnail URL"
-                  helperText="Poster image displayed while video is loading or paused. For Instagram Reels, this is auto-resolved from the official embed."
+                  helperText="Cover image displayed while reel is loading or paused. For Instagram Reels, this is auto-resolved from the official embed."
                 />
               </div>
 
@@ -967,7 +1075,7 @@ const Reels = () => {
                   ) : (
                     <Save className="h-4 w-4" />
                   )}
-                  {editingId ? 'Save Changes' : 'Publish Reel'}
+                  {editingId ? 'Save Changes' : 'Save Reel'}
                 </button>
               </div>
             </form>
