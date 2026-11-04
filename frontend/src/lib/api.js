@@ -553,6 +553,13 @@ export const deleteAdminPaymentAttempt = async (attemptId) => {
   return data;
 };
 
+export const syncAdminPaymentAttempts = async (attemptId = null) => {
+  const { data } = await adminApi.post('/admin/payments/payment-attempts/sync-razorpay', {
+    attempt_id: attemptId,
+  });
+  return data;
+};
+
 export const fetchAdminCustomers = async () => {
   const { data } = await adminApi.get('/admin/customers');
   return data;

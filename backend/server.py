@@ -4344,6 +4344,74 @@ async def admin_report_payments_excel(
 
 
 
+
+class SyncPaymentAttemptsIn(BaseModel):
+    attempt_id: Optional[str] = None
+
+
+@admin_router.post("/payments/payment-attempts/sync-razorpay")
+async def admin_sync_payment_attempts_razorpay(
+    payload: Optional[SyncPaymentAttemptsIn] = None,
+    current_admin: AdminBase = Depends(get_current_active_admin),
+):
+    if db is None:
+        raise HTTPException(status_code=500, detail="Database not configured")
+    if not RAZORPAY_KEY_ID or not RAZORPAY_KEY_SECRET or razorpay_client is None:
+        raise HTTPException(status_code=400, detail=RAZORPAY_AUTH_ERROR_MESSAGE)
+
+    filter_query = {}
+    if payload and payload.attempt_id:
+        filter_query = {"$or": [{"id": payload.attempt_id}, {"razorpay_order_id": payload.attempt_id}]}
+    else:
+        filter_query = {
+            "razorpay_order_id": {"$exists": True, "$nin": [None, ""]},
+            "$or": [
+                {"payment_status": "pending"},
+                {"status": "pending"},
+            ],
+        }
+
+    attempts = await db.payment_attempts.find(filter_query).to_list(100)
+    updated_paid = 0
+    updated_failed = 0
+    unchanged = 0
+    results = []
+
+    for attempt in attempts:
+        order_id = attempt.get("razorpay_order_id") or attempt.get("id")
+        try:
+            sync_res = await _sync_order_with_razorpay(attempt, send_email=True)
+            if sync_res.get("verified_paid"):
+                updated_paid += 1
+            elif sync_res.get("local_status") in ("failed", "cancelled", "expired"):
+                updated_failed += 1
+            else:
+                unchanged += 1
+            results.append({
+                "id": attempt.get("id"),
+                "order_id": order_id,
+                "verified_paid": bool(sync_res.get("verified_paid")),
+                "status": sync_res.get("local_status"),
+                "reason": sync_res.get("reason"),
+            })
+        except Exception as exc:
+            logger.exception("Failed to sync attempt %s with Razorpay", order_id)
+            results.append({
+                "id": attempt.get("id"),
+                "order_id": order_id,
+                "error": str(exc),
+            })
+
+    return {
+        "success": True,
+        "total": len(attempts),
+        "updated_paid": updated_paid,
+        "updated_failed": updated_failed,
+        "unchanged": unchanged,
+        "results": results,
+    }
+
+
 class ArchivePaymentAttemptsIn(BaseModel):
     days: Optional[int] = 0
 
@@ -4600,7 +4668,7 @@ async def admin_recheck_razorpay_payments(current_admin: AdminBase = Depends(get
         )
 
     try:
-        rows = await db.orders.find(
+        order_rows = await db.orders.find(
             {
                 "$or": [
                     {"razorpay_order_id": {"$exists": True, "$nin": [None, ""]}},
@@ -4609,6 +4677,17 @@ async def admin_recheck_razorpay_payments(current_admin: AdminBase = Depends(get
             },
             {"_id": 0},
         ).sort([("created_at", -1)]).to_list(500)
+
+        attempt_rows = await db.payment_attempts.find(
+            {
+                "razorpay_order_id": {"$exists": True, "$nin": [None, ""]},
+                "$or": [{"payment_status": "pending"}, {"status": "pending"}],
+            },
+            {"_id": 0},
+        ).to_list(100)
+
+        known_order_ids = {r.get("razorpay_order_id") for r in order_rows if r.get("razorpay_order_id")}
+        rows = order_rows + [a for a in attempt_rows if a.get("razorpay_order_id") not in known_order_ids]
     except Exception as exc:
         safe_detail = mongodb_public_error(exc)
         logger.exception("Bulk Razorpay recheck order load failed error=%s", safe_detail)
