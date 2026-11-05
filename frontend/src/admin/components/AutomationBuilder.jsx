@@ -23,13 +23,13 @@ import {
   MoreVertical,
   Flame,
   ExternalLink,
-  ChevronRight,
   Headphones,
   CheckCircle2,
   Coins,
   Send,
-  MessageSquare,
-  Plus
+  Plus,
+  Maximize2,
+  Link as LinkIcon
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -37,10 +37,88 @@ import {
   createAdminHybridAutomation,
   deleteAdminHybridAutomation,
   duplicateAdminHybridAutomation,
-  testAdminHybridAutomation,
   formatApiErrorDetail
 } from '../../lib/api';
 import superprofileSeedList from '../data/superprofile_automations.json';
+
+// 9 Pranvith Reels extracted directly from the video (frame 005)
+export const PRANVITH_REELS_SELECTION = [
+  {
+    id: 'reel_01',
+    title: 'Under 1 lakhs best camera for beginners #photography #sony #nikon #camera #canon',
+    caption: 'Under 1 lakhs best camera for beginners #photography #sony #nikon #camera #canon',
+    url: 'https://www.instagram.com/reel/DfTekPtNTe5/',
+    thumbnail: '/assets/reels/reel_01.jpg'
+  },
+  {
+    id: 'reel_02',
+    title: 'Small Steps Big Dreams — Complete Camera Rig Breakdown',
+    caption: 'Small Steps Big Dreams — Complete Camera Rig Breakdown #cinematography #rig',
+    url: 'https://www.instagram.com/reel/DfJJtArtezd/',
+    thumbnail: '/assets/reels/reel_02.jpg'
+  },
+  {
+    id: 'reel_03',
+    title: 'NIKON Z50 II vs SONY ZV-E10 II — Which one to buy in 2026?',
+    caption: 'NIKON Z50 II vs SONY ZV-E10 II — Which one to buy in 2026? #nikon #sony',
+    url: 'https://www.instagram.com/reel/DfGkPPLt99R/',
+    thumbnail: '/assets/reels/reel_03.jpg'
+  },
+  {
+    id: 'reel_04',
+    title: 'Best Low Light Wedding Cinema Settings',
+    caption: 'Best Low Light Wedding Cinema Settings #wedding #sony #cinematic',
+    url: 'https://www.instagram.com/reel/DeYOjcENiWE/',
+    thumbnail: '/assets/reels/reel_04.jpg'
+  },
+  {
+    id: 'reel_05',
+    title: 'Sony FX3 Hands-on Review & Exposure Guide',
+    caption: 'Sony FX3 Hands-on Review & Exposure Guide #fx3 #sony #filmmaking',
+    url: 'https://www.instagram.com/reel/DeVp0J6tgmU/',
+    thumbnail: '/assets/reels/reel_05.jpg'
+  },
+  {
+    id: 'reel_06',
+    title: '85mm F/1.4 Portrait Masterclass & Depth of Field',
+    caption: '85mm F/1.4 Portrait Masterclass & Depth of Field #portrait #lens',
+    url: 'https://www.instagram.com/reel/DdNjeLczi02/',
+    thumbnail: '/assets/reels/reel_06.jpg'
+  },
+  {
+    id: 'reel_07',
+    title: 'How to Grade S-Log3 in 3 Simple Steps',
+    caption: 'How to Grade S-Log3 in 3 Simple Steps #colorgrading #lut #davinci',
+    url: 'https://www.instagram.com/reel/DeABC123xyz/',
+    thumbnail: '/assets/reels/reel_07.jpg'
+  },
+  {
+    id: 'reel_08',
+    title: 'Cinematography Lighting for Beginners: 3 Point Setup',
+    caption: 'Cinematography Lighting for Beginners: 3 Point Setup #lighting #setup',
+    url: 'https://www.instagram.com/reel/DeDEF456uvw/',
+    thumbnail: '/assets/reels/reel_08.jpg'
+  },
+  {
+    id: 'reel_09',
+    title: 'Behind the Scenes — Commercial Shoot with Production Crew',
+    caption: 'Behind the Scenes — Commercial Shoot with Production Crew #bts #production',
+    url: 'https://www.instagram.com/reel/DeGHI789rst/',
+    thumbnail: '/assets/reels/reel_09.jpg'
+  }
+];
+
+// Pranvith DOP Assets Quick Picker (from pranvithdop.com/assets in frame 023)
+export const PRANVITH_ASSETS_QUICK_LINKS = [
+  { name: 'Nikon Z6II Skin Tone Settings (Free)', url: 'https://pranvithdop.com/assets/nikon-z6ii-skin-tone' },
+  { name: 'Nikon Z6II Photos Full Settings (Free)', url: 'https://pranvithdop.com/assets/nikon-z6ii-photos' },
+  { name: 'Sony FX3 S-Cinetone Settings (Free)', url: 'https://pranvithdop.com/assets/sony-fx3-scinetone' },
+  { name: 'Sony FX3 S-Log3 Settings (Free)', url: 'https://pranvithdop.com/assets/sony-fx3-slog3' },
+  { name: 'iPhone 17 Pro Max Settings Guide (Free)', url: 'https://pranvithdop.com/assets/iphone-17-promax' },
+  { name: 'Sony A7M5 Wedding Settings Guide (Free)', url: 'https://pranvithdop.com/assets/sony-a7m5-wedding' },
+  { name: 'Creative LUT Pack (₹49)', url: 'https://pranvithdop.com/assets/creative-lut-pack' },
+  { name: 'Cinematic Sound FX Pack (₹149)', url: 'https://pranvithdop.com/assets/cinematic-sound-fx' }
+];
 
 const DEFAULT_SEED_AUTOMATION = {
   name: 'Sony Camera Settings',
@@ -49,9 +127,10 @@ const DEFAULT_SEED_AUTOMATION = {
   platformUrls: { youtube: '', facebook: '', instagram: 'https://www.instagram.com/reel/DfTekPtNTe5/' },
   videoTitle: 'Under 1 lakhs best camera for beginners #photography #sony #nikon #camera #canon',
   videoCaption: 'Under 1 lakhs best camera for beginners #photography #sony #nikon #camera #canon',
-  thumbnailUrl: '/assets/superprofile-sample-thumb.jpg',
+  thumbnailUrl: '/assets/reels/reel_01.jpg',
+  selectedReelId: 'reel_01',
   triggerType: 'any_comment',
-  targetPostType: 'any_post', // 'specific_post', 'any_post', 'next_post'
+  targetPostType: 'specific_post', // 'specific_post', 'any_post', 'next_post'
   keywords: ['SETTINGS', 'LINK', 'PRICE'],
   triggerDelayMinutes: 1,
   triggerDelaySeconds: 30,
@@ -59,7 +138,7 @@ const DEFAULT_SEED_AUTOMATION = {
   replyMessage: 'Thanks! Please see DMs.',
   replyVariations: [
     'Thanks! Please see DMs.',
-    'Sent you a message! Check it out!',
+    'Message sent! Take a look.',
     'Nice! Check your DMs!'
   ],
   requireFollow: true,
@@ -68,12 +147,13 @@ const DEFAULT_SEED_AUTOMATION = {
   followButtonLabel: 'Visit Profile',
   followConfirmLabel: "I'm following ✅",
   primaryDmType: 'Text + Button',
-  primaryDmMessage: "Hi there!\nAppreciate your comment 🙌 As promised, here's the link for you ⬇️",
-  primaryDmButtonLabel: 'Click me',
-  buttonTapAction: 'send_dm', // 'send_dm', 'open_url'
+  primaryDmMessage: "Hi! Appreciate the interaction 🙌 Here's the link as promised ⬇️",
+  primaryDmButtonLabel: 'Click me for link',
+  buttonTapAction: 'open_url', // 'open_url', 'send_dm'
+  buttonActionUrl: 'https://pranvithdop.com/assets/nikon-z6ii-skin-tone',
   resourceDmType: 'Text',
   resourceMessage: "1. Nikon z50ii\nhttps://link.amazon/B08V0k2KI\n2. Sony zv-e10ii\nhttps://link.amazon/B07ZQ5bfd\n3. Sony a6400\nhttps://link.amazon/B04SfYq6K\n4. Canon Eos r10\nhttps://link.amazon/B03DhzQmC\n5. Canon r50v\nhttps://link.amazon/B06J4al3o",
-  resourceUrl: '',
+  resourceUrl: 'https://pranvithdop.com/assets/nikon-z6ii-skin-tone',
   trackButtonClicks: true,
   aiFallback: true,
   enabled: true,
@@ -87,35 +167,28 @@ export default function AutomationBuilder() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [activeTab, setActiveTab] = useState('automations'); // 'automations', 'must_haves', 'settings'
-  const [sortBy, setSortBy] = useState('runs'); // 'runs', 'followers', 'clicks', 'date'
+  const [activeTab, setActiveTab] = useState('automations');
+  const [sortBy, setSortBy] = useState('runs');
   const [sortAsc, setSortAsc] = useState(false);
   const [bannerDismissed, setBannerDismissed] = useState(false);
 
-  // Creation Wizard Modal State (Steps 1, 2, 3, Launch Review)
-  const [showCreateWizard, setShowCreateWizard] = useState(false);
-  const [wizardStep, setWizardStep] = useState(1); // 1, 2, 3, 4 (Review)
-
-  // Edit Modal State (Direct SuperProfile Flow)
+  // Main Edit Modal (View with Live Preview & Steps)
   const [showEditorModal, setShowEditorModal] = useState(false);
   const [activeRowMenu, setActiveRowMenu] = useState(null);
 
-  // Form Data for Current Automation
+  // Dedicated Step Editor Sub-Modals (Triggered by Pencil Icons)
+  // 'step1_picker', 'step2_trigger', 'step3_follow', 'step4_reply', 'step5_dm', 'step6_resource'
+  const [activeStepModal, setActiveStepModal] = useState(null);
+
+  // Creation Wizard Modal (Steps 1, 2, 3, Launch Review)
+  const [showCreateWizard, setShowCreateWizard] = useState(false);
+  const [wizardStep, setWizardStep] = useState(1);
+
+  // Active Automation Form Data
   const [formData, setFormData] = useState({ ...DEFAULT_SEED_AUTOMATION });
   const [keywordInput, setKeywordInput] = useState('');
 
-  // Expandable steps inside the Edit modal
-  const [expandedSteps, setExpandedSteps] = useState({
-    step1: false,
-    step2: false,
-    step3: false,
-    step4: false,
-    step5: false,
-    step6: false,
-    step7: false
-  });
-
-  // Load Automations (Merge DB automations with SuperProfile 30 imported list)
+  // Load Automations
   const loadAutomations = async () => {
     setLoading(true);
     try {
@@ -134,7 +207,7 @@ export default function AutomationBuilder() {
               run_count: dbItem.run_count || 0,
               click_count: dbItem.click_count || 0,
               status: dbItem.status || 'Enabled',
-              thumbnail: dbItem.thumbnailUrl || '/assets/superprofile-sample-thumb.jpg'
+              thumbnail: dbItem.thumbnailUrl || '/assets/reels/reel_01.jpg'
             });
           }
         });
@@ -152,10 +225,6 @@ export default function AutomationBuilder() {
   useEffect(() => {
     loadAutomations();
   }, []);
-
-  const toggleStepExpand = (stepKey) => {
-    setExpandedSteps((prev) => ({ ...prev, [stepKey]: !prev[stepKey] }));
-  };
 
   const addKeyword = () => {
     const clean = (keywordInput || '').trim().toUpperCase();
@@ -189,26 +258,37 @@ export default function AutomationBuilder() {
       ...auto,
       name: auto.name || 'Sony Camera Settings',
       videoCaption: auto.videoCaption || auto.name || DEFAULT_SEED_AUTOMATION.videoCaption,
-      thumbnailUrl: auto.thumbnail || auto.thumbnailUrl || '/assets/superprofile-sample-thumb.jpg'
+      thumbnailUrl: auto.thumbnail || auto.thumbnailUrl || '/assets/reels/reel_01.jpg',
+      selectedReelId: auto.selectedReelId || 'reel_01'
     });
     setActiveRowMenu(null);
     setShowEditorModal(true);
   };
 
-  const handleSaveAutomation = async () => {
+  const handleSelectReelInGrid = (reel) => {
+    setFormData({
+      ...formData,
+      selectedReelId: reel.id,
+      videoCaption: reel.caption,
+      videoTitle: reel.title,
+      videoUrl: reel.url,
+      thumbnailUrl: reel.thumbnail
+    });
+  };
+
+  const handleStepSave = async () => {
     setSaving(true);
     try {
       const payload = {
         ...formData,
         safeTestingMode: true,
         status: 'draft',
-        enabled: false // Safety requirement: keep draft / preview
+        enabled: formData.enabled
       };
       await createAdminHybridAutomation(payload);
-      toast.success('AutoDM draft saved successfully.');
+      toast.success('AutoDM Updated!');
       await loadAutomations();
-      setShowCreateWizard(false);
-      setShowEditorModal(false);
+      setActiveStepModal(null);
     } catch (err) {
       const msg = formatApiErrorDetail(err?.response?.data?.detail) || err.message;
       toast.error(`Save failed: ${msg}`);
@@ -268,7 +348,7 @@ export default function AutomationBuilder() {
     <div className="space-y-6 max-w-7xl mx-auto pb-12 font-sans">
       
       {/* ============================================================== */}
-      {/* 1. TOP HEADER (MATCHING VIDEO FRAME 001)                       */}
+      {/* 1. TOP HEADER (MATCHING VIDEO 2 FRAME 001)                     */}
       {/* ============================================================== */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pt-1">
         <div className="flex items-center gap-3">
@@ -295,7 +375,7 @@ export default function AutomationBuilder() {
             </button>
           </div>
 
-          {/* + Create Automation Button (Blue, matching video) */}
+          {/* + Create Automation Button */}
           <button
             type="button"
             onClick={handleOpenCreateWizard}
@@ -308,7 +388,7 @@ export default function AutomationBuilder() {
       </div>
 
       {/* ============================================================== */}
-      {/* 2. REFERRAL BANNER (MATCHING VIDEO FRAME 001 / 025)            */}
+      {/* 2. REFERRAL BANNER (MATCHING VIDEO 2 FRAME 001)                */}
       {/* ============================================================== */}
       {!bannerDismissed && (
         <div className="relative rounded-2xl overflow-hidden border border-blue-500/25 bg-gradient-to-r from-blue-950/40 via-neutral-900/90 to-blue-900/30 p-6 shadow-xl">
@@ -330,7 +410,7 @@ export default function AutomationBuilder() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => toast.info('SuperProfile Referral Program (Preview).')}
+                  onClick={() => toast.info('SuperProfile Referral Program.')}
                   className="px-4 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow-md transition-colors flex items-center gap-1"
                 >
                   Learn more →
@@ -338,7 +418,7 @@ export default function AutomationBuilder() {
               </div>
             </div>
 
-            {/* Right Graphic: 3D Coins + ₹52,921+ Payouts Card */}
+            {/* Right Graphic: ₹52,921+ Payouts Card */}
             <div className="flex items-center gap-4 bg-neutral-950/60 border border-white/10 rounded-2xl p-4 self-start lg:self-center shadow-inner">
               <div className="w-12 h-12 rounded-2xl bg-blue-600/20 border border-blue-500/30 flex items-center justify-center text-blue-400">
                 <Coins className="w-6 h-6" />
@@ -357,7 +437,7 @@ export default function AutomationBuilder() {
       )}
 
       {/* ============================================================== */}
-      {/* 3. NAVIGATION TABS (MATCHING VIDEO FRAME 001)                   */}
+      {/* 3. NAVIGATION TABS                                             */}
       {/* ============================================================== */}
       <div className="flex items-center justify-between border-b border-white/10 pb-3">
         <div className="flex items-center gap-2 text-xs font-semibold">
@@ -398,7 +478,7 @@ export default function AutomationBuilder() {
 
         <button
           type="button"
-          onClick={() => toast.info('SuperProfile Help Center & Direct Support.')}
+          onClick={() => toast.info('SuperProfile Help & Support.')}
           className="text-xs text-neutral-400 hover:text-white flex items-center gap-1.5"
         >
           <Headphones className="w-3.5 h-3.5" />
@@ -407,45 +487,31 @@ export default function AutomationBuilder() {
       </div>
 
       {/* ============================================================== */}
-      {/* 4. THREE METRIC KPI CARDS (MATCHING VIDEO FRAME 001)           */}
+      {/* 4. THREE METRIC KPI CARDS                                      */}
       {/* ============================================================== */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {/* Card 1: DM's SENT */}
+        {/* DM's SENT */}
         <div className="rounded-2xl border border-white/10 bg-neutral-900/60 p-5 space-y-3 relative overflow-hidden">
-          <div className="flex items-center justify-between text-xs text-neutral-400">
-            <span className="font-semibold uppercase tracking-wider text-[11px] flex items-center gap-1">
-              DM's SENT ⓘ
-            </span>
-          </div>
+          <span className="font-semibold uppercase tracking-wider text-[11px] text-neutral-400 block">
+            DM's SENT ⓘ
+          </span>
           <div className="text-3xl font-extrabold text-white tracking-tight">2.31K</div>
-          {/* Wave chart graphic (green) */}
           <div className="h-10 w-full pt-1">
-            <svg viewBox="0 0 100 25" className="w-full h-full preserve-3d" preserveAspectRatio="none">
-              <path
-                d="M0,20 Q20,18 35,12 T70,8 T100,15 L100,25 L0,25 Z"
-                fill="rgba(16, 185, 129, 0.15)"
-              />
-              <path
-                d="M0,20 Q20,18 35,12 T70,8 T100,15"
-                fill="none"
-                stroke="#10b981"
-                strokeWidth="2"
-              />
+            <svg viewBox="0 0 100 25" className="w-full h-full" preserveAspectRatio="none">
+              <path d="M0,20 Q20,18 35,12 T70,8 T100,15 L100,25 L0,25 Z" fill="rgba(16, 185, 129, 0.15)" />
+              <path d="M0,20 Q20,18 35,12 T70,8 T100,15" fill="none" stroke="#10b981" strokeWidth="2" />
             </svg>
           </div>
         </div>
 
-        {/* Card 2: EMAILS COLLECTED */}
+        {/* EMAILS COLLECTED */}
         <div className="rounded-2xl border border-white/10 bg-neutral-900/60 p-5 space-y-3 relative overflow-hidden">
-          <div className="flex items-center justify-between text-xs text-neutral-400">
-            <span className="font-semibold uppercase tracking-wider text-[11px] flex items-center gap-1">
-              EMAILS COLLECTED ⓘ
-            </span>
-          </div>
+          <span className="font-semibold uppercase tracking-wider text-[11px] text-neutral-400 block">
+            EMAILS COLLECTED ⓘ
+          </span>
           <div className="text-3xl font-extrabold text-white tracking-tight flex items-baseline gap-1.5">
             0 <span className="text-sm font-normal text-neutral-500">↗</span>
           </div>
-          {/* Flat line graphic */}
           <div className="h-10 w-full pt-1">
             <svg viewBox="0 0 100 25" className="w-full h-full" preserveAspectRatio="none">
               <path d="M0,20 L100,20" fill="none" stroke="#10b981" strokeWidth="1.5" strokeDasharray="3 3" />
@@ -453,37 +519,25 @@ export default function AutomationBuilder() {
           </div>
         </div>
 
-        {/* Card 3: FOLLOWERS GAINED */}
+        {/* FOLLOWERS GAINED */}
         <div className="rounded-2xl border border-white/10 bg-neutral-900/60 p-5 space-y-3 relative overflow-hidden">
-          <div className="flex items-center justify-between text-xs text-neutral-400">
-            <span className="font-semibold uppercase tracking-wider text-[11px] flex items-center gap-1">
-              FOLLOWERS GAINED ⓘ
-            </span>
-          </div>
+          <span className="font-semibold uppercase tracking-wider text-[11px] text-neutral-400 block">
+            FOLLOWERS GAINED ⓘ
+          </span>
           <div className="text-3xl font-extrabold text-white tracking-tight">1.72K</div>
-          {/* Wave chart graphic (green) */}
           <div className="h-10 w-full pt-1">
             <svg viewBox="0 0 100 25" className="w-full h-full" preserveAspectRatio="none">
-              <path
-                d="M0,22 Q30,20 50,10 T85,14 T100,18 L100,25 L0,25 Z"
-                fill="rgba(16, 185, 129, 0.15)"
-              />
-              <path
-                d="M0,22 Q30,20 50,10 T85,14 T100,18"
-                fill="none"
-                stroke="#10b981"
-                strokeWidth="2"
-              />
+              <path d="M0,22 Q30,20 50,10 T85,14 T100,18 L100,25 L0,25 Z" fill="rgba(16, 185, 129, 0.15)" />
+              <path d="M0,22 Q30,20 50,10 T85,14 T100,18" fill="none" stroke="#10b981" strokeWidth="2" />
             </svg>
           </div>
         </div>
       </div>
 
       {/* ============================================================== */}
-      {/* 5. SEARCH & TABLE CONTROLS BAR (MATCHING VIDEO FRAME 001)       */}
+      {/* 5. SEARCH & TABLE CONTROLS BAR                                 */}
       {/* ============================================================== */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pt-2">
-        {/* Search input with magnifying glass */}
         <div className="relative flex-1 max-w-md">
           <Search className="w-4 h-4 text-neutral-400 absolute left-3.5 top-2.5" />
           <input
@@ -495,7 +549,6 @@ export default function AutomationBuilder() {
           />
         </div>
 
-        {/* Right Action Buttons: Sort, Filter, Export */}
         <div className="flex items-center gap-2">
           <button
             type="button"
@@ -533,7 +586,7 @@ export default function AutomationBuilder() {
       </div>
 
       {/* ============================================================== */}
-      {/* 6. AUTOMATIONS TABLE (MATCHING VIDEO FRAME 001 & 025)          */}
+      {/* 6. AUTOMATIONS TABLE (30 ITEMS)                                */}
       {/* ============================================================== */}
       <div className="rounded-2xl border border-white/10 bg-neutral-900/60 overflow-hidden shadow-xl">
         <div className="overflow-x-auto">
@@ -559,7 +612,7 @@ export default function AutomationBuilder() {
               ) : filteredList.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="py-12 text-center text-xs text-neutral-400">
-                    No automations found. Click "+ Create Automation" to get started.
+                    No automations found.
                   </td>
                 </tr>
               ) : (
@@ -569,11 +622,10 @@ export default function AutomationBuilder() {
                     onClick={() => handleOpenEditModal(row)}
                     className="hover:bg-white/[0.02] cursor-pointer transition-colors group"
                   >
-                    {/* Automation column (Thumbnail + Name + Subtitle) */}
                     <td className="py-3.5 px-5">
                       <div className="flex items-center gap-3">
                         <img
-                          src={row.thumbnail || '/assets/superprofile-sample-thumb.jpg'}
+                          src={row.thumbnail || '/assets/reels/reel_01.jpg'}
                           alt="Thumbnail"
                           className="w-10 h-10 rounded-xl object-cover shrink-0 border border-white/10 shadow-sm"
                           onError={(e) => {
@@ -596,7 +648,6 @@ export default function AutomationBuilder() {
                       </div>
                     </td>
 
-                    {/* Followers Gained */}
                     <td className="py-3.5 px-4 text-center">
                       <div className="inline-flex items-center gap-1 text-xs font-semibold text-neutral-200">
                         <Flame className="w-3.5 h-3.5 text-orange-400" />
@@ -604,24 +655,20 @@ export default function AutomationBuilder() {
                       </div>
                     </td>
 
-                    {/* Runs */}
                     <td className="py-3.5 px-4 text-center font-semibold text-white">
                       {row.run_count || 0}
                     </td>
 
-                    {/* Button Clicks */}
                     <td className="py-3.5 px-4 text-center text-neutral-300">
                       {row.click_count || 0}
                     </td>
 
-                    {/* Status */}
                     <td className="py-3.5 px-4 text-center">
                       <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
                         {row.status || 'Enabled'}
                       </span>
                     </td>
 
-                    {/* Actions Menu */}
                     <td
                       className="py-3.5 px-4 text-right relative"
                       onClick={(e) => e.stopPropagation()}
@@ -669,507 +716,7 @@ export default function AutomationBuilder() {
       </div>
 
       {/* ============================================================== */}
-      {/* 7. STEP-BY-STEP "+ CREATE AUTOMATION" WIZARD (FRAMES 003-024)   */}
-      {/* ============================================================== */}
-      {showCreateWizard && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-md overflow-y-auto">
-          <div className="w-full max-w-lg rounded-3xl border border-white/10 bg-neutral-900 shadow-2xl overflow-hidden flex flex-col my-6 max-h-[92vh]">
-            
-            {/* Header */}
-            <div className="flex items-center justify-between border-b border-white/10 px-6 py-4 bg-neutral-900 sticky top-0 z-10">
-              <div className="flex items-center gap-2 text-sm font-bold text-white">
-                <span className="w-2 h-2 rounded-full bg-emerald-400" />
-                {wizardStep === 4 ? 'Launch AutoDM' : 'When someone comments on your Post/Reel'}
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowCreateWizard(false)}
-                className="w-8 h-8 rounded-full flex items-center justify-center text-neutral-400 hover:text-white hover:bg-white/10"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* Scrollable Wizard Body */}
-            <div className="p-6 overflow-y-auto space-y-6">
-
-              {/* Creator Instagram Profile Header (Steps 1, 2, 3) */}
-              {wizardStep <= 3 && (
-                <div className="text-center space-y-1">
-                  <div className="w-14 h-14 rounded-full bg-gradient-to-tr from-pink-500 via-purple-500 to-amber-500 p-0.5 mx-auto">
-                    <img
-                      src="/assets/superprofile-sample-thumb.jpg"
-                      alt="Profile"
-                      className="w-full h-full rounded-full object-cover border-2 border-neutral-900"
-                    />
-                  </div>
-                  <h3 className="text-xs font-bold text-white">pranvith_dop</h3>
-                  <button type="button" className="text-[11px] text-blue-400 hover:underline">
-                    Add another account
-                  </button>
-                </div>
-              )}
-
-              {/* -------------------------------------------------------- */}
-              {/* WIZARD STEP 1: TARGET POST SELECTION (FRAMES 003, 004)   */}
-              {/* -------------------------------------------------------- */}
-              {wizardStep === 1 && (
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-xs font-semibold text-neutral-300 mb-2">
-                      The Comment is on...
-                    </label>
-                    <div className="grid grid-cols-3 gap-2">
-                      {[
-                        { id: 'specific_post', label: 'Specific Post/Reel' },
-                        { id: 'any_post', label: 'Any Post/Reel' },
-                        { id: 'next_post', label: 'Next Post/Reel' }
-                      ].map((item) => (
-                        <button
-                          key={item.id}
-                          type="button"
-                          onClick={() => setFormData({ ...formData, targetPostType: item.id })}
-                          className={`py-2 px-2.5 rounded-2xl border text-xs font-semibold transition-all text-center ${
-                            formData.targetPostType === item.id
-                              ? 'bg-blue-600 text-white border-blue-500 shadow-md'
-                              : 'bg-neutral-950 text-neutral-300 border-white/10 hover:text-white'
-                          }`}
-                        >
-                          {item.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Informational Blue Card */}
-                  <div className="p-4 rounded-2xl bg-blue-500/10 border border-blue-500/20 flex items-start gap-3">
-                    <CheckCircle2 className="w-5 h-5 text-blue-400 shrink-0 mt-0.5" />
-                    <p className="text-xs text-blue-200 leading-relaxed">
-                      {formData.targetPostType === 'any_post'
-                        ? 'The automation will trigger when a comment is posted on any of your Posts & Reels'
-                        : formData.targetPostType === 'specific_post'
-                        ? 'The automation will trigger only on the specific post or reel chosen.'
-                        : 'The automation will trigger automatically on your very next uploaded reel/post.'}
-                    </p>
-                  </div>
-
-                  {formData.targetPostType === 'specific_post' && (
-                    <div className="space-y-1.5 pt-1">
-                      <label className="text-xs text-neutral-400">Post / Reel URL</label>
-                      <input
-                        type="text"
-                        value={formData.videoUrl}
-                        onChange={(e) => setFormData({ ...formData, videoUrl: e.target.value })}
-                        placeholder="https://www.instagram.com/reel/DfTekPtNTe5/"
-                        className="w-full px-3 py-2 rounded-xl bg-neutral-950 border border-white/10 text-xs text-white font-mono"
-                      />
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* -------------------------------------------------------- */}
-              {/* WIZARD STEP 2: TRIGGER & COMMENT REPLIES (FRAMES 006-008) */}
-              {/* -------------------------------------------------------- */}
-              {wizardStep === 2 && (
-                <div className="space-y-5">
-                  <div>
-                    <label className="block text-xs font-semibold text-neutral-300 mb-2">
-                      What kind of comment should trigger this automation?
-                    </label>
-                    <div className="grid grid-cols-2 gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setFormData({ ...formData, triggerType: 'keyword' })}
-                        className={`py-2 px-3 rounded-2xl border text-xs font-semibold transition-all ${
-                          formData.triggerType === 'keyword'
-                            ? 'bg-blue-600 text-white border-blue-500 shadow-md'
-                            : 'bg-neutral-950 text-neutral-300 border-white/10 hover:text-white'
-                        }`}
-                      >
-                        Specific keyword
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setFormData({ ...formData, triggerType: 'any_comment' })}
-                        className={`py-2 px-3 rounded-2xl border text-xs font-semibold transition-all ${
-                          formData.triggerType === 'any_comment'
-                            ? 'bg-blue-600 text-white border-blue-500 shadow-md'
-                            : 'bg-neutral-950 text-neutral-300 border-white/10 hover:text-white'
-                        }`}
-                      >
-                        Any comment
-                      </button>
-                    </div>
-                  </div>
-
-                  {formData.triggerType === 'keyword' ? (
-                    <div className="space-y-3">
-                      <div>
-                        <label className="block text-xs text-neutral-400 mb-1">Should include any of these:</label>
-                        <div className="flex gap-2">
-                          <input
-                            type="text"
-                            value={keywordInput}
-                            onChange={(e) => setKeywordInput(e.target.value)}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter') {
-                                e.preventDefault();
-                                addKeyword();
-                              }
-                            }}
-                            placeholder="Type a keyword (min. 1 characters)"
-                            className="flex-1 px-3 py-2 rounded-xl bg-neutral-950 border border-white/10 text-xs text-white"
-                          />
-                          <button
-                            type="button"
-                            onClick={addKeyword}
-                            className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-xs font-semibold text-white"
-                          >
-                            + Add
-                          </button>
-                        </div>
-                      </div>
-
-                      <div className="flex flex-wrap gap-1.5">
-                        {(formData.keywords || []).map((kw) => (
-                          <span
-                            key={kw}
-                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-blue-500/15 border border-blue-500/30 text-blue-300 text-xs font-mono"
-                          >
-                            {kw}
-                            <button
-                              type="button"
-                              onClick={() => removeKeyword(kw)}
-                              className="hover:text-red-400 ml-0.5"
-                            >
-                              <X className="w-3 h-3" />
-                            </button>
-                          </span>
-                        ))}
-                      </div>
-
-                      <p className="text-[11px] text-neutral-400 leading-relaxed">
-                        Keywords are not case-sensitive. Automations trigger only on exact matches.
-                      </p>
-
-                      {/* Also reply without keywords (AI Semantic check) */}
-                      <div className="p-3.5 rounded-2xl bg-neutral-950 border border-white/10 flex items-center justify-between gap-3">
-                        <div>
-                          <div className="text-xs font-bold text-white flex items-center gap-1.5">
-                            Also reply without your keywords <Sparkles className="w-3.5 h-3.5 text-blue-400" />
-                          </div>
-                          <p className="text-[11px] text-neutral-400 mt-0.5">
-                            AI checks comment meaning and replies when relevant to camera & settings.
-                          </p>
-                        </div>
-                        <input
-                          type="checkbox"
-                          checked={formData.aiFallback}
-                          onChange={(e) => setFormData({ ...formData, aiFallback: e.target.checked })}
-                          className="rounded text-blue-600 focus:ring-0"
-                        />
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="p-3.5 rounded-2xl bg-blue-500/10 border border-blue-500/20 flex items-start gap-3">
-                      <CheckCircle2 className="w-5 h-5 text-blue-400 shrink-0 mt-0.5" />
-                      <p className="text-xs text-blue-200">The automation will trigger for all comments</p>
-                    </div>
-                  )}
-
-                  {/* Auto-Reply to comments on the post (Frame 008) */}
-                  <div className="pt-2 border-t border-white/10 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-semibold text-white">Auto-Reply to comments on the post</span>
-                      <input
-                        type="checkbox"
-                        checked={formData.autoReplyToComments}
-                        onChange={(e) => setFormData({ ...formData, autoReplyToComments: e.target.checked })}
-                        className="rounded text-blue-600 focus:ring-0"
-                      />
-                    </div>
-
-                    {formData.autoReplyToComments && (
-                      <div className="space-y-3 pt-1">
-                        <p className="text-[11px] text-neutral-400">
-                          Write 3 replies which will be sent in a random order so that your replies don't look like a bot.
-                        </p>
-
-                        <div className="space-y-2.5">
-                          {[0, 1, 2].map((idx) => (
-                            <div key={idx} className="space-y-1">
-                              <div className="flex items-center justify-between text-[11px] text-neutral-400">
-                                <span>Comment response {idx + 1} *</span>
-                                <span>{formData.replyVariations?.[idx]?.length || 0}/140</span>
-                              </div>
-                              <input
-                                type="text"
-                                value={formData.replyVariations?.[idx] || ''}
-                                onChange={(e) => {
-                                  const updated = [...(formData.replyVariations || [])];
-                                  updated[idx] = e.target.value;
-                                  setFormData({ ...formData, replyVariations: updated });
-                                }}
-                                className="w-full px-3 py-2 rounded-xl bg-neutral-950 border border-white/10 text-xs text-white"
-                              />
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* -------------------------------------------------------- */}
-              {/* WIZARD STEP 3: TIME DELAY & PRIMARY DM (FRAMES 010-023)  */}
-              {/* -------------------------------------------------------- */}
-              {wizardStep === 3 && (
-                <div className="space-y-5">
-                  {/* Time Delay */}
-                  <div>
-                    <label className="block text-xs font-semibold text-neutral-300 mb-1">
-                      Set a time delay *
-                    </label>
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="number"
-                        min={0}
-                        max={60}
-                        value={formData.triggerDelayMinutes}
-                        onChange={(e) => setFormData({ ...formData, triggerDelayMinutes: parseInt(e.target.value) || 1 })}
-                        className="w-20 px-3 py-2 rounded-xl bg-neutral-950 border border-white/10 text-xs text-white font-mono"
-                      />
-                      <select className="px-3 py-2 rounded-xl bg-neutral-950 border border-white/10 text-xs text-white">
-                        <option>Minute</option>
-                        <option>Seconds</option>
-                      </select>
-                    </div>
-                    <p className="text-[11px] text-neutral-400 mt-1">
-                      We'll wait 1 minute after someone triggers this automation before sending the first DM.
-                    </p>
-                  </div>
-
-                  {/* Follow & Email Gate Toggles */}
-                  <div className="space-y-2 pt-2 border-t border-white/10">
-                    <span className="text-xs font-semibold text-neutral-400 block mb-1">
-                      Before you send your primary DM, send them...
-                    </span>
-
-                    <div className="p-3.5 rounded-2xl bg-neutral-950 border border-white/10 flex items-center justify-between">
-                      <span className="text-xs text-white">a DM asking to follow you</span>
-                      <input
-                        type="checkbox"
-                        checked={formData.requireFollow}
-                        onChange={(e) => setFormData({ ...formData, requireFollow: e.target.checked })}
-                        className="rounded text-blue-600 focus:ring-0"
-                      />
-                    </div>
-
-                    <div className="p-3.5 rounded-2xl bg-neutral-950 border border-white/10 flex items-center justify-between">
-                      <span className="text-xs text-white">a DM asking to share their email</span>
-                      <input
-                        type="checkbox"
-                        checked={formData.askEmail}
-                        onChange={(e) => setFormData({ ...formData, askEmail: e.target.checked })}
-                        className="rounded text-blue-600 focus:ring-0"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Primary DM Configuration */}
-                  <div className="space-y-3 pt-2 border-t border-white/10">
-                    <span className="text-xs font-semibold text-white block">
-                      Then send the primary DM...
-                    </span>
-
-                    <div>
-                      <label className="text-[11px] text-neutral-400 mb-1 block">DM type</label>
-                      <select
-                        value={formData.primaryDmType}
-                        onChange={(e) => setFormData({ ...formData, primaryDmType: e.target.value })}
-                        className="w-full px-3 py-2 rounded-xl bg-neutral-950 border border-white/10 text-xs text-white"
-                      >
-                        <option>Text + Button</option>
-                        <option>Text</option>
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="text-[11px] text-neutral-400 mb-1 block">DM content</label>
-                      <textarea
-                        rows={3}
-                        value={formData.primaryDmMessage}
-                        onChange={(e) => setFormData({ ...formData, primaryDmMessage: e.target.value })}
-                        className="w-full px-3 py-2 rounded-xl bg-neutral-950 border border-white/10 text-xs text-white"
-                      />
-                    </div>
-
-                    {/* Button #1 Configuration */}
-                    <div className="p-4 rounded-2xl bg-neutral-950 border border-white/10 space-y-3">
-                      <div className="flex items-center justify-between text-xs font-bold text-white">
-                        <span>^ Button #1</span>
-                        <span className="text-neutral-500 font-normal">8/60</span>
-                      </div>
-
-                      <input
-                        type="text"
-                        value={formData.primaryDmButtonLabel}
-                        onChange={(e) => setFormData({ ...formData, primaryDmButtonLabel: e.target.value })}
-                        placeholder="Click me for link"
-                        className="w-full px-3 py-2 rounded-xl bg-neutral-900 border border-white/10 text-xs text-white font-semibold"
-                      />
-
-                      <div>
-                        <label className="text-[11px] text-neutral-400 mb-1 block">
-                          When someone taps on this button,
-                        </label>
-                        <select className="w-full px-3 py-2 rounded-xl bg-neutral-900 border border-white/10 text-xs text-white">
-                          <option>Send a DM</option>
-                          <option>Open Link in Browser</option>
-                        </select>
-                      </div>
-
-                      {/* Resource Message Box */}
-                      <div className="space-y-1">
-                        <label className="text-[11px] text-neutral-400 block">
-                          Follow-up Message (Camera affiliate links):
-                        </label>
-                        <textarea
-                          rows={4}
-                          value={formData.resourceMessage}
-                          onChange={(e) => setFormData({ ...formData, resourceMessage: e.target.value })}
-                          className="w-full px-3 py-2 rounded-xl bg-neutral-900 border border-white/10 text-xs text-white font-mono"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* -------------------------------------------------------- */}
-              {/* WIZARD STEP 4: LAUNCH AUTODM SUMMARY (FRAMES 014, 024)   */}
-              {/* -------------------------------------------------------- */}
-              {wizardStep === 4 && (
-                <div className="space-y-6">
-                  <div className="text-sm font-bold text-white">When someone...</div>
-
-                  {/* Summary Tree Steps with ↳ */}
-                  <div className="space-y-4 text-xs">
-                    <div>
-                      <p className="text-neutral-400 font-medium">comments on your next Posts or Reels</p>
-                    </div>
-
-                    <div className="space-y-1.5 pl-2">
-                      <p className="text-neutral-400 font-medium">and comments...</p>
-                      <div className="flex items-center gap-2">
-                        <span className="text-neutral-500 font-mono">↳</span>
-                        <span className="px-3 py-1.5 rounded-xl bg-neutral-950 border border-white/10 text-white font-semibold">
-                          {formData.triggerType === 'keyword' ? 'Specific Keywords' : 'Any comment'}
-                        </span>
-                      </div>
-                      <p className="text-[11px] text-neutral-500 italic pl-5">
-                        🕒 then wait 30 seconds after the trigger
-                      </p>
-                    </div>
-
-                    {formData.requireFollow && (
-                      <div className="space-y-2 pl-2">
-                        <p className="text-neutral-400 font-medium">then ask them to follow you</p>
-                        <div className="flex items-start gap-2">
-                          <span className="text-neutral-500 font-mono mt-1">↳</span>
-                          <div className="space-y-2 flex-1 max-w-sm">
-                            <div className="p-3.5 rounded-2xl rounded-tl-sm bg-neutral-950 border border-white/10 text-white whitespace-pre-line leading-relaxed">
-                              {formData.followMessage}
-                            </div>
-                            <div className="py-2 px-3 rounded-xl bg-neutral-950 border border-white/10 text-white font-semibold text-center">
-                              Visit Profile
-                            </div>
-                            <div className="py-2 px-3 rounded-xl bg-neutral-950 border border-white/10 text-white font-semibold text-center">
-                              I'm following ✅
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                    <div className="space-y-2 pl-2">
-                      <p className="text-neutral-400 font-medium">Once they follow, send them the following DM</p>
-                      <div className="flex items-start gap-2">
-                        <span className="text-neutral-500 font-mono mt-1">↳</span>
-                        <div className="space-y-2 flex-1 max-w-sm">
-                          <div className="p-3.5 rounded-2xl rounded-tl-sm bg-neutral-950 border border-white/10 text-white whitespace-pre-line leading-relaxed">
-                            {formData.primaryDmMessage}
-                          </div>
-                          <div className="py-2 px-3 rounded-xl bg-neutral-950 border border-white/10 text-white font-semibold text-center">
-                            {formData.primaryDmButtonLabel || 'Click me'}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="space-y-2 pl-2">
-                      <p className="text-neutral-400 font-medium">
-                        On the Primary DM, if they tap on the button '{formData.primaryDmButtonLabel || 'Click me'}', we send them the following DM
-                      </p>
-                      <div className="flex items-start gap-2">
-                        <span className="text-neutral-500 font-mono mt-1">↳</span>
-                        <div className="p-3.5 rounded-2xl rounded-tl-sm bg-neutral-950 border border-white/10 text-white font-mono whitespace-pre-line flex-1 max-w-sm">
-                          {formData.resourceMessage}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-            </div>
-
-            {/* Wizard Footer Controls */}
-            <div className="p-4 border-t border-white/10 bg-neutral-950 flex items-center justify-between sticky bottom-0 z-10">
-              <span className="text-xs text-neutral-500">
-                {wizardStep <= 3 ? `Step ${wizardStep} of 3` : 'Review Mode'}
-              </span>
-
-              <div className="flex items-center gap-2">
-                {wizardStep > 1 && (
-                  <button
-                    type="button"
-                    onClick={() => setWizardStep(wizardStep - 1)}
-                    className="px-4 py-2 rounded-2xl bg-neutral-800 hover:bg-neutral-700 text-white text-xs font-semibold"
-                  >
-                    Back
-                  </button>
-                )}
-
-                {wizardStep < 4 ? (
-                  <button
-                    type="button"
-                    onClick={() => setWizardStep(wizardStep + 1)}
-                    className="px-6 py-2 rounded-2xl bg-black hover:bg-neutral-800 text-white border border-white/20 text-xs font-bold shadow-md"
-                  >
-                    Next
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={handleSaveAutomation}
-                    disabled={saving}
-                    className="px-6 py-2 rounded-2xl bg-black hover:bg-neutral-800 text-white border border-white/20 text-xs font-bold shadow-md flex items-center gap-1.5"
-                  >
-                    {saving ? 'Saving...' : 'Confirm & launch'}
-                  </button>
-                )}
-              </div>
-            </div>
-
-          </div>
-        </div>
-      )}
-
-      {/* ============================================================== */}
-      {/* 8. EDIT AUTOMATION MODAL (MATCHING VIDEO SCREENSHOTS 1, 2, 3, 4)*/}
+      {/* 7. EDIT AUTOMATION MODAL (WITH LIVE PREVIEW & STEPS)           */}
       {/* ============================================================== */}
       {showEditorModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-md overflow-y-auto">
@@ -1199,7 +746,7 @@ export default function AutomationBuilder() {
                 {/* Post snippet */}
                 <div className="flex items-start gap-3">
                   <img
-                    src={formData.thumbnailUrl || '/assets/superprofile-sample-thumb.jpg'}
+                    src={formData.thumbnailUrl || '/assets/reels/reel_01.jpg'}
                     alt="Post"
                     className="w-12 h-12 rounded-xl object-cover shrink-0 border border-white/10"
                   />
@@ -1261,14 +808,16 @@ export default function AutomationBuilder() {
                     <span className="text-xs font-semibold text-white">pranvith_dop</span>
                   </div>
 
-                  <div className="space-y-2 max-w-[90%]">
-                    <div className="p-3.5 rounded-2xl rounded-tl-sm bg-neutral-800/90 border border-white/10 text-xs text-neutral-100 whitespace-pre-line leading-relaxed">
-                      {formData.followMessage}
+                  {formData.requireFollow && (
+                    <div className="space-y-2 max-w-[90%]">
+                      <div className="p-3.5 rounded-2xl rounded-tl-sm bg-neutral-800/90 border border-white/10 text-xs text-neutral-100 whitespace-pre-line leading-relaxed">
+                        {formData.followMessage}
+                      </div>
+                      <div className="w-full py-2 px-3 rounded-2xl bg-white/10 text-white text-xs font-semibold text-center border border-white/10">
+                        Visit Profile
+                      </div>
                     </div>
-                    <div className="w-full py-2 px-3 rounded-2xl bg-white/10 text-white text-xs font-semibold text-center border border-white/10">
-                      Visit Profile
-                    </div>
-                  </div>
+                  )}
 
                   <div className="space-y-2 max-w-[90%] pt-1">
                     <div className="p-3.5 rounded-2xl rounded-tl-sm bg-neutral-800/90 border border-white/10 text-xs text-neutral-100 whitespace-pre-line leading-relaxed">
@@ -1285,7 +834,7 @@ export default function AutomationBuilder() {
               <div className="space-y-6 pt-2">
                 <div className="text-base font-bold text-white tracking-tight">When someone...</div>
 
-                {/* Step 1: Video */}
+                {/* Step 1: Video (Clicking ✏️ opens Visual Reel Grid Picker) */}
                 <div className="space-y-2">
                   <div className="text-xs font-medium text-neutral-300">comments on this specific post</div>
                   <div className="flex items-start gap-3 pl-1">
@@ -1294,7 +843,7 @@ export default function AutomationBuilder() {
                       <div className="flex items-center justify-between gap-3">
                         <div className="flex items-start gap-3.5">
                           <img
-                            src={formData.thumbnailUrl || '/assets/superprofile-sample-thumb.jpg'}
+                            src={formData.thumbnailUrl || '/assets/reels/reel_01.jpg'}
                             alt="Post Thumbnail"
                             className="w-14 h-14 rounded-2xl object-cover shrink-0 border border-white/10 shadow-md"
                           />
@@ -1308,42 +857,21 @@ export default function AutomationBuilder() {
                           </div>
                         </div>
 
+                        {/* Circular Pencil Button (Opens Visual Grid Picker) */}
                         <button
                           type="button"
-                          onClick={() => toggleStepExpand('step1')}
+                          onClick={() => setActiveStepModal('step1_picker')}
                           className="w-8 h-8 rounded-full bg-neutral-800 hover:bg-neutral-700 border border-white/10 flex items-center justify-center text-neutral-300 hover:text-white transition-colors shrink-0 shadow-sm"
+                          title="Choose Post / Reel"
                         >
                           <Pencil className="w-3.5 h-3.5" />
                         </button>
                       </div>
-
-                      {expandedSteps.step1 && (
-                        <div className="pt-3 border-t border-white/10 space-y-3 text-xs animate-in fade-in duration-200">
-                          <div>
-                            <label className="text-neutral-400 block mb-1">Caption</label>
-                            <textarea
-                              rows={2}
-                              value={formData.videoCaption}
-                              onChange={(e) => setFormData({ ...formData, videoCaption: e.target.value })}
-                              className="w-full px-3 py-2 rounded-xl bg-neutral-900 border border-white/10 text-white text-xs"
-                            />
-                          </div>
-                          <div>
-                            <label className="text-neutral-400 block mb-1">Reel URL</label>
-                            <input
-                              type="text"
-                              value={formData.videoUrl}
-                              onChange={(e) => setFormData({ ...formData, videoUrl: e.target.value })}
-                              className="w-full px-3 py-1.5 rounded-xl bg-neutral-900 border border-white/10 text-white text-xs font-mono"
-                            />
-                          </div>
-                        </div>
-                      )}
                     </div>
                   </div>
                 </div>
 
-                {/* Step 2: Trigger & Delay */}
+                {/* Step 2: Trigger & Delay (Clicking ✏️ opens Trigger Modal) */}
                 <div className="space-y-2">
                   <div className="text-xs font-medium text-neutral-300">and comments...</div>
                   <div className="flex items-start gap-3 pl-1">
@@ -1357,8 +885,9 @@ export default function AutomationBuilder() {
                         </div>
                         <button
                           type="button"
-                          onClick={() => toggleStepExpand('step2')}
+                          onClick={() => setActiveStepModal('step2_trigger')}
                           className="w-8 h-8 rounded-full bg-neutral-800 hover:bg-neutral-700 border border-white/10 flex items-center justify-center text-neutral-300 hover:text-white transition-colors shrink-0 shadow-sm"
+                          title="Edit Trigger"
                         >
                           <Pencil className="w-3.5 h-3.5" />
                         </button>
@@ -1372,7 +901,7 @@ export default function AutomationBuilder() {
                   </div>
                 </div>
 
-                {/* Step 3: Follow Request Gate */}
+                {/* Step 3: Follow Request Gate (Clicking ✏️ opens Follow Modal) */}
                 <div className="space-y-2">
                   <div className="text-xs font-medium text-neutral-300">then ask them to follow you</div>
                   <div className="flex items-start gap-3 pl-1">
@@ -1393,8 +922,9 @@ export default function AutomationBuilder() {
 
                         <button
                           type="button"
-                          onClick={() => toggleStepExpand('step3')}
+                          onClick={() => setActiveStepModal('step3_follow')}
                           className="w-8 h-8 rounded-full bg-neutral-800 hover:bg-neutral-700 border border-white/10 flex items-center justify-center text-neutral-300 hover:text-white transition-colors shrink-0 shadow-sm mt-1"
+                          title="Edit Follow Request"
                         >
                           <Pencil className="w-3.5 h-3.5" />
                         </button>
@@ -1403,7 +933,7 @@ export default function AutomationBuilder() {
                   </div>
                 </div>
 
-                {/* Step 4: Public Reply */}
+                {/* Step 4: Public Reply (Clicking ✏️ opens Auto-Reply Modal) */}
                 <div className="space-y-2">
                   <div className="text-xs font-medium text-neutral-300">
                     leave a reply to their comment on the post · Replies rotate: 1 of {(formData.replyVariations || []).length || 3}
@@ -1429,7 +959,7 @@ export default function AutomationBuilder() {
                             <div>
                               <span className="font-semibold text-purple-300 mr-1.5">You</span>
                               <span className="text-neutral-200">
-                                {formData.replyVariations?.[0] || '@priya.sharma Thanks! Please see DMs.'}
+                                {formData.replyVariations?.[0] || 'Thanks! Please see DMs.'}
                               </span>
                             </div>
                           </div>
@@ -1437,8 +967,9 @@ export default function AutomationBuilder() {
 
                         <button
                           type="button"
-                          onClick={() => toggleStepExpand('step4')}
+                          onClick={() => setActiveStepModal('step4_reply')}
                           className="w-8 h-8 rounded-full bg-neutral-800 hover:bg-neutral-700 border border-white/10 flex items-center justify-center text-neutral-300 hover:text-white transition-colors shrink-0 shadow-sm mt-1"
+                          title="Edit Comment Responses"
                         >
                           <Pencil className="w-3.5 h-3.5" />
                         </button>
@@ -1447,7 +978,7 @@ export default function AutomationBuilder() {
                   </div>
                 </div>
 
-                {/* Step 5: Primary DM */}
+                {/* Step 5: Primary DM (Clicking ✏️ opens Primary DM & Button Modal) */}
                 <div className="space-y-2">
                   <div className="text-xs font-medium text-neutral-300">
                     Once they follow, send them the following DM
@@ -1461,14 +992,15 @@ export default function AutomationBuilder() {
                             {formData.primaryDmMessage}
                           </div>
                           <div className="py-2.5 px-4 rounded-2xl bg-neutral-950 border border-white/10 text-white text-xs font-semibold text-center">
-                            {formData.primaryDmButtonLabel || 'Click me'}
+                            {formData.primaryDmButtonLabel || 'Click me for link'}
                           </div>
                         </div>
 
                         <button
                           type="button"
-                          onClick={() => toggleStepExpand('step5')}
+                          onClick={() => setActiveStepModal('step5_dm')}
                           className="w-8 h-8 rounded-full bg-neutral-800 hover:bg-neutral-700 border border-white/10 flex items-center justify-center text-neutral-300 hover:text-white transition-colors shrink-0 shadow-sm mt-1"
+                          title="Edit Primary DM"
                         >
                           <Pencil className="w-3.5 h-3.5" />
                         </button>
@@ -1480,7 +1012,7 @@ export default function AutomationBuilder() {
                 {/* Step 6: Final Resource Delivery */}
                 <div className="space-y-2">
                   <div className="text-xs font-medium text-neutral-300">
-                    On the Primary DM, if they tap on the button '{formData.primaryDmButtonLabel || 'Click me'}', we send them the following DM
+                    On the Primary DM, if they tap on the button '{formData.primaryDmButtonLabel || 'Click me for link'}', we send them the following DM
                   </div>
                   <div className="flex items-start gap-3 pl-1">
                     <span className="text-neutral-400 text-sm font-mono mt-2">↳</span>
@@ -1492,8 +1024,9 @@ export default function AutomationBuilder() {
 
                         <button
                           type="button"
-                          onClick={() => toggleStepExpand('step6')}
+                          onClick={() => setActiveStepModal('step6_resource')}
                           className="w-8 h-8 rounded-full bg-neutral-800 hover:bg-neutral-700 border border-white/10 flex items-center justify-center text-neutral-300 hover:text-white transition-colors shrink-0 shadow-sm mt-1"
+                          title="Edit Resource Message"
                         >
                           <Pencil className="w-3.5 h-3.5" />
                         </button>
@@ -1532,7 +1065,7 @@ export default function AutomationBuilder() {
               </button>
               <button
                 type="button"
-                onClick={handleSaveAutomation}
+                onClick={handleStepSave}
                 disabled={saving}
                 className="px-6 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold shadow-md flex items-center gap-1.5"
               >
@@ -1541,6 +1074,654 @@ export default function AutomationBuilder() {
               </button>
             </div>
 
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================== */}
+      {/* 8. STEP 1 EDITOR MODAL: VISUAL REEL GRID PICKER (FRAME 005)    */}
+      {/* ============================================================== */}
+      {activeStepModal === 'step1_picker' && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-md overflow-y-auto">
+          <div className="w-full max-w-md rounded-3xl border border-white/10 bg-neutral-900 shadow-2xl overflow-hidden flex flex-col my-6 max-h-[92vh]">
+            
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-white/10 px-6 py-4 bg-neutral-900 sticky top-0 z-10">
+              <div className="flex items-center gap-2 text-sm font-bold text-white">
+                <span className="w-2 h-2 rounded-full bg-emerald-400" />
+                When someone comments on your Post/Reel
+              </div>
+              <button
+                type="button"
+                onClick={() => setActiveStepModal(null)}
+                className="w-8 h-8 rounded-full flex items-center justify-center text-neutral-400 hover:text-white hover:bg-white/10"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="p-6 overflow-y-auto space-y-5">
+              <div>
+                <label className="block text-xs font-semibold text-neutral-300 mb-2">
+                  The Comment is on...
+                </label>
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    { id: 'specific_post', label: 'Specific Post/Reel' },
+                    { id: 'any_post', label: 'Any Post/Reel' },
+                    { id: 'next_post', label: 'Next Post/Reel' }
+                  ].map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => setFormData({ ...formData, targetPostType: item.id })}
+                      className={`py-2 px-2 rounded-2xl border text-xs font-semibold transition-all text-center ${
+                        formData.targetPostType === item.id
+                          ? 'bg-blue-600 text-white border-blue-500 shadow-md'
+                          : 'bg-neutral-950 text-neutral-300 border-white/10 hover:text-white'
+                      }`}
+                    >
+                      {item.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* 3x3 Visual Grid of Pranvith's Instagram Reels (frame 005) */}
+              {formData.targetPostType === 'specific_post' && (
+                <div className="space-y-2">
+                  <div className="grid grid-cols-3 gap-2.5">
+                    {PRANVITH_REELS_SELECTION.map((reel) => {
+                      const isSelected = formData.selectedReelId === reel.id;
+                      return (
+                        <div
+                          key={reel.id}
+                          onClick={() => handleSelectReelInGrid(reel)}
+                          className={`relative aspect-square rounded-2xl overflow-hidden cursor-pointer border-2 transition-all group ${
+                            isSelected
+                              ? 'border-blue-500 shadow-lg shadow-blue-500/20 scale-[0.98]'
+                              : 'border-white/10 hover:border-white/30'
+                          }`}
+                        >
+                          <img
+                            src={reel.thumbnail}
+                            alt={reel.title}
+                            className="w-full h-full object-cover transition-transform group-hover:scale-105"
+                          />
+
+                          {/* Selected White Checkmark Circle (Frame 005) */}
+                          {isSelected && (
+                            <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                              <div className="w-8 h-8 rounded-full bg-white text-black flex items-center justify-center shadow-lg">
+                                <Check className="w-5 h-5 stroke-[3]" />
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Expand Icon */}
+                          <div className="absolute bottom-1.5 right-1.5 p-1 rounded-md bg-black/60 text-white/80">
+                            <Maximize2 className="w-3 h-3" />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  <p className="text-[11px] text-neutral-400 text-center pt-1 font-sans">
+                    Selected: <strong className="text-white">{formData.videoTitle || 'Sony Camera Settings'}</strong>
+                  </p>
+                </div>
+              )}
+
+              {formData.targetPostType === 'any_post' && (
+                <div className="p-4 rounded-2xl bg-blue-500/10 border border-blue-500/20 flex items-start gap-3">
+                  <CheckCircle2 className="w-5 h-5 text-blue-400 shrink-0 mt-0.5" />
+                  <p className="text-xs text-blue-200">The automation will trigger when a comment is posted on any of your Posts & Reels</p>
+                </div>
+              )}
+
+              {formData.targetPostType === 'next_post' && (
+                <div className="p-4 rounded-2xl bg-blue-500/10 border border-blue-500/20 flex items-start gap-3">
+                  <CheckCircle2 className="w-5 h-5 text-blue-400 shrink-0 mt-0.5" />
+                  <p className="text-xs text-blue-200">The automation will trigger on your next published post or reel.</p>
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="p-4 border-t border-white/10 bg-neutral-950 flex items-center justify-between sticky bottom-0 z-10">
+              <button
+                type="button"
+                onClick={() => setActiveStepModal(null)}
+                className="px-4 py-2 rounded-2xl bg-neutral-800 hover:bg-neutral-700 text-white text-xs font-semibold"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleStepSave}
+                disabled={saving}
+                className="px-6 py-2 rounded-2xl bg-black hover:bg-neutral-800 text-white border border-white/20 text-xs font-bold shadow-md"
+              >
+                {saving ? 'Saving...' : 'Save changes'}
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================== */}
+      {/* 9. STEP 4 EDITOR MODAL: AUTO-REPLY 3 VARIATIONS (FRAME 008)    */}
+      {/* ============================================================== */}
+      {activeStepModal === 'step4_reply' && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-md overflow-y-auto">
+          <div className="w-full max-w-md rounded-3xl border border-white/10 bg-neutral-900 shadow-2xl overflow-hidden flex flex-col my-6 max-h-[92vh]">
+            
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-white/10 px-6 py-4 bg-neutral-900 sticky top-0 z-10">
+              <div className="flex items-center gap-2 text-sm font-bold text-white">
+                <span className="w-2 h-2 rounded-full bg-emerald-400" />
+                When someone comments on your Post/Reel
+              </div>
+              <button
+                type="button"
+                onClick={() => setActiveStepModal(null)}
+                className="w-8 h-8 rounded-full flex items-center justify-center text-neutral-400 hover:text-white hover:bg-white/10"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="p-6 overflow-y-auto space-y-4">
+              <div className="flex items-center justify-between pb-1">
+                <span className="text-xs font-semibold text-white">Auto-Reply to comments on the post</span>
+                <input
+                  type="checkbox"
+                  checked={formData.autoReplyToComments}
+                  onChange={(e) => setFormData({ ...formData, autoReplyToComments: e.target.checked })}
+                  className="rounded text-blue-600 focus:ring-0"
+                />
+              </div>
+
+              <p className="text-[11px] text-neutral-400 leading-relaxed">
+                Write 3 replies which will be sent in a random order so that your replies don't look like a bot. Automating comment replies comes with risk - Stay informed.
+              </p>
+
+              <button
+                type="button"
+                onClick={() => {
+                  const base = formData.replyVariations?.[0] || 'Thanks! Please see DMs.';
+                  setFormData({
+                    ...formData,
+                    replyVariations: [
+                      base,
+                      'Message sent! Take a look.',
+                      'Nice! Check your DMs!'
+                    ]
+                  });
+                  toast.success('Generated 3 natural variations with AI.');
+                }}
+                className="w-full py-2 px-3 rounded-2xl bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/25 text-blue-300 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors"
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                Fill variations from reply 1 ✦ AI
+              </button>
+
+              <div className="space-y-3 pt-1">
+                {[0, 1, 2].map((idx) => (
+                  <div key={idx} className="space-y-1.5">
+                    <div className="flex items-center justify-between text-[11px] text-neutral-400">
+                      <span>Comment response {idx + 1} *</span>
+                      <span className="font-mono">{formData.replyVariations?.[idx]?.length || 0}/140</span>
+                    </div>
+
+                    <input
+                      type="text"
+                      value={formData.replyVariations?.[idx] || ''}
+                      onChange={(e) => {
+                        const updated = [...(formData.replyVariations || [])];
+                        updated[idx] = e.target.value;
+                        setFormData({ ...formData, replyVariations: updated });
+                      }}
+                      className="w-full px-3.5 py-2.5 rounded-xl bg-neutral-950 border border-white/10 text-xs text-white"
+                    />
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        toast.info(`Rewriting variation ${idx + 1} with AI...`);
+                      }}
+                      className="text-[10px] text-blue-400 hover:text-blue-300 flex items-center gap-1 font-medium pl-1"
+                    >
+                      <Sparkles className="w-3 h-3" /> Rewrite ✦ AI
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="p-4 border-t border-white/10 bg-neutral-950 flex items-center justify-between sticky bottom-0 z-10">
+              <button
+                type="button"
+                onClick={() => setActiveStepModal(null)}
+                className="px-4 py-2 rounded-2xl bg-neutral-800 hover:bg-neutral-700 text-white text-xs font-semibold"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleStepSave}
+                disabled={saving}
+                className="px-6 py-2 rounded-2xl bg-black hover:bg-neutral-800 text-white border border-white/20 text-xs font-bold shadow-md"
+              >
+                {saving ? 'Saving...' : 'Save changes'}
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================== */}
+      {/* 10. STEP 5 EDITOR MODAL: PRIMARY DM & BUTTON (FRAMES 014, 017) */}
+      {/* ============================================================== */}
+      {activeStepModal === 'step5_dm' && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-md overflow-y-auto">
+          <div className="w-full max-w-md rounded-3xl border border-white/10 bg-neutral-900 shadow-2xl overflow-hidden flex flex-col my-6 max-h-[92vh]">
+            
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-white/10 px-6 py-4 bg-neutral-900 sticky top-0 z-10">
+              <div className="flex items-center gap-2 text-sm font-bold text-white">
+                <span className="w-2 h-2 rounded-full bg-emerald-400" />
+                When someone comments on your Post/Reel
+              </div>
+              <button
+                type="button"
+                onClick={() => setActiveStepModal(null)}
+                className="w-8 h-8 rounded-full flex items-center justify-center text-neutral-400 hover:text-white hover:bg-white/10"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="p-6 overflow-y-auto space-y-4">
+              {/* Follow & Email Toggles */}
+              <div className="space-y-2">
+                <div className="p-3.5 rounded-2xl bg-neutral-950 border border-white/10 flex items-center justify-between">
+                  <span className="text-xs text-white">a DM asking to follow you</span>
+                  <input
+                    type="checkbox"
+                    checked={formData.requireFollow}
+                    onChange={(e) => setFormData({ ...formData, requireFollow: e.target.checked })}
+                    className="rounded text-blue-600 focus:ring-0"
+                  />
+                </div>
+
+                <div className="p-3.5 rounded-2xl bg-neutral-950 border border-white/10 flex items-center justify-between">
+                  <span className="text-xs text-white">a DM asking to share their email</span>
+                  <input
+                    type="checkbox"
+                    checked={formData.askEmail}
+                    onChange={(e) => setFormData({ ...formData, askEmail: e.target.checked })}
+                    className="rounded text-blue-600 focus:ring-0"
+                  />
+                </div>
+              </div>
+
+              {/* Primary DM Content */}
+              <div className="space-y-3 pt-2 border-t border-white/10">
+                <span className="text-xs font-semibold text-white block">
+                  Then send the primary DM...
+                </span>
+
+                <div>
+                  <label className="text-[11px] text-neutral-400 mb-1 block">DM type</label>
+                  <select
+                    value={formData.primaryDmType}
+                    onChange={(e) => setFormData({ ...formData, primaryDmType: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl bg-neutral-950 border border-white/10 text-xs text-white"
+                  >
+                    <option>Text + Button</option>
+                    <option>Text</option>
+                  </select>
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between text-[11px] text-neutral-400 mb-1">
+                    <span>DM content</span>
+                    <span className="font-mono">{formData.primaryDmMessage?.length || 0}/900</span>
+                  </div>
+                  <textarea
+                    rows={3}
+                    value={formData.primaryDmMessage}
+                    onChange={(e) => setFormData({ ...formData, primaryDmMessage: e.target.value })}
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-neutral-950 border border-white/10 text-xs text-white leading-relaxed"
+                  />
+                </div>
+
+                {/* Button #1 Configuration (Frame 017) */}
+                <div className="p-4 rounded-2xl bg-neutral-950 border border-white/10 space-y-3">
+                  <div className="flex items-center justify-between text-xs font-bold text-white">
+                    <span>^ Button #1</span>
+                    <span className="text-neutral-500 font-mono text-[11px]">
+                      {formData.primaryDmButtonLabel?.length || 0}/60
+                    </span>
+                  </div>
+
+                  <input
+                    type="text"
+                    value={formData.primaryDmButtonLabel}
+                    onChange={(e) => setFormData({ ...formData, primaryDmButtonLabel: e.target.value })}
+                    placeholder="Click me for link"
+                    className="w-full px-3.5 py-2 rounded-xl bg-neutral-900 border border-white/10 text-xs text-white font-semibold"
+                  />
+
+                  <div>
+                    <label className="text-[11px] text-neutral-400 mb-1 block">
+                      When someone taps on this button,
+                    </label>
+                    <select
+                      value={formData.buttonTapAction}
+                      onChange={(e) => setFormData({ ...formData, buttonTapAction: e.target.value })}
+                      className="w-full px-3 py-2 rounded-xl bg-neutral-900 border border-white/10 text-xs text-white"
+                    >
+                      <option value="open_url">Open a Link</option>
+                      <option value="send_dm">Send a DM</option>
+                    </select>
+                  </div>
+
+                  {/* If Open a Link: URL field + Asset Quick Picker */}
+                  {formData.buttonTapAction === 'open_url' ? (
+                    <div className="space-y-2">
+                      <div className="relative">
+                        <LinkIcon className="w-3.5 h-3.5 text-neutral-400 absolute left-3 top-2.5" />
+                        <input
+                          type="text"
+                          value={formData.buttonActionUrl || formData.resourceUrl}
+                          onChange={(e) => setFormData({ ...formData, buttonActionUrl: e.target.value, resourceUrl: e.target.value })}
+                          placeholder="https://pranvithdop.com/assets/..."
+                          className="w-full pl-9 pr-3 py-2 rounded-xl bg-neutral-900 border border-white/10 text-xs text-white font-mono"
+                        />
+                      </div>
+
+                      {/* Quick link picker from pranvithdop.com/assets */}
+                      <div className="pt-1">
+                        <label className="text-[10px] text-neutral-400 block mb-1">
+                          Or select from Pranvith Creative Assets Store:
+                        </label>
+                        <select
+                          onChange={(e) => {
+                            if (e.target.value) {
+                              setFormData({
+                                ...formData,
+                                buttonActionUrl: e.target.value,
+                                resourceUrl: e.target.value
+                              });
+                              toast.success('Pasted asset link!');
+                            }
+                          }}
+                          className="w-full px-3 py-1.5 rounded-xl bg-neutral-900 border border-white/10 text-[11px] text-purple-300"
+                        >
+                          <option value="">-- Choose Creative Asset --</option>
+                          {PRANVITH_ASSETS_QUICK_LINKS.map((asset) => (
+                            <option key={asset.url} value={asset.url}>
+                              {asset.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-1">
+                      <label className="text-[11px] text-neutral-400 block">
+                        Message to send on tap (e.g. camera links):
+                      </label>
+                      <textarea
+                        rows={4}
+                        value={formData.resourceMessage}
+                        onChange={(e) => setFormData({ ...formData, resourceMessage: e.target.value })}
+                        className="w-full px-3 py-2 rounded-xl bg-neutral-900 border border-white/10 text-xs text-white font-mono"
+                      />
+                    </div>
+                  )}
+
+                  {/* Track button clicks toggle */}
+                  <div className="flex items-center justify-between pt-2 border-t border-white/5">
+                    <div>
+                      <span className="text-xs text-white block">Track button clicks ⓘ</span>
+                      <span className="text-[10px] text-neutral-500">See how many people tap your buttons.</span>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={formData.trackButtonClicks}
+                      onChange={(e) => setFormData({ ...formData, trackButtonClicks: e.target.checked })}
+                      className="rounded text-blue-600 focus:ring-0"
+                    />
+                  </div>
+
+                  {/* Account Safety Card */}
+                  <div className="p-3 rounded-xl bg-white/[0.02] border border-white/5 space-y-1">
+                    <span className="text-[10px] font-bold text-neutral-300 uppercase">Account safety</span>
+                    <p className="text-[10px] text-neutral-400 leading-relaxed">
+                      We automatically create natural variations of your message, so not everyone receives the exact same text.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="p-4 border-t border-white/10 bg-neutral-950 flex items-center justify-between sticky bottom-0 z-10">
+              <button
+                type="button"
+                onClick={() => setActiveStepModal(null)}
+                className="px-4 py-2 rounded-2xl bg-neutral-800 hover:bg-neutral-700 text-white text-xs font-semibold"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleStepSave}
+                disabled={saving}
+                className="px-6 py-2 rounded-2xl bg-black hover:bg-neutral-800 text-white border border-white/20 text-xs font-bold shadow-md"
+              >
+                {saving ? 'Saving...' : 'Save changes'}
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================== */}
+      {/* 11. STEP 2 TRIGGER MODAL                                       */}
+      {/* ============================================================== */}
+      {activeStepModal === 'step2_trigger' && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-md overflow-y-auto">
+          <div className="w-full max-w-md rounded-3xl border border-white/10 bg-neutral-900 shadow-2xl overflow-hidden flex flex-col my-6 max-h-[92vh]">
+            <div className="flex items-center justify-between border-b border-white/10 px-6 py-4 bg-neutral-900 sticky top-0 z-10">
+              <div className="flex items-center gap-2 text-sm font-bold text-white">
+                <span className="w-2 h-2 rounded-full bg-emerald-400" />
+                Comment Trigger Configuration
+              </div>
+              <button
+                type="button"
+                onClick={() => setActiveStepModal(null)}
+                className="w-8 h-8 rounded-full flex items-center justify-center text-neutral-400 hover:text-white"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 overflow-y-auto space-y-4 text-xs">
+              <div>
+                <label className="block text-neutral-400 mb-1">Trigger Type</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setFormData({ ...formData, triggerType: 'any_comment' })}
+                    className={`py-2 rounded-xl border font-semibold ${
+                      formData.triggerType === 'any_comment' ? 'bg-blue-600 text-white border-blue-500' : 'bg-neutral-950 text-neutral-400 border-white/10'
+                    }`}
+                  >
+                    Any comment
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setFormData({ ...formData, triggerType: 'keyword' })}
+                    className={`py-2 rounded-xl border font-semibold ${
+                      formData.triggerType === 'keyword' ? 'bg-blue-600 text-white border-blue-500' : 'bg-neutral-950 text-neutral-400 border-white/10'
+                    }`}
+                  >
+                    Specific keyword
+                  </button>
+                </div>
+              </div>
+
+              {formData.triggerType === 'keyword' && (
+                <div className="space-y-2">
+                  <label className="text-neutral-400 block">Keywords</label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={keywordInput}
+                      onChange={(e) => setKeywordInput(e.target.value)}
+                      placeholder="Type keyword"
+                      className="flex-1 px-3 py-1.5 rounded-xl bg-neutral-950 border border-white/10 text-white"
+                    />
+                    <button
+                      type="button"
+                      onClick={addKeyword}
+                      className="px-3 py-1.5 rounded-xl bg-white/10 text-white font-semibold"
+                    >
+                      + Add
+                    </button>
+                  </div>
+                  <div className="flex flex-wrap gap-1 mt-1">
+                    {(formData.keywords || []).map((k) => (
+                      <span key={k} className="px-2 py-0.5 rounded bg-blue-500/20 text-blue-300 font-mono text-[11px] flex items-center gap-1">
+                        {k}
+                        <button type="button" onClick={() => removeKeyword(k)}>×</button>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div>
+                <label className="text-neutral-400 block mb-1">Delay After Trigger (seconds)</label>
+                <input
+                  type="number"
+                  value={formData.triggerDelaySeconds || 30}
+                  onChange={(e) => setFormData({ ...formData, triggerDelaySeconds: parseInt(e.target.value) || 0 })}
+                  className="w-24 px-3 py-1.5 rounded-xl bg-neutral-950 border border-white/10 text-white font-mono"
+                />
+              </div>
+            </div>
+
+            <div className="p-4 border-t border-white/10 bg-neutral-950 flex items-center justify-between sticky bottom-0 z-10">
+              <button
+                type="button"
+                onClick={() => setActiveStepModal(null)}
+                className="px-4 py-2 rounded-2xl bg-neutral-800 text-white text-xs font-semibold"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleStepSave}
+                disabled={saving}
+                className="px-6 py-2 rounded-2xl bg-black text-white border border-white/20 text-xs font-bold"
+              >
+                Save changes
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================== */}
+      {/* 12. STEP 3 FOLLOW MODAL & STEP 6 RESOURCE MODAL                */}
+      {/* ============================================================== */}
+      {activeStepModal === 'step3_follow' && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-md overflow-y-auto">
+          <div className="w-full max-w-md rounded-3xl border border-white/10 bg-neutral-900 shadow-2xl overflow-hidden flex flex-col my-6 max-h-[92vh]">
+            <div className="flex items-center justify-between border-b border-white/10 px-6 py-4 bg-neutral-900 sticky top-0 z-10">
+              <div className="text-sm font-bold text-white">Instagram Follow Request</div>
+              <button type="button" onClick={() => setActiveStepModal(null)} className="text-neutral-400 hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 overflow-y-auto space-y-4 text-xs">
+              <div className="flex items-center justify-between">
+                <span className="text-white">Require viewer to follow before DM link</span>
+                <input
+                  type="checkbox"
+                  checked={formData.requireFollow}
+                  onChange={(e) => setFormData({ ...formData, requireFollow: e.target.checked })}
+                  className="rounded text-blue-600"
+                />
+              </div>
+
+              <div>
+                <label className="text-neutral-400 block mb-1">Follow Request Message</label>
+                <textarea
+                  rows={3}
+                  value={formData.followMessage}
+                  onChange={(e) => setFormData({ ...formData, followMessage: e.target.value })}
+                  className="w-full px-3 py-2 rounded-xl bg-neutral-950 border border-white/10 text-white"
+                />
+              </div>
+            </div>
+
+            <div className="p-4 border-t border-white/10 bg-neutral-950 flex items-center justify-between sticky bottom-0 z-10">
+              <button type="button" onClick={() => setActiveStepModal(null)} className="px-4 py-2 rounded-2xl bg-neutral-800 text-white text-xs font-semibold">
+                Cancel
+              </button>
+              <button type="button" onClick={handleStepSave} disabled={saving} className="px-6 py-2 rounded-2xl bg-black text-white border border-white/20 text-xs font-bold">
+                Save changes
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {activeStepModal === 'step6_resource' && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-md overflow-y-auto">
+          <div className="w-full max-w-md rounded-3xl border border-white/10 bg-neutral-900 shadow-2xl overflow-hidden flex flex-col my-6 max-h-[92vh]">
+            <div className="flex items-center justify-between border-b border-white/10 px-6 py-4 bg-neutral-900 sticky top-0 z-10">
+              <div className="text-sm font-bold text-white">Final Resource Message</div>
+              <button type="button" onClick={() => setActiveStepModal(null)} className="text-neutral-400 hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 overflow-y-auto space-y-4 text-xs">
+              <div>
+                <label className="text-neutral-400 block mb-1">Resource Delivery Message (Multi-line links)</label>
+                <textarea
+                  rows={7}
+                  value={formData.resourceMessage}
+                  onChange={(e) => setFormData({ ...formData, resourceMessage: e.target.value })}
+                  className="w-full px-3 py-2 rounded-xl bg-neutral-950 border border-white/10 text-white font-mono"
+                />
+              </div>
+            </div>
+
+            <div className="p-4 border-t border-white/10 bg-neutral-950 flex items-center justify-between sticky bottom-0 z-10">
+              <button type="button" onClick={() => setActiveStepModal(null)} className="px-4 py-2 rounded-2xl bg-neutral-800 text-white text-xs font-semibold">
+                Cancel
+              </button>
+              <button type="button" onClick={handleStepSave} disabled={saving} className="px-6 py-2 rounded-2xl bg-black text-white border border-white/20 text-xs font-bold">
+                Save changes
+              </button>
+            </div>
           </div>
         </div>
       )}
