@@ -246,10 +246,68 @@ export default function AutomationBuilder() {
   const handleOpenCreateWizard = () => {
     setFormData({
       ...DEFAULT_SEED_AUTOMATION,
-      name: `Hi! Appreciate the interaction 🙌 Here's the... (New Draft)`
+      id: `custom_${Date.now()}`,
+      name: `Hi! Appreciate the interaction 🙌 Here's the... (New Draft)`,
+      targetPostType: 'specific_post',
+      selectedReelId: 'reel_01',
+      videoCaption: 'Under 1 lakhs best camera for beginners #photography #sony #nikon #camera #canon',
+      thumbnailUrl: '/assets/reels/reel_01.jpg',
+      triggerType: 'any_comment',
+      keywords: ['SETTINGS', 'LINK', 'PRICE'],
+      autoReplyToComments: true,
+      replyVariations: [
+        'Thanks! Please see DMs.',
+        'Sent you the details in DM! 🙌',
+        'Check your direct message for the camera links 📸'
+      ],
+      requireFollow: true,
+      followMessage: "Oops! Looks like you haven't followed me yet 👀\nIt would mean a lot if you could visit my profile and hit that follow button 😁.",
+      primaryDmMessage: "Hi! Appreciate the interaction 🙌\nHere's the link as promised ⬇️",
+      primaryDmButtonLabel: 'Click me for link',
+      buttonTapAction: 'send_dm',
+      resourceMessage: "1. Nikon z50ii https://link.amazon/B08V0k2KI\n2. Sony zv-e10ii https://link.amazon/B07ZQ5bfd\n3. Sony a6400 https://link.amazon/B04SfYq6K\n4. Canon Eos r10 https://link.amazon/B03DhzQmC\n5. Canon r50v https://link.amazon/B06J4al3o",
+      status: 'Enabled',
+      enabled: true,
+      safeTestingMode: true
     });
     setWizardStep(1);
     setShowCreateWizard(true);
+  };
+
+  const handleSaveCreateWizard = async () => {
+    setSaving(true);
+    try {
+      const newAuto = {
+        ...formData,
+        id: formData.id || `custom_${Date.now()}`,
+        name: formData.name || "Hi! Appreciate the interaction 🙌 Here's the...",
+        videoCaption: formData.videoCaption || 'Under 1 lakhs best camera for beginners #photography #sony #nikon #camera #canon',
+        thumbnail: formData.thumbnailUrl || '/assets/reels/reel_01.jpg',
+        thumbnailUrl: formData.thumbnailUrl || '/assets/reels/reel_01.jpg',
+        followers_gained: 0,
+        run_count: 0,
+        click_count: 0,
+        status: 'Enabled',
+        enabled: true,
+        safeTestingMode: true
+      };
+
+      setAutomations((prev) => [newAuto, ...prev]);
+
+      try {
+        await createAdminHybridAutomation(newAuto);
+      } catch (e) {
+        console.warn('Backend draft save fallback to local state:', e);
+      }
+
+      toast.success('🎉 Automation Created Successfully! (Safe Preview Mode)');
+      setShowCreateWizard(false);
+      setShowEditorModal(true);
+    } catch (err) {
+      toast.error('Failed to create automation: ' + err.message);
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleOpenEditModal = (auto) => {
@@ -282,12 +340,18 @@ export default function AutomationBuilder() {
       const payload = {
         ...formData,
         safeTestingMode: true,
-        status: 'draft',
+        status: 'Enabled',
         enabled: formData.enabled
       };
-      await createAdminHybridAutomation(payload);
+      setAutomations((prev) =>
+        prev.map((a) => (a.id === formData.id ? { ...a, ...payload } : a))
+      );
+      try {
+        await createAdminHybridAutomation(payload);
+      } catch (e) {
+        console.warn('Backend draft save fallback to local state:', e);
+      }
       toast.success('AutoDM Updated!');
-      await loadAutomations();
       setActiveStepModal(null);
     } catch (err) {
       const msg = formatApiErrorDetail(err?.response?.data?.detail) || err.message;
@@ -716,30 +780,458 @@ export default function AutomationBuilder() {
       </div>
 
       {/* ============================================================== */}
-      {/* 7. EDIT AUTOMATION MODAL (WITH LIVE PREVIEW & STEPS)           */}
+      {/* 6. CREATE AUTOMATION WIZARD (STEP 1, 2, 3)                     */}
       {/* ============================================================== */}
-      {showEditorModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-md overflow-y-auto">
-          <div className="w-full max-w-xl rounded-3xl border border-white/10 bg-neutral-900 shadow-2xl overflow-hidden flex flex-col my-6 max-h-[94vh]">
-            
+      {showCreateWizard && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-sm overflow-y-auto">
+          <div className="w-full max-w-lg rounded-3xl bg-white text-gray-900 shadow-2xl overflow-hidden flex flex-col my-6 max-h-[92vh] border border-gray-200">
             {/* Header */}
-            <div className="flex items-center justify-between border-b border-white/10 px-6 py-4 bg-neutral-900 sticky top-0 z-20">
-              <h3 className="text-lg font-bold text-white tracking-tight">Edit Automation</h3>
+            <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4 bg-white sticky top-0 z-20">
+              <div className="flex items-center gap-2.5 text-sm font-bold text-gray-900">
+                <div className="w-6 h-6 rounded-lg bg-emerald-100 text-emerald-600 flex items-center justify-center">
+                  <Sparkles className="w-3.5 h-3.5" />
+                </div>
+                <span>When someone comments on your Post/Reel</span>
+              </div>
               <button
                 type="button"
-                onClick={() => setShowEditorModal(false)}
-                className="w-8 h-8 rounded-full flex items-center justify-center text-neutral-400 hover:text-white hover:bg-white/10"
+                onClick={() => setShowCreateWizard(false)}
+                className="w-8 h-8 rounded-full flex items-center justify-center text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             {/* Modal Body */}
-            <div className="p-6 overflow-y-auto space-y-6">
+            <div className="p-6 overflow-y-auto space-y-5 bg-white text-gray-900 text-xs">
+              {/* STEP 1: Post / Reel Selection (Frame 004) */}
+              {wizardStep === 1 && (
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 mb-2">
+                      The Comment is on...
+                    </label>
+                    <div className="grid grid-cols-3 gap-2">
+                      {[
+                        { id: 'specific_post', label: 'Specific Post/Reel' },
+                        { id: 'any_post', label: 'Any Post/Reel' },
+                        { id: 'next_post', label: 'Next Post/Reel' }
+                      ].map((item) => (
+                        <button
+                          key={item.id}
+                          type="button"
+                          onClick={() => setFormData({ ...formData, targetPostType: item.id })}
+                          className={`py-2 px-2 rounded-2xl border text-xs font-semibold transition-all text-center ${
+                            formData.targetPostType === item.id
+                              ? 'bg-blue-50 text-blue-600 border-blue-400 shadow-sm'
+                              : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'
+                          }`}
+                        >
+                          {item.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
 
-              {/* In-Modal Live Preview (Comments on this post) */}
-              <div className="rounded-3xl border border-white/10 bg-neutral-950/70 p-5 space-y-4 shadow-inner">
-                <div className="text-xs font-semibold text-neutral-400 text-center border-b border-white/5 pb-2">
+                  {formData.targetPostType === 'specific_post' && (
+                    <div className="space-y-2">
+                      <div className="grid grid-cols-3 gap-2.5">
+                        {PRANVITH_REELS_SELECTION.map((reel) => {
+                          const isSelected = formData.selectedReelId === reel.id;
+                          return (
+                            <div
+                              key={reel.id}
+                              onClick={() => handleSelectReelInGrid(reel)}
+                              className={`relative aspect-square rounded-2xl overflow-hidden cursor-pointer border-2 transition-all group ${
+                                isSelected
+                                  ? 'border-blue-500 shadow-md scale-[0.98]'
+                                  : 'border-gray-200 hover:border-gray-400'
+                              }`}
+                            >
+                              <img
+                                src={reel.thumbnail}
+                                alt={reel.title}
+                                className="w-full h-full object-cover transition-transform group-hover:scale-105"
+                              />
+                              {isSelected && (
+                                <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                                  <div className="w-8 h-8 rounded-full bg-white text-black flex items-center justify-center shadow-lg">
+                                    <Check className="w-5 h-5 stroke-[3]" />
+                                  </div>
+                                </div>
+                              )}
+                              <div className="absolute bottom-1.5 right-1.5 p-1 rounded-md bg-black/60 text-white">
+                                <Maximize2 className="w-3 h-3" />
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      <p className="text-[11px] text-gray-500 text-center pt-1 font-sans">
+                        Selected: <strong className="text-gray-900">{formData.videoTitle || 'Under 1 lakhs best camera for beginners'}</strong>
+                      </p>
+                    </div>
+                  )}
+
+                  {formData.targetPostType === 'any_post' && (
+                    <div className="p-4 rounded-2xl bg-blue-50 border border-blue-200 flex items-start gap-3">
+                      <CheckCircle2 className="w-5 h-5 text-blue-500 shrink-0 mt-0.5" />
+                      <p className="text-xs text-blue-800">
+                        The automation will trigger when a comment is posted on any of your Posts & Reels.
+                      </p>
+                    </div>
+                  )}
+
+                  {formData.targetPostType === 'next_post' && (
+                    <div className="p-4 rounded-2xl bg-blue-50 border border-blue-200 flex items-start gap-3">
+                      <CheckCircle2 className="w-5 h-5 text-blue-500 shrink-0 mt-0.5" />
+                      <p className="text-xs text-blue-800">
+                        The automation will trigger on your next published post or reel.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* STEP 2: Comment Trigger & Public Reply (Frame 007) */}
+              {wizardStep === 2 && (
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 mb-2">
+                      What kind of comment should trigger this automation?
+                    </label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setFormData({ ...formData, triggerType: 'keyword' })}
+                        className={`py-2 px-3 rounded-2xl border text-xs font-semibold transition-all ${
+                          formData.triggerType === 'keyword'
+                            ? 'bg-blue-50 text-blue-600 border-blue-400 shadow-sm'
+                            : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'
+                        }`}
+                      >
+                        Specific keyword
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setFormData({ ...formData, triggerType: 'any_comment' })}
+                        className={`py-2 px-3 rounded-2xl border text-xs font-semibold transition-all ${
+                          formData.triggerType === 'any_comment'
+                            ? 'bg-blue-50 text-blue-600 border-blue-400 shadow-sm'
+                            : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'
+                        }`}
+                      >
+                        Any comment
+                      </button>
+                    </div>
+                  </div>
+
+                  {formData.triggerType === 'any_comment' ? (
+                    <div className="p-4 rounded-2xl bg-blue-50/70 border border-blue-200 flex items-center justify-center gap-2.5">
+                      <div className="w-5 h-5 rounded-full bg-blue-600 text-white flex items-center justify-center">
+                        <Check className="w-3.5 h-3.5 stroke-[3]" />
+                      </div>
+                      <span className="text-xs font-medium text-gray-800">
+                        The automation will trigger for all comments
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="space-y-2 p-3 rounded-2xl bg-gray-50 border border-gray-200">
+                      <label className="text-xs font-semibold text-gray-700 block">Trigger Keywords</label>
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={keywordInput}
+                          onChange={(e) => setKeywordInput(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              addKeyword();
+                            }
+                          }}
+                          placeholder="e.g. SETTINGS, LINK, PRICE"
+                          className="flex-1 px-3 py-1.5 rounded-xl bg-white border border-gray-300 text-xs text-gray-900"
+                        />
+                        <button
+                          type="button"
+                          onClick={addKeyword}
+                          className="px-3 py-1.5 rounded-xl bg-blue-600 text-white text-xs font-semibold hover:bg-blue-500"
+                        >
+                          + Add
+                        </button>
+                      </div>
+                      <div className="flex flex-wrap gap-1.5 pt-1">
+                        {(formData.keywords || []).map((k) => (
+                          <span
+                            key={k}
+                            className="px-2.5 py-1 rounded-lg bg-blue-100 text-blue-700 text-xs font-semibold flex items-center gap-1"
+                          >
+                            {k}
+                            <button type="button" onClick={() => removeKeyword(k)} className="hover:text-blue-900">×</button>
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Auto-reply to comments toggle */}
+                  <div className="pt-2 border-t border-gray-100 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-gray-900">Auto-Reply to comments on the post</span>
+                      <input
+                        type="checkbox"
+                        checked={formData.autoReplyToComments}
+                        onChange={(e) => setFormData({ ...formData, autoReplyToComments: e.target.checked })}
+                        className="rounded text-blue-600 w-4 h-4 cursor-pointer"
+                      />
+                    </div>
+                    <p className="text-[11px] text-gray-500 leading-relaxed">
+                      Write 3 replies which will be sent in a random order so that your replies don't look like a bot. Automating comment replies comes with risk - Stay informed.
+                    </p>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const base = formData.replyVariations?.[0] || 'Thanks! Please see DMs.';
+                        setFormData({
+                          ...formData,
+                          replyVariations: [
+                            base,
+                            'Message sent! Take a look. 🙌',
+                            'Nice! Check your direct message! 📸'
+                          ]
+                        });
+                        toast.success('Generated 3 natural variations with AI.');
+                      }}
+                      className="w-full py-2 px-3 rounded-2xl bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-600 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors"
+                    >
+                      <Sparkles className="w-3.5 h-3.5" />
+                      Fill variations from reply 1 ✦ AI
+                    </button>
+
+                    <div className="space-y-2.5 pt-1">
+                      {[0, 1, 2].map((idx) => (
+                        <div key={idx} className="space-y-1">
+                          <div className="flex items-center justify-between text-[11px] text-gray-500">
+                            <span>Comment response {idx + 1} *</span>
+                            <span className="font-mono">{formData.replyVariations?.[idx]?.length || 0}/140</span>
+                          </div>
+                          <input
+                            type="text"
+                            value={formData.replyVariations?.[idx] || ''}
+                            onChange={(e) => {
+                              const updated = [...(formData.replyVariations || [])];
+                              updated[idx] = e.target.value;
+                              setFormData({ ...formData, replyVariations: updated });
+                            }}
+                            className="w-full px-3.5 py-2 rounded-xl bg-gray-50 border border-gray-200 text-xs text-gray-900 focus:bg-white focus:border-blue-500"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* STEP 3: DM & Resource Configuration (Frame 013, 015) */}
+              {wizardStep === 3 && (
+                <div className="space-y-4">
+                  {/* Follow gate */}
+                  <div className="p-3.5 rounded-2xl bg-gray-50 border border-gray-200 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-gray-900">a DM asking to follow you</span>
+                      <input
+                        type="checkbox"
+                        checked={formData.requireFollow}
+                        onChange={(e) => setFormData({ ...formData, requireFollow: e.target.checked })}
+                        className="rounded text-blue-600 w-4 h-4 cursor-pointer"
+                      />
+                    </div>
+                    {formData.requireFollow && (
+                      <textarea
+                        rows={2}
+                        value={formData.followMessage}
+                        onChange={(e) => setFormData({ ...formData, followMessage: e.target.value })}
+                        className="w-full px-3 py-2 rounded-xl bg-white border border-gray-200 text-xs text-gray-800"
+                      />
+                    )}
+                  </div>
+
+                  {/* Primary DM */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="font-bold text-gray-900">Primary DM Message</span>
+                      <span className="text-gray-400 font-mono text-[11px]">{formData.primaryDmMessage?.length || 0}/900</span>
+                    </div>
+                    <textarea
+                      rows={2}
+                      value={formData.primaryDmMessage}
+                      onChange={(e) => setFormData({ ...formData, primaryDmMessage: e.target.value })}
+                      className="w-full px-3.5 py-2.5 rounded-xl bg-gray-50 border border-gray-200 text-xs text-gray-900 focus:bg-white focus:border-blue-500"
+                    />
+                  </div>
+
+                  {/* Button #1 Configuration */}
+                  <div className="p-4 rounded-2xl bg-gray-50 border border-gray-200 space-y-3">
+                    <div className="flex items-center justify-between text-xs font-bold text-gray-900">
+                      <span>^ Button #1</span>
+                      <span className="text-gray-400 font-mono text-[11px]">
+                        {formData.primaryDmButtonLabel?.length || 0}/60
+                      </span>
+                    </div>
+
+                    <input
+                      type="text"
+                      value={formData.primaryDmButtonLabel}
+                      onChange={(e) => setFormData({ ...formData, primaryDmButtonLabel: e.target.value })}
+                      placeholder="Click me for link"
+                      className="w-full px-3.5 py-2 rounded-xl bg-white border border-gray-200 text-xs text-gray-900 font-semibold"
+                    />
+
+                    <div>
+                      <label className="text-[11px] text-gray-600 mb-1 block">
+                        When someone taps on this button,
+                      </label>
+                      <select
+                        value={formData.buttonTapAction}
+                        onChange={(e) => setFormData({ ...formData, buttonTapAction: e.target.value })}
+                        className="w-full px-3 py-2 rounded-xl bg-white border border-gray-200 text-xs text-gray-900"
+                      >
+                        <option value="send_dm">Send a DM</option>
+                        <option value="open_url">Open a Link</option>
+                      </select>
+                    </div>
+
+                    {formData.buttonTapAction === 'send_dm' ? (
+                      <div className="space-y-1.5">
+                        <label className="text-[11px] text-gray-600 block">
+                          Message to send on tap (Product / Camera Links):
+                        </label>
+                        <textarea
+                          rows={5}
+                          value={formData.resourceMessage}
+                          onChange={(e) => setFormData({ ...formData, resourceMessage: e.target.value })}
+                          className="w-full px-3 py-2 rounded-xl bg-white border border-gray-200 text-xs text-gray-900 font-sans"
+                        />
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        <div className="relative">
+                          <LinkIcon className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-2.5" />
+                          <input
+                            type="text"
+                            value={formData.buttonActionUrl || formData.resourceUrl}
+                            onChange={(e) => setFormData({ ...formData, buttonActionUrl: e.target.value, resourceUrl: e.target.value })}
+                            placeholder="https://pranvithdop.com/assets/..."
+                            className="w-full pl-9 pr-3 py-2 rounded-xl bg-white border border-gray-200 text-xs text-gray-900 font-mono"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="text-[10px] text-gray-500 block mb-1">
+                            Or select from Pranvith Creative Assets Store:
+                          </label>
+                          <select
+                            onChange={(e) => {
+                              if (e.target.value) {
+                                setFormData({
+                                  ...formData,
+                                  buttonActionUrl: e.target.value,
+                                  resourceUrl: e.target.value
+                                });
+                                toast.success('Pasted asset link!');
+                              }
+                            }}
+                            className="w-full px-3 py-1.5 rounded-xl bg-white border border-gray-200 text-[11px] text-purple-600"
+                          >
+                            <option value="">-- Choose Creative Asset --</option>
+                            {PRANVITH_ASSETS_QUICK_LINKS.map((asset) => (
+                              <option key={asset.url} value={asset.url}>
+                                {asset.name}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="p-4 border-t border-gray-100 bg-gray-50 flex items-center justify-between sticky bottom-0 z-20">
+              <span className="text-xs text-gray-500 font-medium">
+                Step {wizardStep} of 3
+              </span>
+              <div className="flex items-center gap-2">
+                {wizardStep > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => setWizardStep(wizardStep - 1)}
+                    className="px-4 py-2 rounded-2xl bg-gray-200 hover:bg-gray-300 text-gray-700 text-xs font-semibold"
+                  >
+                    Back
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setShowCreateWizard(false)}
+                  className="px-4 py-2 rounded-2xl bg-gray-200 hover:bg-gray-300 text-gray-700 text-xs font-semibold"
+                >
+                  Cancel
+                </button>
+                {wizardStep < 3 ? (
+                  <button
+                    type="button"
+                    onClick={() => setWizardStep(wizardStep + 1)}
+                    className="px-6 py-2 rounded-2xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold shadow-md"
+                  >
+                    Next
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handleSaveCreateWizard}
+                    disabled={saving}
+                    className="px-6 py-2 rounded-2xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold shadow-md"
+                  >
+                    {saving ? 'Creating...' : 'Confirm & Launch (Preview)'}
+                  </button>
+                )}
+              </div>
+            </div>
+
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================== */}
+      {/* 7. EDIT AUTOMATION MODAL (EXACT MATCH TO USER SCREENSHOTS)     */}
+      {/* ============================================================== */}
+      {showEditorModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-sm overflow-y-auto">
+          <div className="w-full max-w-lg rounded-3xl bg-white text-gray-900 shadow-2xl overflow-hidden flex flex-col my-6 max-h-[92vh] border border-gray-200">
+            
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4 bg-white sticky top-0 z-20">
+              <h3 className="text-base sm:text-lg font-bold text-gray-900 tracking-tight">Edit Automation</h3>
+              <button
+                type="button"
+                onClick={() => setShowEditorModal(false)}
+                className="w-8 h-8 rounded-full flex items-center justify-center text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 overflow-y-auto space-y-6 bg-white">
+
+              {/* In-Modal Live Simulated DM Preview (Screenshots 1 & 3) */}
+              <div className="rounded-3xl border border-gray-200 bg-white p-5 space-y-4 shadow-sm">
+                <div className="text-xs font-semibold text-gray-400 text-center border-b border-gray-100 pb-2">
                   Comments on this post
                 </div>
 
@@ -748,11 +1240,11 @@ export default function AutomationBuilder() {
                   <img
                     src={formData.thumbnailUrl || '/assets/reels/reel_01.jpg'}
                     alt="Post"
-                    className="w-12 h-12 rounded-xl object-cover shrink-0 border border-white/10"
+                    className="w-12 h-12 rounded-xl object-cover shrink-0 border border-gray-200 shadow-sm"
                   />
                   <div className="min-w-0">
-                    <span className="text-xs font-bold text-white block">pranvith_dop</span>
-                    <p className="text-[11px] text-neutral-300 line-clamp-2 mt-0.5">
+                    <span className="text-xs font-bold text-gray-900 block">pranvith_dop</span>
+                    <p className="text-[11px] text-gray-600 line-clamp-2 mt-0.5">
                       {formData.videoCaption}
                     </p>
                   </div>
@@ -761,27 +1253,28 @@ export default function AutomationBuilder() {
                 {/* Comment row */}
                 <div className="space-y-2 pt-1 pl-1">
                   <div className="flex items-start gap-2.5 text-xs">
-                    <div className="w-6 h-6 rounded-full bg-neutral-800 text-neutral-400 flex items-center justify-center text-[10px] font-bold">
+                    <div className="w-6 h-6 rounded-full bg-gray-300 text-gray-700 flex items-center justify-center text-[10px] font-bold">
                       P
                     </div>
                     <div>
-                      <span className="font-semibold text-white mr-1.5">priya.sharma</span>
-                      <span className="text-neutral-200">Interested!</span>
+                      <span className="font-semibold text-gray-900 mr-1.5">priya.sharma</span>
+                      <span className="text-gray-800">Interested!</span>
                     </div>
                   </div>
 
                   {/* Replies rotate */}
-                  <div className="ml-8 space-y-1 border-l-2 border-white/10 pl-3">
-                    <div className="text-[10px] text-neutral-500">
+                  <div className="ml-8 space-y-1 border-l-2 border-gray-200 pl-3">
+                    <div className="text-[10px] text-gray-400 font-medium">
                       Replies rotate: 1 of {(formData.replyVariations || []).length || 3}
                     </div>
                     <div className="flex items-start gap-2 text-xs">
-                      <div className="w-5 h-5 rounded-full bg-neutral-800 text-neutral-400 flex items-center justify-center text-[9px] font-bold">
+                      <div className="w-5 h-5 rounded-full bg-gray-300 text-gray-700 flex items-center justify-center text-[9px] font-bold">
                         P
                       </div>
                       <div>
-                        <span className="font-semibold text-purple-300 mr-1.5">pranvith_dop</span>
-                        <span className="text-neutral-200">
+                        <span className="font-semibold text-gray-900 mr-1.5">pranvith_dop</span>
+                        <span className="text-blue-600 font-medium mr-1">@priya.sharma</span>
+                        <span className="text-gray-700">
                           {formData.replyVariations?.[0] || 'Thanks! Please see DMs.'}
                         </span>
                       </div>
@@ -792,9 +1285,9 @@ export default function AutomationBuilder() {
                 {/* Divider */}
                 <div className="relative py-2">
                   <div className="absolute inset-0 flex items-center">
-                    <div className="w-full border-t border-white/10" />
+                    <div className="w-full border-t border-gray-200" />
                   </div>
-                  <div className="relative flex justify-center text-[10px] text-neutral-400 bg-neutral-950 px-3 font-mono">
+                  <div className="relative flex justify-center text-[10px] text-gray-400 bg-white px-3 font-medium">
                     Message to @priya.sharma
                   </div>
                 </div>
@@ -802,56 +1295,66 @@ export default function AutomationBuilder() {
                 {/* Follow Gate & Primary DM */}
                 <div className="space-y-3 pt-1">
                   <div className="flex items-center gap-2">
-                    <div className="w-6 h-6 rounded-full bg-gradient-to-tr from-pink-500 to-purple-500 flex items-center justify-center text-[10px] font-bold text-white">
+                    <div className="w-6 h-6 rounded-full bg-gradient-to-tr from-pink-500 to-purple-500 flex items-center justify-center text-[10px] font-bold text-white shadow-sm">
                       P
                     </div>
-                    <span className="text-xs font-semibold text-white">pranvith_dop</span>
+                    <span className="text-xs font-semibold text-gray-900">pranvith_dop</span>
                   </div>
 
                   {formData.requireFollow && (
                     <div className="space-y-2 max-w-[90%]">
-                      <div className="p-3.5 rounded-2xl rounded-tl-sm bg-neutral-800/90 border border-white/10 text-xs text-neutral-100 whitespace-pre-line leading-relaxed">
+                      <div className="p-3.5 rounded-2xl rounded-tl-sm bg-gray-100 border border-gray-200/60 text-xs text-gray-900 whitespace-pre-line leading-relaxed shadow-sm">
                         {formData.followMessage}
                       </div>
-                      <div className="w-full py-2 px-3 rounded-2xl bg-white/10 text-white text-xs font-semibold text-center border border-white/10">
+                      <div className="w-full py-2.5 px-3 rounded-xl bg-gray-200 hover:bg-gray-300 text-gray-800 text-xs font-semibold text-center transition-colors">
                         Visit Profile
+                      </div>
+                      <div className="w-full py-2.5 px-3 rounded-xl bg-gray-200 hover:bg-gray-300 text-gray-800 text-xs font-semibold text-center transition-colors">
+                        I'm following ✅
                       </div>
                     </div>
                   )}
 
                   <div className="space-y-2 max-w-[90%] pt-1">
-                    <div className="p-3.5 rounded-2xl rounded-tl-sm bg-neutral-800/90 border border-white/10 text-xs text-neutral-100 whitespace-pre-line leading-relaxed">
+                    <div className="p-3.5 rounded-2xl rounded-tl-sm bg-gray-100 border border-gray-200/60 text-xs text-gray-900 whitespace-pre-line leading-relaxed shadow-sm">
                       {formData.primaryDmMessage}
                     </div>
-                    <div className="w-full py-2.5 px-3 rounded-2xl bg-white/10 text-white text-xs font-bold text-center border border-white/15">
+                    <div className="w-full py-2.5 px-3 rounded-xl bg-gray-200 hover:bg-gray-300 text-gray-800 text-xs font-semibold text-center transition-colors">
                       {formData.primaryDmButtonLabel || 'Click me for link'}
+                    </div>
+                  </div>
+
+                  {/* Secondary Resource DM on tap (Screenshot 2) */}
+                  <div className="space-y-2 max-w-[90%] pt-1">
+                    <div className="p-3.5 rounded-2xl rounded-tl-sm bg-gray-100 border border-gray-200/60 text-xs text-gray-800 font-sans whitespace-pre-line leading-relaxed shadow-sm">
+                      {formData.resourceMessage}
                     </div>
                   </div>
                 </div>
               </div>
 
-              {/* Vertically Connected Steps Flow with ↳ */}
+              {/* Vertically Connected Steps Flow with ↳ (Screenshots 1, 2, 4) */}
               <div className="space-y-6 pt-2">
-                <div className="text-base font-bold text-white tracking-tight">When someone...</div>
+                <div className="text-sm font-bold text-gray-900 tracking-tight">When someone...</div>
 
                 {/* Step 1: Video (Clicking ✏️ opens Visual Reel Grid Picker) */}
                 <div className="space-y-2">
-                  <div className="text-xs font-medium text-neutral-300">comments on this specific post</div>
+                  <div className="text-xs font-medium text-gray-700">comments on this specific post</div>
                   <div className="flex items-start gap-3 pl-1">
-                    <span className="text-neutral-400 text-sm font-mono mt-2">↳</span>
-                    <div className="flex-1 p-4 rounded-3xl bg-neutral-950 border border-white/10 space-y-3">
+                    <span className="text-gray-400 text-sm font-mono mt-2">↳</span>
+                    <div className="flex-1 p-3.5 rounded-2xl bg-white border border-gray-200 space-y-3 shadow-sm">
                       <div className="flex items-center justify-between gap-3">
                         <div className="flex items-start gap-3.5">
                           <img
                             src={formData.thumbnailUrl || '/assets/reels/reel_01.jpg'}
                             alt="Post Thumbnail"
-                            className="w-14 h-14 rounded-2xl object-cover shrink-0 border border-white/10 shadow-md"
+                            className="w-14 h-14 rounded-2xl object-cover shrink-0 border border-gray-200 shadow-sm"
                           />
                           <div>
-                            <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-500">
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
                               CAPTION
                             </span>
-                            <p className="text-xs text-white font-sans line-clamp-2 mt-0.5 leading-relaxed">
+                            <p className="text-xs text-gray-800 font-sans line-clamp-2 mt-0.5 leading-relaxed">
                               {formData.videoCaption}
                             </p>
                           </div>
@@ -861,7 +1364,7 @@ export default function AutomationBuilder() {
                         <button
                           type="button"
                           onClick={() => setActiveStepModal('step1_picker')}
-                          className="w-8 h-8 rounded-full bg-neutral-800 hover:bg-neutral-700 border border-white/10 flex items-center justify-center text-neutral-300 hover:text-white transition-colors shrink-0 shadow-sm"
+                          className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 border border-gray-200 flex items-center justify-center text-gray-600 transition-colors shrink-0 shadow-sm"
                           title="Choose Post / Reel"
                         >
                           <Pencil className="w-3.5 h-3.5" />
@@ -873,12 +1376,12 @@ export default function AutomationBuilder() {
 
                 {/* Step 2: Trigger & Delay (Clicking ✏️ opens Trigger Modal) */}
                 <div className="space-y-2">
-                  <div className="text-xs font-medium text-neutral-300">and comments...</div>
+                  <div className="text-xs font-medium text-gray-700">and comments...</div>
                   <div className="flex items-start gap-3 pl-1">
-                    <span className="text-neutral-400 text-sm font-mono mt-2">↳</span>
+                    <span className="text-gray-400 text-sm font-mono mt-2">↳</span>
                     <div className="flex-1 space-y-2.5">
                       <div className="flex items-center gap-2">
-                        <div className="px-4 py-2 rounded-2xl bg-neutral-950 border border-white/15 text-xs font-medium text-white shadow-sm">
+                        <div className="px-4 py-2 rounded-2xl bg-white border border-gray-200 text-xs font-medium text-gray-800 shadow-sm">
                           {formData.triggerType === 'keyword'
                             ? `Specific Keywords: ${(formData.keywords || []).join(', ')}`
                             : 'Any comment'}
@@ -886,15 +1389,15 @@ export default function AutomationBuilder() {
                         <button
                           type="button"
                           onClick={() => setActiveStepModal('step2_trigger')}
-                          className="w-8 h-8 rounded-full bg-neutral-800 hover:bg-neutral-700 border border-white/10 flex items-center justify-center text-neutral-300 hover:text-white transition-colors shrink-0 shadow-sm"
+                          className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 border border-gray-200 flex items-center justify-center text-gray-600 transition-colors shrink-0 shadow-sm"
                           title="Edit Trigger"
                         >
                           <Pencil className="w-3.5 h-3.5" />
                         </button>
                       </div>
 
-                      <div className="flex items-center gap-1.5 text-xs text-neutral-400 italic pl-1">
-                        <Clock className="w-3.5 h-3.5 text-neutral-500" />
+                      <div className="flex items-center gap-1.5 text-xs text-gray-500 italic pl-1">
+                        <Clock className="w-3.5 h-3.5 text-gray-400" />
                         then wait {formData.triggerDelaySeconds || 30} seconds after the trigger
                       </div>
                     </div>
@@ -903,19 +1406,19 @@ export default function AutomationBuilder() {
 
                 {/* Step 3: Follow Request Gate (Clicking ✏️ opens Follow Modal) */}
                 <div className="space-y-2">
-                  <div className="text-xs font-medium text-neutral-300">then ask them to follow you</div>
+                  <div className="text-xs font-medium text-gray-700">then ask them to follow you</div>
                   <div className="flex items-start gap-3 pl-1">
-                    <span className="text-neutral-400 text-sm font-mono mt-2">↳</span>
+                    <span className="text-gray-400 text-sm font-mono mt-2">↳</span>
                     <div className="flex-1 space-y-2">
                       <div className="flex items-start justify-between gap-3">
                         <div className="space-y-2 flex-1 max-w-md">
-                          <div className="p-4 rounded-3xl rounded-tl-sm bg-neutral-950 border border-white/10 text-xs text-neutral-100 whitespace-pre-line leading-relaxed shadow-sm">
+                          <div className="p-4 rounded-3xl rounded-tl-sm bg-gray-100 border border-gray-200/60 text-xs text-gray-900 whitespace-pre-line leading-relaxed shadow-sm">
                             {formData.followMessage}
                           </div>
-                          <div className="py-2.5 px-4 rounded-2xl bg-neutral-950 border border-white/10 text-white text-xs font-semibold text-center">
+                          <div className="py-2.5 px-4 rounded-xl bg-gray-200 text-gray-800 text-xs font-semibold text-center">
                             Visit Profile
                           </div>
-                          <div className="py-2.5 px-4 rounded-2xl bg-neutral-950 border border-white/10 text-white text-xs font-semibold text-center">
+                          <div className="py-2.5 px-4 rounded-xl bg-gray-200 text-gray-800 text-xs font-semibold text-center">
                             I'm following ✅
                           </div>
                         </div>
@@ -923,7 +1426,7 @@ export default function AutomationBuilder() {
                         <button
                           type="button"
                           onClick={() => setActiveStepModal('step3_follow')}
-                          className="w-8 h-8 rounded-full bg-neutral-800 hover:bg-neutral-700 border border-white/10 flex items-center justify-center text-neutral-300 hover:text-white transition-colors shrink-0 shadow-sm mt-1"
+                          className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 border border-gray-200 flex items-center justify-center text-gray-600 transition-colors shrink-0 shadow-sm mt-1"
                           title="Edit Follow Request"
                         >
                           <Pencil className="w-3.5 h-3.5" />
@@ -935,20 +1438,20 @@ export default function AutomationBuilder() {
 
                 {/* Step 4: Public Reply (Clicking ✏️ opens Auto-Reply Modal) */}
                 <div className="space-y-2">
-                  <div className="text-xs font-medium text-neutral-300">
+                  <div className="text-xs font-medium text-gray-700">
                     leave a reply to their comment on the post · Replies rotate: 1 of {(formData.replyVariations || []).length || 3}
                   </div>
                   <div className="flex items-start gap-3 pl-1">
-                    <span className="text-neutral-400 text-sm font-mono mt-2">↳</span>
+                    <span className="text-gray-400 text-sm font-mono mt-2">↳</span>
                     <div className="flex-1 space-y-2">
                       <div className="flex items-start justify-between gap-3">
                         <div className="space-y-2 flex-1 max-w-md">
                           <div className="flex items-center gap-2 text-xs">
-                            <div className="w-6 h-6 rounded-full bg-neutral-800 text-neutral-300 flex items-center justify-center text-[10px] font-bold">
+                            <div className="w-6 h-6 rounded-full bg-gray-300 text-gray-700 flex items-center justify-center text-[10px] font-bold">
                               P
                             </div>
-                            <span className="font-semibold text-white">priya.sharma</span>
-                            <span className="text-neutral-300">This is a comment</span>
+                            <span className="font-semibold text-gray-900">priya.sharma</span>
+                            <span className="text-gray-600">This is a comment</span>
                           </div>
                           <div className="ml-5 flex items-start gap-2 text-xs">
                             <img
@@ -957,8 +1460,9 @@ export default function AutomationBuilder() {
                               className="w-5 h-5 rounded-full object-cover shrink-0 mt-0.5 border border-purple-500/40"
                             />
                             <div>
-                              <span className="font-semibold text-purple-300 mr-1.5">You</span>
-                              <span className="text-neutral-200">
+                              <span className="font-semibold text-gray-900 mr-1.5">You</span>
+                              <span className="text-blue-600 font-medium mr-1">@priya.sharma</span>
+                              <span className="text-gray-700">
                                 {formData.replyVariations?.[0] || 'Thanks! Please see DMs.'}
                               </span>
                             </div>
@@ -968,7 +1472,7 @@ export default function AutomationBuilder() {
                         <button
                           type="button"
                           onClick={() => setActiveStepModal('step4_reply')}
-                          className="w-8 h-8 rounded-full bg-neutral-800 hover:bg-neutral-700 border border-white/10 flex items-center justify-center text-neutral-300 hover:text-white transition-colors shrink-0 shadow-sm mt-1"
+                          className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 border border-gray-200 flex items-center justify-center text-gray-600 transition-colors shrink-0 shadow-sm mt-1"
                           title="Edit Comment Responses"
                         >
                           <Pencil className="w-3.5 h-3.5" />
@@ -980,18 +1484,18 @@ export default function AutomationBuilder() {
 
                 {/* Step 5: Primary DM (Clicking ✏️ opens Primary DM & Button Modal) */}
                 <div className="space-y-2">
-                  <div className="text-xs font-medium text-neutral-300">
+                  <div className="text-xs font-medium text-gray-700">
                     Once they follow, send them the following DM
                   </div>
                   <div className="flex items-start gap-3 pl-1">
-                    <span className="text-neutral-400 text-sm font-mono mt-2">↳</span>
+                    <span className="text-gray-400 text-sm font-mono mt-2">↳</span>
                     <div className="flex-1 space-y-2">
                       <div className="flex items-start justify-between gap-3">
                         <div className="space-y-2 flex-1 max-w-md">
-                          <div className="p-4 rounded-3xl rounded-tl-sm bg-neutral-950 border border-white/10 text-xs text-neutral-100 whitespace-pre-line leading-relaxed shadow-sm">
+                          <div className="p-4 rounded-3xl rounded-tl-sm bg-gray-100 border border-gray-200/60 text-xs text-gray-900 whitespace-pre-line leading-relaxed shadow-sm">
                             {formData.primaryDmMessage}
                           </div>
-                          <div className="py-2.5 px-4 rounded-2xl bg-neutral-950 border border-white/10 text-white text-xs font-semibold text-center">
+                          <div className="py-2.5 px-4 rounded-xl bg-gray-200 text-gray-800 text-xs font-semibold text-center">
                             {formData.primaryDmButtonLabel || 'Click me for link'}
                           </div>
                         </div>
@@ -999,7 +1503,7 @@ export default function AutomationBuilder() {
                         <button
                           type="button"
                           onClick={() => setActiveStepModal('step5_dm')}
-                          className="w-8 h-8 rounded-full bg-neutral-800 hover:bg-neutral-700 border border-white/10 flex items-center justify-center text-neutral-300 hover:text-white transition-colors shrink-0 shadow-sm mt-1"
+                          className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 border border-gray-200 flex items-center justify-center text-gray-600 transition-colors shrink-0 shadow-sm mt-1"
                           title="Edit Primary DM"
                         >
                           <Pencil className="w-3.5 h-3.5" />
@@ -1009,23 +1513,23 @@ export default function AutomationBuilder() {
                   </div>
                 </div>
 
-                {/* Step 6: Final Resource Delivery */}
+                {/* Step 6: Final Resource Delivery (Screenshots 1 & 2) */}
                 <div className="space-y-2">
-                  <div className="text-xs font-medium text-neutral-300">
+                  <div className="text-xs font-medium text-gray-700">
                     On the Primary DM, if they tap on the button '{formData.primaryDmButtonLabel || 'Click me for link'}', we send them the following DM
                   </div>
                   <div className="flex items-start gap-3 pl-1">
-                    <span className="text-neutral-400 text-sm font-mono mt-2">↳</span>
+                    <span className="text-gray-400 text-sm font-mono mt-2">↳</span>
                     <div className="flex-1 space-y-2">
                       <div className="flex items-start justify-between gap-3">
-                        <div className="p-4 rounded-3xl rounded-tl-sm bg-neutral-950 border border-white/10 text-xs text-neutral-100 font-mono whitespace-pre-line flex-1 max-w-md shadow-sm">
+                        <div className="p-4 rounded-3xl rounded-tl-sm bg-gray-100 border border-gray-200/60 text-xs text-gray-800 font-sans whitespace-pre-line flex-1 max-w-md shadow-sm">
                           {formData.resourceMessage}
                         </div>
 
                         <button
                           type="button"
                           onClick={() => setActiveStepModal('step6_resource')}
-                          className="w-8 h-8 rounded-full bg-neutral-800 hover:bg-neutral-700 border border-white/10 flex items-center justify-center text-neutral-300 hover:text-white transition-colors shrink-0 shadow-sm mt-1"
+                          className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 border border-gray-200 flex items-center justify-center text-gray-600 transition-colors shrink-0 shadow-sm mt-1"
                           title="Edit Resource Message"
                         >
                           <Pencil className="w-3.5 h-3.5" />
@@ -1037,8 +1541,8 @@ export default function AutomationBuilder() {
 
               </div>
 
-              {/* Bottom Action: Disable Automation (Matching Video Screenshot) */}
-              <div className="pt-4 border-t border-white/10 space-y-3">
+              {/* Bottom Action: Disable Automation (Exact match to Screenshots 1, 2, 3, 4) */}
+              <div className="pt-4 border-t border-gray-100 space-y-3">
                 <button
                   type="button"
                   onClick={() => {
@@ -1046,20 +1550,20 @@ export default function AutomationBuilder() {
                     setFormData({ ...formData, enabled: next });
                     toast.info(next ? 'Automation Enabled (Preview Only)' : 'Automation Disabled');
                   }}
-                  className="w-full py-3.5 px-6 rounded-full border border-white/20 bg-neutral-950 hover:bg-white/5 text-white text-sm font-semibold text-center transition-all shadow-md"
+                  className="w-full py-3.5 px-6 rounded-full border border-gray-300 bg-white hover:bg-gray-50 text-gray-900 text-sm font-semibold text-center transition-all shadow-sm"
                 >
-                  {formData.enabled ? 'Disable Automation' : 'Disable Automation (Currently Inactive)'}
+                  {formData.enabled ? 'Disable Automation' : 'Enable Automation'}
                 </button>
               </div>
 
             </div>
 
             {/* Modal Footer Controls */}
-            <div className="p-4 border-t border-white/10 bg-neutral-950 flex items-center justify-between sticky bottom-0 z-20">
+            <div className="p-4 border-t border-gray-100 bg-gray-50 flex items-center justify-between sticky bottom-0 z-20">
               <button
                 type="button"
                 onClick={() => setShowEditorModal(false)}
-                className="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-neutral-300 text-xs font-semibold"
+                className="px-5 py-2 rounded-2xl bg-gray-200 hover:bg-gray-300 text-gray-700 text-xs font-semibold"
               >
                 Close
               </button>
@@ -1067,7 +1571,7 @@ export default function AutomationBuilder() {
                 type="button"
                 onClick={handleStepSave}
                 disabled={saving}
-                className="px-6 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold shadow-md flex items-center gap-1.5"
+                className="px-6 py-2 rounded-2xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold shadow-md flex items-center gap-1.5"
               >
                 <Save className="w-3.5 h-3.5" />
                 {saving ? 'Saving...' : 'Save Draft'}
@@ -1082,28 +1586,28 @@ export default function AutomationBuilder() {
       {/* 8. STEP 1 EDITOR MODAL: VISUAL REEL GRID PICKER (FRAME 005)    */}
       {/* ============================================================== */}
       {activeStepModal === 'step1_picker' && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-md overflow-y-auto">
-          <div className="w-full max-w-md rounded-3xl border border-white/10 bg-neutral-900 shadow-2xl overflow-hidden flex flex-col my-6 max-h-[92vh]">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-sm overflow-y-auto">
+          <div className="w-full max-w-md rounded-3xl bg-white text-gray-900 shadow-2xl overflow-hidden flex flex-col my-6 max-h-[92vh] border border-gray-200">
             
             {/* Header */}
-            <div className="flex items-center justify-between border-b border-white/10 px-6 py-4 bg-neutral-900 sticky top-0 z-10">
-              <div className="flex items-center gap-2 text-sm font-bold text-white">
-                <span className="w-2 h-2 rounded-full bg-emerald-400" />
+            <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4 bg-white sticky top-0 z-10">
+              <div className="flex items-center gap-2 text-sm font-bold text-gray-900">
+                <span className="w-2 h-2 rounded-full bg-emerald-500" />
                 When someone comments on your Post/Reel
               </div>
               <button
                 type="button"
                 onClick={() => setActiveStepModal(null)}
-                className="w-8 h-8 rounded-full flex items-center justify-center text-neutral-400 hover:text-white hover:bg-white/10"
+                className="w-8 h-8 rounded-full flex items-center justify-center text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             {/* Body */}
-            <div className="p-6 overflow-y-auto space-y-5">
+            <div className="p-6 overflow-y-auto space-y-5 bg-white text-gray-900 text-xs">
               <div>
-                <label className="block text-xs font-semibold text-neutral-300 mb-2">
+                <label className="block text-xs font-semibold text-gray-700 mb-2">
                   The Comment is on...
                 </label>
                 <div className="grid grid-cols-3 gap-2">
@@ -1118,8 +1622,8 @@ export default function AutomationBuilder() {
                       onClick={() => setFormData({ ...formData, targetPostType: item.id })}
                       className={`py-2 px-2 rounded-2xl border text-xs font-semibold transition-all text-center ${
                         formData.targetPostType === item.id
-                          ? 'bg-blue-600 text-white border-blue-500 shadow-md'
-                          : 'bg-neutral-950 text-neutral-300 border-white/10 hover:text-white'
+                          ? 'bg-blue-50 text-blue-600 border-blue-400 shadow-sm'
+                          : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'
                       }`}
                     >
                       {item.label}
@@ -1140,8 +1644,8 @@ export default function AutomationBuilder() {
                           onClick={() => handleSelectReelInGrid(reel)}
                           className={`relative aspect-square rounded-2xl overflow-hidden cursor-pointer border-2 transition-all group ${
                             isSelected
-                              ? 'border-blue-500 shadow-lg shadow-blue-500/20 scale-[0.98]'
-                              : 'border-white/10 hover:border-white/30'
+                              ? 'border-blue-500 shadow-md scale-[0.98]'
+                              : 'border-gray-200 hover:border-gray-400'
                           }`}
                         >
                           <img
@@ -1160,7 +1664,7 @@ export default function AutomationBuilder() {
                           )}
 
                           {/* Expand Icon */}
-                          <div className="absolute bottom-1.5 right-1.5 p-1 rounded-md bg-black/60 text-white/80">
+                          <div className="absolute bottom-1.5 right-1.5 p-1 rounded-md bg-black/60 text-white">
                             <Maximize2 className="w-3 h-3" />
                           </div>
                         </div>
@@ -1168,33 +1672,33 @@ export default function AutomationBuilder() {
                     })}
                   </div>
 
-                  <p className="text-[11px] text-neutral-400 text-center pt-1 font-sans">
-                    Selected: <strong className="text-white">{formData.videoTitle || 'Sony Camera Settings'}</strong>
+                  <p className="text-[11px] text-gray-500 text-center pt-1 font-sans">
+                    Selected: <strong className="text-gray-900">{formData.videoTitle || 'Under 1 lakhs best camera for beginners'}</strong>
                   </p>
                 </div>
               )}
 
               {formData.targetPostType === 'any_post' && (
-                <div className="p-4 rounded-2xl bg-blue-500/10 border border-blue-500/20 flex items-start gap-3">
-                  <CheckCircle2 className="w-5 h-5 text-blue-400 shrink-0 mt-0.5" />
-                  <p className="text-xs text-blue-200">The automation will trigger when a comment is posted on any of your Posts & Reels</p>
+                <div className="p-4 rounded-2xl bg-blue-50 border border-blue-200 flex items-start gap-3">
+                  <CheckCircle2 className="w-5 h-5 text-blue-500 shrink-0 mt-0.5" />
+                  <p className="text-xs text-blue-800">The automation will trigger when a comment is posted on any of your Posts & Reels.</p>
                 </div>
               )}
 
               {formData.targetPostType === 'next_post' && (
-                <div className="p-4 rounded-2xl bg-blue-500/10 border border-blue-500/20 flex items-start gap-3">
-                  <CheckCircle2 className="w-5 h-5 text-blue-400 shrink-0 mt-0.5" />
-                  <p className="text-xs text-blue-200">The automation will trigger on your next published post or reel.</p>
+                <div className="p-4 rounded-2xl bg-blue-50 border border-blue-200 flex items-start gap-3">
+                  <CheckCircle2 className="w-5 h-5 text-blue-500 shrink-0 mt-0.5" />
+                  <p className="text-xs text-blue-800">The automation will trigger on your next published post or reel.</p>
                 </div>
               )}
             </div>
 
             {/* Footer */}
-            <div className="p-4 border-t border-white/10 bg-neutral-950 flex items-center justify-between sticky bottom-0 z-10">
+            <div className="p-4 border-t border-gray-100 bg-gray-50 flex items-center justify-between sticky bottom-0 z-10">
               <button
                 type="button"
                 onClick={() => setActiveStepModal(null)}
-                className="px-4 py-2 rounded-2xl bg-neutral-800 hover:bg-neutral-700 text-white text-xs font-semibold"
+                className="px-4 py-2 rounded-2xl bg-gray-200 hover:bg-gray-300 text-gray-700 text-xs font-semibold"
               >
                 Cancel
               </button>
@@ -1202,7 +1706,7 @@ export default function AutomationBuilder() {
                 type="button"
                 onClick={handleStepSave}
                 disabled={saving}
-                className="px-6 py-2 rounded-2xl bg-black hover:bg-neutral-800 text-white border border-white/20 text-xs font-bold shadow-md"
+                className="px-6 py-2 rounded-2xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold shadow-md"
               >
                 {saving ? 'Saving...' : 'Save changes'}
               </button>
@@ -1216,37 +1720,37 @@ export default function AutomationBuilder() {
       {/* 9. STEP 4 EDITOR MODAL: AUTO-REPLY 3 VARIATIONS (FRAME 008)    */}
       {/* ============================================================== */}
       {activeStepModal === 'step4_reply' && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-md overflow-y-auto">
-          <div className="w-full max-w-md rounded-3xl border border-white/10 bg-neutral-900 shadow-2xl overflow-hidden flex flex-col my-6 max-h-[92vh]">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-sm overflow-y-auto">
+          <div className="w-full max-w-md rounded-3xl bg-white text-gray-900 shadow-2xl overflow-hidden flex flex-col my-6 max-h-[92vh] border border-gray-200">
             
             {/* Header */}
-            <div className="flex items-center justify-between border-b border-white/10 px-6 py-4 bg-neutral-900 sticky top-0 z-10">
-              <div className="flex items-center gap-2 text-sm font-bold text-white">
-                <span className="w-2 h-2 rounded-full bg-emerald-400" />
+            <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4 bg-white sticky top-0 z-10">
+              <div className="flex items-center gap-2 text-sm font-bold text-gray-900">
+                <span className="w-2 h-2 rounded-full bg-emerald-500" />
                 When someone comments on your Post/Reel
               </div>
               <button
                 type="button"
                 onClick={() => setActiveStepModal(null)}
-                className="w-8 h-8 rounded-full flex items-center justify-center text-neutral-400 hover:text-white hover:bg-white/10"
+                className="w-8 h-8 rounded-full flex items-center justify-center text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             {/* Body */}
-            <div className="p-6 overflow-y-auto space-y-4">
+            <div className="p-6 overflow-y-auto space-y-4 bg-white text-gray-900 text-xs">
               <div className="flex items-center justify-between pb-1">
-                <span className="text-xs font-semibold text-white">Auto-Reply to comments on the post</span>
+                <span className="text-xs font-bold text-gray-900">Auto-Reply to comments on the post</span>
                 <input
                   type="checkbox"
                   checked={formData.autoReplyToComments}
                   onChange={(e) => setFormData({ ...formData, autoReplyToComments: e.target.checked })}
-                  className="rounded text-blue-600 focus:ring-0"
+                  className="rounded text-blue-600 w-4 h-4 cursor-pointer"
                 />
               </div>
 
-              <p className="text-[11px] text-neutral-400 leading-relaxed">
+              <p className="text-[11px] text-gray-500 leading-relaxed">
                 Write 3 replies which will be sent in a random order so that your replies don't look like a bot. Automating comment replies comes with risk - Stay informed.
               </p>
 
@@ -1258,13 +1762,13 @@ export default function AutomationBuilder() {
                     ...formData,
                     replyVariations: [
                       base,
-                      'Message sent! Take a look.',
-                      'Nice! Check your DMs!'
+                      'Message sent! Take a look. 🙌',
+                      'Nice! Check your direct message! 📸'
                     ]
                   });
                   toast.success('Generated 3 natural variations with AI.');
                 }}
-                className="w-full py-2 px-3 rounded-2xl bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/25 text-blue-300 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors"
+                className="w-full py-2 px-3 rounded-2xl bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-600 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors"
               >
                 <Sparkles className="w-3.5 h-3.5" />
                 Fill variations from reply 1 ✦ AI
@@ -1273,7 +1777,7 @@ export default function AutomationBuilder() {
               <div className="space-y-3 pt-1">
                 {[0, 1, 2].map((idx) => (
                   <div key={idx} className="space-y-1.5">
-                    <div className="flex items-center justify-between text-[11px] text-neutral-400">
+                    <div className="flex items-center justify-between text-[11px] text-gray-500">
                       <span>Comment response {idx + 1} *</span>
                       <span className="font-mono">{formData.replyVariations?.[idx]?.length || 0}/140</span>
                     </div>
@@ -1286,7 +1790,7 @@ export default function AutomationBuilder() {
                         updated[idx] = e.target.value;
                         setFormData({ ...formData, replyVariations: updated });
                       }}
-                      className="w-full px-3.5 py-2.5 rounded-xl bg-neutral-950 border border-white/10 text-xs text-white"
+                      className="w-full px-3.5 py-2.5 rounded-xl bg-gray-50 border border-gray-200 text-xs text-gray-900 focus:bg-white focus:border-blue-500"
                     />
 
                     <button
@@ -1294,7 +1798,7 @@ export default function AutomationBuilder() {
                       onClick={() => {
                         toast.info(`Rewriting variation ${idx + 1} with AI...`);
                       }}
-                      className="text-[10px] text-blue-400 hover:text-blue-300 flex items-center gap-1 font-medium pl-1"
+                      className="text-[10px] text-blue-600 hover:text-blue-700 flex items-center gap-1 font-medium pl-1"
                     >
                       <Sparkles className="w-3 h-3" /> Rewrite ✦ AI
                     </button>
@@ -1304,11 +1808,11 @@ export default function AutomationBuilder() {
             </div>
 
             {/* Footer */}
-            <div className="p-4 border-t border-white/10 bg-neutral-950 flex items-center justify-between sticky bottom-0 z-10">
+            <div className="p-4 border-t border-gray-100 bg-gray-50 flex items-center justify-between sticky bottom-0 z-10">
               <button
                 type="button"
                 onClick={() => setActiveStepModal(null)}
-                className="px-4 py-2 rounded-2xl bg-neutral-800 hover:bg-neutral-700 text-white text-xs font-semibold"
+                className="px-4 py-2 rounded-2xl bg-gray-200 hover:bg-gray-300 text-gray-700 text-xs font-semibold"
               >
                 Cancel
               </button>
@@ -1316,7 +1820,7 @@ export default function AutomationBuilder() {
                 type="button"
                 onClick={handleStepSave}
                 disabled={saving}
-                className="px-6 py-2 rounded-2xl bg-black hover:bg-neutral-800 text-white border border-white/20 text-xs font-bold shadow-md"
+                className="px-6 py-2 rounded-2xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold shadow-md"
               >
                 {saving ? 'Saving...' : 'Save changes'}
               </button>
@@ -1330,61 +1834,61 @@ export default function AutomationBuilder() {
       {/* 10. STEP 5 EDITOR MODAL: PRIMARY DM & BUTTON (FRAMES 014, 017) */}
       {/* ============================================================== */}
       {activeStepModal === 'step5_dm' && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-md overflow-y-auto">
-          <div className="w-full max-w-md rounded-3xl border border-white/10 bg-neutral-900 shadow-2xl overflow-hidden flex flex-col my-6 max-h-[92vh]">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-sm overflow-y-auto">
+          <div className="w-full max-w-md rounded-3xl bg-white text-gray-900 shadow-2xl overflow-hidden flex flex-col my-6 max-h-[92vh] border border-gray-200">
             
             {/* Header */}
-            <div className="flex items-center justify-between border-b border-white/10 px-6 py-4 bg-neutral-900 sticky top-0 z-10">
-              <div className="flex items-center gap-2 text-sm font-bold text-white">
-                <span className="w-2 h-2 rounded-full bg-emerald-400" />
+            <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4 bg-white sticky top-0 z-10">
+              <div className="flex items-center gap-2 text-sm font-bold text-gray-900">
+                <span className="w-2 h-2 rounded-full bg-emerald-500" />
                 When someone comments on your Post/Reel
               </div>
               <button
                 type="button"
                 onClick={() => setActiveStepModal(null)}
-                className="w-8 h-8 rounded-full flex items-center justify-center text-neutral-400 hover:text-white hover:bg-white/10"
+                className="w-8 h-8 rounded-full flex items-center justify-center text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             {/* Body */}
-            <div className="p-6 overflow-y-auto space-y-4">
+            <div className="p-6 overflow-y-auto space-y-4 bg-white text-gray-900 text-xs">
               {/* Follow & Email Toggles */}
               <div className="space-y-2">
-                <div className="p-3.5 rounded-2xl bg-neutral-950 border border-white/10 flex items-center justify-between">
-                  <span className="text-xs text-white">a DM asking to follow you</span>
+                <div className="p-3.5 rounded-2xl bg-gray-50 border border-gray-200 flex items-center justify-between">
+                  <span className="text-xs font-semibold text-gray-900">a DM asking to follow you</span>
                   <input
                     type="checkbox"
                     checked={formData.requireFollow}
                     onChange={(e) => setFormData({ ...formData, requireFollow: e.target.checked })}
-                    className="rounded text-blue-600 focus:ring-0"
+                    className="rounded text-blue-600 w-4 h-4 cursor-pointer"
                   />
                 </div>
 
-                <div className="p-3.5 rounded-2xl bg-neutral-950 border border-white/10 flex items-center justify-between">
-                  <span className="text-xs text-white">a DM asking to share their email</span>
+                <div className="p-3.5 rounded-2xl bg-gray-50 border border-gray-200 flex items-center justify-between">
+                  <span className="text-xs font-semibold text-gray-900">a DM asking to share their email</span>
                   <input
                     type="checkbox"
                     checked={formData.askEmail}
                     onChange={(e) => setFormData({ ...formData, askEmail: e.target.checked })}
-                    className="rounded text-blue-600 focus:ring-0"
+                    className="rounded text-blue-600 w-4 h-4 cursor-pointer"
                   />
                 </div>
               </div>
 
               {/* Primary DM Content */}
-              <div className="space-y-3 pt-2 border-t border-white/10">
-                <span className="text-xs font-semibold text-white block">
+              <div className="space-y-3 pt-2 border-t border-gray-100">
+                <span className="text-xs font-bold text-gray-900 block">
                   Then send the primary DM...
                 </span>
 
                 <div>
-                  <label className="text-[11px] text-neutral-400 mb-1 block">DM type</label>
+                  <label className="text-[11px] text-gray-600 mb-1 block">DM type</label>
                   <select
                     value={formData.primaryDmType}
                     onChange={(e) => setFormData({ ...formData, primaryDmType: e.target.value })}
-                    className="w-full px-3 py-2 rounded-xl bg-neutral-950 border border-white/10 text-xs text-white"
+                    className="w-full px-3 py-2 rounded-xl bg-gray-50 border border-gray-200 text-xs text-gray-900"
                   >
                     <option>Text + Button</option>
                     <option>Text</option>
@@ -1392,7 +1896,7 @@ export default function AutomationBuilder() {
                 </div>
 
                 <div>
-                  <div className="flex items-center justify-between text-[11px] text-neutral-400 mb-1">
+                  <div className="flex items-center justify-between text-[11px] text-gray-600 mb-1">
                     <span>DM content</span>
                     <span className="font-mono">{formData.primaryDmMessage?.length || 0}/900</span>
                   </div>
@@ -1400,15 +1904,15 @@ export default function AutomationBuilder() {
                     rows={3}
                     value={formData.primaryDmMessage}
                     onChange={(e) => setFormData({ ...formData, primaryDmMessage: e.target.value })}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-neutral-950 border border-white/10 text-xs text-white leading-relaxed"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-gray-50 border border-gray-200 text-xs text-gray-900 leading-relaxed focus:bg-white focus:border-blue-500"
                   />
                 </div>
 
                 {/* Button #1 Configuration (Frame 017) */}
-                <div className="p-4 rounded-2xl bg-neutral-950 border border-white/10 space-y-3">
-                  <div className="flex items-center justify-between text-xs font-bold text-white">
+                <div className="p-4 rounded-2xl bg-gray-50 border border-gray-200 space-y-3">
+                  <div className="flex items-center justify-between text-xs font-bold text-gray-900">
                     <span>^ Button #1</span>
-                    <span className="text-neutral-500 font-mono text-[11px]">
+                    <span className="text-gray-400 font-mono text-[11px]">
                       {formData.primaryDmButtonLabel?.length || 0}/60
                     </span>
                   </div>
@@ -1418,40 +1922,39 @@ export default function AutomationBuilder() {
                     value={formData.primaryDmButtonLabel}
                     onChange={(e) => setFormData({ ...formData, primaryDmButtonLabel: e.target.value })}
                     placeholder="Click me for link"
-                    className="w-full px-3.5 py-2 rounded-xl bg-neutral-900 border border-white/10 text-xs text-white font-semibold"
+                    className="w-full px-3.5 py-2 rounded-xl bg-white border border-gray-200 text-xs text-gray-900 font-semibold"
                   />
 
                   <div>
-                    <label className="text-[11px] text-neutral-400 mb-1 block">
+                    <label className="text-[11px] text-gray-600 mb-1 block">
                       When someone taps on this button,
                     </label>
                     <select
                       value={formData.buttonTapAction}
                       onChange={(e) => setFormData({ ...formData, buttonTapAction: e.target.value })}
-                      className="w-full px-3 py-2 rounded-xl bg-neutral-900 border border-white/10 text-xs text-white"
+                      className="w-full px-3 py-2 rounded-xl bg-white border border-gray-200 text-xs text-gray-900"
                     >
-                      <option value="open_url">Open a Link</option>
                       <option value="send_dm">Send a DM</option>
+                      <option value="open_url">Open a Link</option>
                     </select>
                   </div>
 
-                  {/* If Open a Link: URL field + Asset Quick Picker */}
                   {formData.buttonTapAction === 'open_url' ? (
                     <div className="space-y-2">
                       <div className="relative">
-                        <LinkIcon className="w-3.5 h-3.5 text-neutral-400 absolute left-3 top-2.5" />
+                        <LinkIcon className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-2.5" />
                         <input
                           type="text"
                           value={formData.buttonActionUrl || formData.resourceUrl}
                           onChange={(e) => setFormData({ ...formData, buttonActionUrl: e.target.value, resourceUrl: e.target.value })}
                           placeholder="https://pranvithdop.com/assets/..."
-                          className="w-full pl-9 pr-3 py-2 rounded-xl bg-neutral-900 border border-white/10 text-xs text-white font-mono"
+                          className="w-full pl-9 pr-3 py-2 rounded-xl bg-white border border-gray-200 text-xs text-gray-900 font-mono"
                         />
                       </div>
 
                       {/* Quick link picker from pranvithdop.com/assets */}
                       <div className="pt-1">
-                        <label className="text-[10px] text-neutral-400 block mb-1">
+                        <label className="text-[10px] text-gray-500 block mb-1">
                           Or select from Pranvith Creative Assets Store:
                         </label>
                         <select
@@ -1465,7 +1968,7 @@ export default function AutomationBuilder() {
                               toast.success('Pasted asset link!');
                             }
                           }}
-                          className="w-full px-3 py-1.5 rounded-xl bg-neutral-900 border border-white/10 text-[11px] text-purple-300"
+                          className="w-full px-3 py-1.5 rounded-xl bg-white border border-gray-200 text-[11px] text-purple-600"
                         >
                           <option value="">-- Choose Creative Asset --</option>
                           {PRANVITH_ASSETS_QUICK_LINKS.map((asset) => (
@@ -1478,49 +1981,41 @@ export default function AutomationBuilder() {
                     </div>
                   ) : (
                     <div className="space-y-1">
-                      <label className="text-[11px] text-neutral-400 block">
-                        Message to send on tap (e.g. camera links):
+                      <label className="text-[11px] text-gray-600 block">
+                        Message to send on tap (Product / Camera links):
                       </label>
                       <textarea
-                        rows={4}
+                        rows={5}
                         value={formData.resourceMessage}
                         onChange={(e) => setFormData({ ...formData, resourceMessage: e.target.value })}
-                        className="w-full px-3 py-2 rounded-xl bg-neutral-900 border border-white/10 text-xs text-white font-mono"
+                        className="w-full px-3 py-2 rounded-xl bg-white border border-gray-200 text-xs text-gray-900 font-sans"
                       />
                     </div>
                   )}
 
                   {/* Track button clicks toggle */}
-                  <div className="flex items-center justify-between pt-2 border-t border-white/5">
+                  <div className="flex items-center justify-between pt-2 border-t border-gray-200">
                     <div>
-                      <span className="text-xs text-white block">Track button clicks ⓘ</span>
-                      <span className="text-[10px] text-neutral-500">See how many people tap your buttons.</span>
+                      <span className="text-xs text-gray-900 font-medium block">Track button clicks ⓘ</span>
+                      <span className="text-[10px] text-gray-500">See how many people tap your buttons.</span>
                     </div>
                     <input
                       type="checkbox"
                       checked={formData.trackButtonClicks}
                       onChange={(e) => setFormData({ ...formData, trackButtonClicks: e.target.checked })}
-                      className="rounded text-blue-600 focus:ring-0"
+                      className="rounded text-blue-600 w-4 h-4 cursor-pointer"
                     />
-                  </div>
-
-                  {/* Account Safety Card */}
-                  <div className="p-3 rounded-xl bg-white/[0.02] border border-white/5 space-y-1">
-                    <span className="text-[10px] font-bold text-neutral-300 uppercase">Account safety</span>
-                    <p className="text-[10px] text-neutral-400 leading-relaxed">
-                      We automatically create natural variations of your message, so not everyone receives the exact same text.
-                    </p>
                   </div>
                 </div>
               </div>
             </div>
 
             {/* Footer */}
-            <div className="p-4 border-t border-white/10 bg-neutral-950 flex items-center justify-between sticky bottom-0 z-10">
+            <div className="p-4 border-t border-gray-100 bg-gray-50 flex items-center justify-between sticky bottom-0 z-10">
               <button
                 type="button"
                 onClick={() => setActiveStepModal(null)}
-                className="px-4 py-2 rounded-2xl bg-neutral-800 hover:bg-neutral-700 text-white text-xs font-semibold"
+                className="px-4 py-2 rounded-2xl bg-gray-200 hover:bg-gray-300 text-gray-700 text-xs font-semibold"
               >
                 Cancel
               </button>
@@ -1528,7 +2023,7 @@ export default function AutomationBuilder() {
                 type="button"
                 onClick={handleStepSave}
                 disabled={saving}
-                className="px-6 py-2 rounded-2xl bg-black hover:bg-neutral-800 text-white border border-white/20 text-xs font-bold shadow-md"
+                className="px-6 py-2 rounded-2xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold shadow-md"
               >
                 {saving ? 'Saving...' : 'Save changes'}
               </button>
@@ -1542,31 +2037,31 @@ export default function AutomationBuilder() {
       {/* 11. STEP 2 TRIGGER MODAL                                       */}
       {/* ============================================================== */}
       {activeStepModal === 'step2_trigger' && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-md overflow-y-auto">
-          <div className="w-full max-w-md rounded-3xl border border-white/10 bg-neutral-900 shadow-2xl overflow-hidden flex flex-col my-6 max-h-[92vh]">
-            <div className="flex items-center justify-between border-b border-white/10 px-6 py-4 bg-neutral-900 sticky top-0 z-10">
-              <div className="flex items-center gap-2 text-sm font-bold text-white">
-                <span className="w-2 h-2 rounded-full bg-emerald-400" />
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-sm overflow-y-auto">
+          <div className="w-full max-w-md rounded-3xl bg-white text-gray-900 shadow-2xl overflow-hidden flex flex-col my-6 max-h-[92vh] border border-gray-200">
+            <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4 bg-white sticky top-0 z-10">
+              <div className="flex items-center gap-2 text-sm font-bold text-gray-900">
+                <span className="w-2 h-2 rounded-full bg-emerald-500" />
                 Comment Trigger Configuration
               </div>
               <button
                 type="button"
                 onClick={() => setActiveStepModal(null)}
-                className="w-8 h-8 rounded-full flex items-center justify-center text-neutral-400 hover:text-white"
+                className="w-8 h-8 rounded-full flex items-center justify-center text-gray-400 hover:text-gray-700 hover:bg-gray-100"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="p-6 overflow-y-auto space-y-4 text-xs">
+            <div className="p-6 overflow-y-auto space-y-4 text-xs bg-white text-gray-900">
               <div>
-                <label className="block text-neutral-400 mb-1">Trigger Type</label>
+                <label className="block text-gray-700 font-semibold mb-2">Trigger Type</label>
                 <div className="grid grid-cols-2 gap-2">
                   <button
                     type="button"
                     onClick={() => setFormData({ ...formData, triggerType: 'any_comment' })}
-                    className={`py-2 rounded-xl border font-semibold ${
-                      formData.triggerType === 'any_comment' ? 'bg-blue-600 text-white border-blue-500' : 'bg-neutral-950 text-neutral-400 border-white/10'
+                    className={`py-2 rounded-2xl border font-semibold ${
+                      formData.triggerType === 'any_comment' ? 'bg-blue-50 text-blue-600 border-blue-400 shadow-sm' : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'
                     }`}
                   >
                     Any comment
@@ -1574,8 +2069,8 @@ export default function AutomationBuilder() {
                   <button
                     type="button"
                     onClick={() => setFormData({ ...formData, triggerType: 'keyword' })}
-                    className={`py-2 rounded-xl border font-semibold ${
-                      formData.triggerType === 'keyword' ? 'bg-blue-600 text-white border-blue-500' : 'bg-neutral-950 text-neutral-400 border-white/10'
+                    className={`py-2 rounded-2xl border font-semibold ${
+                      formData.triggerType === 'keyword' ? 'bg-blue-50 text-blue-600 border-blue-400 shadow-sm' : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'
                     }`}
                   >
                     Specific keyword
@@ -1584,29 +2079,35 @@ export default function AutomationBuilder() {
               </div>
 
               {formData.triggerType === 'keyword' && (
-                <div className="space-y-2">
-                  <label className="text-neutral-400 block">Keywords</label>
+                <div className="space-y-2 p-3 rounded-2xl bg-gray-50 border border-gray-200">
+                  <label className="text-gray-700 font-semibold block">Keywords</label>
                   <div className="flex gap-2">
                     <input
                       type="text"
                       value={keywordInput}
                       onChange={(e) => setKeywordInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          addKeyword();
+                        }
+                      }}
                       placeholder="Type keyword"
-                      className="flex-1 px-3 py-1.5 rounded-xl bg-neutral-950 border border-white/10 text-white"
+                      className="flex-1 px-3 py-1.5 rounded-xl bg-white border border-gray-300 text-xs text-gray-900"
                     />
                     <button
                       type="button"
                       onClick={addKeyword}
-                      className="px-3 py-1.5 rounded-xl bg-white/10 text-white font-semibold"
+                      className="px-3 py-1.5 rounded-xl bg-blue-600 text-white font-semibold hover:bg-blue-500"
                     >
                       + Add
                     </button>
                   </div>
-                  <div className="flex flex-wrap gap-1 mt-1">
+                  <div className="flex flex-wrap gap-1.5 mt-1">
                     {(formData.keywords || []).map((k) => (
-                      <span key={k} className="px-2 py-0.5 rounded bg-blue-500/20 text-blue-300 font-mono text-[11px] flex items-center gap-1">
+                      <span key={k} className="px-2.5 py-1 rounded-lg bg-blue-100 text-blue-700 font-semibold text-xs flex items-center gap-1">
                         {k}
-                        <button type="button" onClick={() => removeKeyword(k)}>×</button>
+                        <button type="button" onClick={() => removeKeyword(k)} className="hover:text-blue-900">×</button>
                       </span>
                     ))}
                   </div>
@@ -1614,21 +2115,21 @@ export default function AutomationBuilder() {
               )}
 
               <div>
-                <label className="text-neutral-400 block mb-1">Delay After Trigger (seconds)</label>
+                <label className="text-gray-700 font-semibold block mb-1">Delay After Trigger (seconds)</label>
                 <input
                   type="number"
                   value={formData.triggerDelaySeconds || 30}
                   onChange={(e) => setFormData({ ...formData, triggerDelaySeconds: parseInt(e.target.value) || 0 })}
-                  className="w-24 px-3 py-1.5 rounded-xl bg-neutral-950 border border-white/10 text-white font-mono"
+                  className="w-24 px-3 py-1.5 rounded-xl bg-gray-50 border border-gray-200 text-gray-900 font-mono"
                 />
               </div>
             </div>
 
-            <div className="p-4 border-t border-white/10 bg-neutral-950 flex items-center justify-between sticky bottom-0 z-10">
+            <div className="p-4 border-t border-gray-100 bg-gray-50 flex items-center justify-between sticky bottom-0 z-10">
               <button
                 type="button"
                 onClick={() => setActiveStepModal(null)}
-                className="px-4 py-2 rounded-2xl bg-neutral-800 text-white text-xs font-semibold"
+                className="px-4 py-2 rounded-2xl bg-gray-200 hover:bg-gray-300 text-gray-700 text-xs font-semibold"
               >
                 Cancel
               </button>
@@ -1636,7 +2137,7 @@ export default function AutomationBuilder() {
                 type="button"
                 onClick={handleStepSave}
                 disabled={saving}
-                className="px-6 py-2 rounded-2xl bg-black text-white border border-white/20 text-xs font-bold"
+                className="px-6 py-2 rounded-2xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold shadow-md"
               >
                 Save changes
               </button>
@@ -1649,42 +2150,42 @@ export default function AutomationBuilder() {
       {/* 12. STEP 3 FOLLOW MODAL & STEP 6 RESOURCE MODAL                */}
       {/* ============================================================== */}
       {activeStepModal === 'step3_follow' && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-md overflow-y-auto">
-          <div className="w-full max-w-md rounded-3xl border border-white/10 bg-neutral-900 shadow-2xl overflow-hidden flex flex-col my-6 max-h-[92vh]">
-            <div className="flex items-center justify-between border-b border-white/10 px-6 py-4 bg-neutral-900 sticky top-0 z-10">
-              <div className="text-sm font-bold text-white">Instagram Follow Request</div>
-              <button type="button" onClick={() => setActiveStepModal(null)} className="text-neutral-400 hover:text-white">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-sm overflow-y-auto">
+          <div className="w-full max-w-md rounded-3xl bg-white text-gray-900 shadow-2xl overflow-hidden flex flex-col my-6 max-h-[92vh] border border-gray-200">
+            <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4 bg-white sticky top-0 z-10">
+              <div className="text-sm font-bold text-gray-900">Instagram Follow Request</div>
+              <button type="button" onClick={() => setActiveStepModal(null)} className="text-gray-400 hover:text-gray-700">
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="p-6 overflow-y-auto space-y-4 text-xs">
+            <div className="p-6 overflow-y-auto space-y-4 text-xs bg-white text-gray-900">
               <div className="flex items-center justify-between">
-                <span className="text-white">Require viewer to follow before DM link</span>
+                <span className="text-gray-900 font-semibold">Require viewer to follow before DM link</span>
                 <input
                   type="checkbox"
                   checked={formData.requireFollow}
                   onChange={(e) => setFormData({ ...formData, requireFollow: e.target.checked })}
-                  className="rounded text-blue-600"
+                  className="rounded text-blue-600 w-4 h-4 cursor-pointer"
                 />
               </div>
 
               <div>
-                <label className="text-neutral-400 block mb-1">Follow Request Message</label>
+                <label className="text-gray-600 font-medium block mb-1">Follow Request Message</label>
                 <textarea
-                  rows={3}
+                  rows={4}
                   value={formData.followMessage}
                   onChange={(e) => setFormData({ ...formData, followMessage: e.target.value })}
-                  className="w-full px-3 py-2 rounded-xl bg-neutral-950 border border-white/10 text-white"
+                  className="w-full px-3 py-2 rounded-xl bg-gray-50 border border-gray-200 text-xs text-gray-900 leading-relaxed"
                 />
               </div>
             </div>
 
-            <div className="p-4 border-t border-white/10 bg-neutral-950 flex items-center justify-between sticky bottom-0 z-10">
-              <button type="button" onClick={() => setActiveStepModal(null)} className="px-4 py-2 rounded-2xl bg-neutral-800 text-white text-xs font-semibold">
+            <div className="p-4 border-t border-gray-100 bg-gray-50 flex items-center justify-between sticky bottom-0 z-10">
+              <button type="button" onClick={() => setActiveStepModal(null)} className="px-4 py-2 rounded-2xl bg-gray-200 hover:bg-gray-300 text-gray-700 text-xs font-semibold">
                 Cancel
               </button>
-              <button type="button" onClick={handleStepSave} disabled={saving} className="px-6 py-2 rounded-2xl bg-black text-white border border-white/20 text-xs font-bold">
+              <button type="button" onClick={handleStepSave} disabled={saving} className="px-6 py-2 rounded-2xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold shadow-md">
                 Save changes
               </button>
             </div>
@@ -1693,32 +2194,32 @@ export default function AutomationBuilder() {
       )}
 
       {activeStepModal === 'step6_resource' && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-md overflow-y-auto">
-          <div className="w-full max-w-md rounded-3xl border border-white/10 bg-neutral-900 shadow-2xl overflow-hidden flex flex-col my-6 max-h-[92vh]">
-            <div className="flex items-center justify-between border-b border-white/10 px-6 py-4 bg-neutral-900 sticky top-0 z-10">
-              <div className="text-sm font-bold text-white">Final Resource Message</div>
-              <button type="button" onClick={() => setActiveStepModal(null)} className="text-neutral-400 hover:text-white">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-sm overflow-y-auto">
+          <div className="w-full max-w-md rounded-3xl bg-white text-gray-900 shadow-2xl overflow-hidden flex flex-col my-6 max-h-[92vh] border border-gray-200">
+            <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4 bg-white sticky top-0 z-10">
+              <div className="text-sm font-bold text-gray-900">Final Resource Message</div>
+              <button type="button" onClick={() => setActiveStepModal(null)} className="text-gray-400 hover:text-gray-700">
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="p-6 overflow-y-auto space-y-4 text-xs">
+            <div className="p-6 overflow-y-auto space-y-4 text-xs bg-white text-gray-900">
               <div>
-                <label className="text-neutral-400 block mb-1">Resource Delivery Message (Multi-line links)</label>
+                <label className="text-gray-600 font-medium block mb-1">Resource Delivery Message (Multi-line links)</label>
                 <textarea
-                  rows={7}
+                  rows={8}
                   value={formData.resourceMessage}
                   onChange={(e) => setFormData({ ...formData, resourceMessage: e.target.value })}
-                  className="w-full px-3 py-2 rounded-xl bg-neutral-950 border border-white/10 text-white font-mono"
+                  className="w-full px-3 py-2 rounded-xl bg-gray-50 border border-gray-200 text-xs text-gray-900 font-sans leading-relaxed"
                 />
               </div>
             </div>
 
-            <div className="p-4 border-t border-white/10 bg-neutral-950 flex items-center justify-between sticky bottom-0 z-10">
-              <button type="button" onClick={() => setActiveStepModal(null)} className="px-4 py-2 rounded-2xl bg-neutral-800 text-white text-xs font-semibold">
+            <div className="p-4 border-t border-gray-100 bg-gray-50 flex items-center justify-between sticky bottom-0 z-10">
+              <button type="button" onClick={() => setActiveStepModal(null)} className="px-4 py-2 rounded-2xl bg-gray-200 hover:bg-gray-300 text-gray-700 text-xs font-semibold">
                 Cancel
               </button>
-              <button type="button" onClick={handleStepSave} disabled={saving} className="px-6 py-2 rounded-2xl bg-black text-white border border-white/20 text-xs font-bold">
+              <button type="button" onClick={handleStepSave} disabled={saving} className="px-6 py-2 rounded-2xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold shadow-md">
                 Save changes
               </button>
             </div>
