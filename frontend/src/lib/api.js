@@ -1274,3 +1274,8 @@ export const testAdminHybridAutomation = async (payload) => {
   const { data } = await adminApi.post('/admin/social/automations/test', payload);
   return data;
 };
+
+export const duplicateAdminHybridAutomation = async (automationId) => {
+  const { data } = await adminApi.post(`/admin/social/automations/${encodeURIComponent(automationId)}/duplicate`);
+  return data;
+};

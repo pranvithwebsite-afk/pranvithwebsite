@@ -2804,13 +2804,37 @@ INITIAL_SEED_AUTOMATION: Dict[str, Any] = {
     "platforms": ["youtube", "facebook", "instagram"],
     "videoUrl": "",
     "video_url": "",
+    "platformUrls": {"youtube": "", "facebook": "", "instagram": ""},
+    "videoTitle": "Under 1 lakhs best camera for beginners #photography #sony #nikon #camera #canon",
+    "videoCaption": "Under 1 lakhs best camera for beginners #photography #sony #nikon #camera #canon",
+    "thumbnailUrl": "/assets/superprofile-sample-thumb.jpg",
     "triggerType": "keyword",
     "trigger_type": "keyword",
     "keywords": ["SETTINGS", "LINK", "PRICE"],
+    "triggerDelaySeconds": 30,
     "replyMessage": "Camera settings మరియు links ఇక్కడ చూడండి 👇",
     "reply_message": "Camera settings మరియు links ఇక్కడ చూడండి 👇",
+    "replyVariations": [
+        "@{username} Thanks! Please see DMs.",
+        "Camera settings మరియు links ఇక్కడ చూడండి 👇",
+        "Hi @{username}! Camera settings and links: https://pranvithdop.com/assets 🎬"
+    ],
+    "requireFollow": True,
+    "followMessage": "Oops! Looks like you haven't followed me yet 👀\nIt would mean a lot if you could visit my profile and hit that follow button 😊.",
+    "followButtonLabel": "Visit Profile",
+    "followConfirmLabel": "I'm following ✅",
+    "primaryDmMessage": "Hi! Appreciate the interaction 🙌\nHere's the link as promised ⬇️",
+    "primaryDmButtonLabel": "Click me for link",
+    "resourceMessage": (
+        "1. Nikon z50ii\nhttps://link.amazon/B08V0k2KI\n"
+        "2. Sony zv-e10ii\nhttps://link.amazon/B07ZQ5bfd\n"
+        "3. Sony a6400\nhttps://link.amazon/B04SfYq6K\n"
+        "4. Canon Eos r10\nhttps://link.amazon/B03DhzQmC\n"
+        "5. Canon r50v\nhttps://link.amazon/B06J4al3o"
+    ),
     "resourceUrl": "",
     "resource_url": "",
+    "resourceLinks": [],
     "aiFallback": True,
     "ai_fallback": True,
     "enabled": False,
@@ -2953,13 +2977,27 @@ async def save_social_automation(db, payload: Dict[str, Any]) -> Tuple[bool, Opt
         "platforms": [p.lower() for p in (payload.get("platforms") or ["youtube"])],
         "videoUrl": (payload.get("videoUrl") or payload.get("video_url") or "").strip(),
         "video_url": (payload.get("videoUrl") or payload.get("video_url") or "").strip(),
+        "platformUrls": payload.get("platformUrls") or payload.get("platform_urls") or {"youtube": "", "facebook": "", "instagram": ""},
+        "videoTitle": payload.get("videoTitle") or payload.get("video_title") or "",
+        "videoCaption": payload.get("videoCaption") or payload.get("video_caption") or "",
+        "thumbnailUrl": payload.get("thumbnailUrl") or payload.get("thumbnail_url") or "",
         "triggerType": (payload.get("triggerType") or payload.get("trigger_type") or "keyword").lower(),
         "trigger_type": (payload.get("triggerType") or payload.get("trigger_type") or "keyword").lower(),
         "keywords": [k.strip() for k in (payload.get("keywords") or []) if isinstance(k, str) and k.strip()],
+        "triggerDelaySeconds": int(payload.get("triggerDelaySeconds") or payload.get("trigger_delay_seconds") or 30),
         "replyMessage": (payload.get("replyMessage") or payload.get("reply_message") or "").strip(),
         "reply_message": (payload.get("replyMessage") or payload.get("reply_message") or "").strip(),
+        "replyVariations": payload.get("replyVariations") or payload.get("reply_variations") or [],
+        "requireFollow": bool(payload.get("requireFollow") if payload.get("requireFollow") is not None else payload.get("require_follow", True)),
+        "followMessage": payload.get("followMessage") or payload.get("follow_message") or "Oops! Looks like you haven't followed me yet 👀\nIt would mean a lot if you could visit my profile and hit that follow button 😁.",
+        "followButtonLabel": payload.get("followButtonLabel") or payload.get("follow_button_label") or "Visit Profile",
+        "followConfirmLabel": payload.get("followConfirmLabel") or payload.get("follow_confirm_label") or "I'm following ✅",
+        "primaryDmMessage": payload.get("primaryDmMessage") or payload.get("primary_dm_message") or "Hi! Appreciate the interaction 🙌\nHere's the link as promised ⬇️",
+        "primaryDmButtonLabel": payload.get("primaryDmButtonLabel") or payload.get("primary_dm_button_label") or "Click me for link",
+        "resourceMessage": payload.get("resourceMessage") or payload.get("resource_message") or "",
         "resourceUrl": (payload.get("resourceUrl") or payload.get("resource_url") or "").strip(),
         "resource_url": (payload.get("resourceUrl") or payload.get("resource_url") or "").strip(),
+        "resourceLinks": payload.get("resourceLinks") or payload.get("resource_links") or [],
         "aiFallback": bool(payload.get("aiFallback") if payload.get("aiFallback") is not None else payload.get("ai_fallback", True)),
         "ai_fallback": bool(payload.get("aiFallback") if payload.get("aiFallback") is not None else payload.get("ai_fallback", True)),
         "enabled": bool(payload.get("enabled", False)),
@@ -2999,6 +3037,27 @@ async def update_social_automation(db, auto_id: str, updates: Dict[str, Any]) ->
     merged["updated_at"] = datetime.now(timezone.utc).isoformat()
     await db.social_automations.update_one({"id": auto_id}, {"$set": merged})
     return True, None, merged
+
+
+async def duplicate_social_automation(db, auto_id: str) -> Tuple[bool, Optional[str], Optional[Dict[str, Any]]]:
+    """Clones an existing automation as a new draft."""
+    if db is None:
+        return False, "Database not available", None
+    existing = await db.social_automations.find_one({"id": auto_id}, {"_id": 0})
+    if not existing:
+        return False, f"Automation '{auto_id}' not found.", None
+    cloned = dict(existing)
+    cloned["id"] = f"auto_{uuid.uuid4().hex[:12]}"
+    cloned["name"] = f"{existing.get('name', 'Automation')} (Copy)"
+    cloned["status"] = "draft"
+    cloned["enabled"] = False
+    cloned["run_count"] = 0
+    now_iso = datetime.now(timezone.utc).isoformat()
+    cloned["created_at"] = now_iso
+    cloned["updated_at"] = now_iso
+    await db.social_automations.insert_one(dict(cloned))
+    cloned.pop("_id", None)
+    return True, None, cloned
 
 
 async def delete_social_automation(db, auto_id: str) -> bool:
@@ -3088,23 +3147,61 @@ async def simulate_hybrid_reply(
 
     candidates = specific_video_autos + generic_autos
 
-    for auto in candidates:
-        trigger_type = (auto.get("triggerType") or auto.get("trigger_type") or "keyword").lower()
-        if trigger_type == "any_comment":
-            matched_auto = auto
-            matched_kws = ["<ANY_COMMENT_TRIGGER>"]
-            target_match_type = "specific_video" if auto in specific_video_autos else "platform_default"
-            break
-        elif trigger_type == "keyword":
+    # Step 4: Deterministic 4-Pass Candidate Matching (Requirement 4)
+    # Pass 1: Specific video keyword match
+    # Pass 2: Platform default keyword match
+    # Pass 3: Specific video any_comment match
+    # Pass 4: Platform default any_comment match
+    matched_auto = None
+    matched_kws: List[str] = []
+    target_match_type = "none"
+
+    # Pass 1: Specific video keyword match
+    for auto in specific_video_autos:
+        ttype = (auto.get("triggerType") or auto.get("trigger_type") or "keyword").lower()
+        if ttype == "keyword":
             kws = auto.get("keywords") or []
             found = match_keywords_in_text(kws, comment_text)
             if found:
                 matched_auto = auto
                 matched_kws = found
-                target_match_type = "specific_video" if auto in specific_video_autos else "platform_default"
+                target_match_type = "specific_video"
                 break
 
-    # Step 5: Resolve reply
+    # Pass 2: Platform default keyword match
+    if not matched_auto:
+        for auto in generic_autos:
+            ttype = (auto.get("triggerType") or auto.get("trigger_type") or "keyword").lower()
+            if ttype == "keyword":
+                kws = auto.get("keywords") or []
+                found = match_keywords_in_text(kws, comment_text)
+                if found:
+                    matched_auto = auto
+                    matched_kws = found
+                    target_match_type = "platform_default"
+                    break
+
+    # Pass 3: Specific video any_comment match
+    if not matched_auto:
+        for auto in specific_video_autos:
+            ttype = (auto.get("triggerType") or auto.get("trigger_type") or "keyword").lower()
+            if ttype == "any_comment":
+                matched_auto = auto
+                matched_kws = ["<ANY_COMMENT_TRIGGER>"]
+                target_match_type = "specific_video"
+                break
+
+    # Pass 4: Platform default any_comment match
+    if not matched_auto:
+        for auto in generic_autos:
+            ttype = (auto.get("triggerType") or auto.get("trigger_type") or "keyword").lower()
+            if ttype == "any_comment":
+                matched_auto = auto
+                matched_kws = ["<ANY_COMMENT_TRIGGER>"]
+                target_match_type = "platform_default"
+                break
+
+    # Step 5: Resolve replies and SuperProfile-style multi-step workflow
     action = "none"
     selected_reply: Optional[str] = None
     public_reply: Optional[str] = None
@@ -3112,32 +3209,72 @@ async def simulate_hybrid_reply(
     ai_fallback_used = False
     ai_fallback_reason: Optional[str] = None
     resource_url: Optional[str] = None
+    rotation_label = "Replies rotate: 1 of 1"
+
+    # Default SuperProfile visual workflow items
+    video_caption = (
+        (matched_auto.get("videoCaption") or matched_auto.get("videoTitle"))
+        if matched_auto else ""
+    ) or "Under 1 lakhs best camera for beginners #photography #sony #nikon #camera #canon"
+    video_thumb = (
+        (matched_auto.get("thumbnailUrl") or matched_auto.get("video_thumbnail"))
+        if matched_auto else ""
+    ) or "/assets/superprofile-sample-thumb.jpg"
+
+    trigger_delay = int(matched_auto.get("triggerDelaySeconds", 30)) if matched_auto else 30
+    require_follow = bool(matched_auto.get("requireFollow", True)) if matched_auto else True
+    follow_msg = (
+        matched_auto.get("followMessage") if matched_auto else None
+    ) or "Oops! Looks like you haven't followed me yet 👀\nIt would mean a lot if you could visit my profile and hit that follow button 😊."
+    primary_dm_msg = (
+        matched_auto.get("primaryDmMessage") if matched_auto else None
+    ) or "Hi! Appreciate the interaction 🙌\nHere's the link as promised ⬇️"
+    primary_dm_btn = (
+        matched_auto.get("primaryDmButtonLabel") if matched_auto else None
+    ) or "Click me for link"
+    resource_dm_msg = (
+        matched_auto.get("resourceMessage") if matched_auto else None
+    ) or (
+        "1. Nikon z50ii\nhttps://link.amazon/B08V0k2KI\n"
+        "2. Sony zv-e10ii\nhttps://link.amazon/B07ZQ5bfd\n"
+        "3. Sony a6400\nhttps://link.amazon/B04SfYq6K\n"
+        "4. Canon Eos r10\nhttps://link.amazon/B03DhzQmC\n"
+        "5. Canon r50v\nhttps://link.amazon/B06J4al3o"
+    )
 
     if matched_auto:
         action = "keyword_automation" if matched_kws != ["<ANY_COMMENT_TRIGGER>"] else "any_comment_automation"
-        base_reply = (matched_auto.get("replyMessage") or matched_auto.get("reply_message") or "").strip()
-        resource_url = (matched_auto.get("resourceUrl") or matched_auto.get("resource_url") or "").strip()
+        
+        # Check rotating variations
+        variations = matched_auto.get("replyVariations") or []
+        if variations and isinstance(variations, list) and len(variations) > 0:
+            rotation_label = f"Replies rotate: 1 of {len(variations)}"
+            base_reply = variations[0].strip()
+        else:
+            base_reply = (matched_auto.get("replyMessage") or matched_auto.get("reply_message") or "").strip()
 
-        # Append resourceUrl if present and not already in reply
-        if resource_url and resource_url not in base_reply:
-            base_reply = f"{base_reply} {resource_url}".strip()
+        resource_url = (matched_auto.get("resourceUrl") or matched_auto.get("resource_url") or "").strip()
 
         # Format public reply
         public_reply = base_reply.replace("{username}", clean_author)
 
-        # Platform specific formatting
+        # Append resourceUrl if present and not in reply
+        if resource_url and resource_url not in public_reply and "{username}" not in resource_url:
+            public_reply = f"{public_reply} {resource_url}".strip()
+
+        # Format Instagram DMs
         if platform_norm == "instagram":
-            # For Instagram, provide both Public Reply and Private DM Preview
-            dm_reply = (
-                f"Hi @{clean_author}! 🙌\n\n"
-                f"{matched_auto.get('replyMessage', '').strip()}"
-            )
-            if resource_url:
-                dm_reply += f"\n\n🔗 Access Link: {resource_url}"
+            # Primary DM
+            dm_reply = primary_dm_msg.replace("{username}", clean_author)
+            
+            # If resourceMessage is empty but resource_url is provided, compose a clean resource text
+            if not resource_dm_msg and resource_url:
+                resource_dm_msg = f"Here is your link: {resource_url}"
+        
         selected_reply = public_reply
 
     else:
-        # Check if an automation exists for this platform that has aiFallback enabled
+        # Check if AI Fallback is allowed
         allow_ai = any(
             bool(a.get("aiFallback") if a.get("aiFallback") is not None else a.get("ai_fallback", True))
             for a in (candidates or automations)
@@ -3156,6 +3293,7 @@ async def simulate_hybrid_reply(
             public_reply = selected_reply
             if platform_norm == "instagram":
                 dm_reply = f"Hi @{clean_author}!\n\n{selected_reply}"
+                resource_dm_msg = selected_reply
             ai_fallback_reason = (
                 f"No keyword matched in {len(candidates)} candidate automation(s). "
                 f"Contextual {ai_eval['source']} AI generated reply for intent '{intent}'."
@@ -3168,7 +3306,120 @@ async def simulate_hybrid_reply(
             selected_reply = None
             public_reply = None
             dm_reply = None
+            resource_dm_msg = None
             ai_fallback_reason = "No keyword rule matched and AI Fallback is disabled."
+
+    # Step 6: Assemble Full SuperProfile Visual Workflow Steps
+    workflow_steps = {
+        "step1_video": {
+            "title": "Select Video",
+            "description": "Trigger automation when someone comments on this specific post",
+            "thumbnail_url": video_thumb,
+            "caption": video_caption,
+            "platform": platform_norm,
+            "video_url": (matched_auto.get("videoUrl") or video_url) if matched_auto else (video_url or ""),
+            "video_id": incoming_media_id or "post_media_001"
+        },
+        "step2_trigger": {
+            "title": "Comment Trigger",
+            "description": f"Trigger: {target_match_type} ({', '.join(matched_kws) if matched_kws else 'None'})",
+            "trigger_type": (matched_auto.get("triggerType") if matched_auto else "keyword"),
+            "matched_keywords": matched_kws,
+            "delay_seconds": trigger_delay,
+            "delay_caption": f"then wait {trigger_delay} seconds after the trigger"
+        },
+        "step3_public_reply": {
+            "title": "Public Comment Reply",
+            "description": "Leave a reply to their comment on the post",
+            "rotation_label": rotation_label,
+            "viewer_username": clean_author,
+            "viewer_comment": comment_text,
+            "creator_username": "pranvith_dop",
+            "reply_text": public_reply
+        },
+        "step4_follow_request": {
+            "title": "Instagram Follow Request",
+            "description": "Ask non-followers to visit profile and follow before delivering DM link",
+            "active": (platform_norm == "instagram" and require_follow),
+            "message": follow_msg,
+            "buttons": [
+                {"label": "Visit Profile", "action": "visit_profile"},
+                {"label": "I'm following ✅", "action": "confirm_follow"}
+            ]
+        },
+        "step5_primary_dm": {
+            "title": "Primary Instagram DM",
+            "description": "Once they follow, send them the primary DM with action button",
+            "active": (platform_norm == "instagram" and bool(dm_reply)),
+            "message": dm_reply or primary_dm_msg,
+            "button": {
+                "label": primary_dm_btn,
+                "action": "open_resource"
+            }
+        },
+        "step6_resource_message": {
+            "title": "Final Resource Message",
+            "description": "On the Primary DM, if they tap on the button, send them the following DM",
+            "active": (platform_norm == "instagram" and bool(resource_dm_msg)),
+            "message": resource_dm_msg or "",
+            "resource_url": resource_url or ""
+        },
+        "step7_ai_fallback": {
+            "title": "AI Fallback Intelligence",
+            "description": "Contextual AI response generation when no automation keywords match",
+            "used": ai_fallback_used,
+            "reason": ai_fallback_reason,
+            "intent": intent,
+            "detected_language": lang
+        }
+    }
+
+    # Step 7: Multi-Step Simulated Conversation (for phone mockup)
+    conversation_steps = [
+        {
+            "step_id": "viewer_comment",
+            "sender": clean_author,
+            "is_creator": False,
+            "type": "comment",
+            "text": comment_text
+        }
+    ]
+    if public_reply:
+        conversation_steps.append({
+            "step_id": "public_reply",
+            "sender": "pranvith_dop",
+            "is_creator": True,
+            "type": "public_reply",
+            "rotation_label": rotation_label,
+            "text": public_reply
+        })
+
+    if platform_norm == "instagram" and public_reply:
+        if require_follow:
+            conversation_steps.append({
+                "step_id": "follow_request",
+                "sender": "pranvith_dop",
+                "is_creator": True,
+                "type": "dm_follow_request",
+                "text": follow_msg,
+                "buttons": ["Visit Profile", "I'm following ✅"]
+            })
+        conversation_steps.append({
+            "step_id": "primary_dm",
+            "sender": "pranvith_dop",
+            "is_creator": True,
+            "type": "dm_primary",
+            "text": dm_reply or primary_dm_msg,
+            "button": primary_dm_btn
+        })
+        if resource_dm_msg:
+            conversation_steps.append({
+                "step_id": "resource_dm",
+                "sender": "pranvith_dop",
+                "is_creator": True,
+                "type": "dm_resource",
+                "text": resource_dm_msg
+            })
 
     return {
         "status": "preview_only",
@@ -3200,5 +3451,7 @@ async def simulate_hybrid_reply(
         "requires_approval": requires_approval,
         "final_reply_preview": public_reply or "(No reply generated - action is none)",
         "superprofile_status": "30 SuperProfile automations protected (Preview Only)" if platform_norm == "instagram" else "N/A",
+        "workflow_steps": workflow_steps,
+        "conversation_steps": conversation_steps,
         "timestamp": now_iso
     }

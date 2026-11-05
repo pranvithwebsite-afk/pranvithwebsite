@@ -6463,13 +6463,27 @@ class HybridAutomationIn(BaseModel):
     platforms: List[str] = ["youtube", "facebook", "instagram"]
     videoUrl: Optional[str] = ""
     video_url: Optional[str] = ""
+    platformUrls: Optional[Dict[str, str]] = None
+    videoTitle: Optional[str] = ""
+    videoCaption: Optional[str] = ""
+    thumbnailUrl: Optional[str] = ""
     triggerType: str = "keyword"
     trigger_type: Optional[str] = None
     keywords: List[str] = []
+    triggerDelaySeconds: Optional[int] = 30
     replyMessage: str = ""
     reply_message: Optional[str] = None
+    replyVariations: Optional[List[str]] = None
+    requireFollow: Optional[bool] = True
+    followMessage: Optional[str] = None
+    followButtonLabel: Optional[str] = "Visit Profile"
+    followConfirmLabel: Optional[str] = "I'm following ✅"
+    primaryDmMessage: Optional[str] = None
+    primaryDmButtonLabel: Optional[str] = "Click me for link"
+    resourceMessage: Optional[str] = ""
     resourceUrl: Optional[str] = ""
     resource_url: Optional[str] = None
+    resourceLinks: Optional[List[Dict[str, str]]] = None
     aiFallback: bool = True
     ai_fallback: Optional[bool] = None
     enabled: bool = False
@@ -6527,6 +6541,21 @@ async def admin_update_hybrid_automation(
     if not ok:
         raise HTTPException(status_code=400, detail=err or "Failed to update automation")
     return {"success": True, "message": f"Automation '{doc.get('name')}' updated successfully.", "automation": doc}
+
+@admin_router.post("/social/automations/{automation_id}/duplicate")
+async def admin_duplicate_hybrid_automation(
+    automation_id: str,
+    current_admin: AdminBase = Depends(get_current_active_admin)
+):
+    try:
+        from .social_automation import duplicate_social_automation
+    except ImportError:
+        from social_automation import duplicate_social_automation
+
+    ok, err, doc = await duplicate_social_automation(db, automation_id)
+    if not ok:
+        raise HTTPException(status_code=400, detail=err or "Failed to duplicate automation")
+    return {"success": True, "message": f"Automation duplicated as '{doc.get('name')}'.", "automation": doc}
 
 @admin_router.delete("/social/automations/{automation_id}")
 async def admin_delete_hybrid_automation(
