@@ -87,7 +87,8 @@ const Customers = () => {
       }
       await loadCustomers();
     } catch (error) {
-      const message = error?.response?.data?.detail || error?.message || 'Download email could not be resent.';
+      const data = error?.response?.data;
+      const message = data?.message || data?.detail || formatApiErrorDetail(data?.detail) || error?.message || 'Download email could not be resent.';
       toast.error(message);
       await loadCustomers();
     } finally {
