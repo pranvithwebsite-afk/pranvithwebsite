@@ -1,9 +1,24 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Mail, Phone, RefreshCw, Search, ShoppingBag } from 'lucide-react';
+import { Check, Copy, Mail, Phone, RefreshCw, Search, ShoppingBag } from 'lucide-react';
 import { toast } from 'sonner';
 import { fetchAdminCustomers, formatApiErrorDetail, resendDownloadEmail, syncRazorpayStatus } from '../../lib/api';
 
 const statusOptions = ['all', 'paid', 'failed', 'pending', 'cancelled'];
+
+const normalizeSlug = (slug) => {
+  if (!slug) return 'N/A';
+  if (slug === 'c' || slug === 'creative-lut') return 'creative-luts-pack';
+  return slug;
+};
+
+const isFreeOrder = (order) => {
+  if (!order) return false;
+  if (Number(order.amount) === 0) return true;
+  if (order.is_free) return true;
+  const oid = String(order.razorpay_order_id || '');
+  const pid = String(order.razorpay_payment_id || '');
+  return oid.startsWith('free_') || pid.startsWith('free_');
+};
 
 const formatAmount = (amount = 0, currency = 'INR') =>
   new Intl.NumberFormat('en-IN', {
@@ -42,6 +57,7 @@ const Customers = () => {
   const [product, setProduct] = useState('all');
   const [resendingOrderId, setResendingOrderId] = useState('');
   const [syncingOrderId, setSyncingOrderId] = useState('');
+  const [copiedOrderId, setCopiedOrderId] = useState('');
 
   const loadCustomers = () => {
     setLoading(true);
@@ -63,8 +79,12 @@ const Customers = () => {
     if (!orderId) return;
     setResendingOrderId(orderId);
     try {
-      await resendDownloadEmail(orderId);
-      toast.success('Download email resent successfully.');
+      const res = await resendDownloadEmail(orderId);
+      if (res?.success === false) {
+        toast.info(res.message || 'Email delivery unavailable. You can use Copy Download Link.');
+      } else {
+        toast.success(res?.message || 'Download email resent successfully.');
+      }
       await loadCustomers();
     } catch (error) {
       const message = error?.response?.data?.detail || error?.message || 'Download email could not be resent.';
@@ -72,6 +92,19 @@ const Customers = () => {
       await loadCustomers();
     } finally {
       setResendingOrderId('');
+    }
+  };
+
+  const handleCopyLink = async (order) => {
+    const orderId = order?.razorpay_order_id || order?.order_id;
+    const url = order?.download_url || `${window.location.origin}/api/orders/${orderId}/download`;
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopiedOrderId(orderId);
+      toast.success('Direct download link copied to clipboard!');
+      setTimeout(() => setCopiedOrderId(''), 2500);
+    } catch (e) {
+      toast.error('Could not copy link to clipboard');
     }
   };
 
@@ -100,8 +133,8 @@ const Customers = () => {
     const seen = new Map();
     customers.forEach((customer) => {
       (customer.orders || []).forEach((order) => {
-        const slug = order.product_slug || order.asset_slug;
-        if (!slug) return;
+        const slug = normalizeSlug(order.product_slug || order.asset_slug);
+        if (!slug || slug === 'N/A') return;
         seen.set(slug, order.product_name || order.asset_title || slug);
       });
     });
@@ -114,7 +147,7 @@ const Customers = () => {
       .map((customer) => {
         const orders = (customer.orders || []).filter((order) => {
           const orderStatus = normalizeStatus(order.payment_status || order.status);
-          const slug = order.product_slug || order.asset_slug;
+          const slug = normalizeSlug(order.product_slug || order.asset_slug);
           if (status !== 'all' && orderStatus !== status) return false;
           if (product !== 'all' && slug !== product) return false;
           return true;
@@ -185,8 +218,10 @@ const Customers = () => {
               customer={customer}
               onResend={handleResend}
               onSync={handleSync}
+              onCopyLink={handleCopyLink}
               resendingOrderId={resendingOrderId}
               syncingOrderId={syncingOrderId}
+              copiedOrderId={copiedOrderId}
             />
           ))
         ) : (
@@ -199,7 +234,7 @@ const Customers = () => {
   );
 };
 
-const CustomerCard = ({ customer, onResend, onSync, resendingOrderId, syncingOrderId }) => {
+const CustomerCard = ({ customer, onResend, onSync, onCopyLink, resendingOrderId, syncingOrderId, copiedOrderId }) => {
   const orders = customer.orders || [];
   const paidCustomer = orders.some((order) => normalizeStatus(order.payment_status || order.status) === 'paid');
   const repeatCustomer = orders.length > 1;
@@ -234,8 +269,10 @@ const CustomerCard = ({ customer, onResend, onSync, resendingOrderId, syncingOrd
             order={order}
             onResend={onResend}
             onSync={onSync}
+            onCopyLink={onCopyLink}
             isResending={resendingOrderId === (order.razorpay_order_id || order.order_id)}
             isSyncing={syncingOrderId === (order.razorpay_order_id || order.order_id)}
+            copied={copiedOrderId === (order.razorpay_order_id || order.order_id)}
           />
         ))}
       </div>
@@ -243,10 +280,11 @@ const CustomerCard = ({ customer, onResend, onSync, resendingOrderId, syncingOrd
   );
 };
 
-const OrderRow = ({ order, onResend, onSync, isResending, isSyncing }) => {
+const OrderRow = ({ order, onResend, onSync, onCopyLink, isResending, isSyncing, copied }) => {
   const paymentStatus = normalizeStatus(order.payment_status || order.status);
   const deliveryStatus = emailDeliveryStatus(order);
   const deliveryError = emailDeliveryError(order);
+  const isFree = isFreeOrder(order);
   const statusClass = paymentStatus === 'paid'
     ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-200'
     : paymentStatus === 'failed'
@@ -260,12 +298,19 @@ const OrderRow = ({ order, onResend, onSync, isResending, isSyncing }) => {
           <ShoppingBag size={15} className="text-violet-300" />
           {order.product_name || order.asset_title || 'Product'}
         </p>
-        <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${statusClass}`}>
-          {paymentStatus}
-        </span>
+        <div className="flex items-center gap-2">
+          {isFree && (
+            <span className="rounded-full border border-sky-500/20 bg-sky-500/10 px-2.5 py-0.5 text-xs font-medium text-sky-200">
+              Free Order
+            </span>
+          )}
+          <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${statusClass}`}>
+            {paymentStatus}
+          </span>
+        </div>
       </div>
       <dl className="mt-4 grid gap-3 text-xs text-slate-400 sm:grid-cols-2">
-        <Info label="Asset slug" value={order.product_slug || order.asset_slug || 'N/A'} />
+        <Info label="Asset slug" value={normalizeSlug(order.product_slug || order.asset_slug)} />
         <Info label="Amount" value={formatAmount(order.amount, order.currency || 'INR')} />
         <Info label="Razorpay payment ID" value={order.razorpay_payment_id || 'N/A'} />
         <Info label="Razorpay order ID" value={order.razorpay_order_id || 'N/A'} />
@@ -284,13 +329,24 @@ const OrderRow = ({ order, onResend, onSync, isResending, isSyncing }) => {
         </button>
         <button
           type="button"
-          onClick={() => onSync(order)}
-          disabled={isSyncing || !order.razorpay_order_id}
-          className="inline-flex h-10 items-center gap-2 rounded-2xl border border-slate-700 bg-slate-800 px-4 text-sm font-semibold text-slate-100 transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
+          onClick={() => onCopyLink(order)}
+          disabled={paymentStatus !== 'paid'}
+          className="inline-flex h-10 items-center gap-2 rounded-2xl border border-violet-500/30 bg-slate-900 px-4 text-sm font-semibold text-violet-200 transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          <RefreshCw size={15} className={isSyncing ? 'animate-spin' : ''} />
-          {isSyncing ? 'Syncing...' : 'Sync with Razorpay'}
+          {copied ? <Check size={15} className="text-emerald-400" /> : <Copy size={15} />}
+          {copied ? 'Copied Download Link' : 'Copy Download Link'}
         </button>
+        {!isFree && (
+          <button
+            type="button"
+            onClick={() => onSync(order)}
+            disabled={isSyncing || !order.razorpay_order_id}
+            className="inline-flex h-10 items-center gap-2 rounded-2xl border border-slate-700 bg-slate-800 px-4 text-sm font-semibold text-slate-100 transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <RefreshCw size={15} className={isSyncing ? 'animate-spin' : ''} />
+            {isSyncing ? 'Syncing...' : 'Sync with Razorpay'}
+          </button>
+        )}
       </div>
       {deliveryError && <p className="mt-3 text-xs text-amber-300">{deliveryError}</p>}
     </div>

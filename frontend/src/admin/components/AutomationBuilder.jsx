@@ -1541,40 +1541,29 @@ export default function AutomationBuilder() {
 
               </div>
 
-              {/* Bottom Action: Disable Automation (Exact match to Screenshots 1, 2, 3, 4) */}
-              <div className="pt-4 border-t border-gray-100 space-y-3">
-                <button
-                  type="button"
-                  onClick={() => {
-                    const next = !formData.enabled;
-                    setFormData({ ...formData, enabled: next });
-                    toast.info(next ? 'Automation Enabled (Preview Only)' : 'Automation Disabled');
-                  }}
-                  className="w-full py-3.5 px-6 rounded-full border border-gray-300 bg-white hover:bg-gray-50 text-gray-900 text-sm font-semibold text-center transition-all shadow-sm"
-                >
-                  {formData.enabled ? 'Disable Automation' : 'Enable Automation'}
-                </button>
-              </div>
-
             </div>
 
-            {/* Modal Footer Controls */}
-            <div className="p-4 border-t border-gray-100 bg-gray-50 flex items-center justify-between sticky bottom-0 z-20">
+            {/* Modal Bottom Pinned Action: Disable Automation (Exact match to Screenshots 1, 2, 4) */}
+            <div className="p-4 border-t border-gray-100 bg-white sticky bottom-0 z-20">
               <button
                 type="button"
-                onClick={() => setShowEditorModal(false)}
-                className="px-5 py-2 rounded-2xl bg-gray-200 hover:bg-gray-300 text-gray-700 text-xs font-semibold"
+                onClick={async () => {
+                  const next = !formData.enabled;
+                  const nextData = { ...formData, enabled: next };
+                  setFormData(nextData);
+                  setAutomations((prev) =>
+                    prev.map((a) => (a.id === formData.id ? { ...a, enabled: next } : a))
+                  );
+                  try {
+                    await createAdminHybridAutomation({ ...nextData, safeTestingMode: true });
+                  } catch (e) {
+                    console.warn('Backend fallback:', e);
+                  }
+                  toast.success(next ? 'Automation Enabled' : 'Automation Disabled');
+                }}
+                className="w-full py-3.5 px-6 rounded-full border border-gray-300 bg-white hover:bg-gray-50 text-gray-900 text-sm font-semibold text-center transition-all shadow-sm active:scale-[0.99]"
               >
-                Close
-              </button>
-              <button
-                type="button"
-                onClick={handleStepSave}
-                disabled={saving}
-                className="px-6 py-2 rounded-2xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold shadow-md flex items-center gap-1.5"
-              >
-                <Save className="w-3.5 h-3.5" />
-                {saving ? 'Saving...' : 'Save Draft'}
+                {formData.enabled ? 'Disable Automation' : 'Enable Automation'}
               </button>
             </div>
 

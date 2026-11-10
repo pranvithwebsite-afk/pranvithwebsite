@@ -3081,9 +3081,14 @@ async def public_product_by_slug(slug: str):
             raise HTTPException(status_code=404, detail="Product not found")
         return _public_product(product)
     try:
-        product = await db.products.find_one({"slug": slug, "published": True}, {"download_file": 0, "download_file_url": 0, "download_file_key": 0, "download_file_name": 0, "download_file_bucket": 0, "payment_link": 0, "razorpay_payment_link_id": 0, "razorpay_payment_link_url": 0, "razorpay_payment_link_status": 0})
+        product = await db.products.find_one(
+            {"published": True, "$or": [{"slug": slug}, {"legacy_slugs": slug}, {"id": slug}]},
+            {"download_file": 0, "download_file_url": 0, "download_file_key": 0, "download_file_name": 0, "download_file_bucket": 0, "payment_link": 0, "razorpay_payment_link_id": 0, "razorpay_payment_link_url": 0, "razorpay_payment_link_status": 0}
+        )
         if not product:
-            raise HTTPException(status_code=404, detail="Product not found")
+            product = next((product for product in ASSET_PRODUCTS if (product.get("slug") == slug or slug in product.get("legacy_slugs", [])) and product.get("published", True)), None)
+            if not product:
+                raise HTTPException(status_code=404, detail="Product not found")
         return _public_product(product)
     except HTTPException:
         raise
@@ -4726,12 +4731,19 @@ async def admin_resend_download_email(order_id: str, current_admin: AdminBase = 
     await _upsert_checkout_customer(updated_order, product)
 
     if not sent:
-        raise HTTPException(status_code=502, detail=error or "Download email could not be sent")
+        return {
+            "success": False,
+            "message": f"Email delivery unavailable ({error or 'SMTP unconfigured'}). Direct download link generated.",
+            "error": error,
+            "download_url": _public_download_url(download_url),
+            "order": _public_order_payload(updated_order),
+        }
 
     return {
         "success": True,
         "message": "Download email resent successfully.",
         "order": _public_order_payload(updated_order),
+        "download_url": _public_download_url(download_url),
     }
 
 
@@ -4930,7 +4942,7 @@ async def admin_recheck_razorpay_payments(current_admin: AdminBase = Depends(get
 async def admin_customers(current_admin: AdminBase = Depends(get_current_active_admin)):
     try:
         customer_rows = await db.customers.find({}, {"_id": 0}).to_list(500)
-        order_rows = await db.orders.find({}, {"_id": 0, "download_file": 0, "download_url": 0, "download_token_hash": 0, "razorpay_signature": 0}).sort([("created_at", -1)]).to_list(1000)
+        order_rows = await db.orders.find({}, {"_id": 0, "download_file": 0, "download_token_hash": 0, "razorpay_signature": 0}).sort([("created_at", -1)]).to_list(1000)
     except Exception:
         logger.exception("Admin customers fetch failed")
         raise HTTPException(status_code=500, detail="Could not load customers")
@@ -7527,13 +7539,13 @@ async def _find_checkout_product(product_id: Optional[str], product_slug: Option
             if product:
                 product["mongoId"] = product_id
         if not product and product_slug:
-            product = await db.products.find_one({**query, "slug": product_slug}, {"_id": 0})
+            product = await db.products.find_one({**query, "$or": [{"slug": product_slug}, {"legacy_slugs": product_slug}]}, {"_id": 0})
     if not product:
         product = next(
             (
                 p for p in ASSET_PRODUCTS
                 if p.get("published", True)
-                and ((product_id and p.get("id") == product_id) or (product_slug and p.get("slug") == product_slug))
+                and ((product_id and p.get("id") == product_id) or (product_slug and (p.get("slug") == product_slug or product_slug in p.get("legacy_slugs", []))))
             ),
             None,
         )
@@ -8037,6 +8049,8 @@ def _customer_order_summary(order: dict, product: dict) -> dict:
         "email_error": email_delivery_error,
         "email_attempted_at": order.get("email_attempted_at"),
         "email_delivery_attempted_at": order.get("email_delivery_attempted_at") or order.get("email_attempted_at"),
+        "download_url": _public_download_url(order.get("download_url")) if order.get("download_url") else None,
+        "is_free": int(order.get("amount") or 0) == 0 or bool(order.get("is_free")) or str(order.get("razorpay_order_id") or "").startswith("free_") or str(order.get("razorpay_payment_id") or "").startswith("free_"),
     }
 
 
@@ -8196,10 +8210,14 @@ def _send_download_email(
     smtp_user = os.environ.get("SMTP_USER")
     smtp_pass = os.environ.get("SMTP_PASS")
     smtp_from = os.environ.get("FROM_EMAIL") or os.environ.get("SMTP_FROM") or smtp_user
-    if not all([smtp_host, smtp_port, smtp_user, smtp_pass, smtp_from]):
-        error = "SMTP is not fully configured"
+    if (
+        not all([smtp_host, smtp_port, smtp_user, smtp_pass, smtp_from])
+        or smtp_host in ("smtp.example.com", "example.com", "localhost")
+        or smtp_user in ("replace_me", "user@example.com")
+        or smtp_pass == "replace_me"
+    ):
+        error = "SMTP is not configured in environment (smtp.example.com placeholder)"
         logger.warning("Download email skipped: %s", error)
-        # Explicitly return a dict, even on failure
         return {"sent": False, "error": error}
 
     msg = EmailMessage()
