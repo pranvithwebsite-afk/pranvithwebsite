@@ -1,204 +1,188 @@
-import React, { Suspense, lazy } from 'react';
-import { ArrowRight } from 'lucide-react';
-import Header from '../components/Header';
-import Hero from '../components/Hero';
-import Footer from '../components/Footer';
-import { usePublicPageLoading } from '../components/PublicPageLoader';
+import React, { useState, useMemo } from 'react';
+import '../styles/cinematic.css';
+import CinematicTopbar from '../components/cinematic/CinematicTopbar';
+import CinematicHero from '../components/cinematic/CinematicHero';
+import CinematicExperience from '../components/cinematic/CinematicExperience';
+import CinematicShowreel from '../components/cinematic/CinematicShowreel';
+import CinematicPortfolio from '../components/cinematic/CinematicPortfolio';
+import CinematicAbout from '../components/cinematic/CinematicAbout';
+import CinematicServices from '../components/cinematic/CinematicServices';
+import CinematicContact from '../components/cinematic/CinematicContact';
+import CinematicFooter from '../components/cinematic/CinematicFooter';
+import CinematicModal from '../components/cinematic/CinematicModal';
 import { useCmsPage } from '../hooks/useCmsPage';
-import { safePublicHref } from '../lib/utils';
-import CmsSectionRenderer from '../components/cms/CmsSectionRenderer';
-import SafeVideoEmbed, { detectMediaType } from '../components/SafeVideoEmbed';
+import { usePublicPageLoading } from '../components/PublicPageLoader';
 
-const ServicesSection = lazy(() => import('../components/ServicesSection'));
-const ShowreelSection = lazy(() => import('../components/ShowreelSection'));
-const TransformVision = lazy(() => import('../components/TransformVision'));
-const OurWorks = lazy(() => import('../components/OurWorks'));
-const FAQ = lazy(() => import('../components/FAQ'));
+const DEFAULT_ORDER = [
+  'hero',
+  'experience',
+  'showreel',
+  'portfolio',
+  'about',
+  'services',
+  'contact',
+];
 
-const sectionToHomeKey = {
-  hero: 'hero',
-  services: 'services',
-  services_cards: 'services',
-  showreel: 'showreel',
-  cta: 'cta',
-  'featured-assets': 'featuredAssets',
-  featured_assets_preview: 'featuredAssets',
-  portfolio_grid: 'featuredAssets',
-  instagram: 'instagramProfile',
-  'instagram-profile': 'instagramProfile',
-  instagram_profile: 'instagramProfile',
-  gallery: 'instagramProfile',
-  faq: 'footerCta',
-};
-
-const sectionByKey = (sections = []) => (key) =>
-  sections.find((section) => section.section_id === key)
-  || sections.find((section) => section.type === key);
-
-const firstText = (...values) =>
-  values.find((value) => typeof value === 'string' && value.trim()) || '';
-
-const videoMediaTypes = new Set(['video_file', 'video_url', 'youtube', 'vimeo']);
-
-const homeOrderFromCms = (sections = [], allowFallback = false) => {
-  const order = sections
-    .map((section) => sectionToHomeKey[section.section_id]
-      || sectionToHomeKey[section.type]
-      || `cms:${section.id || section.section_id}`)
-    .filter(Boolean);
-  return order.length || !allowFallback ? order : ['hero', 'featuredAssets', 'instagramProfile', 'services', 'showreel', 'cta', 'footerCta'];
+const findSection = (sections, key) => {
+  if (!Array.isArray(sections)) return null;
+  return (
+    sections.find((s) => s.section_id === key) ||
+    sections.find((s) => s.type === key) ||
+    sections.find((s) => {
+      if (key === 'about' && (s.section_id === 'about_me' || s.type === 'about_me')) return true;
+      if (
+        key === 'portfolio' &&
+        (s.section_id === 'portfolio_highlights' ||
+          s.section_id === 'featured-assets' ||
+          s.section_id === 'works' ||
+          s.type === 'portfolio_grid')
+      )
+        return true;
+      if (key === 'services' && (s.type === 'services_cards' || s.type === 'home_services'))
+        return true;
+      if (key === 'contact' && (s.section_id === 'cta' || s.type === 'cta')) return true;
+      if (key === 'showreel' && (s.section_id === 'selected_moments' || s.type === 'showreel'))
+        return true;
+      if (key === 'experience' && s.section_id === 'shoot_experience') return true;
+      return false;
+    })
+  );
 };
 
 const Home = () => {
-  const { page, loading, error } = useCmsPage('home');
+  const { page, loading } = useCmsPage('home');
   usePublicPageLoading(loading);
-  const cmsSections = page?.sections || [];
-  const findSection = sectionByKey(cmsSections);
-  const heroSection = findSection('hero');
-  const ctaSection = findSection('cta');
-  const worksSection = findSection('featured-assets') || findSection('portfolio_grid');
-  const instagramSection = findSection('instagram-profile') || findSection('instagram') || findSection('gallery');
-  const servicesSection = findSection('services') || findSection('services_cards') || findSection('home_services');
-  const showreelSection = findSection('showreel');
-  const faqSection = findSection('faq');
-  const order = homeOrderFromCms(cmsSections, !loading && (!!error || !page));
 
-  const heroData = heroSection ? {
-    badgeText: firstText(heroSection.subtitle, heroSection.data?.badge_text),
-    headline: firstText(heroSection.title, heroSection.data?.title, heroSection.data?.heading, heroSection.data?.hero_title),
-    subheadline: firstText(heroSection.description, heroSection.data?.description, heroSection.data?.hero_subtitle),
-    image: firstText(heroSection.image_url, heroSection.data?.image_url, !videoMediaTypes.has(heroSection.media_type) ? heroSection.media_url : '', !videoMediaTypes.has(heroSection.data?.hero_media_type) ? heroSection.data?.hero_media_url : ''),
-    videoUrl: firstText(heroSection.video_url, heroSection.data?.video_url, videoMediaTypes.has(heroSection.media_type) ? heroSection.media_url : '', videoMediaTypes.has(heroSection.data?.media_type) ? heroSection.data?.media_url : '', videoMediaTypes.has(heroSection.data?.hero_media_type) ? heroSection.data?.hero_media_url : ''),
-    thumbnailUrl: firstText(heroSection.thumbnail_url, heroSection.data?.thumbnail_url, heroSection.data?.thumbnail_image_url),
-    mediaType: firstText(heroSection.media_type, heroSection.data?.media_type, heroSection.data?.hero_media_type),
-    posterUrl: firstText(heroSection.poster_url, heroSection.image_url, heroSection.thumbnail_url, heroSection.data?.poster_url, heroSection.data?.image_url, heroSection.data?.thumbnail_url, heroSection.data?.hero_media_poster_url),
-    buttonText: firstText(heroSection.button_text, heroSection.data?.button_text, heroSection.data?.primary_button_text),
-    buttonUrl: firstText(heroSection.button_link, heroSection.data?.button_link, heroSection.data?.primary_button_link),
-    secondaryButtonText: firstText(heroSection.data?.secondary_button_text),
-    secondaryButtonUrl: firstText(heroSection.data?.secondary_button_link),
-  } : null;
+  const [activeModalVideo, setActiveModalVideo] = useState(null);
+
+  const cmsSections = useMemo(() => page?.sections || [], [page?.sections]);
+
+  const sectionOrder = useMemo(() => {
+    if (cmsSections.length > 0) {
+      const list = cmsSections.map((s) => {
+        const id = s.section_id || s.type;
+        if (
+          id === 'portfolio_highlights' ||
+          id === 'portfolio_grid' ||
+          id === 'featured-assets' ||
+          id === 'works'
+        )
+          return 'portfolio';
+        if (id === 'services_cards' || id === 'home_services') return 'services';
+        if (id === 'about_me') return 'about';
+        if (id === 'cta') return 'contact';
+        if (id === 'selected_moments' || id === 'showreel') return 'showreel';
+        if (id === 'shoot_experience') return 'experience';
+        return id;
+      });
+
+      const seen = new Set();
+      const unique = [];
+      for (const item of list) {
+        if (!seen.has(item) && DEFAULT_ORDER.includes(item)) {
+          seen.add(item);
+          unique.push(item);
+        }
+      }
+      for (const item of DEFAULT_ORDER) {
+        if (!seen.has(item)) unique.push(item);
+      }
+      return unique;
+    }
+    return DEFAULT_ORDER;
+  }, [cmsSections]);
 
   return (
-    <>
-      <Header />
-      <main className="home-page public-page page relative bg-black text-white">
-        {order.map((sectionKey) => {
-          if (sectionKey.startsWith('cms:')) {
-            const sectionId = sectionKey.slice(4);
-            const cmsSection = cmsSections.find((section) => String(section.id || section.section_id) === sectionId);
-            return cmsSection ? <CmsSectionRenderer key={sectionKey} section={cmsSection} /> : null;
+    <div className="cinematic-site home-page">
+      <CinematicTopbar />
+
+      <main id="main-content">
+        {sectionOrder.map((key) => {
+          if (key === 'hero') {
+            const s = findSection(cmsSections, 'hero');
+            if (s && s.enabled === false) return null;
+            return (
+              <CinematicHero
+                key="hero"
+                section={s}
+                isVideoModalOpen={!!activeModalVideo}
+              />
+            );
           }
-          const sections = {
-            hero: (
-              <React.Fragment key="hero">
-                <Hero pageData={heroData} loading={loading} fallbackAllowed={!loading && (!!error || !heroSection)} />
-                <HomeHeroVideo hero={heroData} />
-              </React.Fragment>
-            ),
-            featuredAssets: (
-              <Suspense key="featuredAssets" fallback={<SectionSkeleton />}>
-                <OurWorks section={worksSection} />
-              </Suspense>
-            ),
-            instagramProfile: instagramSection ? (
-              <Suspense key="instagramProfile" fallback={<SectionSkeleton />}>
-                <TransformVision section={instagramSection} />
-              </Suspense>
-            ) : null,
-            services: servicesSection ? (
-              <Suspense key="services" fallback={<SectionSkeleton />}>
-                <ServicesSection section={servicesSection} />
-              </Suspense>
-            ) : null,
-            showreel: showreelSection ? (
-              <Suspense key="showreel" fallback={<SectionSkeleton />}>
-                <ShowreelSection section={showreelSection} />
-              </Suspense>
-            ) : null,
-            cta: <HomeCta key="cta" section={ctaSection} />,
-            footerCta: faqSection ? (
-              <Suspense key="footerCta" fallback={<SectionSkeleton />}>
-                <FAQ section={faqSection} />
-              </Suspense>
-            ) : null,
-          };
-          const content = sections[sectionKey] || null;
-          if (!content) return null;
-          return content;
+
+          if (key === 'experience') {
+            const s =
+              findSection(cmsSections, 'experience') ||
+              findSection(cmsSections, 'shoot_experience');
+            if (s && s.enabled === false) return null;
+            return <CinematicExperience key="experience" section={s} />;
+          }
+
+          if (key === 'showreel') {
+            const s =
+              findSection(cmsSections, 'showreel') ||
+              findSection(cmsSections, 'selected_moments');
+            if (s && s.enabled === false) return null;
+            return (
+              <CinematicShowreel
+                key="showreel"
+                section={s}
+                onPlayVideo={setActiveModalVideo}
+              />
+            );
+          }
+
+          if (key === 'portfolio') {
+            const s =
+              findSection(cmsSections, 'portfolio') ||
+              findSection(cmsSections, 'featured-assets') ||
+              findSection(cmsSections, 'portfolio_highlights') ||
+              findSection(cmsSections, 'portfolio_grid');
+            if (s && s.enabled === false) return null;
+            return (
+              <CinematicPortfolio
+                key="portfolio"
+                section={s}
+                onPlayVideo={setActiveModalVideo}
+              />
+            );
+          }
+
+          if (key === 'about') {
+            const s =
+              findSection(cmsSections, 'about') || findSection(cmsSections, 'about_me');
+            if (s && s.enabled === false) return null;
+            return <CinematicAbout key="about" section={s} />;
+          }
+
+          if (key === 'services') {
+            const s =
+              findSection(cmsSections, 'services') ||
+              findSection(cmsSections, 'services_cards') ||
+              findSection(cmsSections, 'home_services');
+            if (s && s.enabled === false) return null;
+            return <CinematicServices key="services" section={s} />;
+          }
+
+          if (key === 'contact') {
+            const s =
+              findSection(cmsSections, 'contact') || findSection(cmsSections, 'cta');
+            if (s && s.enabled === false) return null;
+            return <CinematicContact key="contact" section={s} />;
+          }
+
+          return null;
         })}
       </main>
-      <Footer />
-    </>
+
+      <CinematicFooter />
+
+      <CinematicModal
+        videoData={activeModalVideo}
+        onClose={() => setActiveModalVideo(null)}
+      />
+    </div>
   );
 };
-
-const HomeHeroVideo = ({ hero }) => {
-  const videoUrl = hero?.videoUrl;
-  if (!videoUrl) return null;
-
-  const videoType = firstText(hero?.mediaType, detectMediaType(videoUrl), 'video_file');
-  const posterUrl = firstText(hero?.posterUrl, hero?.thumbnailUrl, hero?.image);
-
-  return (
-    <section className="home-hero-video-section section-block relative z-10 px-4 sm:px-6 pt-0 overflow-hidden w-full max-w-full">
-      <div className="page-shell w-full max-w-6xl mx-auto px-0">
-        <div className="video-glow-card mx-auto max-w-6xl w-full">
-          <div className="video-glow-card__inner rounded-[20px] sm:rounded-[30px] border border-[var(--border-blue)] bg-black p-1.5 sm:p-2 shadow-2xl shadow-blue-950/40 w-full overflow-hidden">
-            <SafeVideoEmbed
-              videoType={videoType}
-              videoUrl={videoUrl}
-              title={hero?.headline || 'PranvithDOP hero video'}
-              posterUrl={posterUrl}
-              className="rounded-[24px]"
-              aspectRatio="aspect-video"
-              fit="cover"
-              autoPlay
-              muted
-              loop
-              showPlayOverlay={false}
-              loadWhenVisible={false}
-              thumbnailFetchPriority="high"
-            />
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-};
-
-const HomeCta = ({ section }) => (
-  <section className="section-block site-section--base px-6">
-    <div className="page-shell rounded-3xl border border-[var(--border-soft)] bg-[var(--panel-purple)] px-6 py-8 shadow-2xl shadow-black/20 md:px-10">
-      <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.3em] text-[var(--accent-purple)]">{section?.data?.eyebrow || 'PranvithDOP'}</p>
-          <h2 className="mt-3 text-2xl font-bold text-white md:text-4xl">{section?.title || 'Ready to create cinematic visuals?'}</h2>
-          <p className="mt-2 max-w-2xl text-sm text-white/65">{section?.description || 'Explore assets, courses, showreels, and production services built for serious creators.'}</p>
-        </div>
-        {(section?.button_text || section?.button_link) && (
-          <a href={safePublicHref(section?.button_link, '/hire')} className="group inline-flex shrink-0 items-center gap-3 rounded-full bg-accent-purple-strong px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-accent-purple">
-            {section?.button_text || 'Book a Project'}
-            <span className="flex h-5 w-5 items-center justify-center rounded-full bg-white/20 transition-transform group-hover:translate-x-0.5">
-              <ArrowRight size={11} />
-            </span>
-          </a>
-        )}
-      </div>
-    </div>
-  </section>
-);
-
-const SectionSkeleton = ({ compact = false }) => (
-  <section className={`home-section-skeleton section-block px-6 ${compact ? 'py-10' : ''}`.trim()} aria-hidden="true">
-    <div className="mx-auto max-w-7xl">
-      <div className="h-8 w-56 animate-pulse rounded-full bg-white/8" />
-      <div className="mt-6 grid gap-5 md:grid-cols-3">
-        {[0, 1, 2].map((item) => (
-          <div key={item} className="h-56 animate-pulse rounded-2xl border border-white/10 bg-white/[0.04]" />
-        ))}
-      </div>
-    </div>
-  </section>
-);
 
 export default Home;

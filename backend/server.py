@@ -2622,6 +2622,7 @@ async def _cms_page_response(page_key: str, public: bool = False) -> dict:
                 "video_url": section.get("video_url", ""),
                 "image_url": section.get("image_url", ""),
                 "thumbnail_url": section.get("thumbnail_url", ""),
+                "sort_order": section.get("sort_order", 0),
                 "data": section.get("data") or {},
             })
         safe_page["sections"] = public_sections

@@ -1,5 +1,5 @@
 import React, { Suspense, lazy } from 'react';
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import FloatingAiAssistant from './components/FloatingAiAssistant';
 
 const Home = lazy(() => import('./pages/Home'));
@@ -9,6 +9,7 @@ const Assets = lazy(() => import('./pages/Assets'));
 const AssetLanding = lazy(() => import('./pages/AssetLanding'));
 const Hire = lazy(() => import('./pages/Hire'));
 const Works = lazy(() => import('./pages/Works'));
+const Traditional = lazy(() => import('./pages/Traditional'));
 const Reels = lazy(() => import('./pages/Reels'));
 const Privacy = lazy(() => import('./pages/Privacy'));
 const ServicePage = lazy(() => import('./pages/ServicePage'));
@@ -42,6 +43,7 @@ const PublicApp = () => (
         <Route path="/payment-failed" element={<PaymentFailed />} />
         <Route path="/works" element={<Works />} />
         <Route path="/portfolio" element={<Works />} />
+        <Route path="/traditional" element={<Navigate to="/works" replace />} />
         <Route path="/reels" element={<Reels />} />
         <Route path="/hire" element={<Hire />} />
         <Route path="/contact" element={<Hire />} />

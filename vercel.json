@@ -31,8 +31,12 @@
       "dest": "/frontend/static/$1"
     },
     {
-      "src": "/assets/(.*\\.(png|jpg|jpeg|webp|gif|svg|ico))",
+      "src": "/assets/(.*\\.(png|jpg|jpeg|webp|gif|svg|ico|mp4|webm))",
       "dest": "/frontend/assets/$1"
+    },
+    {
+      "src": "/(.*\\.(mp4|webm))",
+      "dest": "/frontend/$1"
     },
     {
       "src": "/asset-manifest.json",

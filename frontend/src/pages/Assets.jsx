@@ -1,37 +1,37 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import Header from '../components/Header';
-import Footer from '../components/Footer';
-import { ChevronDown, Filter, Search, Share2 } from 'lucide-react';
-import { FALLBACK_IMAGE, dedupeCatalogItems, getCatalogItemKey, handleImageError, safeImageSrc, shareProduct, toProductDescriptionPreview } from '../lib/utils';
+import { Search, Share2 } from 'lucide-react';
+import '../styles/cinematic.css';
+import CinematicTopbar from '../components/cinematic/CinematicTopbar';
+import CinematicExperience from '../components/cinematic/CinematicExperience';
+import CinematicContact from '../components/cinematic/CinematicContact';
+import CinematicFooter from '../components/cinematic/CinematicFooter';
 import CheckoutModal from '../components/CheckoutModal';
 import { usePublicPageLoading } from '../components/PublicPageLoader';
 import { useCmsPage } from '../hooks/useCmsPage';
 import { useProducts } from '../hooks/useProducts';
 import OptimizedImage from '../components/OptimizedImage';
-import AssetCategoryFilter from '../components/AssetCategoryFilter';
-import HeroLightSticks from '../components/HeroLightSticks';
+import {
+  FALLBACK_IMAGE,
+  dedupeCatalogItems,
+  getCatalogItemKey,
+  handleImageError,
+  safeImageSrc,
+  shareProduct,
+  toProductDescriptionPreview,
+} from '../lib/utils';
 
-const assetCategories = [
-  'All Assets',
-  'Camera Settings',
-  'Editing Assets',
+const CATEGORIES = [
+  { key: 'all', label: 'ALL ASSETS' },
+  { key: 'camera', label: 'CAMERA SETTINGS' },
+  { key: 'editing', label: 'EDITING ASSETS' },
 ];
 
-const defaultBackgrounds = [
-  'linear-gradient(135deg, #024950 0%, #04383c 60%, #003135 100%)',
-  'linear-gradient(135deg, #04383c 0%, #003135 100%)',
-  'linear-gradient(135deg, #964734 0%, #0FA4AF 60%, #024950 100%)',
-  'linear-gradient(135deg, #003135 0%, #024950 60%, #003135 100%)',
-  'linear-gradient(135deg, #024950 0%, #04383c 60%, #003135 100%)',
-  'linear-gradient(135deg, #964734 0%, #024950 60%, #003135 100%)',
-  'linear-gradient(135deg, #04383c 0%, #024950 100%)',
-  'linear-gradient(135deg, #0FA4AF 0%, #024950 100%)',
+const PRICE_FILTERS = [
+  { key: 'all', label: 'ALL PRICES' },
+  { key: 'free', label: 'FREE' },
+  { key: 'paid', label: 'PAID' },
 ];
-
-const findSection = (sections = [], idOrType) =>
-  sections.find((section) => section.section_id === idOrType)
-  || sections.find((section) => section.type === idOrType);
 
 const getAssetCategory = (item, name) => {
   const rawCat = (item.category || '').trim();
@@ -51,36 +51,37 @@ const getAssetCategory = (item, name) => {
   return 'Editing Assets';
 };
 
-const getAssetSubcategory = (item, name) => {
-  return item.subcategory || item.sub_category || '';
-};
-
 const normalize = (item = {}, index) => {
   const numericPrice = Number(item.price ?? 0);
   const numericSalePrice = item.sale_price == null ? null : Number(item.sale_price);
-  const price = Number.isFinite(numericSalePrice) && numericSalePrice >= 0
-    ? numericSalePrice
-    : (Number.isFinite(numericPrice) && numericPrice >= 0 ? numericPrice : 0);
-  const original = Number.isFinite(numericPrice) && Number.isFinite(numericSalePrice) && numericPrice > numericSalePrice ? numericPrice : null;
+  const price =
+    Number.isFinite(numericSalePrice) && numericSalePrice >= 0
+      ? numericSalePrice
+      : Number.isFinite(numericPrice) && numericPrice >= 0
+      ? numericPrice
+      : 0;
+  const original =
+    Number.isFinite(numericPrice) &&
+    Number.isFinite(numericSalePrice) &&
+    numericPrice > numericSalePrice
+      ? numericPrice
+      : null;
   const name = item.name || item.title || 'Asset';
   const category = getAssetCategory(item, name);
-  const subcategory = getAssetSubcategory(item, name);
+  const subcategory = item.subcategory || item.sub_category || '';
   const slug = item.slug || item.id || `asset-${index}`;
   const heroImage = safeImageSrc(
-    item.thumbnail_url
-    || item.image_url
-    || item.preview_image_url
-    || item.cover_image_url
-    || item.hero_image
-    || FALLBACK_IMAGE,
+    item.thumbnail_url ||
+      item.image_url ||
+      item.preview_image_url ||
+      item.cover_image_url ||
+      item.hero_image ||
+      FALLBACK_IMAGE,
     FALLBACK_IMAGE
   );
-  const word = name.toUpperCase();
-  const parts = word.split(' ');
-  const headline = parts.slice(0, 2).join(' ') || word;
-  const subhead = parts.slice(2).join(' ') || category.toUpperCase();
+
   return {
-    id: item.id,
+    id: item.id || item._id,
     slug,
     name,
     title: name,
@@ -89,29 +90,25 @@ const normalize = (item = {}, index) => {
     sale_price: Number.isFinite(numericSalePrice) ? numericSalePrice : undefined,
     price,
     original,
-    isFree: price === 0 || item.is_free,
+    isFree: price === 0 || Boolean(item.is_free),
     isPaid: price > 0 && !item.is_free,
     createdAt: item.created_at || new Date().toISOString(),
-    bg: defaultBackgrounds[index % defaultBackgrounds.length],
     image: heroImage,
-    headline,
-    subhead,
-    badge: price === 0 || item.is_free ? 'FREE' : 'SALE!',
+    badge: price === 0 || item.is_free ? 'FREE' : 'PRO ASSET',
     description: toProductDescriptionPreview(item.short_description || item.description || ''),
   };
 };
 
 const Assets = () => {
   const navigate = useNavigate();
-  const { page: cmsPage, loading: cmsLoading } = useCmsPage('assets');
-  const [query, setQuery] = useState('');
-  const [sort, setSort] = useState('newest');
-  const [priceFilter, setPriceFilter] = useState('all');
-  const [selectedCategory, setSelectedCategory] = useState('All Assets');
+  const { page: cmsPage } = useCmsPage('assets');
   const { products: rawProducts, loading, error: loadError, refetch } = useProducts();
+
+  const [query, setQuery] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('all');
+  const [priceFilter, setPriceFilter] = useState('all');
+  const [sortOrder, setSortOrder] = useState('newest');
   const [checkoutProduct, setCheckoutProduct] = useState(null);
-  const [isMobileFilterOpen, setIsMobileFilterOpen] = useState(false);
-  const mobileFilterRef = useRef(null);
 
   const products = useMemo(() => {
     if (!Array.isArray(rawProducts)) return [];
@@ -124,199 +121,257 @@ const Assets = () => {
     const normalizedQuery = query.trim().toLowerCase();
     return products
       .filter((asset) => {
-        const matchesCategory = selectedCategory === 'All Assets'
-          || asset.category === selectedCategory
-          || (selectedCategory === 'Camera Settings' && (asset.category === 'Camera Setting' || asset.category === 'Camera Settings'))
-          || (selectedCategory === 'Editing Assets' && (asset.category === 'Editing Assets' || asset.category === 'Editing Asset'));
-        const matchesSearch = !normalizedQuery || asset.title.toLowerCase().includes(normalizedQuery);
-        const matchesPrice = priceFilter === 'all'
-          || (priceFilter === 'free' && asset.isFree)
-          || (priceFilter === 'paid' && asset.isPaid);
+        const matchesCategory =
+          selectedCategory === 'all' ||
+          (selectedCategory === 'camera' && asset.category === 'Camera Settings') ||
+          (selectedCategory === 'editing' && asset.category === 'Editing Assets');
+
+        const matchesSearch =
+          !normalizedQuery ||
+          asset.title.toLowerCase().includes(normalizedQuery) ||
+          asset.description.toLowerCase().includes(normalizedQuery);
+
+        const matchesPrice =
+          priceFilter === 'all' ||
+          (priceFilter === 'free' && asset.isFree) ||
+          (priceFilter === 'paid' && asset.isPaid);
 
         return matchesCategory && matchesSearch && matchesPrice;
       })
-      .sort((a, b) =>
-      sort === 'newest'
-        ? new Date(b.createdAt) - new Date(a.createdAt)
-        : new Date(a.createdAt) - new Date(b.createdAt)
-      );
-  }, [products, query, selectedCategory, sort, priceFilter]);
-  const settings = cmsPage?.settings || {};
-  const isDevelopment = process.env.NODE_ENV === 'development';
-  const fetchErrorMessage = loadError?.message || 'Unknown request error';
-  const fetchErrorStatus = loadError?.response?.status;
-  const pageHidden = cmsPage?.status === 'hidden';
-  const showProductListing = !pageHidden && settings.show_product_listing !== false;
-  const showFilters = settings.show_filters !== false;
-  const heroSection = findSection(cmsPage?.sections || [], 'hero');
-  const activeFilterCount = (query.trim() ? 1 : 0) + (sort !== 'newest' ? 1 : 0) + (priceFilter !== 'all' ? 1 : 0) + (selectedCategory !== 'All Assets' ? 1 : 0);
-  const mobileFilterPanelId = 'assets-mobile-filters';
-
-  const closeMobileFilters = () => setIsMobileFilterOpen(false);
-
-  const closeMobileFiltersIfNeeded = () => {
-    if (window.matchMedia?.('(max-width: 1023px)').matches) closeMobileFilters();
-  };
-
-  const resetFilters = () => {
-    setQuery('');
-    setSort('newest');
-    setPriceFilter('all');
-    setSelectedCategory('All Assets');
-  };
-
-  useEffect(() => {
-    if (!isMobileFilterOpen) return undefined;
-    const closeOnOutside = (event) => {
-      if (!mobileFilterRef.current?.contains(event.target)) closeMobileFilters();
-    };
-    document.addEventListener('mousedown', closeOnOutside);
-    document.addEventListener('touchstart', closeOnOutside, { passive: true });
-    return () => {
-      document.removeEventListener('mousedown', closeOnOutside);
-      document.removeEventListener('touchstart', closeOnOutside);
-    };
-  }, [isMobileFilterOpen]);
+      .sort((a, b) => {
+        if (sortOrder === 'newest') {
+          return new Date(b.createdAt) - new Date(a.createdAt);
+        }
+        return new Date(a.createdAt) - new Date(b.createdAt);
+      });
+  }, [products, query, selectedCategory, priceFilter, sortOrder]);
 
   return (
-    <>
-      <Header />
-      <main className="assets-page page min-h-screen bg-transparent text-white">
-        <div className="assets-page-bg hero-spectrum" aria-hidden="true">
-          <HeroLightSticks />
-          <div className="hero-spectrum__grid absolute inset-0 pointer-events-none" />
-        </div>
-        {!pageHidden && heroSection?.section_id && (
-          <section className="pb-8 pt-28 md:pt-32">
-            <div className="site-container">
-              <div className="cinematic-card rounded-[18px] px-5 py-6 sm:px-[34px] sm:py-7">
-                <h1 className="max-w-3xl text-[28px] font-bold leading-[1.1] tracking-tight sm:text-[clamp(30px,2.3vw,38px)]" data-testid="assets-page-title">{heroSection?.title || cmsPage?.title || 'Creative Assets Store'}</h1>
-                <p className="mt-2.5 max-w-2xl text-[15px] leading-relaxed text-white/65 sm:text-base">
-                  {heroSection?.subtitle || heroSection?.description || cmsPage?.subtitle || 'Premium LUTs, sound packs, motion templates and more - built for editors.'}
-                </p>
-              </div>
-            </div>
-          </section>
-        )}
+    <div className="cinematic-site">
+      <CinematicTopbar />
 
-        {showProductListing && <section className={`pb-20 ${heroSection?.section_id ? '' : 'pt-28 md:pt-32'}`}>
-          <div className="site-container min-w-0">
-            <AssetCategoryFilter
-              categories={assetCategories}
-              selectedCategory={selectedCategory}
-              onCategoryChange={setSelectedCategory}
-            />
+      <main id="main-content">
+        <section className="work" id="assets-store">
+          <div className="intro">
+            <p className="eyebrow">DIGITAL ASSETS &amp; TOOLS</p>
+            <h1>Creative Assets</h1>
+            <p className="lede">
+              {cmsPage?.subtitle ||
+                'Premium LUTs, sound packs, camera settings, and video editing tools crafted for filmmakers and creators.'}
+            </p>
+            <p className="hint">Instant digital download with one-click secure checkout.</p>
           </div>
-          <div className={`site-container mt-5 grid min-w-0 grid-cols-1 gap-5 ${showFilters ? 'lg:grid-cols-[240px_minmax(0,1fr)]' : ''}`}>
-            {showFilters && (
-              <div ref={mobileFilterRef} className="lg:hidden">
+
+          {/* Category filter pills */}
+          <div aria-label="Filter assets by category" className="filters" role="group">
+            {CATEGORIES.map((c) => (
+              <button
+                key={c.key}
+                type="button"
+                className={selectedCategory === c.key ? 'active' : ''}
+                aria-pressed={selectedCategory === c.key}
+                onClick={() => setSelectedCategory(c.key)}
+              >
+                {c.label}
+              </button>
+            ))}
+
+            <div style={{ marginLeft: 'auto', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              {PRICE_FILTERS.map((p) => (
                 <button
+                  key={p.key}
                   type="button"
-                  aria-expanded={isMobileFilterOpen}
-                  aria-controls={mobileFilterPanelId}
-                  onClick={() => setIsMobileFilterOpen((open) => !open)}
-                  className="flex w-full items-center justify-between rounded-[18px] border border-purple-300/20 bg-[linear-gradient(145deg,rgba(23,16,37,0.96),rgba(13,8,24,0.98))] px-4 py-3 text-left shadow-[0_0_45px_rgba(8,119,255,0.14)] transition hover:border-purple-300/35"
+                  className={priceFilter === p.key ? 'active' : ''}
+                  aria-pressed={priceFilter === p.key}
+                  onClick={() => setPriceFilter(p.key)}
+                  style={{
+                    fontSize: '9.5px',
+                    padding: '8px 16px',
+                    borderColor: priceFilter === p.key ? 'var(--accent)' : 'var(--line)',
+                  }}
                 >
-                  <span className="inline-flex items-center gap-3 text-sm font-semibold text-white">
-                    <span className="flex h-9 w-9 items-center justify-center rounded-2xl border border-purple-300/20 bg-purple-500/15 text-[#69adff]">
-                      <Filter size={17} />
-                    </span>
-                    Filters{activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}
-                  </span>
-                  <ChevronDown size={18} className={`text-[#69adff] transition-transform duration-300 ${isMobileFilterOpen ? 'rotate-180' : ''}`} />
+                  {p.label}
                 </button>
+              ))}
+
+              <button
+                type="button"
+                onClick={() => setSortOrder((prev) => (prev === 'newest' ? 'oldest' : 'newest'))}
+                style={{
+                  fontSize: '9.5px',
+                  padding: '8px 16px',
+                  borderColor: 'var(--line)',
+                }}
+              >
+                {sortOrder === 'newest' ? 'SORT: NEWEST ↓' : 'SORT: OLDEST ↑'}
+              </button>
+            </div>
+          </div>
+
+          {/* Search bar */}
+          <div style={{ marginBottom: '36px' }}>
+            <div className="asset-search-wrapper">
+              <Search size={15} className="asset-search-icon" />
+              <input
+                type="text"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search camera settings, LUTs, sound packs..."
+                className="asset-search-input"
+              />
+            </div>
+          </div>
+
+          {/* Product grid / states */}
+          {loading && products.length === 0 ? (
+            <div className="asset-grid">
+              {Array.from({ length: 8 }).map((_, i) => (
                 <div
-                  id={mobileFilterPanelId}
-                  className={`grid overflow-hidden transition-[grid-template-rows,opacity,margin] duration-300 ease-out ${
-                    isMobileFilterOpen ? 'mt-3 grid-rows-[1fr] opacity-100' : 'mt-0 grid-rows-[0fr] opacity-0'
-                  }`}
+                  key={i}
+                  style={{
+                    height: '380px',
+                    background: '#141312',
+                    borderRadius: '6px',
+                    border: '1px solid var(--line)',
+                    animation: 'pulse 1.8s infinite',
+                  }}
+                />
+              ))}
+            </div>
+          ) : loadError && products.length === 0 ? (
+            <div
+              style={{
+                textAlign: 'center',
+                padding: '60px 20px',
+                border: '1px solid var(--line)',
+                borderRadius: '6px',
+                background: '#141312',
+              }}
+            >
+              <p style={{ color: 'var(--muted)', marginBottom: '16px' }}>
+                We could not reach the asset catalogue.
+              </p>
+              <button
+                type="button"
+                className="pill"
+                onClick={() => refetch()}
+              >
+                RETRY NOW
+              </button>
+            </div>
+          ) : filteredAssets.length === 0 ? (
+            <div
+              style={{
+                textAlign: 'center',
+                padding: '70px 20px',
+                border: '1px solid var(--line)',
+                borderRadius: '6px',
+                background: '#141312',
+              }}
+            >
+              <h3 style={{ fontFamily: 'Georgia, serif', fontSize: '24px', marginBottom: '8px' }}>
+                No assets found
+              </h3>
+              <p style={{ color: 'var(--muted)', marginBottom: '22px' }}>
+                Try changing your search query or filters.
+              </p>
+              <button
+                type="button"
+                className="pill"
+                onClick={() => {
+                  setQuery('');
+                  setSelectedCategory('all');
+                  setPriceFilter('all');
+                }}
+              >
+                RESET FILTERS
+              </button>
+            </div>
+          ) : (
+            <div className="asset-grid">
+              {filteredAssets.map((p, index) => (
+                <div
+                  key={getCatalogItemKey(p, index)}
+                  className="asset-card"
+                  onClick={() => navigate(`/assets/${p.slug}`)}
                 >
-                  <div className="min-h-0 overflow-hidden">
-                    <div className="cinematic-card rounded-[18px] p-5">
-                      <FilterContent
-                        query={query}
-                        setQuery={setQuery}
-                        sort={sort}
-                        setSort={setSort}
-                        priceFilter={priceFilter}
-                        setPriceFilter={setPriceFilter}
-                        onOptionSelect={closeMobileFiltersIfNeeded}
-                        inputTestId="assets-search-input-mobile"
-                        radioNameSuffix="mobile"
-                      />
+                  <div className="asset-card-thumb">
+                    <OptimizedImage
+                      src={p.image}
+                      alt={p.title}
+                      width={600}
+                      height={400}
+                      fit="cover"
+                      fallback={FALLBACK_IMAGE}
+                      onError={handleImageError}
+                    />
+
+                    <span className={`asset-badge ${p.isFree ? 'free' : ''}`}>
+                      {p.badge}
+                    </span>
+
+                    <button
+                      type="button"
+                      className="asset-share-btn"
+                      aria-label={`Share ${p.title}`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        shareProduct(p);
+                      }}
+                    >
+                      <Share2 size={13} />
+                    </button>
+                  </div>
+
+                  <div className="asset-card-body">
+                    <span className="asset-card-category">{p.category}</span>
+                    <h3 className="asset-card-title">{p.title}</h3>
+                    {p.description && <p className="asset-card-desc">{p.description}</p>}
+
+                    <div className="asset-card-footer">
+                      <div>
+                        {p.original && (
+                          <span className="asset-price-original">
+                            ₹{p.original.toLocaleString('en-IN')}
+                          </span>
+                        )}
+                        <span className="asset-price">
+                          {p.isFree ? 'Free' : `₹${p.price.toLocaleString('en-IN')}`}
+                        </span>
+                      </div>
+
+                      <button
+                        type="button"
+                        className={`asset-action-btn ${p.isFree ? 'free' : ''}`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setCheckoutProduct(p);
+                        }}
+                      >
+                        {p.isFree ? 'GET FREE ↘' : 'BUY NOW ↗'}
+                      </button>
                     </div>
                   </div>
                 </div>
-              </div>
-            )}
-
-            {showFilters && (
-              <aside className="cinematic-card hidden h-fit rounded-[18px] p-[22px] lg:sticky lg:top-28 lg:block">
-                <FilterContent
-                  query={query}
-                  setQuery={setQuery}
-                  sort={sort}
-                  setSort={setSort}
-                  priceFilter={priceFilter}
-                  setPriceFilter={setPriceFilter}
-                  inputTestId="assets-search-input"
-                  radioNameSuffix="desktop"
-                />
-              </aside>
-            )}
-
-            <div className="min-w-0">
-              {loading && products.length === 0 ? (
-                <div className="grid grid-cols-2 gap-3 min-[768px]:gap-5 min-[1100px]:grid-cols-3 min-[1440px]:grid-cols-4 max-[374px]:grid-cols-1" aria-hidden="true">
-                  {Array.from({ length: 8 }).map((_, index) => (
-                    <div key={index} className="cinematic-card aspect-[3/4] animate-pulse rounded-[18px]" />
-                  ))}
-                </div>
-              ) : loadError && products.length === 0 ? (
-                <div className="rounded-2xl border border-rose-500/20 bg-rose-500/5 p-12 text-center text-white/70" data-testid="assets-error">
-                  <p>{navigator.onLine ? 'We could not reach the asset catalogue.' : 'You appear to be offline. Reconnect, then try again.'}</p>
-                  {isDevelopment && (
-                    <p className="mt-2 text-xs text-rose-200/80">
-                      {fetchErrorStatus ? `HTTP ${fetchErrorStatus}: ` : ''}{fetchErrorMessage}
-                    </p>
-                  )}
-                  <button type="button" onClick={() => refetch()} className="mt-5 rounded-full border border-white/20 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-white/10">
-                    Retry now
-                  </button>
-                </div>
-              ) : filteredAssets.length === 0 ? (
-                <div className="cinematic-card p-12 text-center text-white/60" data-testid="assets-empty">
-                  <h2 className="text-xl font-semibold text-white">No assets found</h2>
-                  <p className="mt-2">Try changing your category or filters.</p>
-                  <button
-                    type="button"
-                    onClick={resetFilters}
-                    className="mt-5 rounded-full border border-white/15 bg-white/[0.03] px-5 py-2.5 text-sm font-semibold text-white transition hover:border-purple-500/60 hover:bg-purple-500/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-300 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0a0518]"
-                  >
-                    Reset all filters
-                  </button>
-                </div>
-              ) : (
-                <div className="grid grid-cols-2 items-stretch gap-3 min-[768px]:gap-5 min-[1100px]:grid-cols-3 min-[1440px]:grid-cols-4 max-[374px]:grid-cols-1" data-testid="assets-grid">
-                  {filteredAssets.map((p, index) => (
-                    <ProductCard
-                      key={getCatalogItemKey(p, index)}
-                      p={p}
-                      onView={() => navigate(`/assets/${p.slug}`)}
-                      onBuy={() => setCheckoutProduct(p)}
-                    />
-                  ))}
-                </div>
-              )}
+              ))}
             </div>
-          </div>
+          )}
+
+          <p aria-live="polite" className="sr-only">
+            Showing {filteredAssets.length} assets
+          </p>
         </section>
-      }
+
+        <CinematicExperience />
+        <CinematicContact />
       </main>
-      <Footer />
+
+      <CinematicFooter />
+
+      {/* Preserve existing CheckoutModal with Razorpay & Free Order flow */}
       <CheckoutModal
         product={checkoutProduct}
-        open={!!checkoutProduct}
+        open={Boolean(checkoutProduct)}
         onClose={() => setCheckoutProduct(null)}
         onSuccess={(result) => {
           setCheckoutProduct(null);
@@ -324,7 +379,7 @@ const Assets = () => {
             orderId: result.orderId || '',
             paymentId: result.paymentId || '',
             token: result.downloadToken || '',
-            product: result.productSlug || checkoutProduct.slug,
+            product: result.productSlug || checkoutProduct?.slug || '',
           });
           navigate(`/payment-success?${params.toString()}`);
         }}
@@ -332,161 +387,15 @@ const Assets = () => {
           if (result?.failed && checkoutProduct?.slug) {
             const params = new URLSearchParams({
               product: checkoutProduct.slug,
-              message,
+              message: message || '',
               orderId: result.orderId || '',
             });
             navigate(`/payment-failed?${params.toString()}`);
           }
         }}
       />
-    </>
+    </div>
   );
 };
-
-const FilterContent = ({
-  query,
-  setQuery,
-  sort,
-  setSort,
-  priceFilter,
-  setPriceFilter,
-  onOptionSelect,
-  inputTestId,
-  radioNameSuffix,
-}) => {
-  const setSortAndClose = (value) => {
-    setSort(value);
-    onOptionSelect?.();
-  };
-
-  const setPriceAndClose = (value) => {
-    setPriceFilter(value);
-    onOptionSelect?.();
-  };
-
-  return (
-    <>
-      <h3 className="section-eyebrow mb-4 text-[11px]">FILTERS</h3>
-
-      <div className="relative mb-5">
-        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40" />
-        <input
-          type="text"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search assets..."
-          data-testid={inputTestId}
-          className="h-11 w-full rounded-lg border border-purple-300/20 bg-purple-500/10 pl-9 pr-3 text-sm text-white placeholder:text-white/35 focus:border-purple-300/35 focus:outline-none"
-        />
-      </div>
-
-      <div className="mb-5">
-        <p className="mb-2 text-[13px] font-semibold text-white">Sort By</p>
-        <RadioRow name={`sort-${radioNameSuffix}`} value="newest" checked={sort === 'newest'} onChange={() => setSortAndClose('newest')} label="Newest First" />
-        <RadioRow name={`sort-${radioNameSuffix}`} value="oldest" checked={sort === 'oldest'} onChange={() => setSortAndClose('oldest')} label="Oldest First" />
-      </div>
-
-      <div>
-        <p className="mb-2 text-[13px] font-semibold text-white">Price</p>
-        <RadioRow name={`price-${radioNameSuffix}`} value="all" checked={priceFilter === 'all'} onChange={() => setPriceAndClose('all')} label="All" />
-        <RadioRow name={`price-${radioNameSuffix}`} value="free" checked={priceFilter === 'free'} onChange={() => setPriceAndClose('free')} label="Free" />
-        <RadioRow name={`price-${radioNameSuffix}`} value="paid" checked={priceFilter === 'paid'} onChange={() => setPriceAndClose('paid')} label="Paid" />
-      </div>
-    </>
-  );
-};
-
-const RadioRow = ({ name, value, checked, onChange, label }) => (
-  <label className="group flex cursor-pointer items-center gap-2.5 rounded-lg py-1.5 transition hover:bg-purple-500/10">
-    <span className="relative inline-flex">
-      <input type="radio" name={name} value={value} checked={checked} onChange={onChange} className="sr-only" />
-      <span className={`h-4 w-4 rounded-full border-2 transition ${checked ? 'border-purple-300' : 'border-purple-300/30 group-hover:border-purple-300/50'}`} />
-      {checked && <span className="absolute inset-0 m-auto h-2 w-2 rounded-full bg-accent-purple" />}
-    </span>
-    <span className={`text-[13px] ${checked ? 'text-white' : 'text-white/75'}`}>{label}</span>
-  </label>
-);
-
-const ProductCard = ({ p, onView, onBuy }) => (
-  <div
-    onClick={onView}
-    data-testid={`asset-card-${p.slug}`}
-    className="cinematic-card group flex h-full min-w-0 cursor-pointer flex-col overflow-hidden rounded-[18px] transition-all duration-300 hover:-translate-y-1"
-  >
-    <div className="relative aspect-square h-auto w-full shrink-0 overflow-hidden bg-[#0a0e17] flex items-center justify-center p-2.5 sm:p-3">
-      {p.image ? (
-        <OptimizedImage
-          src={p.image}
-          alt={p.title}
-          width={640}
-          height={640}
-          fit="contain"
-          className="h-full w-full object-contain object-center rounded-xl transition duration-500 group-hover:scale-[1.02]"
-          fallback={FALLBACK_IMAGE}
-          onError={handleImageError}
-        />
-      ) : (
-        <div className="absolute inset-0" style={{ background: p.bg }} />
-      )}
-      <div className="pointer-events-none absolute -inset-1 opacity-20" style={{
-        background: 'linear-gradient(115deg, transparent 40%, rgba(255,255,255,0.12) 50%, transparent 60%)'
-      }} />
-      {!p.image && (
-        <div className="absolute inset-0 flex items-center justify-center px-6">
-          <div className="text-center">
-            <p className="text-3xl font-black leading-tight tracking-tight text-white/90 drop-shadow-[0_4px_20px_rgba(0,0,0,0.6)] md:text-4xl">
-              {p.headline}
-            </p>
-            <p className="mt-2 text-lg font-bold tracking-wide text-white/85 drop-shadow-[0_4px_20px_rgba(0,0,0,0.6)] md:text-xl">
-              {p.subhead}
-            </p>
-          </div>
-        </div>
-      )}
-      <span className={`absolute left-2.5 top-2.5 inline-flex h-7 items-center rounded-full px-2.5 text-[10px] font-bold tracking-wider sm:text-[11px] ${
-        p.isFree ? 'bg-[#3b82f6] text-white' : 'bg-gradient-to-r from-[#3b82f6] to-[#2563eb] text-white'
-      }`}>
-        {p.badge}
-      </span>
-      <button
-        type="button"
-        aria-label={`Share ${p.title}`}
-        onClick={(e) => {
-          e.stopPropagation();
-          shareProduct(p);
-        }}
-        className="absolute right-2.5 top-2.5 inline-flex h-9 w-9 items-center justify-center rounded-full border border-[#3b82f6]/20 bg-black/55 text-white/90 backdrop-blur transition hover:border-[#3b82f6]/35 hover:bg-[#3b82f6]/30"
-      >
-        <Share2 size={15} />
-      </button>
-    </div>
-    <div className="flex flex-1 flex-col p-3 sm:p-4">
-      <div className="mb-2 inline-flex w-fit rounded-full border border-[#3b82f6]/20 bg-[#3b82f6]/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#93c5fd] sm:text-[11px]">
-        {p.category}
-      </div>
-      <h3 className="line-clamp-2 text-[13px] font-semibold leading-[1.35] text-white sm:text-[17px]">{p.title}</h3>
-      {p.description ? (
-        <p className="mt-2 line-clamp-2 text-xs leading-relaxed text-white/55 sm:text-[13px]">{p.description}</p>
-      ) : (
-        <div className="mt-2 h-10" />
-      )}
-      <div className="mb-4 mt-3 flex flex-wrap items-center gap-1.5 sm:gap-2">
-        {p.original && (
-          <span className="text-xs text-white/40 line-through sm:text-[13px]">Rs {p.original.toLocaleString('en-IN')}.00</span>
-        )}
-        <span className="text-sm font-bold text-white sm:text-lg">
-          {p.isFree ? 'Free' : `Rs ${p.price.toLocaleString('en-IN')}.00`}
-        </span>
-      </div>
-      <button
-        onClick={(e) => { e.stopPropagation(); p.isFree ? onView() : onBuy(); }}
-        data-testid={`view-asset-btn-${p.slug}`}
-        className="mt-auto inline-flex w-full items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-[#3b82f6] to-[#2563eb] hover:from-[#2563eb] hover:to-[#1d4ed8] py-2 text-xs font-semibold text-white transition-all duration-300 shadow-[0_4px_16px_rgba(59,130,246,0.3)] sm:text-[13px]"
-      >
-        {p.isFree ? 'Get Free' : 'Buy Now'}
-      </button>
-    </div>
-  </div>
-);
 
 export default Assets;

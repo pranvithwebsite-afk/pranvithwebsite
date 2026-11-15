@@ -25,7 +25,7 @@ const sessionCache = new Map();
 const cachedRequest = async (key, request, ttlMs = 5 * 60 * 1000) => {
   const now = Date.now();
   const cached = sessionCache.get(key);
-  if (cached && cached.expires > now) {
+  if (cached && 'value' in cached && cached.expires > now) {
     return cached.value;
   }
   if (cached?.promise) return cached.promise;

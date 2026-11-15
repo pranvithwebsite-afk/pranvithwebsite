@@ -1,7 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import Header from '../components/Header';
-import Footer from '../components/Footer';
+import '../styles/cinematic.css';
+import CinematicTopbar from '../components/cinematic/CinematicTopbar';
+import CinematicFooter from '../components/cinematic/CinematicFooter';
 import {
   X,
   ChevronLeft,
@@ -275,7 +276,11 @@ const AssetLanding = () => {
     fetchProductBySlug(slug)
       .then((response) => {
         if (!active) return;
-        setProduct(response && typeof response === 'object' ? response : {});
+        if (!response || typeof response !== 'object' || (!response.name && !response.title && !response.slug)) {
+          setNotFound(true);
+          return;
+        }
+        setProduct(response);
         if (response?.seo_title) {
           document.title = response.seo_title;
         }
@@ -370,8 +375,8 @@ const AssetLanding = () => {
   };
 
   return (
-    <>
-      <Header />
+    <div className="cinematic-site" style={{ background: 'var(--bg)', minHeight: '100vh' }}>
+      <CinematicTopbar />
       <main className="page min-h-screen bg-transparent text-white">
         {loading ? (
           <section className="px-6 pb-16 pt-32 md:pt-36">
@@ -625,7 +630,7 @@ const AssetLanding = () => {
           </>
         )}
       </main>
-      <Footer />
+      <CinematicFooter />
       <CheckoutModal
         product={product}
         open={checkoutOpen}
@@ -655,7 +660,7 @@ const AssetLanding = () => {
         open={shareOpen}
         onClose={() => setShareOpen(false)}
       />
-    </>
+    </div>
   );
 };
 
