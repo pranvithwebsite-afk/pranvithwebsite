@@ -3,8 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { Search, Share2 } from 'lucide-react';
 import '../styles/cinematic.css';
 import CinematicTopbar from '../components/cinematic/CinematicTopbar';
-import CinematicExperience from '../components/cinematic/CinematicExperience';
-import CinematicContact from '../components/cinematic/CinematicContact';
 import CinematicFooter from '../components/cinematic/CinematicFooter';
 import CheckoutModal from '../components/CheckoutModal';
 import { usePublicPageLoading } from '../components/PublicPageLoader';
@@ -361,9 +359,6 @@ const Assets = () => {
             Showing {filteredAssets.length} assets
           </p>
         </section>
-
-        <CinematicExperience />
-        <CinematicContact />
       </main>
 
       <CinematicFooter />
