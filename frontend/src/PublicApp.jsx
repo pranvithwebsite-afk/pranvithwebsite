@@ -9,7 +9,6 @@ const Assets = lazy(() => import('./pages/Assets'));
 const AssetLanding = lazy(() => import('./pages/AssetLanding'));
 const Hire = lazy(() => import('./pages/Hire'));
 const Works = lazy(() => import('./pages/Works'));
-const Traditional = lazy(() => import('./pages/Traditional'));
 const Reels = lazy(() => import('./pages/Reels'));
 const Privacy = lazy(() => import('./pages/Privacy'));
 const ServicePage = lazy(() => import('./pages/ServicePage'));
