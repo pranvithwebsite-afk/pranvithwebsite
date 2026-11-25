@@ -5339,9 +5339,9 @@ ALLOWED_UPLOAD_TYPES = {
 }
 
 R2_IMAGE_TYPES = {
-    ".jpeg": {"image/jpeg"},
-    ".jpg": {"image/jpeg"},
-    ".png": {"image/png"},
+    ".jpeg": {"image/jpeg", "image/pjpeg"},
+    ".jpg": {"image/jpeg", "image/jpg", "image/pjpeg"},
+    ".png": {"image/png", "image/x-png"},
     ".webp": {"image/webp"},
 }
 R2_VIDEO_TYPES = {
@@ -5353,8 +5353,11 @@ R2_PRIVATE_TYPES = {
     ".7z": {"application/x-7z-compressed", "application/octet-stream"},
     ".cube": {"application/octet-stream", "text/plain", "application/x-cube"},
     ".drp": {"application/octet-stream", "application/x-davinci-resolve-project"},
+    ".jpeg": {"image/jpeg", "image/pjpeg", "application/octet-stream"},
+    ".jpg": {"image/jpeg", "image/jpg", "image/pjpeg", "application/octet-stream"},
     ".mp4": {"video/mp4"},
     ".pdf": {"application/pdf"},
+    ".png": {"image/png", "image/x-png", "application/octet-stream"},
     ".prproj": {"application/octet-stream", "application/x-premiere-project"},
     ".rar": {"application/vnd.rar", "application/x-rar-compressed", "application/octet-stream"},
     ".xmp": {"application/octet-stream", "application/xml", "text/xml", "text/plain"},

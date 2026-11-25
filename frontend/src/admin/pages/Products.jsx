@@ -1382,7 +1382,7 @@ const PrivateDownloadSection = ({
     </div>
     <UploadButton
       label="Upload Private File"
-      accept=".zip,.rar,.7z,.prproj,.drp,.cube,.xmp,.pdf,.mp4,application/zip,application/pdf,video/mp4"
+      accept=".zip,.rar,.7z,.prproj,.drp,.cube,.xmp,.pdf,.mp4,.jpg,.jpeg,.png,application/zip,application/pdf,video/mp4,image/jpeg,image/png"
       disabled={uploading}
       progress={progress}
       onFile={onUpload}

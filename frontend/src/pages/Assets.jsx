@@ -298,8 +298,8 @@ const Assets = () => {
                       src={p.image}
                       alt={p.title}
                       width={600}
-                      height={400}
-                      fit="cover"
+                      height={450}
+                      fit="contain"
                       fallback={FALLBACK_IMAGE}
                       onError={handleImageError}
                     />
